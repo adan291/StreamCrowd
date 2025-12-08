@@ -1,0 +1,5 @@
+{
+  "name": "TwitchVote Live",
+  "description": "Herramienta de votación en tiempo real integrada con el chat de Twitch. Permite a los streamers crear encuestas y a los viewers votar escribiendo +1, +2, etc.",
+  "requestFramePermissions": []
+}
