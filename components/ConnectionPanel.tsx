@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ConnectionStatus } from '../types';
 import { Button } from './Button';
-import { Wifi, Loader2, KeyRound, Link as LinkIcon, Check, AlertCircle } from 'lucide-react';
+import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
 interface ConnectionPanelProps {
@@ -77,6 +77,9 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
     }
   }, [isUrlDetected]);
 
+  // Combine local validation errors with service errors
+  const displayError = localError || errorMessage;
+
   if (status === ConnectionStatus.CONNECTED) return null;
 
   return (
@@ -92,7 +95,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       
       <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white tracking-tight">Vincular Chat</h2>
       <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm">
-          Ingresa el canal para conectar al chat.
+          Ingresa el canal para conectar al chat en tiempo real.
       </p>
       
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,10 +152,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
         </Button>
       </form>
       
-      {(errorMessage || localError) && (
-        <div className="mt-4 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-medium bg-red-100 dark:bg-red-500/10 py-2 px-3 rounded-lg border border-red-200 dark:border-red-500/20 text-left animate-shake">
+      {displayError && (
+        <div className="mt-4 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-medium bg-red-100 dark:bg-red-500/10 py-3 px-3 rounded-lg border border-red-200 dark:border-red-500/20 text-left animate-shake">
           <AlertCircle size={16} className="shrink-0" />
-          <span className="break-words w-full">{localError || errorMessage}</span>
+          <div className="flex flex-col">
+             <span className="font-bold">Error de conexión:</span>
+             <span className="break-words w-full">{displayError}</span>
+          </div>
         </div>
       )}
     </div>

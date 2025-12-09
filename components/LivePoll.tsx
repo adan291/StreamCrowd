@@ -152,9 +152,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
 
   const tickColor = theme === 'dark' || isOverlay ? '#a1a1aa' : '#52525b';
   
-  // Container Classes
+  // Container Classes - Overlay variant is transparent and stripped of padding
   const containerClasses = isOverlay 
-    ? "h-screen w-screen bg-transparent p-8 overflow-hidden" 
+    ? "h-screen w-screen bg-transparent p-4 md:p-8 overflow-hidden flex flex-col justify-center" 
     : "h-full flex flex-col animate-[fadeIn_0.5s_ease-out] relative overflow-hidden p-4 md:p-6";
 
   const chartHeightClass = isOverlay ? "flex-1 min-h-[400px]" : isPreview ? "h-[200px]" : "h-[250px] lg:h-auto";
@@ -194,12 +194,12 @@ export const LivePoll: React.FC<LivePollProps> = ({
              )}
           </div>
           
-          <h2 className={`font-bold text-zinc-900 dark:text-white leading-tight ${isOverlay ? 'text-4xl md:text-5xl drop-shadow-md text-white' : 'text-xl md:text-2xl'}`}>
+          <h2 className={`font-bold text-zinc-900 dark:text-white leading-tight ${isOverlay ? 'text-4xl md:text-5xl drop-shadow-md text-white text-center w-full' : 'text-xl md:text-2xl'}`}>
             {poll.question}
           </h2>
           
-          <div className={`flex flex-wrap items-center gap-4 text-zinc-500 dark:text-zinc-400 text-sm mt-2 ${isOverlay ? 'text-zinc-200' : ''}`}>
-            <span className={`flex items-center gap-1 px-2 py-1 rounded ${isOverlay ? 'bg-black/50 text-white text-lg' : 'bg-zinc-200/50 dark:bg-zinc-800/50'}`}>
+          <div className={`flex flex-wrap items-center gap-4 text-zinc-500 dark:text-zinc-400 text-sm mt-2 ${isOverlay ? 'text-zinc-200 justify-center' : ''}`}>
+            <span className={`flex items-center gap-1 px-2 py-1 rounded ${isOverlay ? 'bg-black/50 text-white text-lg font-bold' : 'bg-zinc-200/50 dark:bg-zinc-800/50'}`}>
               <Users size={isOverlay ? 24 : 14} /> {poll.totalVotes} votos
             </span>
             
@@ -208,14 +208,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 <Target size={14} /> Meta: {maxVoteLimit}
               </span>
             )}
-
-            {poll.isActive && (
-              <span className={`flex items-center gap-1 text-green-600 dark:text-green-400 animate-pulse px-2 py-1 rounded ${isOverlay ? 'bg-black/50 font-bold' : 'bg-green-500/10 border border-green-500/20'}`}>
-                <span className="w-2 h-2 bg-green-500 rounded-full"/> {isOverlay ? 'EN VIVO' : 'En vivo'}
-              </span>
-            )}
             {!poll.isActive && (
-                <span className={`text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded ${isOverlay ? 'bg-black/50 text-white' : 'bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700'}`}>
+                <span className={`text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded ${isOverlay ? 'bg-black/50 text-white text-lg' : 'bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700'}`}>
                     Finalizada
                 </span>
             )}
@@ -258,7 +252,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
         
         {/* Winner Overlay */}
         {winner && showWinnerOverlay && !poll.isActive && (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/95 dark:bg-black/90 backdrop-blur-md rounded-lg animate-fade-in p-4 text-center">
+            <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg animate-fade-in p-4 text-center ${isOverlay ? 'bg-transparent' : 'bg-white/95 dark:bg-black/90 backdrop-blur-md'}`}>
                 {!isOverlay && (
                     <div className="absolute top-0 right-0 p-4">
                         <button onClick={() => setShowWinnerOverlay(false)} className="text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 text-xs">
@@ -267,16 +261,16 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     </div>
                 )}
                 <div className="mb-4 animate-bounce">
-                    <Trophy size={isOverlay ? 100 : 48} className="text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
+                    <Trophy size={isOverlay ? 120 : 48} className="text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
                 </div>
                 
-                <h3 className={`${isOverlay ? 'text-6xl mb-6' : 'text-4xl mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-widest drop-shadow-sm`}>
+                <h3 className={`${isOverlay ? 'text-7xl mb-8' : 'text-4xl mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-widest drop-shadow-sm`}>
                     ¡Ganador!
                 </h3>
 
                 <div className="relative mb-8 group">
                     <div className="absolute -inset-8 bg-gradient-to-r from-yellow-500/30 to-purple-600/30 rounded-full blur-2xl opacity-75 animate-spin-slow"></div>
-                    <div className={`relative ${isOverlay ? 'w-80 h-80 border-8' : 'w-48 h-48 border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_50px_rgba(250,204,21,0.4)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center`}>
+                    <div className={`relative ${isOverlay ? 'w-96 h-96 border-8' : 'w-48 h-48 border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_50px_rgba(250,204,21,0.4)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center`}>
                         {winner.image ? (
                             <img src={winner.image} alt="Winner" className="w-full h-full object-cover" />
                         ) : (
@@ -285,10 +279,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     </div>
                 </div>
 
-                <h2 className={`${isOverlay ? 'text-5xl text-white' : 'text-3xl text-zinc-900 dark:text-white'} font-bold leading-tight mb-2 px-4 drop-shadow-md`}>
+                <h2 className={`${isOverlay ? 'text-6xl text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]' : 'text-3xl text-zinc-900 dark:text-white'} font-bold leading-tight mb-2 px-4`}>
                    {winner.label}
                 </h2>
-                <p className={`${isOverlay ? 'text-2xl text-zinc-300' : 'text-sm text-zinc-500 dark:text-zinc-400'} font-mono`}>{winner.votes} Votos</p>
+                <p className={`${isOverlay ? 'text-4xl text-yellow-300 drop-shadow-md font-bold' : 'text-sm text-zinc-500 dark:text-zinc-400'} font-mono`}>{winner.votes} Votos</p>
             </div>
         )}
 
@@ -301,24 +295,24 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 stroke={tickColor} 
                 tick={({ x, y, payload }) => {
                     const opt = data.find(d => d.name === payload.value);
-                    const size = isOverlay ? 60 : 32;
-                    const fontSizeIcon = isOverlay ? 40 : 20;
-                    const fontSizeText = isOverlay ? 20 : 12;
-                    const dyIcon = isOverlay ? 40 : 25;
-                    const dyText = isOverlay ? 80 : (opt?.image ? 50 : 45);
+                    const size = isOverlay ? 70 : 32;
+                    const fontSizeIcon = isOverlay ? 50 : 20;
+                    const fontSizeText = isOverlay ? 24 : 12;
+                    const dyIcon = isOverlay ? 45 : 25;
+                    const dyText = isOverlay ? 90 : (opt?.image ? 50 : 45);
 
                     return (
                         <g transform={`translate(${x},${y})`} style={{ cursor: 'default' }}>
                             {opt?.image ? (
                                 <foreignObject x={-size/2} y={5} width={size} height={size}>
-                                   <img src={opt.image} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: isOverlay ? '2px solid white' : 'none' }} alt="" />
+                                   <img src={opt.image} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: isOverlay ? '3px solid white' : 'none' }} alt="" />
                                 </foreignObject>
                             ) : (
                                 <text x={0} y={0} dy={dyIcon} textAnchor="middle" fill={tickColor} fontSize={fontSizeIcon}>
                                     {opt?.icon || ''}
                                 </text>
                             )}
-                            <text x={0} y={0} dy={dyText} textAnchor="middle" fill={isOverlay ? '#fff' : tickColor} fontSize={fontSizeText} fontWeight={isOverlay ? 700 : 600} style={{ textShadow: isOverlay ? '0 2px 4px rgba(0,0,0,0.5)' : 'none' }}>
+                            <text x={0} y={0} dy={dyText} textAnchor="middle" fill={isOverlay ? '#fff' : tickColor} fontSize={fontSizeText} fontWeight={isOverlay ? 700 : 600} style={{ textShadow: isOverlay ? '0 2px 4px rgba(0,0,0,0.8)' : 'none' }}>
                                 {payload.value}
                             </text>
                         </g>
@@ -326,7 +320,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 }}
                 tickLine={false}
                 axisLine={false}
-                height={isOverlay ? 100 : 60}
+                height={isOverlay ? 120 : 60}
               />
               <YAxis hide domain={[0, 'auto']} allowDecimals={false} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
@@ -349,7 +343,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
         </div>
 
         {/* Legend */}
-        <div className={`space-y-3 overflow-y-auto pr-1 custom-scrollbar ${isOverlay ? 'grid grid-cols-2 gap-4 space-y-0' : ''}`}>
+        <div className={`space-y-3 overflow-y-auto pr-1 custom-scrollbar ${isOverlay ? 'grid grid-cols-2 gap-4 space-y-0 content-center' : ''}`}>
           {poll.options.map((opt) => {
             const percentage = poll.totalVotes > 0 ? ((opt.votes / poll.totalVotes) * 100).toFixed(1) : "0.0";
             const isWinner = !poll.isActive && winner?.id === opt.id && opt.votes > 0;
@@ -367,7 +361,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 <div className="flex justify-between items-center mb-1 relative z-10">
                   <div className="flex items-center gap-3 overflow-hidden">
                     <span 
-                      className={`rounded-lg flex items-center justify-center font-bold text-black shadow-sm shrink-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800 ${isOverlay ? 'w-12 h-12 text-lg' : 'w-10 h-10 text-xs'}`}
+                      className={`rounded-lg flex items-center justify-center font-bold text-black shadow-sm shrink-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800 ${isOverlay ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-xs'}`}
                       style={{ backgroundColor: opt.image ? 'transparent' : opt.color }}
                     >
                       {opt.image ? (
@@ -376,12 +370,12 @@ export const LivePoll: React.FC<LivePollProps> = ({
                           <span>+{opt.id}</span>
                       )}
                     </span>
-                    <span className={`font-medium truncate ${isOverlay ? 'text-xl text-white drop-shadow-md' : 'text-zinc-900 dark:text-zinc-200'}`}>
+                    <span className={`font-medium truncate ${isOverlay ? 'text-2xl text-white drop-shadow-md font-bold' : 'text-zinc-900 dark:text-zinc-200'}`}>
                       {opt.label}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className={`font-bold tabular-nums ${isOverlay ? 'text-2xl text-white' : 'text-zinc-900 dark:text-white'}`}>{percentage}%</span>
+                      <span className={`font-bold tabular-nums ${isOverlay ? 'text-3xl text-white drop-shadow-md' : 'text-zinc-900 dark:text-white'}`}>{percentage}%</span>
                       {isDefault && (
                         <button onClick={() => shareOption(opt, percentage)} className="text-zinc-400 hover:text-white transition-colors">
                            {copiedOptionId === opt.id ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
@@ -398,7 +392,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                   />
                 </div>
                 
-                <div className={`text-right ${isOverlay ? 'text-sm text-zinc-300' : 'text-xs text-zinc-500'} mt-1 relative z-10 flex justify-end items-center gap-1`}>
+                <div className={`text-right ${isOverlay ? 'text-lg text-zinc-300 font-bold' : 'text-xs text-zinc-500'} mt-1 relative z-10 flex justify-end items-center gap-1`}>
                   {opt.votes} votos
                 </div>
 

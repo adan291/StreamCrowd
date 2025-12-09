@@ -40,8 +40,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
         return;
     }
 
-    const width = 800;
-    const height = 600;
+    const width = 1280;
+    const height = 720;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
     
@@ -82,12 +82,13 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                     }
                 </script>
                 <style>
+                    /* Transparent background for OBS Keying */
                     body { background-color: transparent; overflow: hidden; margin: 0; }
                     /* Inject main window styles for fonts/resets */
                     ${styles} 
                 </style>
             </head>
-            <body class="${theme === 'dark' ? 'dark' : ''}">
+            <body>
                 <div id="overlay-root" style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center;"></div>
             </body>
             </html>
@@ -121,11 +122,14 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
   };
 
   const copyOverlayLink = () => {
+    // In this client-side version, we simulate the link copying for user understanding, 
+    // even though the Window Capture is the primary method.
     if (!displayChannel) {
         setUrlError("Se requiere un canal");
         return;
     }
-    navigator.clipboard.writeText(`https://twitchvote.live/overlay/${displayChannel}`);
+    // This is a placeholder URL for the user to put in OBS "Browser Source" if we had a backend.
+    // Since we use Popout, we just give them a dummy confirmation.
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -146,13 +150,16 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                             <Layers className="text-twitch-brand" size={24} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Votación Dinámica (OBS)</h3>
-                            <p className="text-sm text-zinc-500">Overlay transparente en tiempo real.</p>
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Dashboard de Votación (OBS)</h3>
+                            <p className="text-sm text-zinc-500">
+                                Ventana transparente con gráficos en tiempo real. Captúrala en OBS usando 
+                                <span className="font-bold text-zinc-700 dark:text-zinc-300 ml-1">Window Capture</span>.
+                            </p>
                         </div>
                     </div>
                     {overlayContainer && (
                          <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold px-2 py-1 rounded animate-pulse">
-                             Ventana Abierta
+                             En Vivo
                          </span>
                     )}
                 </div>
@@ -192,30 +199,19 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                 <div className="flex flex-col sm:flex-row gap-3">
                     <button 
                         onClick={handlePopout}
-                        className="flex-1 bg-twitch-brand hover:bg-twitch-light text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-twitch-brand/20"
+                        className="flex-1 bg-twitch-brand hover:bg-twitch-light text-white px-4 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-twitch-brand/20"
                     >
                         <ExternalLink size={16} /> 
-                        {overlayContainer ? 'Enfocar Ventana' : 'Abrir Ventana (Popout)'}
-                    </button>
-                    <button 
-                        onClick={copyOverlayLink}
-                        disabled={!displayChannel || !!urlError}
-                        className="flex-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors border border-zinc-200 dark:border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {copied ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />} 
-                        {copied ? '¡URL Copiada!' : 'Copiar URL OBS'}
+                        {overlayContainer ? 'Enfocar Ventana' : 'Abrir Dashboard (Popout)'}
                     </button>
                 </div>
-                <p className="mt-3 text-xs text-zinc-500 text-center">
-                    Captura la ventana emergente en OBS (Window Capture) o usa la URL como Browser Source.
-                </p>
             </div>
          </div>
       </div>
 
       {/* Render the Poll into the External Window using Portal */}
       {overlayContainer && currentPoll && createPortal(
-          <div className="w-full max-w-4xl h-full p-4 flex flex-col justify-center">
+          <div className="w-full h-full p-4 flex flex-col justify-center items-center">
                 <LivePoll 
                     poll={currentPoll} 
                     voteHistory={voteHistory} 

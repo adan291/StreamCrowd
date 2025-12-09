@@ -200,7 +200,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
       <div className={`absolute inset-0 z-10 pointer-events-none flex flex-col justify-between transition-opacity duration-300 ${overlayVisibility}`}>
         <div className="bg-gradient-to-b from-black/80 to-transparent p-3 flex justify-between items-start pointer-events-auto">
            {isLive === true ? (
-             <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-lg tracking-wider">
+             <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-lg tracking-wider border border-red-500">
                 <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
              </span>
            ) : (
