@@ -17,15 +17,26 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
   const [manualChannel, setManualChannel] = useState('');
   const [urlError, setUrlError] = useState('');
   
-  // State for the external popout window
-  const [externalWindow, setExternalWindow] = useState<Window | null>(null);
+  // State for the portal target container
+  const [overlayContainer, setOverlayContainer] = useState<HTMLElement | null>(null);
+  // Ref for the window object to manage focus/closing
+  const overlayWindowRef = useRef<Window | null>(null);
 
   const displayChannel = channelName || manualChannel;
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+        if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
+            overlayWindowRef.current.close();
+        }
+    };
+  }, []);
+
   const handlePopout = () => {
     // If already open, focus it
-    if (externalWindow && !externalWindow.closed) {
-        externalWindow.focus();
+    if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
+        overlayWindowRef.current.focus();
         return;
     }
 
@@ -41,6 +52,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
     );
 
     if (newWindow) {
+        overlayWindowRef.current = newWindow;
+
         // Copy Styles from main window to popout to ensure Tailwind works
         const styles = Array.from(document.styleSheets)
             .map(styleSheet => {
@@ -50,6 +63,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
             })
             .join('\n');
 
+        newWindow.document.open();
         newWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -74,18 +88,23 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                 </style>
             </head>
             <body class="${theme === 'dark' ? 'dark' : ''}">
-                <div id="overlay-root"></div>
+                <div id="overlay-root" style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center;"></div>
             </body>
             </html>
         `);
         newWindow.document.close();
         
+        // Get the specific container for the portal
+        const container = newWindow.document.getElementById('overlay-root');
+        if (container) {
+            setOverlayContainer(container);
+        }
+
         // Setup listener to clear state when window closes
         newWindow.onbeforeunload = () => {
-            setExternalWindow(null);
+            setOverlayContainer(null);
+            overlayWindowRef.current = null;
         };
-
-        setExternalWindow(newWindow);
     } else {
         alert("Por favor, permite ventanas emergentes.");
     }
@@ -131,7 +150,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                             <p className="text-sm text-zinc-500">Overlay transparente en tiempo real.</p>
                         </div>
                     </div>
-                    {externalWindow && (
+                    {overlayContainer && (
                          <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold px-2 py-1 rounded animate-pulse">
                              Ventana Abierta
                          </span>
@@ -176,7 +195,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                         className="flex-1 bg-twitch-brand hover:bg-twitch-light text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-twitch-brand/20"
                     >
                         <ExternalLink size={16} /> 
-                        {externalWindow ? 'Enfocar Ventana' : 'Abrir Ventana (Popout)'}
+                        {overlayContainer ? 'Enfocar Ventana' : 'Abrir Ventana (Popout)'}
                     </button>
                     <button 
                         onClick={copyOverlayLink}
@@ -195,20 +214,18 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
       </div>
 
       {/* Render the Poll into the External Window using Portal */}
-      {externalWindow && currentPoll && createPortal(
-          <div className="h-screen w-screen flex flex-col items-center justify-center p-4">
-               <div className="w-full max-w-4xl h-full">
-                    <LivePoll 
-                        poll={currentPoll} 
-                        voteHistory={voteHistory} 
-                        onStop={()=>{}} 
-                        onReset={()=>{}} 
-                        theme={theme}
-                        variant="overlay"
-                    />
-               </div>
+      {overlayContainer && currentPoll && createPortal(
+          <div className="w-full max-w-4xl h-full p-4 flex flex-col justify-center">
+                <LivePoll 
+                    poll={currentPoll} 
+                    voteHistory={voteHistory} 
+                    onStop={()=>{}} 
+                    onReset={()=>{}} 
+                    theme={theme}
+                    variant="overlay"
+                />
           </div>,
-          externalWindow.document.body
+          overlayContainer
       )}
     </div>
   );

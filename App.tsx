@@ -473,7 +473,7 @@ const App: React.FC = () => {
 
                           {/* OVERLAYS */}
                           <div className={`h-full ${leftTab === 'overlays' ? '' : 'hidden'}`}>
-                              <Overlays currentPoll={currentPoll} voteHistory={voteHistory} theme={theme} />
+                              <Overlays currentPoll={currentPoll} voteHistory={voteHistory} theme={theme} channelName={channelName} />
                           </div>
 
                       </div>
