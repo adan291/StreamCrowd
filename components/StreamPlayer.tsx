@@ -39,7 +39,11 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
   }, []);
 
   useEffect(() => {
-    if (!channel || isHidden) return;
+    // Basic validation before even trying to load
+    const channelRegex = /^[a-zA-Z0-9_]{3,25}$/;
+    if (!channel || !channelRegex.test(channel)) return;
+
+    if (isHidden) return;
     
     let mounted = true;
     let checkInterval: any;
@@ -218,12 +222,15 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
 
   const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 
-  // Specific Error: Missing Channel
-  if (!channel || channel.trim().length === 0) {
+  // Specific Error: Missing or Invalid Channel
+  const channelRegex = /^[a-zA-Z0-9_]{3,25}$/;
+  if (!channel || !channelRegex.test(channel)) {
       return (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl h-full flex flex-col items-center justify-center p-6 text-center w-full">
             <AlertTriangle size={32} className="text-zinc-500 mb-2" />
-            <p className="text-zinc-500 text-sm">Canal no especificado.</p>
+            <p className="text-zinc-500 text-sm">
+                {!channel ? 'Canal no especificado.' : 'Nombre de canal inválido.'}
+            </p>
         </div>
       );
   }

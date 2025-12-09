@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TwitchMessage, PollOption } from '../types';
-import { MessageSquare, CheckCircle2, RotateCcw } from 'lucide-react';
+import { MessageSquare, CheckCircle2, ArrowDown } from 'lucide-react';
 
 interface ChatFeedProps {
   messages: TwitchMessage[];
@@ -10,42 +10,74 @@ interface ChatFeedProps {
 
 export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  useEffect(() => {
+  // Handle scroll events to detect if user scrolled up
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    
+    // Logic: If user is within 50px of bottom, auto-scroll is ON.
+    // Otherwise, auto-scroll is OFF.
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    setIsAutoScroll(isAtBottom);
+    setShowScrollButton(!isAtBottom);
+  };
+
+  const scrollToBottom = () => {
     if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+      setIsAutoScroll(true);
+      setShowScrollButton(false);
+    }
+  };
+
+  // Effect to auto-scroll when new messages arrive (only if isAutoScroll is true)
+  useEffect(() => {
+    if (isAutoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isAutoScroll]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl h-full flex flex-col shadow-lg overflow-hidden">
-      <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80">
-         <MessageSquare size={14} className="text-zinc-400" />
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative">
+      <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm z-10">
+         <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light">
+             <MessageSquare size={14} />
+         </div>
          <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Chat en Vivo</span>
+         <div className="ml-auto text-[10px] text-zinc-400 font-mono">
+            {messages.length > 0 ? `${messages.length} msgs` : 'Ready'}
+         </div>
       </div>
       
-      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50 dark:bg-black/20">
+      <div 
+        ref={containerRef} 
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50/50 dark:bg-black/20"
+      >
         {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2">
-                <MessageSquare size={24} className="opacity-50" />
+            <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">
+                <MessageSquare size={24} />
                 <span className="text-xs italic">Esperando mensajes...</span>
             </div>
         )}
         {messages.map((msg, i) => {
-            // Check if this user has voted
             const votedOptionId = userVoteMap.get(msg.userId || '') || userVoteMap.get(msg.username);
             const hasVoted = votedOptionId !== undefined;
             
-            // Resolve previous vote option
             let previousVoteOption: PollOption | undefined;
             if (options && hasVoted) {
                 previousVoteOption = options.find(o => o.id === votedOptionId);
             }
             
-            // Check if current message is a vote command
             const voteMatch = msg.message.trim().match(/^\+(\d+)$/);
             
-            // Resolve current message option (if it's a vote)
             let currentMsgOption: PollOption | undefined;
             if (options && voteMatch) {
                 const optId = parseInt(voteMatch[1]);
@@ -53,10 +85,9 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
             }
 
             return (
-              <div key={msg.id || i} className="break-words leading-snug animate-fade-in text-xs md:text-sm group hover:bg-zinc-100 dark:hover:bg-zinc-800/30 p-1.5 rounded -mx-1.5 transition-colors">
+              <div key={msg.id || i} className="break-words leading-snug animate-fade-in text-xs md:text-sm group hover:bg-zinc-100 dark:hover:bg-zinc-800/50 p-1.5 rounded -mx-1.5 transition-colors">
                   <div className="flex flex-wrap items-baseline gap-1.5">
                     
-                    {/* Username */}
                     <span 
                         className="font-bold whitespace-nowrap" 
                         style={{ color: msg.color || '#a970ff' }}
@@ -64,10 +95,9 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                         {msg.username}:
                     </span>
 
-                    {/* Badge: Shows what they voted for (if they have voted) */}
                     {hasVoted && previousVoteOption && (
                         <div 
-                            className="inline-flex items-center gap-1 bg-zinc-200 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-300 dark:border-zinc-700/50 select-none opacity-80"
+                            className="inline-flex items-center gap-1 bg-zinc-200 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-300 dark:border-zinc-700/50 select-none opacity-80 shadow-sm"
                             title={`Votó por: ${previousVoteOption.label}`}
                         >
                             {previousVoteOption.image ? (
@@ -80,14 +110,12 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                         </div>
                     )}
 
-                    {/* Message Content */}
                     <span className="text-zinc-800 dark:text-zinc-300 flex items-center gap-1 flex-wrap">
                       {msg.message}
                       
-                      {/* If message is a NEW vote attempt (and distinct from previous), show preview */}
                       {currentMsgOption && !hasVoted && (
                         <span 
-                          className="inline-flex items-center justify-center h-4 w-4 bg-zinc-200 dark:bg-zinc-800 rounded-sm overflow-hidden border border-zinc-300 dark:border-zinc-700 ml-1 align-text-bottom"
+                          className="inline-flex items-center justify-center h-4 w-4 bg-zinc-200 dark:bg-zinc-800 rounded-sm overflow-hidden border border-zinc-300 dark:border-zinc-700 ml-1 align-text-bottom shadow-sm"
                           title={currentMsgOption.label}
                         >
                             {currentMsgOption.image ? (
@@ -98,7 +126,6 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                         </span>
                       )}
 
-                      {/* If they are voting AGAIN, show explicit warning badge */}
                       {voteMatch && hasVoted && previousVoteOption && (
                          <span className="ml-1 flex items-center gap-1 text-[10px] text-zinc-400 italic">
                             (Ya registrado)
@@ -110,6 +137,18 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
             );
         })}
       </div>
+
+      {/* Floating Scroll Button */}
+      {showScrollButton && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 animate-fade-in-up">
+           <button 
+              onClick={scrollToBottom}
+              className="bg-twitch-brand hover:bg-twitch-light text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-transform hover:scale-105 active:scale-95 border border-white/10"
+           >
+              <ArrowDown size={14} /> Nuevos mensajes
+           </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -110,7 +110,7 @@ const App: React.FC = () => {
     twitchService.onStatusChange((newStatus) => {
         setStatus(newStatus);
         if (newStatus === ConnectionStatus.ERROR) {
-            addNotification('error', 'Error de conexión con Twitch. Verifica el canal o tu internet.');
+            addNotification('error', 'Error de conexión con Twitch. Verifica el canal.');
         } else if (newStatus === ConnectionStatus.CONNECTED) {
             addNotification('success', `Conectado al chat de ${channelName}`);
         } else if (newStatus === ConnectionStatus.DISCONNECTED && status === ConnectionStatus.CONNECTED) {
@@ -306,7 +306,7 @@ const App: React.FC = () => {
   }), {}) : {};
 
   return (
-    <div className="min-h-screen p-4 md:p-6 relative bg-zinc-100 dark:bg-[#0f0f11] text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
+    <div className="min-h-screen p-4 md:p-6 relative bg-zinc-100 dark:bg-[#0f0f11] text-zinc-900 dark:text-zinc-100 transition-colors duration-300 font-sans">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       
       {showHistory && (
@@ -321,7 +321,7 @@ const App: React.FC = () => {
             <div className="w-10 h-10 bg-twitch-brand rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-twitch-brand/30 animate-pulse">
               TV
             </div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-twitch-brand to-zinc-500 dark:from-white dark:to-zinc-400">
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-twitch-brand to-zinc-500 dark:from-white dark:to-zinc-400 tracking-tight">
               TwitchVote Live
             </h1>
           </div>
@@ -329,20 +329,20 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
              {status === ConnectionStatus.CONNECTED && (
                <>
-                 <Button variant="ghost" onClick={() => setShowHistory(true)} className="flex items-center gap-2">
+                 <Button variant="ghost" onClick={() => setShowHistory(true)} className="flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                     <History size={18} /> <span className="hidden sm:inline">Historial</span>
                  </Button>
                  <div className="text-right hidden md:block">
                     <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider block">Estado</span>
-                    <div className="text-green-600 dark:text-green-400 text-sm font-medium flex items-center justify-end gap-2">
-                       Online <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <div className="text-green-600 dark:text-green-400 text-sm font-bold flex items-center justify-end gap-2">
+                       Online <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-green-500/50 shadow-sm"></span>
                     </div>
                  </div>
                </>
              )}
              <button 
                 onClick={toggleTheme} 
-                className="p-2 rounded-full bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shadow-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                className="p-2.5 rounded-full bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shadow-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all active:scale-95"
                 title={theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
              >
                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -362,31 +362,34 @@ const App: React.FC = () => {
 
         {/* Main Dashboard */}
         {status === ConnectionStatus.CONNECTED && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* Left Column (Main Panel: Creator/LivePoll, Gallery, Activity) */}
-            <div className="lg:col-span-8 h-[600px] lg:h-[650px] transition-all duration-300">
-               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl h-full flex flex-col overflow-hidden">
+            <div className="lg:col-span-8 flex flex-col h-[600px] lg:h-[650px]">
+               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl h-full flex flex-col overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
                     {/* Tabs Header */}
-                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30">
+                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
                         <button 
                            onClick={() => setLeftTab('panel')}
-                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'panel' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                           className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'panel' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                         >
-                           {currentPoll ? <LayoutDashboard size={16} /> : <VoteIcon size={16} />} 
-                           <span className="truncate">{currentPoll ? 'Panel' : 'Votación'}</span>
+                           {currentPoll ? <LayoutDashboard size={18} /> : <VoteIcon size={18} />} 
+                           <span className="truncate">{currentPoll ? 'Panel de Control' : 'Crear Votación'}</span>
+                           {leftTab === 'panel' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                         </button>
                         <button 
                            onClick={() => setLeftTab('gallery')}
-                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'gallery' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                           className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'gallery' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                         >
-                           <ImageIcon size={16} /> <span className="truncate">Galería</span>
+                           <ImageIcon size={18} /> <span className="truncate">Galería</span>
+                           {leftTab === 'gallery' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                         </button>
                         <button 
                            onClick={() => setLeftTab('activity')}
-                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'activity' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                           className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'activity' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                         >
-                           <Activity size={16} /> <span className="truncate">Actividad</span>
+                           <Activity size={18} /> <span className="truncate">Actividad</span>
+                           {leftTab === 'activity' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                         </button>
                     </div>
 
@@ -429,7 +432,7 @@ const App: React.FC = () => {
             {/* Right Column (Sidebar: Chat, Stream) */}
             <div className="lg:col-span-4 flex flex-col gap-4 h-auto lg:h-[650px]">
               
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-md shrink-0">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl shadow-md shrink-0">
                 <ConnectionPanel 
                   status={status} 
                   onConnect={connectTwitch} 
@@ -439,25 +442,23 @@ const App: React.FC = () => {
               </div>
 
               {/* Right Sidebar Tabs (Chat, Stream) */}
-              <div className="flex-1 flex flex-col min-h-[400px]">
-                 <div className="flex gap-2 mb-2 bg-white/50 dark:bg-zinc-900/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 shrink-0 overflow-x-auto">
+              <div className="flex-1 flex flex-col min-h-[400px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-md overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
+                 <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
                     <button 
                         onClick={() => setActiveRightTab('chat')}
-                        className={`flex-1 min-w-[60px] py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeRightTab === 'chat' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                        title="Chat"
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${activeRightTab === 'chat' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                     >
-                       <MessageSquare size={14} /> <span className="hidden sm:inline">Chat</span>
+                       <MessageSquare size={14} /> Chat
                     </button>
                     <button 
                         onClick={() => setActiveRightTab('stream')}
-                        className={`flex-1 min-w-[60px] py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeRightTab === 'stream' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                        title="Stream"
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${activeRightTab === 'stream' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                     >
-                       <Tv size={14} /> <span className="hidden sm:inline">Stream</span>
+                       <Tv size={14} /> Stream
                     </button>
                  </div>
 
-                 <div className="flex-1 min-h-0 relative">
+                 <div className="flex-1 relative">
                      {activeRightTab === 'chat' && (
                         <div className="h-full absolute inset-0">
                            <ChatFeed 
@@ -469,7 +470,7 @@ const App: React.FC = () => {
                      )}
 
                      {activeRightTab === 'stream' && (
-                        <div className="h-full absolute inset-0">
+                        <div className="h-full absolute inset-0 bg-black">
                           <StreamPlayer channel={channelName} />
                         </div>
                      )}

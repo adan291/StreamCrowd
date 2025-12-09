@@ -19,13 +19,21 @@
                 accent: '#00f0f0'
               }
             },
+            backgroundImage: {
+              'dot-pattern': 'radial-gradient(circle, #3f3f46 1px, transparent 1px)',
+              'dot-pattern-light': 'radial-gradient(circle, #e4e4e7 1px, transparent 1px)',
+            },
+            backgroundSize: {
+              'dot-md': '24px 24px',
+            },
             animation: {
-              'scale-up': 'scaleUp 0.3s ease-out forwards',
+              'scale-up': 'scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
               'fade-in': 'fadeIn 0.2s ease-out forwards',
               'slide-up': 'slideUp 0.3s ease-out forwards',
               'spin-slow': 'spin 12s linear infinite',
               'fade-in-down': 'fadeInDown 0.5s ease-out forwards',
               'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             },
             keyframes: {
               scaleUp: {
@@ -54,23 +62,23 @@
       }
     </script>
     <style>
-      /* Custom Scrollbar */
+      /* Custom Scrollbar - Refined */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: transparent; 
       }
       ::-webkit-scrollbar-thumb {
-        background: #a1a1aa; 
-        border-radius: 4px;
+        background: #d4d4d8; 
+        border-radius: 10px;
       }
       .dark ::-webkit-scrollbar-thumb {
         background: #3f3f46;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #71717a; 
+        background: #a1a1aa; 
       }
       .dark ::-webkit-scrollbar-thumb:hover {
         background: #52525b;
@@ -89,7 +97,7 @@
 }
 </script>
 </head>
-  <body>
+  <body class="bg-zinc-100 dark:bg-[#0f0f11] bg-dot-pattern-light dark:bg-dot-pattern bg-dot-md transition-colors duration-300 min-h-screen selection:bg-twitch-brand selection:text-white">
     <div id="root"></div>
   </body>
 </html>
