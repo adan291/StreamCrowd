@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Play, Save, Bookmark, X, Palette, RefreshCcw, Smile, Image as ImageIcon, Upload, AlertCircle, Star, MousePointerClick, Check, Grid, Zap } from 'lucide-react';
+import { Plus, Trash2, Play, Save, Bookmark, X, Palette, RefreshCcw, Smile, Image as ImageIcon, Upload, AlertCircle, Star, MousePointerClick, Check, Grid, Zap, Eye, Target } from 'lucide-react';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
 import { SavedPoll, MediaAsset } from '../types';
 import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
+import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number) => void;
@@ -24,6 +25,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [showTemplates, setShowTemplates] = useState(false);
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState<number | null>(null);
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -110,8 +112,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         resetInput();
         return;
       }
-      if (file.size > 2 * 1024 * 1024) {
-        if (onNotification) onNotification('error', 'La imagen es demasiado grande (Máx 2MB).');
+      if (file.size > 40 * 1024 * 1024) { // 40MB Limit
+        if (onNotification) onNotification('error', 'La imagen es demasiado grande (Máx 40MB).');
         resetInput();
         return;
       }
@@ -144,16 +146,24 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                   const newOptions = [...options];
                   newOptions[index].image = iconDataUrl;
                   setOptions(newOptions);
+                  if (onNotification) onNotification('success', 'Icono creado y asignado.');
               }
           } catch (err) {
               console.error(err);
-              if (onNotification) onNotification('error', 'Error al procesar la imagen.');
+              if (onNotification) onNotification('error', 'Error interno al procesar la imagen.');
+          } finally {
+             resetInput();
           }
+        };
+        img.onerror = () => {
+            if (onNotification) onNotification('error', 'El archivo de imagen está dañado.');
+            resetInput();
         };
       };
       reader.readAsDataURL(file);
+    } else {
+       resetInput();
     }
-    resetInput();
   };
 
   const selectAssetFromLibrary = (asset: MediaAsset) => {
@@ -191,6 +201,12 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const saveTemplate = () => {
     if (!question.trim()) {
         if (onNotification) onNotification('error', 'Escribe una pregunta para guardar la plantilla.');
+        return;
+    }
+    
+    // Validate options
+    if (options.some(opt => !opt.label.trim())) {
+        if (onNotification) onNotification('error', 'Todas las opciones deben tener una etiqueta.');
         return;
     }
     
@@ -246,6 +262,16 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       if (!a.isFavorite && b.isFavorite) return 1;
       return parseInt(b.id) - parseInt(a.id);
     });
+
+  // Dummy data for Preview Modal
+  const previewData = options.map((opt, i) => ({
+      name: `+${i+1}`,
+      votes: Math.floor(Math.random() * 50) + 10, // Random votes for visualization
+      label: opt.label,
+      color: opt.color,
+      icon: opt.icon,
+      image: opt.image
+  }));
 
   return (
     <>
@@ -542,15 +568,23 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                       className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light transition-all"
                     />
                  </div>
-                 <div className="flex items-end">
+                 <div className="flex items-end gap-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPreview(true)}
+                      className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center justify-center gap-2 font-bold text-sm h-[42px] shadow-sm"
+                      title="Vista Previa"
+                    >
+                      <Eye size={18} />
+                    </button>
                     <button 
                       type="button" 
                       onClick={saveTemplate}
                       disabled={!question.trim()}
-                      className="w-full sm:w-auto px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 font-bold text-sm h-[42px] shadow-sm"
+                      className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 font-bold text-sm h-[42px] shadow-sm flex-1 sm:flex-none"
                       title="Guardar plantilla"
                     >
-                      <Save size={16} /> <span className="sm:hidden lg:inline">Guardar</span>
+                      <Save size={16} /> <span className="hidden sm:inline">Guardar</span>
                     </button>
                  </div>
              </div>
@@ -566,6 +600,72 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           </div>
         </form>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 w-full max-w-4xl rounded-2xl shadow-2xl p-6 animate-scale-up flex flex-col max-h-[90vh]">
+                 <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                      <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                          <Eye size={18} className="text-twitch-brand"/> Vista Previa
+                      </h3>
+                      <button onClick={() => setShowPreview(false)} className="text-zinc-500 hover:text-black dark:hover:text-white bg-zinc-100 dark:bg-zinc-800 rounded-full p-1 transition-colors"><X size={18}/></button>
+                 </div>
+                 
+                 {/* Simulated Live Poll UI */}
+                 <div className="bg-zinc-50 dark:bg-black/20 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-y-auto custom-scrollbar">
+                     <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase tracking-wider bg-twitch-brand/10 px-2 py-0.5 rounded">
+                            {title || 'Encuesta en Vivo'}
+                        </span>
+                     </div>
+                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 leading-tight">{question || 'Tu pregunta aquí...'}</h2>
+                     <div className="flex gap-4 text-zinc-500 text-sm mb-6">
+                         <span><Target size={14} className="inline mr-1"/> Meta: {maxVotes || '∞'}</span>
+                         <span>0 votos</span>
+                     </div>
+
+                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Mock Chart */}
+                        <div className="lg:col-span-2 bg-zinc-100 dark:bg-zinc-950/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800 h-[250px]">
+                             <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={previewData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                                  <XAxis dataKey="name" stroke="#888" tickLine={false} axisLine={false} />
+                                  <Bar dataKey="votes" radius={[8, 8, 0, 0]}>
+                                    {previewData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                        </div>
+                        {/* Mock List */}
+                        <div className="space-y-3">
+                            {options.map((opt, i) => (
+                                <div key={i} className="relative p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800/30">
+                                     <div className="flex justify-between items-center mb-1">
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shadow-sm shrink-0 overflow-hidden" style={{backgroundColor: opt.image ? 'transparent' : opt.color}}>
+                                                {opt.image ? <img src={opt.image} className="w-full h-full object-cover" /> : <span>+{i+1}</span>}
+                                            </span>
+                                            <span className="font-medium text-zinc-900 dark:text-zinc-200 truncate">{opt.label || `Opción ${i+1}`}</span>
+                                        </div>
+                                     </div>
+                                     <div className="h-1 bg-zinc-100 dark:bg-zinc-800 w-full rounded-full overflow-hidden mt-2">
+                                         <div className="h-full w-1/2" style={{backgroundColor: opt.color}}></div>
+                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                     </div>
+                 </div>
+                 
+                 <div className="mt-4 flex justify-end">
+                     <Button onClick={() => setShowPreview(false)}>Cerrar Vista Previa</Button>
+                 </div>
+             </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       {showConfirm && (

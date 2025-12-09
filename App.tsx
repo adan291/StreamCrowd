@@ -17,6 +17,7 @@ import { Button } from './components/Button';
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [currentPoll, setCurrentPoll] = useState<Poll | null>(null);
   const [voteHistory, setVoteHistory] = useState<VoteRecord[]>([]);
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
@@ -25,22 +26,20 @@ const App: React.FC = () => {
   const [pastPolls, setPastPolls] = useState<Poll[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   
-  // Right sidebar tabs
+  // Right sidebar tabs (Chat, Stream)
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
   
-  // Left column tabs
+  // Left column tabs (Control Panel, Gallery, Activity)
   const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity'>('panel');
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   
-  // Lifted from Ref to State to trigger re-renders in ChatFeed
+  // State for tracked votes to update UI efficiently
   const [votedUserIds, setVotedUserIds] = useState<Set<string>>(new Set());
   
-  // Use a ref to access the current poll state inside the TMI callback
+  // Refs for callbacks
   const pollRef = useRef<Poll | null>(null);
-  
-  // Keep ref for logic that needs instant access without dependencies
   const votedUserIdsRef = useRef<Set<string>>(new Set());
 
   // Memoize the map of UserID -> OptionID
@@ -107,11 +106,18 @@ const App: React.FC = () => {
     twitchService.connect(channelName, authToken);
 
     // Setup Twitch Service Listeners
-    twitchService.onStatusChange((newStatus) => {
+    twitchService.onStatusChange((newStatus, errorMsg) => {
         setStatus(newStatus);
+        
         if (newStatus === ConnectionStatus.ERROR) {
-            addNotification('error', 'Error de conexión con Twitch. Verifica el canal.');
-        } else if (newStatus === ConnectionStatus.CONNECTED) {
+            const msg = errorMsg || 'Error de conexión con Twitch.';
+            setConnectionError(msg);
+            addNotification('error', msg);
+        } else {
+            setConnectionError(null);
+        }
+
+        if (newStatus === ConnectionStatus.CONNECTED) {
             addNotification('success', `Conectado al chat de ${channelName}`);
         } else if (newStatus === ConnectionStatus.DISCONNECTED && status === ConnectionStatus.CONNECTED) {
             addNotification('info', 'Desconectado del chat.');
@@ -127,6 +133,7 @@ const App: React.FC = () => {
           id: tags.id,
           userId: tags['user-id']
       };
+      // CRITICAL: Limit history to last 100 messages to prevent indefinite growth
       setChatMessages(prev => [...prev.slice(-99), chatMsg]);
 
       // 1. Handle Streamer/Mod Commands
@@ -174,8 +181,6 @@ const App: React.FC = () => {
 
         if (optionExists && !hasVoted) {
           handleVote(userId, username, optionId);
-        } else if (!optionExists) {
-           // Optional: Debug log or silent ignore for invalid option
         }
       }
     });
@@ -232,7 +237,6 @@ const App: React.FC = () => {
   };
 
   const connectTwitch = (channel: string, token?: string) => {
-    // Just update state, useEffect will handle connection
     setAuthToken(token || '');
     setChannelName(channel);
   };
@@ -241,6 +245,7 @@ const App: React.FC = () => {
     setChannelName('');
     setAuthToken('');
     setChatMessages([]);
+    setStatus(ConnectionStatus.DISCONNECTED);
   };
 
   const createPoll = (title: string, question: string, optionsData: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number) => {
@@ -267,7 +272,7 @@ const App: React.FC = () => {
     setVotedUserIds(new Set());
     setVoteHistory([]);
     setCurrentPoll(newPoll);
-    setLeftTab('panel'); // Switch to panel view
+    setLeftTab('panel'); // Switch to panel view automatically
 
     // Announce poll if connected
     const optionsText = newPoll.options.map(o => `+${o.id} (${o.label})`).join(' | ');
@@ -289,11 +294,9 @@ const App: React.FC = () => {
   };
 
   const resetPoll = () => {
-    // Save to history before clearing
     if (currentPoll) {
       setPastPolls(prev => [currentPoll, ...prev]);
     }
-
     setCurrentPoll(null);
     votedUserIdsRef.current.clear();
     setVotedUserIds(new Set());
@@ -357,6 +360,7 @@ const App: React.FC = () => {
             onConnect={connectTwitch} 
             onDisconnect={disconnectTwitch}
             channelName={channelName} 
+            errorMessage={connectionError}
           />
         )}
 
@@ -368,7 +372,7 @@ const App: React.FC = () => {
             <div className="lg:col-span-8 flex flex-col h-[600px] lg:h-[650px]">
                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl h-full flex flex-col overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
                     {/* Tabs Header */}
-                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
+                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20 shrink-0">
                         <button 
                            onClick={() => setLeftTab('panel')}
                            className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'panel' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
@@ -421,29 +425,28 @@ const App: React.FC = () => {
                              />
                         )}
                         {leftTab === 'activity' && (
-                            <div className="h-full bg-white dark:bg-zinc-900">
-                                <RecentVotes votes={voteHistory} options={optionsMap} />
-                            </div>
+                            <RecentVotes votes={voteHistory} options={optionsMap} />
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Right Column (Sidebar: Chat, Stream) */}
+            {/* Right Column (Sidebar: Connection, Chat, Stream) */}
             <div className="lg:col-span-4 flex flex-col gap-4 h-auto lg:h-[650px]">
               
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl shadow-md shrink-0">
+              <div className="shrink-0">
                 <ConnectionPanel 
                   status={status} 
                   onConnect={connectTwitch} 
                   onDisconnect={disconnectTwitch} 
                   channelName={channelName}
+                  errorMessage={connectionError}
                 />
               </div>
 
               {/* Right Sidebar Tabs (Chat, Stream) */}
               <div className="flex-1 flex flex-col min-h-[400px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-md overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
-                 <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20">
+                 <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20 shrink-0">
                     <button 
                         onClick={() => setActiveRightTab('chat')}
                         className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${activeRightTab === 'chat' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}

@@ -157,11 +157,19 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
            0% { background-color: rgba(169, 112, 255, 0.2); transform: scale(1.02); }
            100% { background-color: transparent; transform: scale(1); }
         }
+        @keyframes pulseGlow {
+           0%, 100% { filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.4)); }
+           50% { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
+        }
         .flash-active {
            animation: flashHighlight 0.4s ease-out;
         }
         .winner-border {
            box-shadow: 0 0 0 2px #facc15, 0 0 20px rgba(250, 204, 21, 0.3);
+           animation: pulseGlow 2s infinite;
+        }
+        .winner-bar {
+           animation: pulseGlow 2s infinite;
         }
       `}</style>
       
@@ -354,7 +362,7 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
                         fill={entry.color} 
                         stroke={isWinner ? '#facc15' : 'none'}
                         strokeWidth={isWinner ? 4 : 0}
-                        style={isWinner ? { filter: 'drop-shadow(0 0 8px rgba(250, 204, 21, 0.5))' } : {}}
+                        style={isWinner ? { animation: 'pulseGlow 2s infinite' } : {}}
                     />
                   )
                 })}

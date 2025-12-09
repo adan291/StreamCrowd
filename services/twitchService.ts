@@ -7,7 +7,7 @@ type MessageCallback = (tags: tmi.ChatUserstate, message: string, self: boolean)
 class TwitchService {
   private client: tmi.Client | null = null;
   private messageCallback: MessageCallback | null = null;
-  private statusChangeCallback: ((status: ConnectionStatus) => void) | null = null;
+  private statusChangeCallback: ((status: ConnectionStatus, error?: string) => void) | null = null;
   private currentChannel: string = '';
   private isAnonymous: boolean = false;
 
@@ -63,11 +63,22 @@ class TwitchService {
 
         this.client.connect().catch((err) => {
           console.error("Twitch Connection Error:", err);
-          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR);
+          let errorMsg = "No se pudo conectar al chat.";
+          
+          // Basic error parsing
+          if (typeof err === 'string') {
+              if (err.includes('Login authentication failed')) {
+                  errorMsg = "Token OAuth inválido o expirado.";
+              } else if (err.includes('No response from Twitch')) {
+                  errorMsg = "Sin respuesta de Twitch (Problema de red).";
+              }
+          }
+          
+          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR, errorMsg);
         });
     } catch (error) {
         console.error("Failed to initialize Twitch Client:", error);
-        if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR);
+        if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR, "Error interno al inicializar cliente.");
     }
   }
 
@@ -104,7 +115,7 @@ class TwitchService {
     this.messageCallback = callback;
   }
 
-  public onStatusChange(callback: (status: ConnectionStatus) => void) {
+  public onStatusChange(callback: (status: ConnectionStatus, error?: string) => void) {
     this.statusChangeCallback = callback;
   }
 }

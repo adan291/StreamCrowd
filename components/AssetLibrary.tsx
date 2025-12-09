@@ -10,7 +10,7 @@ interface AssetLibraryProps {
   onNotification: (type: NotificationType, message: string) => void;
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB
 
 export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDelete, onNotification }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +27,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
 
     // 2. Validate Size
     if (file.size > MAX_FILE_SIZE) {
-        onNotification('error', 'La imagen supera el límite de 2MB.');
+        onNotification('error', 'La imagen supera el límite de 40MB.');
         return;
     }
 
@@ -192,7 +192,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                     <ImageIcon size={48} className="opacity-20" />
                     <p className="text-xs text-center max-w-[200px] leading-relaxed">
                         Arrastra imágenes aquí o usa el botón subir.<br/>
-                        <span className="opacity-70">Soporta PNG, JPG, GIF (Máx 2MB).</span>
+                        <span className="opacity-70">Soporta PNG, JPG, GIF (Máx 40MB).</span>
                     </p>
                 </div>
             ) : filteredAssets.length === 0 ? (
@@ -222,7 +222,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
             )}
         </div>
         <div className="p-2 text-[10px] text-zinc-500 text-center border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
-            {assets.length} imágenes guardadas • Máx 2MB por archivo
+            {assets.length} imágenes guardadas • Máx 40MB por archivo
         </div>
     </div>
   );
