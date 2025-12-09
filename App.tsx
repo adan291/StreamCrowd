@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
@@ -7,13 +7,15 @@ import { PollHistory } from './components/PollHistory';
 import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
 import { StreamPlayer } from './components/StreamPlayer';
+import { AssetLibrary } from './components/AssetLibrary';
 import { twitchService } from './services/twitchService';
-import { ConnectionStatus, Poll, VoteRecord, TwitchMessage } from './types';
+import { ConnectionStatus, Poll, VoteRecord, TwitchMessage, MediaAsset } from './types';
 import { CHART_COLORS } from './constants';
-import { History, MessageSquare, Activity, Tv } from 'lucide-react';
+import { History, MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun } from 'lucide-react';
 import { Button } from './components/Button';
 
 const App: React.FC = () => {
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [currentPoll, setCurrentPoll] = useState<Poll | null>(null);
   const [voteHistory, setVoteHistory] = useState<VoteRecord[]>([]);
@@ -22,8 +24,15 @@ const App: React.FC = () => {
   const [authToken, setAuthToken] = useState<string>('');
   const [pastPolls, setPastPolls] = useState<Poll[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [activeTab, setActiveTab] = useState<'votes' | 'chat' | 'stream'>('votes');
+  
+  // Right sidebar tabs
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
+  
+  // Left column tabs
+  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity'>('panel');
+
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   
   // Lifted from Ref to State to trigger re-renders in ChatFeed
   const [votedUserIds, setVotedUserIds] = useState<Set<string>>(new Set());
@@ -34,9 +43,41 @@ const App: React.FC = () => {
   // Keep ref for logic that needs instant access without dependencies
   const votedUserIdsRef = useRef<Set<string>>(new Set());
 
+  // Memoize the map of UserID -> OptionID
+  const userVoteMap = useMemo(() => {
+    const map = new Map<string, number>();
+    voteHistory.forEach(v => map.set(v.userId, v.optionId));
+    return map;
+  }, [voteHistory]);
+
+  // Apply Theme
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   useEffect(() => {
     pollRef.current = currentPoll;
   }, [currentPoll]);
+
+  // Load Media Library
+  useEffect(() => {
+    const savedAssets = localStorage.getItem('twitch_vote_assets');
+    if (savedAssets) {
+        try {
+            setMediaLibrary(JSON.parse(savedAssets));
+        } catch (e) {
+            console.error("Failed to load assets", e);
+        }
+    }
+  }, []);
 
   const addNotification = (type: NotificationType, message: string) => {
     const id = Date.now().toString() + Math.random();
@@ -45,6 +86,18 @@ const App: React.FC = () => {
 
   const removeNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleAddAsset = (asset: MediaAsset) => {
+      const updated = [asset, ...mediaLibrary];
+      setMediaLibrary(updated);
+      localStorage.setItem('twitch_vote_assets', JSON.stringify(updated));
+  };
+
+  const handleDeleteAsset = (id: string) => {
+      const updated = mediaLibrary.filter(a => a.id !== id);
+      setMediaLibrary(updated);
+      localStorage.setItem('twitch_vote_assets', JSON.stringify(updated));
   };
 
   useEffect(() => {
@@ -214,7 +267,7 @@ const App: React.FC = () => {
     setVotedUserIds(new Set());
     setVoteHistory([]);
     setCurrentPoll(newPoll);
-    setActiveTab('votes'); // Switch to votes tab on new poll
+    setLeftTab('panel'); // Switch to panel view
 
     // Announce poll if connected
     const optionsText = newPoll.options.map(o => `+${o.id} (${o.label})`).join(' | ');
@@ -253,40 +306,47 @@ const App: React.FC = () => {
   }), {}) : {};
 
   return (
-    <div className="min-h-screen p-4 md:p-8 relative">
+    <div className="min-h-screen p-4 md:p-6 relative bg-zinc-100 dark:bg-[#0f0f11] text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       
       {showHistory && (
         <PollHistory history={pastPolls} onClose={() => setShowHistory(false)} />
       )}
       
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1600px] mx-auto">
         
         {/* Header */}
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-twitch-brand rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-twitch-brand/30 animate-pulse">
               TV
             </div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-twitch-brand to-zinc-500 dark:from-white dark:to-zinc-400">
               TwitchVote Live
             </h1>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
              {status === ConnectionStatus.CONNECTED && (
                <>
-                 <Button variant="ghost" onClick={() => setShowHistory(true)} className="hidden md:flex">
-                    <History size={18} /> Historial
+                 <Button variant="ghost" onClick={() => setShowHistory(true)} className="flex items-center gap-2">
+                    <History size={18} /> <span className="hidden sm:inline">Historial</span>
                  </Button>
-                 <div className="text-right">
-                    <span className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Estado</span>
-                    <div className="text-green-400 text-sm font-medium flex items-center justify-end gap-2">
+                 <div className="text-right hidden md:block">
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider block">Estado</span>
+                    <div className="text-green-600 dark:text-green-400 text-sm font-medium flex items-center justify-end gap-2">
                        Online <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                     </div>
                  </div>
                </>
              )}
+             <button 
+                onClick={toggleTheme} 
+                className="p-2 rounded-full bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 shadow-sm border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                title={theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
+             >
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+             </button>
           </div>
         </header>
 
@@ -295,7 +355,8 @@ const App: React.FC = () => {
           <ConnectionPanel 
             status={status} 
             onConnect={connectTwitch} 
-            onDisconnect={disconnectTwitch} 
+            onDisconnect={disconnectTwitch}
+            channelName={channelName} 
           />
         )}
 
@@ -303,105 +364,112 @@ const App: React.FC = () => {
         {status === ConnectionStatus.CONNECTED && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Left Column (Poll) */}
-            <div className="lg:col-span-8 h-[650px] transition-all duration-300">
-              {currentPoll ? (
-                <LivePoll 
-                  poll={currentPoll} 
-                  voteHistory={voteHistory}
-                  onStop={() => stopPoll()}
-                  onReset={resetPoll}
-                />
-              ) : (
-                <PollCreator 
-                  onCreate={createPoll} 
-                  onNotification={(type, msg) => addNotification(type, msg)}
-                />
-              )}
+            {/* Left Column (Main Panel: Creator/LivePoll, Gallery, Activity) */}
+            <div className="lg:col-span-8 h-[600px] lg:h-[650px] transition-all duration-300">
+               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl h-full flex flex-col overflow-hidden">
+                    {/* Tabs Header */}
+                    <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30">
+                        <button 
+                           onClick={() => setLeftTab('panel')}
+                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'panel' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                        >
+                           {currentPoll ? <LayoutDashboard size={16} /> : <VoteIcon size={16} />} 
+                           <span className="truncate">{currentPoll ? 'Panel' : 'Votación'}</span>
+                        </button>
+                        <button 
+                           onClick={() => setLeftTab('gallery')}
+                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'gallery' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                        >
+                           <ImageIcon size={16} /> <span className="truncate">Galería</span>
+                        </button>
+                        <button 
+                           onClick={() => setLeftTab('activity')}
+                           className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${leftTab === 'activity' ? 'bg-white dark:bg-zinc-900 text-twitch-brand dark:text-twitch-light border-b-2 border-twitch-brand shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                        >
+                           <Activity size={16} /> <span className="truncate">Actividad</span>
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-hidden relative">
+                        {leftTab === 'panel' && (
+                             currentPoll ? (
+                                <LivePoll 
+                                  poll={currentPoll} 
+                                  voteHistory={voteHistory}
+                                  onStop={() => stopPoll()}
+                                  onReset={resetPoll}
+                                  theme={theme}
+                                />
+                             ) : (
+                                <PollCreator 
+                                  onCreate={createPoll} 
+                                  onNotification={(type, msg) => addNotification(type, msg)}
+                                  mediaLibrary={mediaLibrary}
+                                />
+                             )
+                        )}
+                        {leftTab === 'gallery' && (
+                             <AssetLibrary 
+                                assets={mediaLibrary} 
+                                onAdd={handleAddAsset} 
+                                onDelete={handleDeleteAsset}
+                                onNotification={(type, msg) => addNotification(type, msg)}
+                             />
+                        )}
+                        {leftTab === 'activity' && (
+                            <div className="h-full bg-white dark:bg-zinc-900">
+                                <RecentVotes votes={voteHistory} options={optionsMap} />
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            {/* Right Column (Sidebar) */}
-            <div className="lg:col-span-4 flex flex-col gap-4 h-[650px]">
+            {/* Right Column (Sidebar: Chat, Stream) */}
+            <div className="lg:col-span-4 flex flex-col gap-4 h-auto lg:h-[650px]">
               
-              {/* Mobile History Button */}
-              <div className="md:hidden">
-                 <Button variant="secondary" fullWidth onClick={() => setShowHistory(true)}>
-                    <History size={18} /> Ver Historial
-                 </Button>
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-md shrink-0">
+                <ConnectionPanel 
+                  status={status} 
+                  onConnect={connectTwitch} 
+                  onDisconnect={disconnectTwitch} 
+                  channelName={channelName}
+                />
               </div>
 
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl shadow-md shrink-0">
-                <h3 className="font-bold text-white mb-2">Comandos de Chat</h3>
-                <div className="space-y-2 text-sm text-zinc-400">
-                  <div className="flex justify-between border-b border-zinc-800 pb-2">
-                     <span>Votar:</span>
-                     <span className="text-white font-mono">+1, +2...</span>
-                  </div>
-                  <div className="flex justify-between border-b border-zinc-800 pb-2">
-                     <span>Info (Todos):</span>
-                     <span className="text-white font-mono">!poll</span>
-                  </div>
-                  <div className="flex justify-between">
-                     <span>Streamer:</span>
-                     <span className="text-twitch-light font-mono">!stop, !reset</span>
-                  </div>
-                </div>
-              </div>
-
-              <ConnectionPanel 
-                status={status} 
-                onConnect={connectTwitch} 
-                onDisconnect={disconnectTwitch} 
-              />
-
-              {/* Tabs and Content (Chat, Votes, Stream) */}
-              <div className="flex-1 flex flex-col min-h-0">
-                 <div className="flex gap-2 mb-2 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800 shrink-0">
+              {/* Right Sidebar Tabs (Chat, Stream) */}
+              <div className="flex-1 flex flex-col min-h-[400px]">
+                 <div className="flex gap-2 mb-2 bg-white/50 dark:bg-zinc-900/50 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 shrink-0 overflow-x-auto">
                     <button 
-                        onClick={() => setActiveTab('votes')}
-                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'votes' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        onClick={() => setActiveRightTab('chat')}
+                        className={`flex-1 min-w-[60px] py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeRightTab === 'chat' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                        title="Chat"
                     >
-                       <Activity size={14} /> Votos
+                       <MessageSquare size={14} /> <span className="hidden sm:inline">Chat</span>
                     </button>
                     <button 
-                        onClick={() => setActiveTab('chat')}
-                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'chat' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        onClick={() => setActiveRightTab('stream')}
+                        className={`flex-1 min-w-[60px] py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeRightTab === 'stream' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                        title="Stream"
                     >
-                       <MessageSquare size={14} /> Chat
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('stream')}
-                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'stream' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
-                       <Tv size={14} /> Stream
+                       <Tv size={14} /> <span className="hidden sm:inline">Stream</span>
                     </button>
                  </div>
 
-                 <div className="flex-1 min-h-0">
-                     {activeTab === 'votes' && (
-                        currentPoll ? (
-                           <div className="h-full">
-                               <RecentVotes votes={voteHistory} options={optionsMap} />
-                           </div>
-                        ) : (
-                           <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-8 text-center text-zinc-500 text-sm h-full flex items-center justify-center">
-                              <p>Inicia una votación para ver la actividad.</p>
-                           </div>
-                        )
-                     )}
-                     
-                     {activeTab === 'chat' && (
-                        <div className="h-full">
+                 <div className="flex-1 min-h-0 relative">
+                     {activeRightTab === 'chat' && (
+                        <div className="h-full absolute inset-0">
                            <ChatFeed 
                              messages={chatMessages} 
-                             votedUserIds={votedUserIds} 
+                             userVoteMap={userVoteMap} 
                              options={currentPoll?.options} 
                            />
                         </div>
                      )}
 
-                     {activeTab === 'stream' && (
-                        <div className="h-full">
+                     {activeRightTab === 'stream' && (
+                        <div className="h-full absolute inset-0">
                           <StreamPlayer channel={channelName} />
                         </div>
                      )}

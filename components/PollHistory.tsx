@@ -10,20 +10,20 @@ interface PollHistoryProps {
 export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[80vh] animate-scale-up">
-        <div className="flex justify-between items-center p-6 border-b border-zinc-800">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[80vh] animate-scale-up">
+        <div className="flex justify-between items-center p-6 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-500/20 rounded-lg">
-               <Calendar className="text-purple-400" size={24} />
+            <div className="p-2 bg-twitch-brand/20 rounded-lg">
+               <Calendar className="text-twitch-brand dark:text-twitch-light" size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Historial de Encuestas</h2>
-              <p className="text-zinc-400 text-xs">Resultados de sesiones anteriores</p>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Historial de Encuestas</h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs">Resultados de sesiones anteriores</p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="text-zinc-500 hover:text-white transition-colors p-2 hover:bg-zinc-800 rounded-full"
+            className="text-zinc-400 hover:text-black dark:hover:text-white transition-colors p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full"
           >
             <X size={24} />
           </button>
@@ -40,21 +40,21 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
               const date = new Date(poll.startTime);
               
               return (
-                <div key={poll.id} className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors">
+                <div key={poll.id} className="bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 hover:border-twitch-brand/30 dark:hover:border-zinc-700 transition-colors">
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-bold text-white text-lg">{poll.question}</h3>
-                    <span className="text-xs text-zinc-500 font-mono">
+                    <h3 className="font-bold text-zinc-900 dark:text-white text-lg">{poll.question}</h3>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-500 font-mono">
                       {date.toLocaleDateString()} {date.toLocaleTimeString()}
                     </span>
                   </div>
                   
                   <div className="flex gap-4 mb-4 text-sm">
-                    <div className="flex items-center gap-2 text-zinc-400 bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800">
+                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
                       <Hash size={14} />
-                      <span className="text-white font-bold">{poll.totalVotes}</span> votos
+                      <span className="text-zinc-900 dark:text-white font-bold">{poll.totalVotes}</span> votos
                     </div>
                     {winner.votes > 0 && (
-                      <div className="flex items-center gap-2 text-yellow-400 bg-yellow-500/10 px-3 py-1.5 rounded-lg border border-yellow-500/20">
+                      <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 px-3 py-1.5 rounded-lg border border-yellow-200 dark:border-yellow-500/20">
                         <Trophy size={14} />
                         Ganador: <span className="font-bold">{winner.icon} {winner.label}</span>
                       </div>
@@ -66,13 +66,13 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
                     {poll.options.map(opt => {
                       const pct = poll.totalVotes > 0 ? (opt.votes / poll.totalVotes) * 100 : 0;
                       return (
-                        <div key={opt.id} className="relative h-6 bg-zinc-900 rounded overflow-hidden flex items-center px-2">
+                        <div key={opt.id} className="relative h-6 bg-white dark:bg-zinc-900 rounded overflow-hidden flex items-center px-2 border border-zinc-100 dark:border-zinc-800">
                            <div 
                               className="absolute top-0 left-0 h-full opacity-20" 
                               style={{ width: `${pct}%`, backgroundColor: opt.color }} 
                            />
                            <div className="relative z-10 flex justify-between w-full text-xs">
-                              <span className="text-zinc-300">
+                              <span className="text-zinc-700 dark:text-zinc-300">
                                 {opt.icon && <span className="mr-1">{opt.icon}</span>}
                                 {opt.label}
                               </span>
@@ -88,8 +88,8 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
           )}
         </div>
         
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 rounded-b-2xl flex justify-end">
-           <button onClick={onClose} className="text-zinc-400 hover:text-white text-sm font-medium">Cerrar</button>
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-2xl flex justify-end">
+           <button onClick={onClose} className="text-zinc-500 hover:text-black dark:hover:text-white text-sm font-medium">Cerrar</button>
         </div>
       </div>
     </div>

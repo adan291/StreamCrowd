@@ -34,6 +34,13 @@ export interface SavedPoll {
   isFavorite?: boolean;
 }
 
+export interface MediaAsset {
+  id: string;
+  name: string;
+  data: string; // Base64
+  date: number;
+}
+
 export enum ConnectionStatus {
   DISCONNECTED = 'DISCONNECTED',
   CONNECTING = 'CONNECTING',
