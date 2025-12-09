@@ -9,6 +9,7 @@ class TwitchService {
   private messageCallback: MessageCallback | null = null;
   private statusChangeCallback: ((status: ConnectionStatus) => void) | null = null;
   private currentChannel: string = '';
+  private isAnonymous: boolean = false;
 
   constructor() {}
 
@@ -17,11 +18,16 @@ class TwitchService {
       this.disconnect();
     }
 
-    this.currentChannel = channel;
+    // Ensure channel has # prefix for IRC
+    const safeChannel = channel.startsWith('#') ? channel : `#${channel}`;
+    this.currentChannel = safeChannel;
+    // Determine if anonymous based on presence of token
+    this.isAnonymous = !token;
+    
     if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.CONNECTING);
 
     const options: tmi.Options = {
-      channels: [channel],
+      channels: [safeChannel],
       connection: {
         secure: true,
         reconnect: true,
@@ -31,43 +37,62 @@ class TwitchService {
     // If token is provided, add identity to enable sending messages
     if (token) {
       options.identity = {
-        username: channel, // Assuming the streamer is connecting as themselves
+        username: channel, // Using channel name as username often works, but token is key
         password: token.startsWith('oauth:') ? token : `oauth:${token}`
       };
     }
 
-    this.client = new tmi.Client(options);
+    try {
+        this.client = new tmi.Client(options);
 
-    this.client.on('message', (channel, tags, message, self) => {
-      if (this.messageCallback) {
-        this.messageCallback(tags, message, self);
-      }
-    });
+        this.client.on('message', (channel, tags, message, self) => {
+          if (this.messageCallback) {
+            this.messageCallback(tags, message, self);
+          }
+        });
 
-    this.client.on('connected', () => {
-      console.log(`Connected to ${channel}`);
-      if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.CONNECTED);
-    });
+        this.client.on('connected', (addr, port) => {
+          console.log(`Connected to ${addr}:${port}`);
+          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.CONNECTED);
+        });
 
-    this.client.on('disconnected', () => {
-      if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.DISCONNECTED);
-    });
+        this.client.on('disconnected', (reason) => {
+          console.log(`Disconnected: ${reason}`);
+          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.DISCONNECTED);
+        });
 
-    this.client.connect().catch((err) => {
-      console.error(err);
-      if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR);
-    });
+        this.client.connect().catch((err) => {
+          console.error("Twitch Connection Error:", err);
+          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR);
+        });
+    } catch (error) {
+        console.error("Failed to initialize Twitch Client:", error);
+        if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR);
+    }
   }
 
   public disconnect() {
     if (this.client) {
-      this.client.disconnect();
+      try {
+        // Only disconnect if connected or connecting
+        if (this.client.readyState() === 'OPEN' || this.client.readyState() === 'CONNECTING') {
+            this.client.disconnect();
+        }
+      } catch (e) {
+          console.warn("Error disconnecting", e);
+      }
       this.client = null;
       if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.DISCONNECTED);
     }
   }
 
   public sendMessage(message: string) {
+    // Prevent sending if anonymous (no token provided)
+    if (this.isAnonymous) {
+      console.warn("Skipping message send: Anonymous connection (No OAuth token provided).");
+      return;
+    }
+
     if (this.client && this.client.readyState() === 'OPEN') {
       this.client.say(this.currentChannel, message).catch(err => {
         console.error("Failed to send message:", err);

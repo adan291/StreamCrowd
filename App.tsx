@@ -4,37 +4,83 @@ import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
 import { RecentVotes } from './components/RecentVotes';
 import { PollHistory } from './components/PollHistory';
+import { ChatFeed } from './components/ChatFeed';
+import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
+import { StreamPlayer } from './components/StreamPlayer';
 import { twitchService } from './services/twitchService';
-import { ConnectionStatus, Poll, VoteRecord } from './types';
+import { ConnectionStatus, Poll, VoteRecord, TwitchMessage } from './types';
 import { CHART_COLORS } from './constants';
-import { History } from 'lucide-react';
+import { History, MessageSquare, Activity, Tv } from 'lucide-react';
 import { Button } from './components/Button';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [currentPoll, setCurrentPoll] = useState<Poll | null>(null);
   const [voteHistory, setVoteHistory] = useState<VoteRecord[]>([]);
+  const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
   const [channelName, setChannelName] = useState<string>('');
+  const [authToken, setAuthToken] = useState<string>('');
   const [pastPolls, setPastPolls] = useState<Poll[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [activeTab, setActiveTab] = useState<'votes' | 'chat' | 'stream'>('votes');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   
-  // Use a ref for voted users to avoid closure staleness
-  const votedUsersRef = useRef<Set<string>>(new Set());
+  // Lifted from Ref to State to trigger re-renders in ChatFeed
+  const [votedUserIds, setVotedUserIds] = useState<Set<string>>(new Set());
+  
   // Use a ref to access the current poll state inside the TMI callback
   const pollRef = useRef<Poll | null>(null);
+  
+  // Keep ref for logic that needs instant access without dependencies
+  const votedUserIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     pollRef.current = currentPoll;
   }, [currentPoll]);
 
+  const addNotification = (type: NotificationType, message: string) => {
+    const id = Date.now().toString() + Math.random();
+    setNotifications(prev => [...prev, { id, type, message }]);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   useEffect(() => {
+    if (!channelName) return;
+
+    // Connect when channelName changes
+    twitchService.connect(channelName, authToken);
+
     // Setup Twitch Service Listeners
-    twitchService.onStatusChange(setStatus);
+    twitchService.onStatusChange((newStatus) => {
+        setStatus(newStatus);
+        if (newStatus === ConnectionStatus.ERROR) {
+            addNotification('error', 'Error de conexión con Twitch. Verifica el canal o tu internet.');
+        } else if (newStatus === ConnectionStatus.CONNECTED) {
+            addNotification('success', `Conectado al chat de ${channelName}`);
+        } else if (newStatus === ConnectionStatus.DISCONNECTED && status === ConnectionStatus.CONNECTED) {
+            addNotification('info', 'Desconectado del chat.');
+        }
+    });
 
     twitchService.onMessage((tags, message, self) => {
+      // 0. Store in Chat History (Keep last 100 messages)
+      const chatMsg: TwitchMessage = {
+          username: tags['display-name'] || tags.username || 'Anonymous',
+          message: message,
+          color: tags.color,
+          id: tags.id,
+          userId: tags['user-id']
+      };
+      setChatMessages(prev => [...prev.slice(-99), chatMsg]);
+
       // 1. Handle Streamer/Mod Commands
-      const isBroadcaster = tags.username?.toLowerCase() === channelName.toLowerCase();
-      // Simple command parser
+      const sender = tags.username?.toLowerCase() || '';
+      const targetChannel = channelName.toLowerCase().replace('#', '');
+      const isBroadcaster = sender === targetChannel;
+      
       const lowerMsg = message.trim().toLowerCase();
 
       // Viewers can ask for poll info
@@ -44,9 +90,6 @@ const App: React.FC = () => {
              .map(o => `+${o.id} (${o.label})`)
              .join(' | ');
            twitchService.sendMessage(`📊 ${pollRef.current.question} 👉 Opciones: ${optionsText}`);
-        } else {
-           // Optional: Reply even if inactive, or stay silent to reduce spam
-           // twitchService.sendMessage(`😴 No hay ninguna encuesta activa.`);
         }
         return;
       }
@@ -74,10 +117,12 @@ const App: React.FC = () => {
         const userId = tags['user-id'] || username; 
 
         const optionExists = pollRef.current.options.some(opt => opt.id === optionId);
-        const hasVoted = votedUsersRef.current.has(userId);
+        const hasVoted = votedUserIdsRef.current.has(userId);
 
         if (optionExists && !hasVoted) {
           handleVote(userId, username, optionId);
+        } else if (!optionExists) {
+           // Optional: Debug log or silent ignore for invalid option
         }
       }
     });
@@ -85,18 +130,23 @@ const App: React.FC = () => {
     return () => {
       twitchService.disconnect();
     };
-  }, [channelName]);
+  }, [channelName, authToken]); // Re-run if channel or token changes
 
   const handleVote = (userId: string, username: string, optionId: number) => {
     // Check Max Votes Limit
     if (pollRef.current && pollRef.current.maxVotes) {
       if (pollRef.current.totalVotes >= pollRef.current.maxVotes) {
-         // Should have been stopped, but just in case
          return;
       }
     }
 
-    votedUsersRef.current.add(userId);
+    // Update Refs and State
+    votedUserIdsRef.current.add(userId);
+    setVotedUserIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(userId);
+        return newSet;
+    });
 
     setCurrentPoll(prev => {
       if (!prev) return null;
@@ -117,7 +167,7 @@ const App: React.FC = () => {
     if (pollRef.current?.maxVotes) {
        const newTotal = pollRef.current.totalVotes + 1;
        if (newTotal >= pollRef.current.maxVotes) {
-          stopPoll(true); // true = auto stopped
+          stopPoll(true); 
        }
     }
 
@@ -129,13 +179,15 @@ const App: React.FC = () => {
   };
 
   const connectTwitch = (channel: string, token?: string) => {
+    // Just update state, useEffect will handle connection
+    setAuthToken(token || '');
     setChannelName(channel);
-    twitchService.connect(channel, token);
   };
 
   const disconnectTwitch = () => {
-    twitchService.disconnect();
     setChannelName('');
+    setAuthToken('');
+    setChatMessages([]);
   };
 
   const createPoll = (title: string, question: string, optionsData: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number) => {
@@ -158,14 +210,18 @@ const App: React.FC = () => {
       maxVotes
     };
     
-    votedUsersRef.current.clear();
+    votedUserIdsRef.current.clear();
+    setVotedUserIds(new Set());
     setVoteHistory([]);
     setCurrentPoll(newPoll);
+    setActiveTab('votes'); // Switch to votes tab on new poll
 
     // Announce poll if connected
     const optionsText = newPoll.options.map(o => `+${o.id} (${o.label})`).join(' | ');
     const maxText = maxVotes ? ` (Meta: ${maxVotes} votos)` : '';
     twitchService.sendMessage(`🔴 ${title}: ${question}${maxText} 👉 Escribe: ${optionsText}`);
+    
+    addNotification('success', '¡Encuesta iniciada correctamente!');
   };
 
   const stopPoll = (auto = false) => {
@@ -173,6 +229,8 @@ const App: React.FC = () => {
       if (!prev || !prev.isActive) return prev;
       const reason = auto ? "¡Meta de votos alcanzada! 🎯" : "La encuesta ha finalizado.";
       twitchService.sendMessage(`🛑 ${reason} ¡Gracias por votar!`);
+      if (auto) addNotification('info', 'La encuesta se detuvo automáticamente (Meta alcanzada).');
+      else addNotification('info', 'Encuesta detenida manualmente.');
       return { ...prev, isActive: false };
     });
   };
@@ -184,8 +242,10 @@ const App: React.FC = () => {
     }
 
     setCurrentPoll(null);
-    votedUsersRef.current.clear();
+    votedUserIdsRef.current.clear();
+    setVotedUserIds(new Set());
     setVoteHistory([]);
+    addNotification('info', 'Panel reiniciado.');
   };
 
   const optionsMap = currentPoll ? currentPoll.options.reduce((acc, opt) => ({
@@ -193,7 +253,9 @@ const App: React.FC = () => {
   }), {}) : {};
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
+    <div className="min-h-screen p-4 md:p-8 relative">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      
       {showHistory && (
         <PollHistory history={pastPolls} onClose={() => setShowHistory(false)} />
       )}
@@ -241,7 +303,7 @@ const App: React.FC = () => {
         {status === ConnectionStatus.CONNECTED && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* Left Column */}
+            {/* Left Column (Poll) */}
             <div className="lg:col-span-8 h-[650px] transition-all duration-300">
               {currentPoll ? (
                 <LivePoll 
@@ -251,12 +313,15 @@ const App: React.FC = () => {
                   onReset={resetPoll}
                 />
               ) : (
-                <PollCreator onCreate={createPoll} />
+                <PollCreator 
+                  onCreate={createPoll} 
+                  onNotification={(type, msg) => addNotification(type, msg)}
+                />
               )}
             </div>
 
-            {/* Right Column */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
+            {/* Right Column (Sidebar) */}
+            <div className="lg:col-span-4 flex flex-col gap-4 h-[650px]">
               
               {/* Mobile History Button */}
               <div className="md:hidden">
@@ -265,7 +330,7 @@ const App: React.FC = () => {
                  </Button>
               </div>
 
-              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl shadow-md">
+              <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl shadow-md shrink-0">
                 <h3 className="font-bold text-white mb-2">Comandos de Chat</h3>
                 <div className="space-y-2 text-sm text-zinc-400">
                   <div className="flex justify-between border-b border-zinc-800 pb-2">
@@ -289,9 +354,59 @@ const App: React.FC = () => {
                 onDisconnect={disconnectTwitch} 
               />
 
-              {currentPoll && (
-                <RecentVotes votes={voteHistory} options={optionsMap} />
-              )}
+              {/* Tabs and Content (Chat, Votes, Stream) */}
+              <div className="flex-1 flex flex-col min-h-0">
+                 <div className="flex gap-2 mb-2 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800 shrink-0">
+                    <button 
+                        onClick={() => setActiveTab('votes')}
+                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'votes' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                       <Activity size={14} /> Votos
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('chat')}
+                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'chat' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                       <MessageSquare size={14} /> Chat
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('stream')}
+                        className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2 ${activeTab === 'stream' ? 'bg-twitch-brand text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                       <Tv size={14} /> Stream
+                    </button>
+                 </div>
+
+                 <div className="flex-1 min-h-0">
+                     {activeTab === 'votes' && (
+                        currentPoll ? (
+                           <div className="h-full">
+                               <RecentVotes votes={voteHistory} options={optionsMap} />
+                           </div>
+                        ) : (
+                           <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-xl p-8 text-center text-zinc-500 text-sm h-full flex items-center justify-center">
+                              <p>Inicia una votación para ver la actividad.</p>
+                           </div>
+                        )
+                     )}
+                     
+                     {activeTab === 'chat' && (
+                        <div className="h-full">
+                           <ChatFeed 
+                             messages={chatMessages} 
+                             votedUserIds={votedUserIds} 
+                             options={currentPoll?.options} 
+                           />
+                        </div>
+                     )}
+
+                     {activeTab === 'stream' && (
+                        <div className="h-full">
+                          <StreamPlayer channel={channelName} />
+                        </div>
+                     )}
+                 </div>
+              </div>
             </div>
           </div>
         )}

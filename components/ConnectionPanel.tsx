@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ConnectionStatus } from '../types';
 import { Button } from './Button';
 import { Wifi, WifiOff, Loader2, KeyRound } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -55,7 +56,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left">
-          <label className="text-xs text-zinc-500 font-bold ml-1 uppercase">Canal</label>
+          <label className="text-xs text-zinc-500 font-bold ml-1 uppercase flex items-center">
+            Canal
+            <Tooltip text="El nombre de usuario de Twitch donde se leerá el chat (ej. ibai)." />
+          </label>
           <input
             type="text"
             value={channel}
@@ -73,7 +77,8 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
             className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 mb-1 transition-colors"
           >
             <KeyRound size={12} />
-            {showToken ? 'Ocultar Token (Opcional)' : 'Token OAuth (Opcional - Para responder !poll)'}
+            {showToken ? 'Ocultar Token (Opcional)' : 'Token OAuth (Opcional)'}
+            <Tooltip text="Necesario para que el bot responda en el chat (!poll, !stop). Puedes generarlo en twitchtokengenerator.com (scope: chat:edit)." />
           </button>
           
           {showToken && (

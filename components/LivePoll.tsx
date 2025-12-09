@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { Poll, VoteRecord } from '../types';
+import { Poll, VoteRecord, PollOption } from '../types';
 import { Button } from './Button';
-import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy } from 'lucide-react';
+import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Clipboard, Copy } from 'lucide-react';
 
 interface LivePollProps {
   poll: Poll;
@@ -15,6 +15,8 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
   const [showConfirmStop, setShowConfirmStop] = useState(false);
   const [prevVotes, setPrevVotes] = useState<{[key: number]: number}>({});
   const [animatingOptions, setAnimatingOptions] = useState<{[key: number]: boolean}>({});
+  const [copied, setCopied] = useState(false);
+  const [copiedOptionId, setCopiedOptionId] = useState<number | null>(null);
 
   // Detect vote changes to trigger animation
   useEffect(() => {
@@ -92,6 +94,23 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
     document.body.removeChild(link);
   };
 
+  const sharePoll = () => {
+    const optionsText = poll.options.map(o => `+${o.id} ${o.label}`).join(' | ');
+    const text = `📊 ${poll.question} 👉 Opciones: ${optionsText}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const shareOption = (opt: PollOption, percentage: string) => {
+    const text = `${opt.label}: ${percentage}% de los votos`;
+    navigator.clipboard.writeText(text).then(() => {
+        setCopiedOptionId(opt.id);
+        setTimeout(() => setCopiedOptionId(null), 1500);
+    });
+  };
+
   return (
     <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-xl h-full flex flex-col animate-[fadeIn_0.5s_ease-out]">
       <style>{`
@@ -149,6 +168,16 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
         </div>
         
         <div className="flex gap-2 shrink-0 flex-col items-end sm:flex-row">
+           <Button 
+              variant="ghost" 
+              onClick={sharePoll} 
+              size="sm" 
+              title="Copiar pregunta y opciones al portapapeles"
+              className={copied ? "text-green-400 hover:text-green-300" : ""}
+            >
+              {copied ? <CheckCircle2 size={18} /> : <Share2 size={18} />}
+           </Button>
+
            {!poll.isActive && (
              <Button variant="ghost" onClick={exportCSV} size="sm" title="Exportar CSV">
                <Download size={18} /> CSV
@@ -264,6 +293,7 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
             const percentage = poll.totalVotes > 0 ? ((opt.votes / poll.totalVotes) * 100).toFixed(1) : "0.0";
             const isWinner = !poll.isActive && winner?.id === opt.id && opt.votes > 0;
             const isAnimating = animatingOptions[opt.id];
+            const isCopied = copiedOptionId === opt.id;
 
             return (
               <div 
@@ -291,7 +321,16 @@ export const LivePoll: React.FC<LivePollProps> = ({ poll, voteHistory, onStop, o
                       {opt.label}
                     </span>
                   </div>
-                  <span className="font-bold text-white tabular-nums shrink-0 ml-2">{percentage}%</span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className="font-bold text-white tabular-nums">{percentage}%</span>
+                      <button 
+                         onClick={() => shareOption(opt, percentage)}
+                         className="text-zinc-500 hover:text-white transition-colors"
+                         title="Copiar resultado"
+                      >
+                         {isCopied ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
+                      </button>
+                  </div>
                 </div>
                 
                 {/* Progress Bar Background */}

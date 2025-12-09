@@ -31,6 +31,7 @@ export interface SavedPoll {
   question: string;
   options: { label: string; color: string; icon?: string; image?: string }[];
   maxVotes?: number;
+  isFavorite?: boolean;
 }
 
 export enum ConnectionStatus {
