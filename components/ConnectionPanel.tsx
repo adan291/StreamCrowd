@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ConnectionStatus } from '../types';
 import { Button } from './Button';
-import { Wifi, WifiOff, Loader2, KeyRound, Link as LinkIcon, Check, AlertCircle } from 'lucide-react';
+import { Wifi, Loader2, KeyRound, Link as LinkIcon, Check, AlertCircle } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
 interface ConnectionPanelProps {
@@ -20,24 +20,18 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
   const [localError, setLocalError] = useState<string | null>(null);
   const [isUrlDetected, setIsUrlDetected] = useState(false);
 
-  // Helper to extract username from URL or raw text
   const extractUsername = (input: string): string => {
-    // Regex to catch twitch.tv/username pattern
     const urlRegex = /^(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]+)(?:\/.*)?$/i;
     const match = input.match(urlRegex);
-    
     if (match && match[1]) {
         setIsUrlDetected(true);
         return match[1].toLowerCase();
     }
-    
-    // If input contains slashes but not twitch.tv, just take the last part
     if (input.includes('/')) {
         const parts = input.split('/');
         const lastPart = parts[parts.length - 1];
         if (lastPart) return lastPart.trim();
     }
-
     setIsUrlDetected(false);
     return input.trim();
   };
@@ -46,20 +40,19 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       const rawValue = e.target.value;
       const cleanValue = extractUsername(rawValue);
       setChannel(cleanValue);
-      
       if (localError) setLocalError(null);
   };
 
   const validateChannel = (value: string): boolean => {
     const cleanChannel = value.trim();
     if (!cleanChannel) {
-        setLocalError('El nombre del canal no puede estar vacío.');
+        setLocalError('El nombre del canal es obligatorio.');
         return false;
     }
-    // Twitch username: 4-25 characters, alphanumeric + underscores
+    // Strict Twitch username rules: 3-25 chars, alphanumeric + underscores
     const channelRegex = /^[a-zA-Z0-9_]{3,25}$/;
     if (!channelRegex.test(cleanChannel)) {
-        setLocalError('Nombre inválido (solo letras, números y guion bajo).');
+        setLocalError('Nombre inválido (3-25 caracteres, letras, números y _).');
         return false;
     }
     setLocalError(null);
@@ -77,7 +70,6 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
     }
   };
 
-  // Reset URL detected icon after a moment
   useEffect(() => {
     if (isUrlDetected) {
         const timer = setTimeout(() => setIsUrlDetected(false), 2000);
@@ -85,17 +77,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
     }
   }, [isUrlDetected]);
 
-  if (status === ConnectionStatus.CONNECTED) {
-    // Hidden here because App.tsx handles the connected state in the header
-    return null;
-  }
-
-  // Determine which error to show (validation error or API error)
-  const displayError = localError || errorMessage;
+  if (status === ConnectionStatus.CONNECTED) return null;
 
   return (
     <div className="bg-white/90 dark:bg-zinc-900/90 p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md max-w-md mx-auto mt-10 md:mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-twitch-brand to-twitch-accent"></div>
 
       <div className="mb-6 flex justify-center relative">
@@ -107,14 +92,14 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       
       <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white tracking-tight">Vincular Chat</h2>
       <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm">
-          Ingresa el canal o pega la URL para conectar.
+          Ingresa el canal para conectar al chat.
       </p>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left group">
           <label className="text-xs text-zinc-500 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
             Canal / URL
-            <Tooltip text="El nombre de usuario o enlace de Twitch (ej. https://twitch.tv/ibai)." />
+            <Tooltip text="El nombre de usuario o enlace de Twitch (ej. ibai)." />
           </label>
           <div className="relative">
               <input
@@ -122,22 +107,14 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                 value={channel}
                 onChange={handleInputChange}
                 onBlur={handleBlur}
-                placeholder="Ej: ibai o twitch.tv/ibai"
-                className={`w-full bg-zinc-50 dark:bg-black/50 border text-zinc-900 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium ${displayError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-zinc-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
+                placeholder="Ej: ibai"
+                className={`w-full bg-zinc-50 dark:bg-black/50 border text-zinc-900 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium ${localError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-zinc-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
                 disabled={status === ConnectionStatus.CONNECTING}
                 autoComplete="off"
-                autoCorrect="off"
                 spellCheck="false"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none transition-all duration-300">
-                  {isUrlDetected ? (
-                      <div className="flex items-center gap-1 text-green-500 animate-scale-up">
-                          <LinkIcon size={16} />
-                          <Check size={14} />
-                      </div>
-                  ) : displayError ? (
-                      <AlertCircle size={18} className="text-red-500" />
-                  ) : null}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">
+                  {isUrlDetected ? <LinkIcon size={16} className="text-green-500" /> : localError ? <AlertCircle size={18} className="text-red-500" /> : null}
               </div>
           </div>
         </div>
@@ -149,21 +126,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
             className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 flex items-center gap-1 mb-1 transition-colors"
           >
             <KeyRound size={12} />
-            {showToken ? 'Ocultar Token (Opcional)' : 'Token OAuth (Opcional)'}
-            <Tooltip text="Necesario para que el bot responda en el chat (!poll, !stop). Puedes generarlo en twitchtokengenerator.com" />
+            {showToken ? 'Ocultar Token' : 'Token OAuth (Opcional)'}
           </button>
-          
           {showToken && (
-            <div className="animate-fade-in-down">
-                <input
+            <input
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="oauth:xxxxxxxxxxxxx"
-                className="w-full bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-2 focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20 transition-all text-sm font-mono"
-                disabled={status === ConnectionStatus.CONNECTING}
-                />
-            </div>
+                className="w-full bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono"
+            />
           )}
         </div>
 
@@ -173,34 +145,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
           disabled={!channel.trim() || status === ConnectionStatus.CONNECTING}
           className="h-12 text-base shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40"
         >
-          {status === ConnectionStatus.CONNECTING ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              Conectando...
-            </>
-          ) : (
-            'Conectar al Chat'
-          )}
+          {status === ConnectionStatus.CONNECTING ? <><Loader2 className="animate-spin" size={20} /> Conectando...</> : 'Conectar al Chat'}
         </Button>
       </form>
       
-      {displayError && (
+      {(errorMessage || localError) && (
         <div className="mt-4 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-medium bg-red-100 dark:bg-red-500/10 py-2 px-3 rounded-lg border border-red-200 dark:border-red-500/20 text-left animate-shake">
           <AlertCircle size={16} className="shrink-0" />
-          <span className="break-words w-full">{displayError}</span>
+          <span className="break-words w-full">{localError || errorMessage}</span>
         </div>
       )}
-      
-      <style>{`
-          @keyframes shake {
-              0%, 100% { transform: translateX(0); }
-              25% { transform: translateX(-5px); }
-              75% { transform: translateX(5px); }
-          }
-          .animate-shake {
-              animation: shake 0.3s ease-in-out;
-          }
-      `}</style>
     </div>
   );
 };
