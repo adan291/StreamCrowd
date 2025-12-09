@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, Volume2, VolumeX, Play, Pause, AlertTriangle, RefreshCw, Maximize, Minimize, Share2, Check, Tv } from 'lucide-react';
+import { Eye, EyeOff, Volume2, VolumeX, Play, Pause, AlertTriangle, RefreshCw, Maximize, Minimize, Share2, Check } from 'lucide-react';
 
 interface StreamPlayerProps {
   channel: string;
@@ -292,7 +292,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
            {/* Status Badge */}
            <div className="flex items-center gap-2">
               {isLive === true ? (
-                <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-red-500/20 shadow-lg tracking-wider">
+                <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-green-500/20 shadow-lg tracking-wider">
                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span> LIVE
                 </span>
               ) : (
@@ -328,7 +328,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
               {/* Play/Pause */}
               <button 
                  onClick={togglePlay}
-                 className="text-white hover:text-twitch-light transition-colors"
+                 className="text-white hover:text-twitch-light transition-colors p-1"
               >
                  {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
               </button>
@@ -337,12 +337,12 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
               <div className="flex items-center gap-2 group/vol">
                  <button 
                    onClick={toggleMute}
-                   className="text-white hover:text-twitch-light transition-colors"
+                   className="text-white hover:text-twitch-light transition-colors p-1"
                  >
                     {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                  </button>
                  
-                 <div className="w-0 overflow-hidden group-hover/vol:w-20 transition-all duration-300">
+                 <div className="w-0 overflow-hidden group-hover/vol:w-16 sm:group-hover/vol:w-20 transition-all duration-300">
                    <input
                      type="range"
                      min="0"
@@ -353,7 +353,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
                      onClick={stopPropagation}
                      onMouseDown={stopPropagation}
                      onMouseUp={stopPropagation}
-                     className="w-20 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-twitch-brand"
+                     className="w-16 sm:w-20 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-twitch-brand"
                    />
                  </div>
               </div>
@@ -367,7 +367,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
                  {/* Fullscreen Toggle */}
                  <button 
                     onClick={toggleFullscreen}
-                    className="text-white hover:text-twitch-light transition-colors"
+                    className="text-white hover:text-twitch-light transition-colors p-1"
                  >
                     {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
                  </button>

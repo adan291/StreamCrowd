@@ -85,38 +85,15 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
   }, [isUrlDetected]);
 
   if (status === ConnectionStatus.CONNECTED) {
-    return (
-      <div className="bg-white dark:bg-zinc-900 border border-green-500/30 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between shadow-lg mb-6 animate-fade-in-down gap-4 transition-colors">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_#22c55e] shrink-0"></div>
-            <div className="flex flex-col">
-                <span className="text-zinc-500 dark:text-zinc-400 text-xs font-medium uppercase tracking-wider leading-none mb-1">Conectado a</span>
-                <span className="font-bold text-zinc-900 dark:text-white text-xl tracking-wide leading-none truncate max-w-[200px]">
-                    {channelName || channel}
-                </span>
-            </div>
-        </div>
-        <button 
-            onClick={() => {
-                onDisconnect();
-                setChannel('');
-                setToken('');
-                setLocalError(null);
-            }}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-500 text-white shadow-sm text-sm border border-red-500/50"
-        >
-            <WifiOff size={16} />
-            Desconectar
-        </button>
-      </div>
-    );
+    // Hidden here because App.tsx handles the connected state in the header
+    return null;
   }
 
   // Determine which error to show (validation error or API error)
   const displayError = localError || errorMessage;
 
   return (
-    <div className="bg-white/90 dark:bg-zinc-900/90 p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md max-w-md mx-auto mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
+    <div className="bg-white/90 dark:bg-zinc-900/90 p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md max-w-md mx-auto mt-10 md:mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-twitch-brand to-twitch-accent"></div>
 
@@ -209,7 +186,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       {displayError && (
         <div className="mt-4 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-medium bg-red-100 dark:bg-red-500/10 py-2 px-3 rounded-lg border border-red-200 dark:border-red-500/20 text-left animate-shake">
           <AlertCircle size={16} className="shrink-0" />
-          {displayError}
+          <span className="break-words w-full">{displayError}</span>
         </div>
       )}
       

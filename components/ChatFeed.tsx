@@ -59,7 +59,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
       <div 
         ref={containerRef} 
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50/50 dark:bg-black/20"
+        className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50/50 dark:bg-black/20"
       >
         {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">
