@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Volume2, VolumeX, Play, Pause, AlertTriangle, RefreshCw, Maximize, Minimize, Share2, Check } from 'lucide-react';
 
@@ -26,7 +27,8 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
 
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const embedId = "twitch-embed";
+  // Generate a unique ID for this instance to prevent collisions
+  const embedId = useRef(`twitch-embed-${Math.floor(Math.random() * 100000)}`).current;
 
   // Handle Fullscreen changes
   useEffect(() => {
@@ -76,7 +78,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
       const hostname = window.location.hostname;
       const parent = hostname === '' ? 'localhost' : hostname;
 
-      // Manually create the embed element
+      // Manually create the embed element with UNIQUE ID
       const embedElem = document.createElement('div');
       embedElem.id = embedId;
       embedElem.style.width = '100%';
@@ -104,8 +106,12 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
           player.addEventListener(window.Twitch.Player.READY, () => {
             if (!mounted) return;
             setIsReady(true);
-            player.setVolume(0.5);
-            setIsMuted(player.getMuted());
+            try {
+              player.setVolume(0.5);
+              if (player.getMuted() !== undefined) setIsMuted(player.getMuted());
+            } catch (e) {
+               console.warn("Error setting volume/mute status", e);
+            }
           });
 
           player.addEventListener(window.Twitch.Player.ONLINE, () => {
@@ -154,7 +160,7 @@ export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
       clearInterval(checkInterval);
       cleanup();
     };
-  }, [channel, isHidden]);
+  }, [channel, isHidden, embedId]);
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();

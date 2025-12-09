@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { PollCreator } from './components/PollCreator';
@@ -8,10 +9,11 @@ import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
 import { StreamPlayer } from './components/StreamPlayer';
 import { AssetLibrary } from './components/AssetLibrary';
+import { Overlays } from './components/Overlays';
 import { twitchService } from './services/twitchService';
 import { ConnectionStatus, Poll, VoteRecord, TwitchMessage, MediaAsset } from './types';
 import { CHART_COLORS } from './constants';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, LogOut, Power } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, Layers } from 'lucide-react';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -28,8 +30,8 @@ const App: React.FC = () => {
   // Right sidebar tabs (Chat, Stream)
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
   
-  // Left column tabs (Control Panel, Gallery, Activity)
-  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity'>('panel');
+  // Left column tabs (Control Panel, Gallery, Activity, Overlays)
+  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity' | 'overlays'>('panel');
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
@@ -399,35 +401,44 @@ const App: React.FC = () => {
               <div className="lg:col-span-8 flex flex-col h-auto lg:h-[650px] gap-6 lg:gap-0">
                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-xl h-[600px] lg:h-full flex flex-col overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
                       {/* Tabs Header */}
-                      <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20 shrink-0">
+                      <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/20 shrink-0 overflow-x-auto">
                           <button 
                              onClick={() => setLeftTab('panel')}
-                             className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'panel' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                             className={`flex-1 min-w-[100px] py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'panel' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                           >
                              {currentPoll ? <LayoutDashboard size={18} /> : <VoteIcon size={18} />} 
-                             <span className="truncate">{currentPoll ? 'Panel de Control' : 'Crear Votación'}</span>
+                             <span className="truncate">{currentPoll ? 'Panel' : 'Votación'}</span>
                              {leftTab === 'panel' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                           </button>
                           <button 
                              onClick={() => setLeftTab('gallery')}
-                             className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'gallery' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                             className={`flex-1 min-w-[100px] py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'gallery' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                           >
                              <ImageIcon size={18} /> <span className="truncate">Galería</span>
                              {leftTab === 'gallery' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                           </button>
                           <button 
                              onClick={() => setLeftTab('activity')}
-                             className={`flex-1 py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'activity' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                             className={`flex-1 min-w-[100px] py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'activity' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
                           >
                              <Activity size={18} /> <span className="truncate">Actividad</span>
                              {leftTab === 'activity' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
                           </button>
+                          <button 
+                             onClick={() => setLeftTab('overlays')}
+                             className={`flex-1 min-w-[100px] py-4 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 relative ${leftTab === 'overlays' ? 'text-twitch-brand dark:text-twitch-light bg-white dark:bg-zinc-900' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+                          >
+                             <Layers size={18} /> <span className="truncate">Overlays</span>
+                             {leftTab === 'overlays' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-twitch-brand dark:bg-twitch-light"></div>}
+                          </button>
                       </div>
 
-                      {/* Content */}
+                      {/* Content Area - Using CSS display instead of conditional rendering to preserve state */}
                       <div className="flex-1 overflow-hidden relative">
-                          {leftTab === 'panel' && (
-                               currentPoll ? (
+                          
+                          {/* PANEL (CREATOR + LIVE POLL) */}
+                          <div className={`h-full flex flex-col ${leftTab === 'panel' ? '' : 'hidden'}`}>
+                               {currentPoll ? (
                                   <LivePoll 
                                     poll={currentPoll} 
                                     voteHistory={voteHistory}
@@ -440,20 +451,31 @@ const App: React.FC = () => {
                                     onCreate={createPoll} 
                                     onNotification={(type, msg) => addNotification(type, msg)}
                                     mediaLibrary={mediaLibrary}
+                                    onAddAsset={handleAddAsset}
                                   />
-                               )
-                          )}
-                          {leftTab === 'gallery' && (
+                               )}
+                          </div>
+
+                          {/* GALLERY */}
+                          <div className={`h-full ${leftTab === 'gallery' ? '' : 'hidden'}`}>
                                <AssetLibrary 
                                   assets={mediaLibrary} 
                                   onAdd={handleAddAsset} 
                                   onDelete={handleDeleteAsset}
                                   onNotification={(type, msg) => addNotification(type, msg)}
                                />
-                          )}
-                          {leftTab === 'activity' && (
+                          </div>
+                          
+                          {/* ACTIVITY */}
+                          <div className={`h-full ${leftTab === 'activity' ? '' : 'hidden'}`}>
                               <RecentVotes votes={voteHistory} options={optionsMap} />
-                          )}
+                          </div>
+
+                          {/* OVERLAYS */}
+                          <div className={`h-full ${leftTab === 'overlays' ? '' : 'hidden'}`}>
+                              <Overlays currentPoll={currentPoll} voteHistory={voteHistory} theme={theme} />
+                          </div>
+
                       </div>
                   </div>
               </div>

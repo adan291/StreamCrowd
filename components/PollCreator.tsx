@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Play, Save, Bookmark, X, Palette, RefreshCcw, Smile, Image as ImageIcon, Upload, AlertCircle, Star, MousePointerClick, Check, Grid, Zap, Eye, Target } from 'lucide-react';
 import { Button } from './Button';
@@ -11,9 +12,10 @@ interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number) => void;
   onNotification?: (type: NotificationType, message: string) => void;
   mediaLibrary?: MediaAsset[];
+  onAddAsset?: (asset: MediaAsset) => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [] }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset }) => {
   const [title, setTitle] = useState('Encuesta en Vivo');
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string }[]>([
@@ -143,10 +145,21 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                   ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, ICON_SIZE, ICON_SIZE);
                   const iconDataUrl = canvas.toDataURL('image/png');
                   
+                  // Add to global library if function is provided
+                  if (onAddAsset) {
+                      const newAsset: MediaAsset = {
+                          id: Date.now().toString(),
+                          name: file.name.split('.')[0].slice(0, 15) || `Img ${index}`,
+                          data: iconDataUrl,
+                          date: Date.now()
+                      };
+                      onAddAsset(newAsset);
+                  }
+
                   const newOptions = [...options];
                   newOptions[index].image = iconDataUrl;
                   setOptions(newOptions);
-                  if (onNotification) onNotification('success', 'Icono creado y asignado.');
+                  if (onNotification) onNotification('success', 'Icono asignado y guardado en Galería.');
               }
           } catch (err) {
               console.error(err);
@@ -275,7 +288,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
   return (
     <>
-      <div className="h-full flex flex-col relative p-4 md:p-6 bg-zinc-50 dark:bg-black/10">
+      <div className="h-full flex flex-col relative p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
             <span className="bg-twitch-brand w-8 h-8 rounded-lg flex items-center justify-center text-sm text-white shadow-lg shadow-twitch-brand/30">🛠️</span>
