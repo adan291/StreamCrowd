@@ -5,102 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TwitchVote Live</title>
     <script src="https://embed.twitch.tv/embed/v1.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              twitch: {
-                dark: '#18181b',
-                light: '#a970ff',
-                brand: '#6441a5',
-                accent: '#00f0f0'
-              }
-            },
-            backgroundImage: {
-              'dot-pattern': 'radial-gradient(circle, #3f3f46 1px, transparent 1px)',
-              'dot-pattern-light': 'radial-gradient(circle, #e4e4e7 1px, transparent 1px)',
-            },
-            backgroundSize: {
-              'dot-md': '24px 24px',
-            },
-            animation: {
-              'scale-up': 'scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-              'fade-in': 'fadeIn 0.2s ease-out forwards',
-              'slide-up': 'slideUp 0.3s ease-out forwards',
-              'spin-slow': 'spin 12s linear infinite',
-              'fade-in-down': 'fadeInDown 0.5s ease-out forwards',
-              'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
-              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            },
-            keyframes: {
-              scaleUp: {
-                '0%': { transform: 'scale(0.95)', opacity: '0' },
-                '100%': { transform: 'scale(1)', opacity: '1' },
-              },
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              slideUp: {
-                '0%': { transform: 'translateY(20px)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              },
-              fadeInDown: {
-                '0%': { opacity: '0', transform: 'translateY(-10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-              fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      /* Custom Scrollbar - Refined */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #d4d4d8; 
-        border-radius: 10px;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #3f3f46;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #a1a1aa; 
-      }
-      .dark ::-webkit-scrollbar-thumb:hover {
-        background: #52525b;
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "tmi.js": "https://aistudiocdn.com/tmi.js@^1.8.5",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.1"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-  <body class="bg-zinc-100 dark:bg-[#0f0f11] bg-dot-pattern-light dark:bg-dot-pattern bg-dot-md transition-colors duration-300 min-h-screen selection:bg-twitch-brand selection:text-white">
+    <link rel="stylesheet" href="/index.css">
+  </head>
+  <body class="bg-zinc-100 dark:bg-[#0f0f11] bg-dot-pattern-light dark:bg-dot-pattern transition-colors duration-300 min-h-screen selection:bg-twitch-brand selection:text-white">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>

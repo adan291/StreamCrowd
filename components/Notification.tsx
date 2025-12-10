@@ -50,13 +50,13 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
   };
 
   return (
-    <div className={`pointer-events-auto inline-flex items-center gap-3 p-3 pr-4 rounded-xl border shadow-2xl animate-slide-up bg-zinc-900 ${borderColors[note.type]} w-auto max-w-md min-w-[300px]`}>
+    <div className={`pointer-events-auto inline-flex items-center gap-2 sm:gap-3 p-2 sm:p-3 pr-3 sm:pr-4 rounded-xl border shadow-2xl animate-slide-up bg-zinc-900 ${borderColors[note.type]} w-auto max-w-[calc(100vw-2rem)] sm:max-w-md min-w-0 sm:min-w-[280px]`}>
       
       {/* Icon or Avatar */}
       <div className="shrink-0">
         {note.metadata?.channelInitial ? (
-           <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700">
-             <span className="font-bold text-twitch-brand dark:text-twitch-light uppercase text-sm">
+           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700">
+             <span className="font-bold text-twitch-brand dark:text-twitch-light uppercase text-xs sm:text-sm">
                {note.metadata.channelInitial}
              </span>
            </div>
@@ -65,7 +65,7 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
         )}
       </div>
 
-      <p className="text-sm text-zinc-200 font-medium flex-1 leading-tight whitespace-normal">
+      <p className="text-xs sm:text-sm text-zinc-200 font-medium flex-1 leading-tight whitespace-normal">
         {note.message}
       </p>
       

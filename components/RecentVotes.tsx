@@ -31,15 +31,15 @@ export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
   return (
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
       {/* Header - simplified as it's inside a tab */}
-      <div className="flex justify-between items-center p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-10">
-         <h4 className="text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider">Últimos {Math.min(votes.length, 50)} Votos</h4>
+      <div className="flex justify-between items-center p-2 sm:p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-10 shrink-0">
+         <h4 className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Últimos {Math.min(votes.length, 50)} Votos</h4>
          <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
          </span>
       </div>
       
-      <div ref={containerRef} className="overflow-y-auto flex-1 custom-scrollbar scroll-smooth p-2 space-y-2">
+      <div ref={containerRef} className="overflow-y-auto flex-1 custom-scrollbar scroll-smooth p-2 sm:p-3 space-y-1.5 sm:space-y-2 pb-20 md:pb-2">
         {votes.map((vote, i) => {
           const option = options[vote.optionId];
           // Determine if this is a "new" vote for animation purposes
@@ -48,25 +48,25 @@ export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
           return (
             <div 
               key={`${vote.userId}-${vote.timestamp}`} 
-              className={`flex items-center justify-between text-sm p-2 rounded-lg border transition-all ${isNew ? 'animate-slide-in-right bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 shadow-sm' : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
+              className={`flex items-center justify-between text-sm p-1.5 sm:p-2 rounded-lg border transition-all ${isNew ? 'animate-slide-in-right bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 shadow-sm' : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-800/50'}`}
               style={{ animationDuration: '0.4s' }}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                 <span className="text-[10px] text-zinc-400 font-mono w-12 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                 <span className="text-[9px] sm:text-[10px] text-zinc-400 font-mono w-10 sm:w-12 shrink-0">
                     {new Date(vote.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
                  </span>
-                 <span className="text-zinc-800 dark:text-zinc-300 font-bold text-xs truncate max-w-[120px] sm:max-w-[200px]">{vote.username}</span>
+                 <span className="text-zinc-800 dark:text-zinc-300 font-bold text-[11px] sm:text-xs truncate max-w-[100px] sm:max-w-[120px] md:max-w-[200px]">{vote.username}</span>
               </div>
               
               <div 
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-zinc-900 text-[10px] font-bold shadow-sm overflow-hidden border border-black/5"
+                className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-zinc-900 text-[9px] sm:text-[10px] font-bold shadow-sm overflow-hidden border border-black/5"
                 style={{ backgroundColor: option?.image ? 'transparent' : (option?.color || '#eee') }}
               >
                 {option?.image ? (
-                    <img src={option.image} alt="opt" className="w-5 h-5 object-cover rounded-sm" />
+                    <img src={option.image} alt="opt" className="w-4 h-4 sm:w-5 sm:h-5 object-cover rounded-sm" />
                 ) : (
                     <>
-                       {option?.icon && <span>{option.icon}</span>}
+                       {option?.icon && <span className="text-xs sm:text-sm">{option.icon}</span>}
                        <span>+{vote.optionId}</span>
                     </>
                 )}

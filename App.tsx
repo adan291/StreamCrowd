@@ -50,6 +50,9 @@ const App: React.FC = () => {
   
   // Left column tabs (Control Panel, Gallery, Activity, Overlays)
   const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity' | 'overlays'>('panel');
+  
+  // Mobile sidebar toggle
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
@@ -888,10 +891,35 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans transition-colors duration-300">
+    <div className="flex flex-col md:flex-row h-screen bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans transition-colors duration-300">
       
-      {/* Sidebar / Left Navigation */}
-      <div className="w-16 md:w-20 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col items-center py-4 shrink-0 z-20">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-30">
+         <div className="flex items-center gap-3">
+             {channelAvatar ? (
+                 <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
+             ) : (
+                 <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
+                     {channelName.charAt(0).toUpperCase()}
+                 </div>
+             )}
+             <span className="font-bold text-sm text-zinc-900 dark:text-white">{channelName}</span>
+         </div>
+         <div className="flex items-center gap-2">
+             <button 
+                onClick={() => setShowMobileSidebar(!showMobileSidebar)} 
+                className={`p-2 rounded-lg transition-colors ${showMobileSidebar ? 'bg-twitch-brand text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
+             >
+                 <MessageSquare size={20} />
+             </button>
+             <button onClick={toggleTheme} className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+             </button>
+         </div>
+      </div>
+      
+      {/* Sidebar / Left Navigation - Hidden on mobile, shown as bottom nav */}
+      <div className="hidden md:flex w-16 lg:w-20 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20">
          <div className="mb-6">
              {channelAvatar ? (
                  <img src={channelAvatar} alt={channelName} className="w-10 h-10 rounded-full border-2 border-twitch-brand" />
@@ -902,14 +930,14 @@ const App: React.FC = () => {
              )}
          </div>
 
-         <div className="flex flex-col gap-4 w-full px-2">
+         <div className="flex flex-col gap-3 w-full px-2">
              <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label="Panel" />
              <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label="Galería" />
              <NavButton active={leftTab === 'activity'} onClick={() => setLeftTab('activity')} icon={<Activity size={20} />} label="Actividad" />
              <NavButton active={leftTab === 'overlays'} onClick={() => setLeftTab('overlays')} icon={<Layers size={20} />} label="Overlays" />
          </div>
 
-         <div className="mt-auto flex flex-col gap-4 w-full px-2">
+         <div className="mt-auto flex flex-col gap-3 w-full px-2">
              <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label="Historial" />
              <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label="Tema" />
              <button onClick={handleDisconnect} className="p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
@@ -918,12 +946,21 @@ const App: React.FC = () => {
              </button>
          </div>
       </div>
+      
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around py-2 px-4 z-40 safe-area-bottom">
+          <MobileNavButton active={leftTab === 'panel'} onClick={() => { setLeftTab('panel'); setShowMobileSidebar(false); }} icon={<LayoutDashboard size={20} />} label="Panel" />
+          <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label="Galería" />
+          <MobileNavButton active={leftTab === 'activity'} onClick={() => { setLeftTab('activity'); setShowMobileSidebar(false); }} icon={<Activity size={20} />} label="Actividad" />
+          <MobileNavButton active={leftTab === 'overlays'} onClick={() => { setLeftTab('overlays'); setShowMobileSidebar(false); }} icon={<Layers size={20} />} label="Overlays" />
+          <MobileNavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label="Historial" />
+      </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="flex-1 flex overflow-hidden relative">
               {/* Left Column Content */}
-              <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative">
+              <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
                   {leftTab === 'panel' && (
                       currentPoll ? (
                           <LivePoll 
@@ -973,17 +1010,45 @@ const App: React.FC = () => {
                   )}
               </div>
 
+              {/* Mobile Sidebar Overlay */}
+              {showMobileSidebar && (
+                  <div 
+                    className="md:hidden fixed inset-0 bg-black/50 z-40 animate-fade-in"
+                    onClick={() => setShowMobileSidebar(false)}
+                  />
+              )}
+
               {/* Right Sidebar (Chat/Stream) */}
-              <div className="w-80 lg:w-96 bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 flex flex-col shrink-0 transition-all duration-300 absolute right-0 top-0 bottom-0 z-30 transform translate-x-full md:relative md:translate-x-0">
-                  <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+              <div className={`
+                  w-full md:w-80 lg:w-96 
+                  bg-white dark:bg-zinc-900 
+                  border-l border-zinc-200 dark:border-zinc-800 
+                  flex flex-col shrink-0 
+                  transition-all duration-300 ease-in-out
+                  fixed md:relative 
+                  inset-y-0 right-0 
+                  z-50 md:z-auto
+                  transform ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0
+                  max-w-[85vw] md:max-w-none
+                  pt-14 md:pt-0 pb-16 md:pb-0
+              `}>
+                  {/* Mobile close button */}
+                  <button 
+                    className="md:hidden absolute top-2 left-2 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                    onClick={() => setShowMobileSidebar(false)}
+                  >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                  
+                  <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
                       <button 
-                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                         onClick={() => setActiveRightTab('chat')}
                       >
                           <MessageSquare size={16} /> Chat
                       </button>
                       <button 
-                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                         onClick={() => setActiveRightTab('stream')}
                       >
                           <Tv size={16} /> Stream
@@ -1019,10 +1084,20 @@ const App: React.FC = () => {
 const NavButton: React.FC<{ active?: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
     <button 
         onClick={onClick} 
-        className={`w-full p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${active ? 'bg-twitch-brand text-white shadow-lg shadow-twitch-brand/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'}`}
+        className={`w-full p-2 lg:p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${active ? 'bg-twitch-brand text-white shadow-lg shadow-twitch-brand/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'}`}
     >
         {icon}
-        <span className="text-[9px] font-bold">{label}</span>
+        <span className="text-[8px] lg:text-[9px] font-bold hidden lg:block">{label}</span>
+    </button>
+);
+
+const MobileNavButton: React.FC<{ active?: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
+    <button 
+        onClick={onClick} 
+        className={`flex flex-col items-center gap-0.5 p-2 rounded-lg transition-all min-w-[48px] ${active ? 'text-twitch-brand' : 'text-zinc-500'}`}
+    >
+        {icon}
+        <span className="text-[10px] font-medium">{label}</span>
     </button>
 );
 

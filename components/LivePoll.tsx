@@ -321,33 +321,33 @@ export const LivePoll: React.FC<LivePollProps> = ({
 
   const tickColor = theme === 'dark' || isOverlay ? '#a1a1aa' : '#52525b';
   
-  // Container Classes
+  // Container Classes - Improved for mobile responsiveness
   const containerClasses = isOverlay 
-    ? "h-full w-full bg-transparent p-4 md:p-8 flex flex-col justify-center" 
+    ? "h-full w-full bg-transparent p-3 sm:p-4 md:p-8 flex flex-col justify-center" 
     : isPreview 
         ? "flex flex-col animate-[fadeIn_0.5s_ease-out] relative w-full h-full" 
-        : `h-full flex flex-col animate-[fadeIn_0.5s_ease-out] relative overflow-hidden p-4 md:p-6 ${isSimulationMode ? 'border-4 border-dashed border-twitch-brand/50 bg-twitch-brand/5 rounded-2xl' : ''}`;
+        : `h-full flex flex-col animate-[fadeIn_0.5s_ease-out] relative overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 md:pb-6 ${isSimulationMode ? 'border-4 border-dashed border-twitch-brand/50 bg-twitch-brand/5 rounded-2xl' : ''}`;
 
   // Chart Height Logic - Fixed height for preview/mobile, flexible for desktop panel/overlay
   const chartHeightClass = isOverlay 
     ? "flex-1 min-h-0" 
     : isPreview 
-        ? "h-[200px] shrink-0 min-h-[150px]" 
-        : "h-[250px] lg:flex-1 lg:min-h-0"; 
+        ? "h-[180px] sm:h-[200px] shrink-0 min-h-[150px]" 
+        : "h-[200px] sm:h-[250px] lg:flex-1 lg:min-h-[250px]"; 
   
-  // Grid Layout Logic
+  // Grid Layout Logic - Stack on mobile, grid on desktop
   const gridLayoutClass = isOverlay 
-    ? "flex flex-col gap-8 h-full" 
+    ? "flex flex-col gap-4 sm:gap-8 h-full" 
     : isPreview 
-        ? "flex flex-col gap-3 mt-4" 
-        : "flex flex-col lg:grid lg:grid-cols-3 gap-6 flex-1 min-h-0 relative z-10";
+        ? "flex flex-col gap-2 sm:gap-3 mt-3 sm:mt-4" 
+        : "flex flex-col gap-4 sm:gap-6 lg:grid lg:grid-cols-3 flex-1 min-h-0 relative z-10";
 
-  // Title Text Size
+  // Title Text Size - Responsive
   const titleTextSize = isOverlay 
-     ? 'text-5xl md:text-6xl drop-shadow-lg font-black tracking-tight' 
+     ? 'text-3xl sm:text-5xl md:text-6xl drop-shadow-lg font-black tracking-tight' 
      : isPreview 
-         ? 'text-lg md:text-xl' 
-         : 'text-xl md:text-2xl';
+         ? 'text-base sm:text-lg md:text-xl' 
+         : 'text-lg sm:text-xl md:text-2xl';
 
   return (
     <div className={containerClasses}>
@@ -369,11 +369,11 @@ export const LivePoll: React.FC<LivePollProps> = ({
       )}
       
       {/* Header */}
-      <div className={`flex justify-between items-start mb-4 relative z-10 shrink-0 ${isOverlay ? 'mb-10 w-full max-w-5xl mx-auto' : ''}`}>
-        <div className="flex-1 mr-4 min-w-0">
-          <div className="flex items-center gap-2 mb-1 justify-center md:justify-start">
+      <div className={`flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-3 sm:mb-4 relative z-10 shrink-0 ${isOverlay ? 'mb-6 sm:mb-10 w-full max-w-5xl mx-auto' : ''}`}>
+        <div className="flex-1 sm:mr-4 min-w-0 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1 justify-center sm:justify-start">
              {!isOverlay && !isEditing && (
-                <span className={`text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase tracking-wider bg-twitch-brand/10 px-2 py-0.5 rounded truncate ${isPreview ? 'text-[10px]' : ''}`}>
+                <span className={`text-[10px] sm:text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase tracking-wider bg-twitch-brand/10 px-1.5 sm:px-2 py-0.5 rounded truncate max-w-[150px] sm:max-w-none ${isPreview ? 'text-[9px]' : ''}`}>
                     {displayPoll.title || 'Encuesta en Vivo'}
                 </span>
              )}
@@ -383,15 +383,16 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     type="text" 
                     value={editTitle} 
                     onChange={e => setEditTitle(e.target.value)}
-                    className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase w-40"
+                    className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase w-32 sm:w-40"
                     placeholder="TÍTULO"
                  />
              )}
 
              {isNearLimit && displayPoll.isActive && !isOverlay && !isEditing && (
-                <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap animate-pulse text-white`} style={{backgroundColor: limitIndicatorColor}}>
+                <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap animate-pulse text-white`} style={{backgroundColor: limitIndicatorColor}}>
                    <AlertTriangle size={10} />
-                   {isAtLimit ? 'Límite' : 'Casi Límite'}
+                   <span className="hidden xs:inline">{isAtLimit ? 'Límite' : 'Casi Límite'}</span>
+                   <span className="xs:hidden">!</span>
                 </span>
              )}
           </div>

@@ -45,12 +45,12 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
   }, [messages, isAutoScroll]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative">
-      <div className="flex items-center gap-2 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm z-10">
-         <div className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light">
+    <div className="bg-white dark:bg-zinc-900 border-0 md:border border-zinc-200 dark:border-zinc-800 rounded-none md:rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative">
+      <div className="flex items-center gap-2 p-2 sm:p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm z-10 shrink-0">
+         <div className="p-1 sm:p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light">
              <MessageSquare size={14} />
          </div>
-         <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Chat en Vivo</span>
+         <span className="text-[10px] sm:text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Chat en Vivo</span>
          <div className="ml-auto text-[10px] text-zinc-400 font-mono">
             {messages.length > 0 ? `${messages.length} msgs` : 'Ready'}
          </div>
@@ -59,7 +59,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
       <div 
         ref={containerRef} 
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2 md:space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50/50 dark:bg-black/20"
+        className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-1.5 sm:space-y-2 md:space-y-3 custom-scrollbar font-mono text-sm bg-zinc-50/50 dark:bg-black/20"
       >
         {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">

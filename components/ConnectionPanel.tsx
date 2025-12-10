@@ -95,18 +95,18 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
   if (status === ConnectionStatus.CONNECTED) return null;
 
   return (
-    <div className="bg-white/90 dark:bg-zinc-900/90 p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md max-w-md mx-auto mt-10 md:mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
+    <div className="bg-white/90 dark:bg-zinc-900/90 p-5 sm:p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md w-full max-w-md mx-auto mt-6 sm:mt-10 md:mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-twitch-brand to-twitch-accent"></div>
 
-      <div className="mb-6 flex justify-center relative">
-        <div className="p-4 bg-twitch-brand/10 dark:bg-twitch-brand/20 rounded-full ring-1 ring-twitch-brand/30 relative z-10">
-          <Wifi size={40} className="text-twitch-brand dark:text-twitch-light" />
+      <div className="mb-4 sm:mb-6 flex justify-center relative">
+        <div className="p-3 sm:p-4 bg-twitch-brand/10 dark:bg-twitch-brand/20 rounded-full ring-1 ring-twitch-brand/30 relative z-10">
+          <Wifi size={32} className="sm:w-10 sm:h-10 text-twitch-brand dark:text-twitch-light" />
         </div>
         <div className="absolute inset-0 bg-twitch-brand/20 blur-xl rounded-full opacity-50 animate-pulse"></div>
       </div>
       
-      <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white tracking-tight">Vincular Chat</h2>
-      <p className="text-zinc-500 dark:text-zinc-400 mb-6 text-sm">
+      <h2 className="text-xl sm:text-2xl font-bold mb-2 text-zinc-900 dark:text-white tracking-tight">Vincular Chat</h2>
+      <p className="text-zinc-500 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
           Ingresa el canal para conectar al chat en tiempo real.
       </p>
       

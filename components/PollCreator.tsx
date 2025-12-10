@@ -342,13 +342,14 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
   return (
     <>
-      <div className="h-full flex flex-col relative p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
-            <span className="bg-twitch-brand w-8 h-8 rounded-lg flex items-center justify-center text-sm text-white shadow-lg shadow-twitch-brand/30">🛠️</span>
-            Crear Votación
+      <div className="h-full flex flex-col relative p-3 sm:p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
+        <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0">
+          <h3 className="text-base sm:text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
+            <span className="bg-twitch-brand w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm text-white shadow-lg shadow-twitch-brand/30">🛠️</span>
+            <span className="hidden xs:inline">Crear Votación</span>
+            <span className="xs:hidden">Nueva</span>
           </h3>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 sm:gap-2">
             <button 
               type="button"
               onClick={() => {
@@ -358,39 +359,39 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 setMaxVotes('');
                 setDuration('');
               }}
-              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-1.5 sm:p-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
               title="Limpiar Formulario"
             >
-              <RefreshCcw size={18} />
+              <RefreshCcw size={16} />
             </button>
             <button 
               onClick={() => setShowTemplates(!showTemplates)}
-              className={`text-sm flex items-center gap-1.5 bg-white dark:bg-zinc-900 px-3 py-1.5 rounded-lg border transition-all ${showTemplates ? 'border-twitch-brand text-twitch-brand dark:text-twitch-light' : 'border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}
+              className={`text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 bg-white dark:bg-zinc-900 px-2 sm:px-3 py-1.5 rounded-lg border transition-all ${showTemplates ? 'border-twitch-brand text-twitch-brand dark:text-twitch-light' : 'border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400'}`}
             >
-              <Bookmark size={16} /> <span className="hidden sm:inline">Plantillas</span>
+              <Bookmark size={14} /> <span className="hidden xs:inline">Plantillas</span>
             </button>
           </div>
         </div>
 
         {showTemplates && (
-          <div className="mb-6 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 animate-fade-in-down relative z-30 shadow-2xl">
-            <div className="flex justify-between items-center mb-3">
-               <div className="flex items-center gap-4">
-                  <h4 className="text-sm font-bold text-zinc-700 dark:text-zinc-300">Mis Plantillas ({savedPolls.length})</h4>
-                  <button onClick={() => setFilterFavorites(!filterFavorites)} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors border ${filterFavorites ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400' : 'border-transparent text-zinc-500'}`}>
-                     <Star size={12} fill={filterFavorites ? "currentColor" : "none"} /> Favoritos
+          <div className="mb-4 sm:mb-6 bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 animate-fade-in-down relative z-30 shadow-2xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-3">
+               <div className="flex items-center gap-2 sm:gap-4">
+                  <h4 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300">Mis Plantillas ({savedPolls.length})</h4>
+                  <button onClick={() => setFilterFavorites(!filterFavorites)} className={`flex items-center gap-1 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors border ${filterFavorites ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400' : 'border-transparent text-zinc-500'}`}>
+                     <Star size={10} fill={filterFavorites ? "currentColor" : "none"} /> Favoritos
                   </button>
                </div>
                <button onClick={() => setShowTemplates(false)}><X size={16} className="text-zinc-500 hover:text-black dark:hover:text-white"/></button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] sm:max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
               {sortedTemplates.map(poll => (
-                <div key={poll.id} onClick={() => loadTemplate(poll)} className={`group relative bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100 dark:hover:bg-zinc-800 border p-3 rounded-lg text-xs cursor-pointer transition-all flex flex-col gap-2 ${poll.isFavorite ? 'border-yellow-400/30' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                <div key={poll.id} onClick={() => loadTemplate(poll)} className={`group relative bg-zinc-50 dark:bg-zinc-950 hover:bg-zinc-100 dark:hover:bg-zinc-800 border p-2 sm:p-3 rounded-lg text-xs cursor-pointer transition-all flex flex-col gap-2 ${poll.isFavorite ? 'border-yellow-400/30' : 'border-zinc-200 dark:border-zinc-800'}`}>
                   <div className="flex justify-between items-start">
-                     <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate pr-6 text-sm">{poll.question}</span>
-                     <div className="flex gap-1 absolute top-2 right-2">
-                         <button onClick={(e) => toggleFavorite(poll.id, e)} className={`transition-colors p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 ${poll.isFavorite ? 'text-yellow-500' : 'text-zinc-400 hover:text-yellow-500'}`}><Star size={14} fill={poll.isFavorite ? "currentColor" : "none"} /></button>
-                         <button onClick={(e) => deleteTemplate(poll.id, e)} className="text-zinc-400 hover:text-red-500 p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"><Trash2 size={14} /></button>
+                     <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate pr-6 text-xs sm:text-sm">{poll.question}</span>
+                     <div className="flex gap-1 absolute top-1.5 sm:top-2 right-1.5 sm:right-2">
+                         <button onClick={(e) => toggleFavorite(poll.id, e)} className={`transition-colors p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 ${poll.isFavorite ? 'text-yellow-500' : 'text-zinc-400 hover:text-yellow-500'}`}><Star size={12} fill={poll.isFavorite ? "currentColor" : "none"} /></button>
+                         <button onClick={(e) => deleteTemplate(poll.id, e)} className="text-zinc-400 hover:text-red-500 p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"><Trash2 size={12} /></button>
                      </div>
                   </div>
                 </div>
