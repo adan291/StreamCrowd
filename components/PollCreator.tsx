@@ -1,15 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon } from 'lucide-react';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
-import { SavedPoll, MediaAsset } from '../types';
+import { SavedPoll, MediaAsset, Poll } from '../types';
 import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
-import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
+import { LivePoll } from './LivePoll';
 
 interface PollCreatorProps {
-  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number) => void;
+  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number) => void;
   onNotification?: (type: NotificationType, message: string) => void;
   mediaLibrary?: MediaAsset[];
   onAddAsset?: (asset: MediaAsset) => void;
@@ -23,12 +23,19 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     { label: 'Opción 2', color: CHART_COLORS[1], icon: '2️⃣', image: '' }
   ]);
   const [maxVotes, setMaxVotes] = useState<string>('');
+  const [duration, setDuration] = useState<string>(''); // Duration in seconds
+  const [progressBarColor, setProgressBarColor] = useState('#3b82f6');
+  const [limitIndicatorColor, setLimitIndicatorColor] = useState('#ef4444');
+  
   const [savedPolls, setSavedPolls] = useState<SavedPoll[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState<number | null>(null);
+  
+  // Modal for preset confirmation
+  const [showPresetConfirm, setShowPresetConfirm] = useState<'yesno' | 'rating' | 'abc' | null>(null);
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -42,6 +49,15 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       }
     }
   }, []);
+
+  const requestPreset = (type: 'yesno' | 'rating' | 'abc') => {
+      // If user has typed something, warn them
+      if (question.trim() || options.some(o => o.label !== `Opción ${options.indexOf(o)+1}`)) {
+          setShowPresetConfirm(type);
+      } else {
+          applyPreset(type);
+      }
+  };
 
   const applyPreset = (type: 'yesno' | 'rating' | 'abc') => {
       if (type === 'yesno') {
@@ -64,6 +80,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               { label: 'Opción C', color: CHART_COLORS[2], icon: '©️', image: '' }
           ]);
       }
+      setShowPresetConfirm(null);
       if (onNotification) onNotification('info', 'Preset aplicado.');
   };
 
@@ -109,20 +126,27 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
     if (file) {
       if (!file.type.startsWith('image/')) {
-        if (onNotification) onNotification('error', 'El archivo debe ser una imagen válida.');
+        if (onNotification) onNotification('error', 'El archivo debe ser una imagen válida (JPG, PNG, GIF).');
         resetInput();
         return;
       }
-      if (file.size > 40 * 1024 * 1024) { 
+      if (file.size > MAX_FILE_SIZE) { 
         if (onNotification) onNotification('error', 'La imagen es demasiado grande (Máx 40MB).');
         resetInput();
         return;
       }
 
       const reader = new FileReader();
+      
+      reader.onerror = () => {
+          if (onNotification) onNotification('error', 'Error al leer el archivo. Intenta de nuevo.');
+          resetInput();
+      };
+
       reader.onload = (readerEvent) => {
         const img = new Image();
         img.src = readerEvent.target?.result as string;
+        
         img.onload = () => {
           try {
               const canvas = document.createElement('canvas');
@@ -147,13 +171,18 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                   const newOptions = [...options];
                   newOptions[index].image = iconDataUrl;
                   setOptions(newOptions);
-                  if (onNotification) onNotification('success', 'Icono asignado y guardado en Galería.');
+                  if (onNotification) onNotification('success', 'Icono procesado y guardado en Galería.');
               }
           } catch (err) {
-              if (onNotification) onNotification('error', 'Error interno al procesar la imagen.');
+              if (onNotification) onNotification('error', 'Error al procesar la imagen en el navegador.');
           } finally {
              resetInput();
           }
+        };
+
+        img.onerror = () => {
+             if (onNotification) onNotification('error', 'El archivo de imagen parece estar dañado.');
+             resetInput();
         };
       };
       reader.readAsDataURL(file);
@@ -180,20 +209,33 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (question.trim() && options.every(opt => opt.label.trim())) {
+    if (question.trim() && options.every(opt => opt.label.trim()) && options.length >= 2) {
       setShowConfirm(true);
+    } else if (options.length < 2) {
+        if (onNotification) onNotification('error', 'Se necesitan al menos 2 opciones.');
+    } else {
+        if (onNotification) onNotification('error', 'Completa la pregunta y todas las opciones.');
     }
   };
 
   const confirmCreate = () => {
     const max = maxVotes ? parseInt(maxVotes, 10) : undefined;
-    onCreate(title.trim() || 'Encuesta en Vivo', question, options, max);
+    // Ensure 0 is treated as 0 (no limit) or undefined based on logic preference, 
+    // but typically 0 means unlimited in this UI.
+    // If the input is empty string, it's undefined. If it's '0', it's 0.
+    const dur = duration !== '' ? parseInt(duration, 10) : undefined;
+    
+    (onCreate as any)(title.trim() || 'Encuesta en Vivo', question, options, max, dur, progressBarColor, limitIndicatorColor);
     setShowConfirm(false);
   };
 
   const saveTemplate = () => {
     if (!question.trim()) {
         if (onNotification) onNotification('error', 'Escribe una pregunta para guardar.');
+        return;
+    }
+    if (options.length < 2) {
+        if (onNotification) onNotification('error', 'La encuesta debe tener al menos 2 opciones.');
         return;
     }
     if (options.some(opt => !opt.label.trim())) {
@@ -206,12 +248,19 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       question,
       options,
       maxVotes: maxVotes ? parseInt(maxVotes, 10) : undefined,
+      duration: duration !== '' ? parseInt(duration, 10) : undefined,
+      progressBarColor,
+      limitIndicatorColor,
       isFavorite: false
     };
-    const newSaved = [...savedPolls, newTemplate];
-    setSavedPolls(newSaved);
-    localStorage.setItem('twitch_vote_templates', JSON.stringify(newSaved));
-    if (onNotification) onNotification('success', 'Plantilla guardada correctamente.');
+    try {
+      const newSaved = [...savedPolls, newTemplate];
+      localStorage.setItem('twitch_vote_templates', JSON.stringify(newSaved));
+      setSavedPolls(newSaved);
+      if (onNotification) onNotification('success', 'Plantilla guardada correctamente.');
+    } catch (e) {
+      if (onNotification) onNotification('error', 'No se pudo guardar: Límite de almacenamiento excedido.');
+    }
   };
 
   const loadTemplate = (template: SavedPoll) => {
@@ -224,6 +273,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
        image: opt.image || '' 
     })));
     setMaxVotes(template.maxVotes ? template.maxVotes.toString() : '');
+    setDuration(template.duration !== undefined ? template.duration.toString() : '');
+    if (template.progressBarColor) setProgressBarColor(template.progressBarColor);
+    if (template.limitIndicatorColor) setLimitIndicatorColor(template.limitIndicatorColor);
+    
     setShowTemplates(false);
     if (onNotification) onNotification('info', `Plantilla cargada.`);
   };
@@ -250,14 +303,30 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       return parseInt(b.id) - parseInt(a.id);
     });
 
-  const previewData = options.map((opt, i) => ({
-      name: `+${i+1}`,
-      votes: Math.floor(Math.random() * 50) + 10,
-      label: opt.label,
-      color: opt.color,
-      icon: opt.icon,
-      image: opt.image
-  }));
+  const MAX_FILE_SIZE = 40 * 1024 * 1024;
+
+  // Construct a poll object for the LivePoll preview
+  const previewPoll: Poll = {
+      id: 'preview',
+      title: title,
+      question: question || 'Vista Previa',
+      options: options.map((o, i) => ({
+        id: i + 1,
+        label: o.label || `Opción ${i + 1}`,
+        votes: Math.floor(Math.random() * 50) + 10,
+        color: o.color,
+        icon: o.icon,
+        image: o.image
+      })),
+      isActive: true,
+      totalVotes: 0, 
+      startTime: Date.now(),
+      maxVotes: maxVotes ? parseInt(maxVotes, 10) : undefined,
+      duration: duration !== '' ? parseInt(duration, 10) : undefined,
+      progressBarColor,
+      limitIndicatorColor
+  };
+  previewPoll.totalVotes = previewPoll.options.reduce((acc, curr) => acc + curr.votes, 0);
 
   return (
     <>
@@ -275,9 +344,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 setQuestion('');
                 setOptions([ { label: 'Opción 1', color: CHART_COLORS[0], icon: '1️⃣', image: '' }, { label: 'Opción 2', color: CHART_COLORS[1], icon: '2️⃣', image: '' } ]);
                 setMaxVotes('');
+                setDuration('');
               }}
               className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-              title="Limpiar"
+              title="Limpiar Formulario"
             >
               <RefreshCcw size={18} />
             </button>
@@ -320,32 +390,32 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         <form onSubmit={handlePreSubmit} className="space-y-4 flex-1 flex flex-col">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <span className="text-xs font-bold text-zinc-400 uppercase self-center mr-1 shrink-0">Rápido:</span>
-              <button type="button" onClick={() => applyPreset('yesno')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm"><Check size={12} className="text-green-500"/> Si / No</button>
-              <button type="button" onClick={() => applyPreset('rating')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm"><Star size={12} className="text-yellow-500"/> 1 - 5</button>
-              <button type="button" onClick={() => applyPreset('abc')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm"><Grid size={12} className="text-blue-500"/> A / B / C</button>
+              <button type="button" onClick={() => requestPreset('yesno')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Check size={12} className="text-green-500"/> Si / No</button>
+              <button type="button" onClick={() => requestPreset('rating')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Star size={12} className="text-yellow-500"/> 1 - 5</button>
+              <button type="button" onClick={() => requestPreset('abc')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Grid size={12} className="text-blue-500"/> A / B / C</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
              <div className="space-y-1 sm:col-span-1">
-                <label className="text-zinc-500 dark:text-zinc-500 text-xs font-bold ml-1 uppercase flex items-center">Título</label>
+                <label className="text-zinc-500 dark:text-zinc-500 text-xs font-bold ml-1 uppercase flex items-center">Título de Sección <Tooltip text="Aparece sobre la pregunta (ej: 'Votando Ahora')"/></label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: Votando" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand" />
             </div>
              <div className="space-y-1 sm:col-span-2">
-                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Pregunta</label>
-                <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="¿Qué jugamos?" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light shadow-sm" />
+                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Pregunta <Tooltip text="La pregunta principal para los viewers"/></label>
+                <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="¿Qué jugamos hoy?" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light shadow-sm" />
             </div>
           </div>
 
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col bg-zinc-100 dark:bg-zinc-900/40 rounded-xl p-3 border border-zinc-200 dark:border-zinc-800/50">
             <div className="flex justify-between items-end px-1">
-                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">Opciones</label>
+                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">Opciones de Respuesta</label>
                 <span className="text-[10px] text-zinc-400 font-mono bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded">{options.length}/{MAX_OPTIONS}</span>
             </div>
             
             <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar pb-2">
               {options.map((opt, index) => (
                 <div key={index} className="flex gap-2 items-center group animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-sm shadow-sm relative overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-1 ring-black/5 dark:ring-white/5" style={{ backgroundColor: opt.color }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-sm shadow-sm relative overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-1 ring-black/5 dark:ring-white/5" style={{ backgroundColor: opt.color }} title="Color">
                      <input type="color" value={opt.color} onChange={(e) => handleColorChange(index, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                   </div>
                   <div className="relative w-[42px] h-9 shrink-0">
@@ -357,8 +427,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                               <input type="text" value={opt.icon || ''} onChange={(e) => handleIconChange(index, e.target.value)} className="w-full h-full bg-transparent text-center text-lg text-zinc-900 dark:text-white focus:outline-none z-10 relative font-emoji" placeholder="😀" maxLength={2} />
                               {!opt.icon && <Smile size={14} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-300 dark:text-zinc-700 pointer-events-none" />}
                               <div className="absolute bottom-0 right-0 left-0 flex h-full opacity-0 group-hover/icon:opacity-100 transition-opacity z-20 bg-white dark:bg-zinc-900">
-                                <button type="button" onClick={() => fileInputRefs.current[index]?.click()} className="flex-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-twitch-brand flex items-center justify-center border-r border-zinc-100 dark:border-zinc-800"><Upload size={14} /></button>
-                                <button type="button" onClick={() => setShowAssetPicker(index)} className="flex-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-twitch-brand flex items-center justify-center"><Grid size={14} /></button>
+                                <button type="button" onClick={() => fileInputRefs.current[index]?.click()} className="flex-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-twitch-brand flex items-center justify-center border-r border-zinc-100 dark:border-zinc-800" title="Subir Imagen"><Upload size={14} /></button>
+                                <button type="button" onClick={() => setShowAssetPicker(index)} className="flex-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-twitch-brand flex items-center justify-center" title="Galería"><Grid size={14} /></button>
                               </div>
                            </>
                         )}
@@ -380,15 +450,59 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
           <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
              <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                 <div className="flex-1 space-y-1">
-                   <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Meta de Votos</label>
-                   <input type="number" min="1" value={maxVotes} onChange={(e) => setMaxVotes(e.target.value)} placeholder="∞" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light" />
+                 <div className="flex-1 grid grid-cols-2 gap-3">
+                     <div className="space-y-1">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Meta <Tooltip text="Detiene al llegar a X votos"/></label>
+                       <div className="relative">
+                           <Target size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+                           <input type="number" min="1" value={maxVotes} onChange={(e) => setMaxVotes(e.target.value)} placeholder="∞" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-9 pr-2 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light" />
+                       </div>
+                     </div>
+                     <div className="space-y-1">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Tiempo (Seg)</label>
+                       <div className="relative">
+                            {(duration === '' || duration === '0') ? (
+                                <InfinityIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
+                            ) : (
+                                <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-twitch-brand dark:text-twitch-light"/>
+                            )}
+                            <input
+                                type="number"
+                                min="0" 
+                                value={duration} 
+                                onChange={(e) => setDuration(e.target.value)}
+                                placeholder="0 = Sin límite"
+                                className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-8 pr-2 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light"
+                            />
+                       </div>
+                     </div>
                  </div>
-                 <div className="flex items-end gap-2">
-                    <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px]" title="Vista Previa"><Eye size={18} /></button>
-                    <button type="button" onClick={saveTemplate} disabled={!question.trim()} className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 font-bold text-sm h-[42px] flex-1 sm:flex-none" title="Guardar"><Save size={16} /> <span className="hidden sm:inline">Guardar</span></button>
+                 
+                 {/* Color Config */}
+                 <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Barra</label>
+                       <div className="h-[38px] w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-lg p-1 relative overflow-hidden">
+                           <input type="color" value={progressBarColor} onChange={e => setProgressBarColor(e.target.value)} className="w-full h-full cursor-pointer opacity-0 absolute inset-0 z-10" />
+                           <div className="w-full h-full rounded flex items-center justify-center text-xs font-mono font-bold" style={{backgroundColor: progressBarColor, color: '#fff', textShadow: '0 1px 2px black'}}>{progressBarColor}</div>
+                       </div>
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Límite</label>
+                       <div className="h-[38px] w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-lg p-1 relative overflow-hidden">
+                           <input type="color" value={limitIndicatorColor} onChange={e => setLimitIndicatorColor(e.target.value)} className="w-full h-full cursor-pointer opacity-0 absolute inset-0 z-10" />
+                           <div className="w-full h-full rounded flex items-center justify-center text-xs font-mono font-bold" style={{backgroundColor: limitIndicatorColor, color: '#fff', textShadow: '0 1px 2px black'}}>{limitIndicatorColor}</div>
+                       </div>
+                    </div>
                  </div>
              </div>
+             
+             <div className="flex gap-2 mb-4">
+                <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px]" title="Vista Previa"><Eye size={18} /></button>
+                <button type="button" onClick={saveTemplate} disabled={!question.trim()} className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 font-bold text-sm h-[42px] flex-1 sm:flex-none" title="Guardar como Plantilla"><Save size={16} /> <span className="hidden sm:inline">Guardar</span></button>
+                <div className="flex-1"></div>
+             </div>
+
              <Button fullWidth type="submit" disabled={!question.trim() || options.some(o => !o.label.trim())} className="shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40 h-12 text-base"><Zap size={20} className="fill-current" /> Iniciar Votación</Button>
           </div>
         </form>
@@ -397,48 +511,36 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       {showPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 w-full max-w-4xl rounded-2xl shadow-2xl p-6 animate-scale-up flex flex-col max-h-[90vh]">
-                 <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                 <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2 shrink-0">
                       <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Eye size={18} className="text-twitch-brand"/> Vista Previa</h3>
                       <button onClick={() => setShowPreview(false)} className="text-zinc-500 hover:text-black dark:hover:text-white bg-zinc-100 dark:bg-zinc-800 rounded-full p-1 transition-colors"><X size={18}/></button>
                  </div>
-                 <div className="bg-zinc-50 dark:bg-black/20 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-y-auto custom-scrollbar">
-                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase tracking-wider bg-twitch-brand/10 px-2 py-0.5 rounded">{title || 'Encuesta en Vivo'}</span>
-                     </div>
-                     <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 leading-tight">{question || 'Tu pregunta aquí...'}</h2>
-                     <div className="flex gap-4 text-zinc-500 text-sm mb-6">
-                         <span><Target size={14} className="inline mr-1"/> Meta: {maxVotes || '∞'}</span>
-                         <span>0 votos</span>
-                     </div>
-                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-zinc-100 dark:bg-zinc-950/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800 h-[250px]">
-                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={previewData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                                  <XAxis dataKey="name" stroke="#888" tickLine={false} axisLine={false} />
-                                  <Bar dataKey="votes" radius={[8, 8, 0, 0]}>
-                                    {previewData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                                  </Bar>
-                                </BarChart>
-                              </ResponsiveContainer>
-                        </div>
-                        <div className="space-y-3">
-                            {options.map((opt, i) => (
-                                <div key={i} className="relative p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800/30">
-                                     <div className="flex justify-between items-center mb-1">
-                                        <div className="flex items-center gap-3">
-                                            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shadow-sm shrink-0 overflow-hidden" style={{backgroundColor: opt.image ? 'transparent' : opt.color}}>
-                                                {opt.image ? <img src={opt.image} className="w-full h-full object-cover" /> : <span>+{i+1}</span>}
-                                            </span>
-                                            <span className="font-medium text-zinc-900 dark:text-zinc-200 truncate">{opt.label || `Opción ${i+1}`}</span>
-                                        </div>
-                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                     </div>
+                 <div className="flex-1 bg-zinc-50 dark:bg-black/20 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-y-auto custom-scrollbar relative">
+                    {/* Render LivePoll with dummy data for exact preview */}
+                    <LivePoll 
+                        poll={previewPoll} 
+                        voteHistory={[]} 
+                        onStop={()=>{}} 
+                        onReset={()=>{}} 
+                        variant="preview"
+                        theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                    />
                  </div>
-                 <div className="mt-4 flex justify-end"><Button onClick={() => setShowPreview(false)}>Cerrar Vista Previa</Button></div>
+                 <div className="mt-4 flex justify-end shrink-0"><Button onClick={() => setShowPreview(false)}>Cerrar</Button></div>
              </div>
+        </div>
+      )}
+
+      {showPresetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-sm rounded-2xl shadow-xl p-6">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">¿Aplicar Preset?</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm mb-4">Esto reemplazará las opciones actuales. ¿Deseas continuar?</p>
+              <div className="flex justify-end gap-2">
+                 <Button variant="secondary" onClick={() => setShowPresetConfirm(null)}>Cancelar</Button>
+                 <Button onClick={() => applyPreset(showPresetConfirm)}>Aplicar</Button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -447,13 +549,17 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 w-full max-w-md rounded-2xl shadow-2xl p-6 animate-scale-up">
              <div className="flex items-center gap-3 mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
                 <div className="bg-twitch-brand/10 p-2.5 rounded-full text-twitch-brand dark:text-twitch-light animate-pulse"><AlertCircle size={24} /></div>
-                <div><h3 className="text-xl font-bold text-zinc-900 dark:text-white">¿Todo listo?</h3><p className="text-zinc-500 dark:text-zinc-400 text-xs">Esta encuesta se mostrará en vivo.</p></div>
+                <div><h3 className="text-xl font-bold text-zinc-900 dark:text-white">Confirmar Encuesta</h3><p className="text-zinc-500 dark:text-zinc-400 text-xs">Revisa los detalles antes de lanzar.</p></div>
              </div>
              <div className="space-y-4 mb-6">
                 <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 relative overflow-hidden">
                    <div className="absolute top-0 right-0 p-2 opacity-10"><Zap size={64} className="text-twitch-brand"/></div>
                    <span className="text-[10px] text-twitch-brand dark:text-twitch-light uppercase font-bold block mb-1 tracking-wider">{title}</span>
-                   <p className="text-zinc-900 dark:text-white font-bold text-lg leading-tight">{question}</p>
+                   <p className="text-zinc-900 dark:text-white font-bold text-lg leading-tight break-words">{question}</p>
+                   <div className="flex gap-3 mt-3">
+                       {maxVotes && <span className="text-xs text-zinc-500 bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded flex items-center gap-1"><Target size={10}/> Meta: {maxVotes}</span>}
+                       {duration && <span className="text-xs text-zinc-500 bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded flex items-center gap-1"><Clock size={10}/> {duration}s</span>}
+                   </div>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-1 space-y-2">
                       {options.map((opt, i) => (
@@ -466,7 +572,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 </div>
              </div>
              <div className="grid grid-cols-2 gap-3">
-                <Button onClick={() => setShowConfirm(false)} variant="secondary">Cancelar</Button>
+                <Button onClick={() => setShowConfirm(false)} variant="secondary">Volver</Button>
                 <Button onClick={confirmCreate}><Check size={18} /> Lanzar Ahora</Button>
              </div>
           </div>

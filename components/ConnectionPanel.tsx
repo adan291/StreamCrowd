@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ConnectionStatus } from '../types';
 import { Button } from './Button';
-import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, ShieldAlert } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
 interface ConnectionPanelProps {
@@ -49,7 +49,6 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
         setLocalError('El nombre del canal es obligatorio.');
         return false;
     }
-    // Strict Twitch username rules: 3-25 chars, alphanumeric + underscores
     const channelRegex = /^[a-zA-Z0-9_]{3,25}$/;
     if (!channelRegex.test(cleanChannel)) {
         setLocalError('Nombre inválido (3-25 caracteres, letras, números y _).');
@@ -65,6 +64,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (token) {
+        const cleanToken = token.trim();
+        const tokenRegex = /^(oauth:)?[a-zA-Z0-9_]{30,}$/i;
+        if (!tokenRegex.test(cleanToken)) {
+            setLocalError('Token inválido. Asegúrate de copiar el "ACCESS TOKEN".');
+            return;
+        }
+    }
+
     if (validateChannel(channel)) {
         onConnect(channel.trim(), token.trim() || undefined);
     }
@@ -77,7 +86,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
     }
   }, [isUrlDetected]);
 
-  // Combine local validation errors with service errors
+  // Specific error UI logic
+  const isAuthError = errorMessage?.includes('OAuth') || errorMessage?.includes('autenticación') || errorMessage?.includes('Token');
+  const isNetworkError = errorMessage?.includes('red') || errorMessage?.includes('respuesta');
+  
   const displayError = localError || errorMessage;
 
   if (status === ConnectionStatus.CONNECTED) return null;
@@ -123,22 +135,36 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
         </div>
         
         <div className="text-left">
-          <button 
-            type="button" 
-            onClick={() => setShowToken(!showToken)}
-            className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 flex items-center gap-1 mb-1 transition-colors"
-          >
-            <KeyRound size={12} />
-            {showToken ? 'Ocultar Token' : 'Token OAuth (Opcional)'}
-          </button>
+          <div className="flex items-center mb-1">
+            <button 
+                type="button" 
+                onClick={() => setShowToken(!showToken)}
+                className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+            >
+                <KeyRound size={12} />
+                {showToken ? 'Ocultar' : 'Access Token (Opcional)'}
+            </button>
+            <Tooltip text="Necesario para que el bot escriba en el chat (anunciar encuestas). Sin esto, funcionará en modo solo lectura." />
+          </div>
           {showToken && (
-            <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="oauth:xxxxxxxxxxxxx"
-                className="w-full bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono"
-            />
+            <div className="animate-fade-in-down">
+                <input
+                    type="password"
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    placeholder="Ej: uo6dgg01..."
+                    className="w-full bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono"
+                />
+                <div className="text-[10px] text-zinc-400 mt-2 ml-1 leading-relaxed bg-zinc-100 dark:bg-zinc-800/50 p-2 rounded border border-zinc-200 dark:border-zinc-800">
+                   <p className="mb-1"><strong>Instrucciones:</strong></p>
+                   <ol className="list-decimal pl-3 space-y-1">
+                     <li>Ve a <a href="https://twitchtokengenerator.com/" target="_blank" rel="noopener noreferrer" className="text-twitch-brand hover:underline font-bold">twitchtokengenerator.com</a></li>
+                     <li>Selecciona "Bot Chat Token" o Custom.</li>
+                     <li>Asegura los scopes: <b>chat:read</b> y <b>chat:edit</b>.</li>
+                     <li>Genera y copia el <strong>ACCESS TOKEN</strong> (no el Client ID).</li>
+                   </ol>
+                </div>
+            </div>
           )}
         </div>
 
@@ -153,11 +179,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       </form>
       
       {displayError && (
-        <div className="mt-4 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-medium bg-red-100 dark:bg-red-500/10 py-3 px-3 rounded-lg border border-red-200 dark:border-red-500/20 text-left animate-shake">
-          <AlertCircle size={16} className="shrink-0" />
+        <div className={`mt-4 flex items-center gap-3 text-xs font-medium py-3 px-3 rounded-lg border text-left animate-shake ${isAuthError ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800/30' : 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20'}`}>
+          <div className="shrink-0">
+             {isAuthError ? <ShieldAlert size={20}/> : isNetworkError ? <Wifi size={20}/> : <XCircle size={20}/>}
+          </div>
           <div className="flex flex-col">
-             <span className="font-bold">Error de conexión:</span>
-             <span className="break-words w-full">{displayError}</span>
+             <span className="font-bold mb-0.5">{isAuthError ? 'Error de Autenticación' : isNetworkError ? 'Error de Red' : 'Error de Conexión'}</span>
+             <span className="break-words w-full opacity-90">{displayError}</span>
           </div>
         </div>
       )}

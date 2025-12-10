@@ -1,3 +1,4 @@
+
 export interface PollOption {
   id: number;
   label: string;
@@ -23,6 +24,9 @@ export interface Poll {
   totalVotes: number;
   startTime: number;
   maxVotes?: number; // Optional limit
+  duration?: number; // Duration in seconds (optional)
+  progressBarColor?: string; // Custom color for progress bar
+  limitIndicatorColor?: string; // Custom color for limit alerts
 }
 
 export interface SavedPoll {
@@ -31,7 +35,10 @@ export interface SavedPoll {
   question: string;
   options: { label: string; color: string; icon?: string; image?: string }[];
   maxVotes?: number;
+  duration?: number;
   isFavorite?: boolean;
+  progressBarColor?: string;
+  limitIndicatorColor?: string;
 }
 
 export interface MediaAsset {

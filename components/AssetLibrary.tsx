@@ -1,5 +1,6 @@
-import React, { useRef, useState, useMemo } from 'react';
-import { Upload, Trash2, Image as ImageIcon, Grid, X, Search, FileWarning, Loader2 } from 'lucide-react';
+
+import React, { useRef, useState, useMemo, useEffect } from 'react';
+import { Upload, Trash2, Image as ImageIcon, Grid, X, Search, FileWarning, Loader2, LayoutList, LayoutGrid, HardDrive } from 'lucide-react';
 import { MediaAsset } from '../types';
 import { NotificationType } from './Notification';
 
@@ -11,12 +12,28 @@ interface AssetLibraryProps {
 }
 
 const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB
+const BROWSER_STORAGE_LIMIT_ESTIMATE = 5 * 1024 * 1024; // ~5MB safe limit for localStorage
 
 export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDelete, onNotification }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortOrder, setSortOrder] = useState<'date' | 'name'>('date');
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [storageUsed, setStorageUsed] = useState(0);
+
+  // Calculate Storage Usage
+  useEffect(() => {
+    let total = 0;
+    assets.forEach(asset => total += asset.data.length);
+    setStorageUsed(total);
+  }, [assets]);
+
+  const storagePercent = Math.min(100, (storageUsed / BROWSER_STORAGE_LIMIT_ESTIMATE) * 100);
+  const isStorageCritical = storagePercent > 90;
 
   const processFile = (file: File) => {
     // 1. Validate Type
@@ -28,6 +45,12 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
     // 2. Validate Size
     if (file.size > MAX_FILE_SIZE) {
         onNotification('error', 'La imagen supera el límite de 40MB.');
+        return;
+    }
+    
+    // 3. Storage Check
+    if (isStorageCritical) {
+        onNotification('error', 'Almacenamiento lleno. Elimina imágenes antiguas.');
         return;
     }
 
@@ -118,10 +141,24 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
     }
   };
 
+  const handleScroll = () => {
+      if (scrollContainerRef.current) {
+          const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+          if (scrollHeight - scrollTop - clientHeight < 100) {
+              setVisibleCount(prev => prev + 20);
+          }
+      }
+  };
+
   const filteredAssets = useMemo(() => {
-    if (!searchQuery) return assets;
-    return assets.filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [assets, searchQuery]);
+    let result = assets;
+    if (searchQuery) {
+        result = result.filter(a => a.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    return result.sort((a, b) => sortOrder === 'date' ? b.date - a.date : a.name.localeCompare(b.name));
+  }, [assets, searchQuery, sortOrder]);
+
+  const visibleAssets = filteredAssets.slice(0, visibleCount);
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-zinc-100 dark:bg-zinc-900">
@@ -132,34 +169,49 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                     <Grid size={16} className="text-twitch-brand dark:text-twitch-light" />
                     <span className="text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">Galería</span>
                 </div>
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessing}
-                    className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-zinc-300 dark:border-zinc-700 shadow-sm"
-                >
-                    {isProcessing ? <Loader2 size={14} className="animate-spin"/> : <Upload size={14} />}
-                    <span className="hidden sm:inline">Subir</span>
-                </button>
+                <div className="flex gap-2">
+                     <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-1.5 text-zinc-500 hover:text-black dark:hover:text-white rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="Cambiar Vista">
+                         {viewMode === 'grid' ? <LayoutList size={16}/> : <LayoutGrid size={16}/>}
+                     </button>
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isProcessing}
+                        className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors border border-zinc-300 dark:border-zinc-700 shadow-sm"
+                    >
+                        {isProcessing ? <Loader2 size={14} className="animate-spin"/> : <Upload size={14} />}
+                        <span className="hidden sm:inline">Subir</span>
+                    </button>
+                </div>
             </div>
             
-            {/* Search Bar */}
-            <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input 
-                    type="text" 
-                    placeholder="Buscar iconos..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light transition-all"
-                />
-                {searchQuery && (
-                    <button 
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-                    >
-                        <X size={12} />
-                    </button>
-                )}
+            {/* Search Bar & Sort */}
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                    <input 
+                        type="text" 
+                        placeholder="Buscar iconos..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light transition-all"
+                    />
+                    {searchQuery && (
+                        <button 
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        >
+                            <X size={12} />
+                        </button>
+                    )}
+                </div>
+                <select 
+                    value={sortOrder} 
+                    onChange={(e) => setSortOrder(e.target.value as any)}
+                    className="bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs rounded-lg px-2 py-2 focus:outline-none"
+                >
+                    <option value="date">Recientes</option>
+                    <option value="name">Nombre</option>
+                </select>
             </div>
             <input 
                 type="file" 
@@ -170,13 +222,29 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
             />
         </div>
 
-        {/* Drop Zone & Grid */}
+        {/* Storage Bar */}
+        <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
+            <HardDrive size={12} className={isStorageCritical ? "text-red-500" : "text-zinc-400"} />
+            <div className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div 
+                    className={`h-full transition-all duration-500 ${isStorageCritical ? 'bg-red-500' : storagePercent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} 
+                    style={{ width: `${storagePercent}%` }}
+                />
+            </div>
+            <span className={`text-[10px] font-mono ${isStorageCritical ? "text-red-500 font-bold" : "text-zinc-500"}`}>
+                {(storageUsed / 1024).toFixed(0)}KB
+            </span>
+        </div>
+
+        {/* Drop Zone & Content */}
         <div 
+            ref={scrollContainerRef}
             className={`flex-1 overflow-y-auto p-4 custom-scrollbar relative transition-colors ${dragActive ? 'bg-twitch-brand/10 dark:bg-twitch-brand/20' : 'bg-zinc-100 dark:bg-black/20'}`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
+            onScroll={handleScroll}
         >
             {dragActive && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center border-2 border-dashed border-twitch-brand pointer-events-none bg-white/50 dark:bg-black/50 backdrop-blur-sm m-2 rounded-xl">
@@ -187,12 +255,18 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                 </div>
             )}
 
+            {isProcessing && (
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-[2px]">
+                     <Loader2 size={32} className="animate-spin text-twitch-brand dark:text-twitch-light" />
+                </div>
+            )}
+
             {assets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3">
                     <ImageIcon size={48} className="opacity-20" />
                     <p className="text-xs text-center max-w-[200px] leading-relaxed">
                         Arrastra imágenes aquí o usa el botón subir.<br/>
-                        <span className="opacity-70">Soporta PNG, JPG, GIF (Máx 40MB).</span>
+                        <span className="opacity-70">Soporta PNG, JPG, GIF.</span>
                     </p>
                 </div>
             ) : filteredAssets.length === 0 ? (
@@ -200,10 +274,10 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                     <Search size={32} className="opacity-30" />
                     <p className="text-xs">No se encontraron resultados.</p>
                 </div>
-            ) : (
-                <div className="grid grid-cols-3 gap-3">
-                    {filteredAssets.map((asset) => (
-                        <div key={asset.id} className="group relative aspect-square bg-white dark:bg-zinc-800 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm hover:ring-2 hover:ring-twitch-brand/50 dark:hover:ring-twitch-light/50 transition-all">
+            ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 perspective-1000">
+                    {visibleAssets.map((asset) => (
+                        <div key={asset.id} className="group relative aspect-square bg-white dark:bg-zinc-800 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm hover:ring-2 hover:ring-twitch-brand/50 dark:hover:ring-twitch-light/50 transition-all transform hover:-rotate-y-12 hover:scale-105 duration-300">
                             <img src={asset.data} alt={asset.name} className="w-full h-full object-cover" />
                             
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
@@ -219,10 +293,25 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                         </div>
                     ))}
                 </div>
+            ) : (
+                <div className="space-y-1">
+                    {visibleAssets.map((asset) => (
+                         <div key={asset.id} className="flex items-center gap-3 p-2 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand transition-colors group">
+                              <img src={asset.data} className="w-8 h-8 rounded object-cover border border-zinc-300 dark:border-zinc-600" />
+                              <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{asset.name}</p>
+                                  <p className="text-[10px] text-zinc-500">{new Date(asset.date).toLocaleDateString()}</p>
+                              </div>
+                              <button 
+                                onClick={() => onDelete(asset.id)}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-400 hover:text-red-500 transition-all"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                         </div>
+                    ))}
+                </div>
             )}
-        </div>
-        <div className="p-2 text-[10px] text-zinc-500 text-center border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50">
-            {assets.length} imágenes guardadas • Máx 40MB por archivo
         </div>
     </div>
   );

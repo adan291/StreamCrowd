@@ -1,3 +1,4 @@
+
 import tmi from 'tmi.js';
 import { ConnectionStatus } from '../types';
 
@@ -100,7 +101,6 @@ class TwitchService {
   public sendMessage(message: string) {
     // Prevent sending if anonymous (no token provided)
     if (this.isAnonymous) {
-      console.warn("Skipping message send: Anonymous connection (No OAuth token provided).");
       return;
     }
 
