@@ -4,6 +4,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   fullWidth?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  /** Accessible label for icon-only buttons */
+  'aria-label'?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({ 
@@ -13,6 +15,7 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'md',
   className = '', 
   disabled,
+  'aria-label': ariaLabel,
   ...props 
 }) => {
   const baseStyles = "rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95";
@@ -36,6 +39,8 @@ export const Button: React.FC<ButtonProps> = ({
     <button 
       className={`${baseStyles} ${sizeStyles[size]} ${variants[variant]} ${widthStyle} ${className}`}
       disabled={disabled}
+      aria-label={ariaLabel}
+      aria-disabled={disabled}
       {...props}
     >
       {children}

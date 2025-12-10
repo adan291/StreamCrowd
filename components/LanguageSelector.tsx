@@ -52,12 +52,15 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         onClick={handleToggle}
         className="p-2 rounded-lg bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700 shadow-sm"
         title={currentLang.name}
+        aria-label={`Change language. Current: ${currentLang.name}`}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
         {variant === 'icon' ? (
-          <Globe size={20} />
+          <Globe size={20} aria-hidden="true" />
         ) : (
           <div className="flex items-center gap-2">
-            <span>{currentLang.flag}</span>
+            <span aria-hidden="true">{currentLang.flag}</span>
             {variant === 'full' && <span className="font-medium">{currentLang.name}</span>}
             {variant === 'compact' && (
               <span className="font-medium">{currentLang.code.toUpperCase()}</span>
@@ -67,11 +70,17 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-44 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-[100] animate-scale-up">
+        <div 
+          className="absolute right-0 mt-2 w-44 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-[100] animate-scale-up"
+          role="listbox"
+          aria-label="Select language"
+        >
           {languages.map((lang) => (
             <button
               key={lang.code}
               type="button"
+              role="option"
+              aria-selected={locale === lang.code}
               onClick={handleSelectLanguage(lang.code)}
               className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                 locale === lang.code
@@ -79,9 +88,9 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                   : 'text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700'
               }`}
             >
-              <span className="text-xl">{lang.flag}</span>
+              <span className="text-xl" aria-hidden="true">{lang.flag}</span>
               <span className="flex-1 font-medium">{lang.name}</span>
-              {locale === lang.code && <Check size={18} className="text-twitch-brand" />}
+              {locale === lang.code && <Check size={18} className="text-twitch-brand" aria-hidden="true" />}
             </button>
           ))}
         </div>

@@ -644,7 +644,6 @@ const App: React.FC = () => {
           <ConnectionPanel 
             status={status} 
             onConnect={handleConnect} 
-            onDisconnect={handleDisconnect} 
             errorMessage={connectionError}
           />
         </div>

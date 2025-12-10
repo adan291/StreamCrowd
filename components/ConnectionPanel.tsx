@@ -9,12 +9,10 @@ import { useI18n } from '../i18n';
 interface ConnectionPanelProps {
   status: ConnectionStatus;
   onConnect: (channel: string, token?: string) => void;
-  onDisconnect: () => void;
-  channelName?: string;
   errorMessage?: string | null;
 }
 
-export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConnect, onDisconnect, channelName, errorMessage }) => {
+export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConnect, errorMessage }) => {
   const { t } = useI18n();
   const [channel, setChannel] = useState('');
   const [token, setToken] = useState('');
@@ -108,13 +106,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       </div>
       
       <h2 className="text-xl sm:text-2xl font-bold mb-2 text-purple-light dark:text-white tracking-tight">{t.connection.title}</h2>
-      <p className="text-slate-500 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
+      <p className="text-slate-600 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
           {t.connection.subtitle}
       </p>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left group">
-          <label className="text-xs text-slate-600 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
+          <label className="text-xs text-slate-700 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
             {t.connection.channelLabel}
             <Tooltip text={t.connection.channelTooltip} />
           </label>
@@ -130,8 +128,8 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                 autoComplete="off"
                 spellCheck="false"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                  {isUrlDetected ? <LinkIcon size={16} className="text-green-500" /> : localError ? <AlertCircle size={18} className="text-red-500" /> : null}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true">
+                  {isUrlDetected ? <LinkIcon size={16} className="text-green-500" aria-label={t.connection.urlDetected} /> : localError ? <AlertCircle size={18} className="text-red-500" aria-label={t.connection.errorConnection} /> : null}
               </div>
           </div>
         </div>
@@ -142,14 +140,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                 type="button" 
                 onClick={() => setShowToken(!showToken)}
                 className="text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                aria-expanded={showToken}
+                aria-controls="token-input-section"
             >
-                <KeyRound size={12} />
+                <KeyRound size={12} aria-hidden="true" />
                 {showToken ? t.connection.hideToken : t.connection.tokenLabel}
             </button>
             <Tooltip text={t.connection.tokenTooltip} />
           </div>
           {showToken && (
-            <div className="animate-fade-in-down">
+            <div id="token-input-section" className="animate-fade-in-down">
                 <input
                     type="password"
                     value={token}

@@ -45,6 +45,7 @@ export interface Translations {
     errorChannelRequired: string;
     errorChannelInvalid: string;
     errorTokenInvalid: string;
+    urlDetected: string;
   };
   nav: {
     panel: string;
@@ -375,6 +376,7 @@ export const translations: Record<Locale, Translations> = {
       errorChannelRequired: 'El nombre del canal es obligatorio.',
       errorChannelInvalid: 'Nombre inválido (3-25 caracteres, letras, números y _).',
       errorTokenInvalid: 'Token inválido. Asegúrate de copiar el "ACCESS TOKEN".',
+      urlDetected: 'URL detectada',
     },
     nav: {
       panel: 'Panel',
@@ -703,6 +705,7 @@ export const translations: Record<Locale, Translations> = {
       errorChannelRequired: 'Channel name is required.',
       errorChannelInvalid: 'Invalid name (3-25 characters, letters, numbers and _).',
       errorTokenInvalid: 'Invalid token. Make sure to copy the "ACCESS TOKEN".',
+      urlDetected: 'URL detected',
     },
     nav: {
       panel: 'Panel',

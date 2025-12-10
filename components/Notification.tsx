@@ -21,7 +21,12 @@ interface NotificationProps {
 
 export const NotificationContainer: React.FC<NotificationProps> = ({ notifications, onRemove, className = "" }) => {
   return (
-    <div className={`flex flex-col items-center gap-2 w-full pointer-events-none ${className}`}>
+    <div 
+      className={`flex flex-col items-center gap-2 w-full pointer-events-none ${className}`}
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+    >
       {notifications.map((note) => (
         <NotificationToast key={note.id} note={note} onRemove={onRemove} />
       ))}
@@ -49,11 +54,21 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
     info: 'border-blue-500/30'
   };
 
+  const roleMap = {
+    success: 'status',
+    error: 'alert',
+    info: 'status'
+  } as const;
+
   return (
-    <div className={`pointer-events-auto inline-flex items-center gap-2 sm:gap-3 p-2 sm:p-3 pr-3 sm:pr-4 rounded-xl border shadow-2xl animate-slide-up bg-zinc-900 ${borderColors[note.type]} w-auto max-w-[calc(100vw-2rem)] sm:max-w-md min-w-0 sm:min-w-[280px]`}>
+    <div 
+      className={`pointer-events-auto inline-flex items-center gap-2 sm:gap-3 p-2 sm:p-3 pr-3 sm:pr-4 rounded-xl border shadow-2xl animate-slide-up bg-zinc-900 ${borderColors[note.type]} w-auto max-w-[calc(100vw-2rem)] sm:max-w-md min-w-0 sm:min-w-[280px]`}
+      role={roleMap[note.type]}
+      aria-live={note.type === 'error' ? 'assertive' : 'polite'}
+    >
       
       {/* Icon or Avatar */}
-      <div className="shrink-0">
+      <div className="shrink-0" aria-hidden="true">
         {note.metadata?.channelInitial ? (
            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700">
              <span className="font-bold text-twitch-brand dark:text-twitch-light uppercase text-xs sm:text-sm">
@@ -72,8 +87,9 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
       <button 
         onClick={() => onRemove(note.id)} 
         className="text-zinc-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10 shrink-0"
+        aria-label="Dismiss notification"
       >
-        <X size={14} />
+        <X size={14} aria-hidden="true" />
       </button>
     </div>
   );

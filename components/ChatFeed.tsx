@@ -47,13 +47,18 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
   }, [messages, isAutoScroll]);
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border-0 md:border border-zinc-200 dark:border-zinc-800 rounded-none md:rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative">
+    <div 
+      className="bg-white dark:bg-zinc-900 border-0 md:border border-zinc-200 dark:border-zinc-800 rounded-none md:rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative"
+      role="log"
+      aria-label={t.chat.liveChat}
+      aria-live="polite"
+    >
       <div className="flex items-center gap-2 p-2 sm:p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm z-10 shrink-0">
-         <div className="p-1 sm:p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light">
+         <div className="p-1 sm:p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light" aria-hidden="true">
              <MessageSquare size={14} />
          </div>
-         <span className="text-[10px] sm:text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t.chat.liveChat}</span>
-         <div className="ml-auto text-[10px] text-zinc-400 font-mono">
+         <span className="text-[10px] sm:text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{t.chat.liveChat}</span>
+         <div className="ml-auto text-[10px] text-zinc-500 dark:text-zinc-400 font-mono" aria-live="off">
             {messages.length > 0 ? `${messages.length} msgs` : 'Ready'}
          </div>
       </div>
@@ -146,8 +151,9 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
            <button 
               onClick={scrollToBottom}
               className="bg-twitch-brand hover:bg-twitch-light text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-transform hover:scale-105 active:scale-95 border border-white/10"
+              aria-label={t.chat.newMessages}
            >
-              <ArrowDown size={14} /> {t.chat.newMessages}
+              <ArrowDown size={14} aria-hidden="true" /> {t.chat.newMessages}
            </button>
         </div>
       )}
