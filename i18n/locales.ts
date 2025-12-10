@@ -55,9 +55,19 @@ export interface Translations {
     analytics: string;
     chat: string;
     stream: string;
+    notConnected: string;
+    connectToChannel: string;
+    invalidChannel: string;
+    invalidChannelName: string;
+    twitchStream: string;
+    loadStream: string;
+    openInTwitch: string;
+    copyLink: string;
+    closeStream: string;
   };
   poll: {
     title: string;
+    liveTitle: string;
     createTitle: string;
     question: string;
     questionPlaceholder: string;
@@ -86,6 +96,56 @@ export interface Translations {
     openOverlay: string;
     copyOverlayUrl: string;
     urlCopied: string;
+    confirm: string;
+    confirmHint: string;
+    preview: string;
+    save: string;
+    saveTemplate: string;
+    apply: string;
+    cancel: string;
+    goal: string;
+    goalTooltip: string;
+    writeQuestion: string;
+    minOptions: string;
+    storageFull: string;
+    templateSaved: string;
+    replaceOptions: string;
+    noPollActive: string;
+    createInPanel: string;
+    shareVotes: string;
+    obsOverlay: string;
+    obsHint: string;
+    quick: string;
+    yesNo: string;
+    sectionTitle: string;
+    sectionTitleTooltip: string;
+    questionLabel: string;
+    questionTooltip: string;
+    questionPlaceholderFull: string;
+    responseOptions: string;
+    addOptionBtn: string;
+    timeSec: string;
+    barColor: string;
+    limitColor: string;
+    startPoll: string;
+    clearForm: string;
+    templates: string;
+    myTemplates: string;
+    favorites: string;
+    uploadImage: string;
+    galleryBtn: string;
+    presetApplied: string;
+    templateLoaded: string;
+    invalidImageType: string;
+    imageTooLarge: string;
+    fileReadError: string;
+    iconSavedToGallery: string;
+    imageProcessError: string;
+    imageDamaged: string;
+    needTwoOptions: string;
+    completeAllFields: string;
+    allOptionsNeedLabel: string;
+    option: string;
   };
   moderation: {
     title: string;
@@ -96,6 +156,29 @@ export interface Translations {
     rejected: string;
     voteChanged: string;
     acceptanceRate: string;
+    reset: string;
+    minAccountAge: string;
+    minAccountAgeTooltip: string;
+    allowVoteChanges: string;
+    allowVoteChangesTooltip: string;
+    enabled: string;
+    disabled: string;
+    cooldown: string;
+    cooldownTooltip: string;
+    voteWeights: string;
+    voteWeightsTooltip: string;
+    subscriber: string;
+    follower: string;
+    regularUsers: string;
+    presets: string;
+    presetName: string;
+    loadPreset: string;
+    noPresets: string;
+    presetSaved: string;
+    presetLoaded: string;
+    presetDeleted: string;
+    enterPresetName: string;
+    resetDefaults: string;
     reasons: {
       accountTooNew: string;
       cooldownActive: string;
@@ -119,6 +202,44 @@ export interface Translations {
     configureAI: string;
     aiActive: string;
     noData: string;
+    live: string;
+    history: string;
+    activeSession: string;
+    noActiveStream: string;
+    connectToSee: string;
+    uniqueViewers: string;
+    messages: string;
+    positive: string;
+    neutral: string;
+    negative: string;
+    engagement: string;
+    mainTopics: string;
+    frequentWords: string;
+    mostUsedEmotes: string;
+    mostActiveViewers: string;
+    msgs: string;
+    sessionsThisDay: string;
+    totalMessages: string;
+    noSessionsDate: string;
+    exportData: string;
+    loading: string;
+  };
+  aiConfig: {
+    title: string;
+    optional: string;
+    description: string;
+    provider: string;
+    apiKey: string;
+    apiKeyPlaceholder: string;
+    saved: string;
+    save: string;
+    test: string;
+    connectionSuccess: string;
+    connectionError: string;
+    aiAnalysis: string;
+    activateInsights: string;
+    noApiKeyHint: string;
+    getApiKey: string;
   };
   history: {
     title: string;
@@ -159,6 +280,19 @@ export interface Translations {
     saved: string;
     deleted: string;
     autoEnded: string;
+  };
+  chat: {
+    newPoll: string;
+    options: string;
+    voteHint: string;
+    pollEnded: string;
+    winner: string;
+    withVotes: string;
+    liveChat: string;
+    waitingMessages: string;
+    newMessages: string;
+    alreadyRegistered: string;
+    votedFor: string;
   };
 }
 
@@ -217,9 +351,19 @@ export const translations: Record<Locale, Translations> = {
       analytics: 'Analytics',
       chat: 'Chat',
       stream: 'Stream',
+      notConnected: 'No conectado',
+      connectToChannel: 'Conéctate a un canal de Twitch para ver el stream.',
+      invalidChannel: 'Canal inválido',
+      invalidChannelName: 'El nombre del canal no es válido.',
+      twitchStream: 'Stream de Twitch',
+      loadStream: 'Cargar Stream',
+      openInTwitch: 'Abrir en Twitch',
+      copyLink: 'Copiar enlace',
+      closeStream: 'Cerrar stream',
     },
     poll: {
       title: 'Encuesta',
+      liveTitle: 'Encuesta en Vivo',
       createTitle: 'Crear Encuesta',
       question: 'Pregunta',
       questionPlaceholder: '¿Cuál es tu pregunta?',
@@ -248,9 +392,59 @@ export const translations: Record<Locale, Translations> = {
       openOverlay: 'Abrir Overlay',
       copyOverlayUrl: 'Copiar URL del Overlay',
       urlCopied: 'URL copiada al portapapeles',
+      confirm: 'Confirmar Encuesta',
+      confirmHint: 'Revisa los detalles antes de lanzar.',
+      preview: 'Vista Previa',
+      save: 'Guardar',
+      saveTemplate: 'Guardar como Plantilla',
+      apply: 'Aplicar',
+      cancel: 'Cancelar',
+      goal: 'Meta',
+      goalTooltip: 'Detiene al llegar a X votos',
+      writeQuestion: 'Escribe una pregunta para guardar.',
+      minOptions: 'La encuesta debe tener al menos 2 opciones.',
+      storageFull: 'No se pudo guardar: Límite de almacenamiento excedido.',
+      templateSaved: 'Plantilla guardada correctamente.',
+      replaceOptions: 'Esto reemplazará las opciones actuales. ¿Deseas continuar?',
+      noPollActive: 'No hay votación activa',
+      createInPanel: 'Crea una encuesta en el Panel para ver la vista previa.',
+      shareVotes: '{label}: {percentage}% de los votos',
+      obsOverlay: 'Overlay para OBS',
+      obsHint: 'Muestra la encuesta en tu stream con Window Capture.',
+      quick: 'Rápido',
+      yesNo: 'Sí / No',
+      sectionTitle: 'Título de Sección',
+      sectionTitleTooltip: "Aparece sobre la pregunta (ej: 'Votando Ahora')",
+      questionLabel: 'Pregunta',
+      questionTooltip: 'La pregunta principal para los viewers',
+      questionPlaceholderFull: '¿Qué jugamos hoy?',
+      responseOptions: 'Opciones de Respuesta',
+      addOptionBtn: 'Agregar Opción',
+      timeSec: 'Tiempo (Seg)',
+      barColor: 'Barra',
+      limitColor: 'Límite',
+      startPoll: 'Iniciar Votación',
+      clearForm: 'Limpiar Formulario',
+      templates: 'Plantillas',
+      myTemplates: 'Mis Plantillas',
+      favorites: 'Favoritos',
+      uploadImage: 'Subir Imagen',
+      galleryBtn: 'Galería',
+      presetApplied: 'Preset aplicado.',
+      templateLoaded: 'Plantilla cargada.',
+      invalidImageType: 'El archivo debe ser una imagen válida (JPG, PNG, GIF).',
+      imageTooLarge: 'La imagen es demasiado grande (Máx 40MB).',
+      fileReadError: 'Error al leer el archivo. Intenta de nuevo.',
+      iconSavedToGallery: 'Icono procesado y guardado en Galería.',
+      imageProcessError: 'Error al procesar la imagen en el navegador.',
+      imageDamaged: 'El archivo de imagen parece estar dañado.',
+      needTwoOptions: 'Se necesitan al menos 2 opciones.',
+      completeAllFields: 'Completa la pregunta y todas las opciones.',
+      allOptionsNeedLabel: 'Todas las opciones deben tener una etiqueta.',
+      option: 'Opción',
     },
     moderation: {
-      title: 'Moderación',
+      title: 'Moderación de Votos',
       config: 'Configuración',
       stats: 'Estadísticas',
       log: 'Registro',
@@ -258,6 +452,29 @@ export const translations: Record<Locale, Translations> = {
       rejected: 'Rechazados',
       voteChanged: 'Cambios de voto',
       acceptanceRate: 'Tasa de aceptación',
+      reset: 'Restablecer',
+      minAccountAge: 'Edad Mín. Cuenta (días)',
+      minAccountAgeTooltip: 'Cuentas más nuevas serán rechazadas. Pon 0 para permitir todas.',
+      allowVoteChanges: 'Permitir Cambio de Voto',
+      allowVoteChangesTooltip: 'Si está desactivado, los usuarios no pueden cambiar su voto.',
+      enabled: 'Activado',
+      disabled: 'Desactivado',
+      cooldown: 'Cooldown (segundos)',
+      cooldownTooltip: 'Tiempo que deben esperar para cambiar su voto.',
+      voteWeights: 'Pesos de Voto (1-5)',
+      voteWeightsTooltip: 'Mayor peso da más poder de voto a suscriptores/seguidores.',
+      subscriber: 'Suscriptor',
+      follower: 'Seguidor',
+      regularUsers: 'Usuarios regulares siempre tienen peso 1x',
+      presets: 'Presets',
+      presetName: 'Nombre del preset...',
+      loadPreset: 'Cargar Preset',
+      noPresets: 'No hay presets guardados',
+      presetSaved: 'Preset "{name}" guardado',
+      presetLoaded: 'Preset "{name}" cargado',
+      presetDeleted: 'Preset "{name}" eliminado',
+      enterPresetName: 'Ingresa un nombre para el preset',
+      resetDefaults: 'Configuración restablecida',
       reasons: {
         accountTooNew: 'Cuenta muy nueva',
         cooldownActive: 'Cooldown activo',
@@ -281,6 +498,44 @@ export const translations: Record<Locale, Translations> = {
       configureAI: 'Configurar IA',
       aiActive: 'Activa',
       noData: 'Sin datos disponibles',
+      live: 'En vivo',
+      history: 'Historial',
+      activeSession: 'Sesión activa',
+      noActiveStream: 'No hay stream activo',
+      connectToSee: 'Conecta a un canal para ver analytics en vivo',
+      uniqueViewers: 'Viewers únicos',
+      messages: 'Mensajes',
+      positive: 'Positivo',
+      neutral: 'Neutral',
+      negative: 'Negativo',
+      engagement: 'Engagement',
+      mainTopics: 'Temas principales',
+      frequentWords: 'Palabras frecuentes',
+      mostUsedEmotes: 'Emotes más usados',
+      mostActiveViewers: 'Viewers más activos',
+      msgs: 'msgs',
+      sessionsThisDay: 'sesión(es) este día',
+      totalMessages: 'Total mensajes',
+      noSessionsDate: 'No hay sesiones para esta fecha',
+      exportData: 'Exportar datos',
+      loading: 'Cargando...',
+    },
+    aiConfig: {
+      title: 'Configuración IA',
+      optional: 'Opcional',
+      description: 'Conecta una IA para analizar tu chat y obtener insights avanzados al final de cada stream.',
+      provider: 'Proveedor',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: 'Tu {provider} API key...',
+      saved: '¡Guardado!',
+      save: 'Guardar',
+      test: 'Test',
+      connectionSuccess: '✓ Conexión exitosa!',
+      connectionError: '✗ Error de conexión',
+      aiAnalysis: 'Análisis con IA',
+      activateInsights: 'Activa para obtener insights avanzados',
+      noApiKeyHint: '💡 Sin API key, se usará análisis local básico.',
+      getApiKey: 'Obtener API key de {provider} →',
     },
     history: {
       title: 'Historial de Encuestas',
@@ -321,6 +576,19 @@ export const translations: Record<Locale, Translations> = {
       saved: 'Guardado correctamente',
       deleted: 'Eliminado correctamente',
       autoEnded: 'Encuesta finalizada por tiempo/límite.',
+    },
+    chat: {
+      newPoll: '📊 Nueva Encuesta',
+      options: 'Opciones',
+      voteHint: 'Vota escribiendo +1, +2, etc.',
+      pollEnded: '🏁 Encuesta Finalizada',
+      winner: '🏆 Ganador',
+      withVotes: 'con {votes} votos',
+      liveChat: 'Chat en Vivo',
+      waitingMessages: 'Esperando mensajes...',
+      newMessages: 'Nuevos mensajes',
+      alreadyRegistered: 'Ya registrado',
+      votedFor: 'Votó por',
     },
   },
   en: {
@@ -377,9 +645,19 @@ export const translations: Record<Locale, Translations> = {
       analytics: 'Analytics',
       chat: 'Chat',
       stream: 'Stream',
+      notConnected: 'Not connected',
+      connectToChannel: 'Connect to a Twitch channel to watch the stream.',
+      invalidChannel: 'Invalid channel',
+      invalidChannelName: 'Channel name is not valid.',
+      twitchStream: 'Twitch Stream',
+      loadStream: 'Load Stream',
+      openInTwitch: 'Open in Twitch',
+      copyLink: 'Copy link',
+      closeStream: 'Close stream',
     },
     poll: {
       title: 'Poll',
+      liveTitle: 'Live Poll',
       createTitle: 'Create Poll',
       question: 'Question',
       questionPlaceholder: 'What is your question?',
@@ -408,9 +686,59 @@ export const translations: Record<Locale, Translations> = {
       openOverlay: 'Open Overlay',
       copyOverlayUrl: 'Copy Overlay URL',
       urlCopied: 'URL copied to clipboard',
+      confirm: 'Confirm Poll',
+      confirmHint: 'Review details before launching.',
+      preview: 'Preview',
+      save: 'Save',
+      saveTemplate: 'Save as Template',
+      apply: 'Apply',
+      cancel: 'Cancel',
+      goal: 'Goal',
+      goalTooltip: 'Stops when reaching X votes',
+      writeQuestion: 'Write a question to save.',
+      minOptions: 'Poll must have at least 2 options.',
+      storageFull: 'Could not save: Storage limit exceeded.',
+      templateSaved: 'Template saved successfully.',
+      replaceOptions: 'This will replace current options. Continue?',
+      noPollActive: 'No active poll',
+      createInPanel: 'Create a poll in the Panel to see the preview.',
+      shareVotes: '{label}: {percentage}% of votes',
+      obsOverlay: 'OBS Overlay',
+      obsHint: 'Show the poll in your stream with Window Capture.',
+      quick: 'Quick',
+      yesNo: 'Yes / No',
+      sectionTitle: 'Section Title',
+      sectionTitleTooltip: "Appears above the question (e.g. 'Voting Now')",
+      questionLabel: 'Question',
+      questionTooltip: 'The main question for viewers',
+      questionPlaceholderFull: 'What are we playing today?',
+      responseOptions: 'Response Options',
+      addOptionBtn: 'Add Option',
+      timeSec: 'Time (Sec)',
+      barColor: 'Bar',
+      limitColor: 'Limit',
+      startPoll: 'Start Poll',
+      clearForm: 'Clear Form',
+      templates: 'Templates',
+      myTemplates: 'My Templates',
+      favorites: 'Favorites',
+      uploadImage: 'Upload Image',
+      galleryBtn: 'Gallery',
+      presetApplied: 'Preset applied.',
+      templateLoaded: 'Template loaded.',
+      invalidImageType: 'File must be a valid image (JPG, PNG, GIF).',
+      imageTooLarge: 'Image is too large (Max 40MB).',
+      fileReadError: 'Error reading file. Try again.',
+      iconSavedToGallery: 'Icon processed and saved to Gallery.',
+      imageProcessError: 'Error processing image in browser.',
+      imageDamaged: 'Image file appears to be damaged.',
+      needTwoOptions: 'At least 2 options are required.',
+      completeAllFields: 'Complete the question and all options.',
+      allOptionsNeedLabel: 'All options must have a label.',
+      option: 'Option',
     },
     moderation: {
-      title: 'Moderation',
+      title: 'Vote Moderation',
       config: 'Configuration',
       stats: 'Statistics',
       log: 'Log',
@@ -418,6 +746,29 @@ export const translations: Record<Locale, Translations> = {
       rejected: 'Rejected',
       voteChanged: 'Vote changes',
       acceptanceRate: 'Acceptance rate',
+      reset: 'Reset',
+      minAccountAge: 'Min Account Age (days)',
+      minAccountAgeTooltip: 'Accounts younger than this will be rejected. Set to 0 to allow all.',
+      allowVoteChanges: 'Allow Vote Changes',
+      allowVoteChangesTooltip: 'When disabled, users cannot change their vote after voting.',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      cooldown: 'Cooldown (seconds)',
+      cooldownTooltip: 'Time users must wait before changing their vote.',
+      voteWeights: 'Vote Weights (1-5)',
+      voteWeightsTooltip: 'Higher weights give more voting power to subscribers/followers.',
+      subscriber: 'Subscriber',
+      follower: 'Follower',
+      regularUsers: 'Regular users always have weight 1x',
+      presets: 'Presets',
+      presetName: 'Preset name...',
+      loadPreset: 'Load Preset',
+      noPresets: 'No presets saved yet',
+      presetSaved: 'Preset "{name}" saved',
+      presetLoaded: 'Preset "{name}" loaded',
+      presetDeleted: 'Preset "{name}" deleted',
+      enterPresetName: 'Enter a preset name',
+      resetDefaults: 'Settings reset to defaults',
       reasons: {
         accountTooNew: 'Account too new',
         cooldownActive: 'Cooldown active',
@@ -441,6 +792,44 @@ export const translations: Record<Locale, Translations> = {
       configureAI: 'Configure AI',
       aiActive: 'Active',
       noData: 'No data available',
+      live: 'Live',
+      history: 'History',
+      activeSession: 'Active session',
+      noActiveStream: 'No active stream',
+      connectToSee: 'Connect to a channel to see live analytics',
+      uniqueViewers: 'Unique viewers',
+      messages: 'Messages',
+      positive: 'Positive',
+      neutral: 'Neutral',
+      negative: 'Negative',
+      engagement: 'Engagement',
+      mainTopics: 'Main topics',
+      frequentWords: 'Frequent words',
+      mostUsedEmotes: 'Most used emotes',
+      mostActiveViewers: 'Most active viewers',
+      msgs: 'msgs',
+      sessionsThisDay: 'session(s) this day',
+      totalMessages: 'Total messages',
+      noSessionsDate: 'No sessions for this date',
+      exportData: 'Export data',
+      loading: 'Loading...',
+    },
+    aiConfig: {
+      title: 'AI Configuration',
+      optional: 'Optional',
+      description: 'Connect an AI to analyze your chat and get advanced insights at the end of each stream.',
+      provider: 'Provider',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: 'Your {provider} API key...',
+      saved: 'Saved!',
+      save: 'Save',
+      test: 'Test',
+      connectionSuccess: '✓ Connection successful!',
+      connectionError: '✗ Connection error',
+      aiAnalysis: 'AI Analysis',
+      activateInsights: 'Enable for advanced insights',
+      noApiKeyHint: '💡 Without API key, basic local analysis will be used.',
+      getApiKey: 'Get {provider} API key →',
     },
     history: {
       title: 'Poll History',
@@ -481,6 +870,19 @@ export const translations: Record<Locale, Translations> = {
       saved: 'Saved successfully',
       deleted: 'Deleted successfully',
       autoEnded: 'Poll ended by time/limit.',
+    },
+    chat: {
+      newPoll: '📊 New Poll',
+      options: 'Options',
+      voteHint: 'Vote by typing +1, +2, etc.',
+      pollEnded: '🏁 Poll Ended',
+      winner: '🏆 Winner',
+      withVotes: 'with {votes} votes',
+      liveChat: 'Live Chat',
+      waitingMessages: 'Waiting for messages...',
+      newMessages: 'New messages',
+      alreadyRegistered: 'Already registered',
+      votedFor: 'Voted for',
     },
   },
 };

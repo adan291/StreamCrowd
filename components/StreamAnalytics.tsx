@@ -26,6 +26,7 @@ import {
   analyzeLocally,
   analyzeWithAI,
 } from '../services/aiAnalyticsService';
+import { useI18n } from '../i18n';
 
 interface StreamAnalyticsProps {
   currentSession?: StreamSession | null;
@@ -40,6 +41,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
   isStreamActive,
   onClose,
 }) => {
+  const { t } = useI18n();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [dailyInsight, setDailyInsight] = useState<DailyInsight | null>(null);
   const [liveAnalysis, setLiveAnalysis] = useState<ChatAnalysis | null>(null);
@@ -117,7 +119,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
       return (
         <div className="text-center py-8 text-gray-500">
           <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>No hay datos suficientes para analizar</p>
+          <p>{t.analytics.noData}</p>
         </div>
       );
     }
@@ -129,7 +131,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
           <div className="bg-black/30 rounded-lg p-3">
             <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
               <Users className="w-3 h-3" />
-              Viewers únicos
+              {t.analytics.uniqueViewers}
             </div>
             <p className="text-2xl font-bold text-white">
               {analysis.viewerInteraction.uniqueViewers}
@@ -138,7 +140,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
           <div className="bg-black/30 rounded-lg p-3">
             <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
               <MessageSquare className="w-3 h-3" />
-              Mensajes
+              {t.analytics.messages}
             </div>
             <p className="text-2xl font-bold text-white">
               {analysis.viewerInteraction.totalMessages}
@@ -152,13 +154,13 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             <div className="flex items-center gap-2">
               <SentimentIcon sentiment={analysis.sentiment} />
               <span className="text-white font-medium capitalize">
-                {analysis.sentiment === 'positive' && 'Positivo'}
-                {analysis.sentiment === 'neutral' && 'Neutral'}
-                {analysis.sentiment === 'negative' && 'Negativo'}
+                {analysis.sentiment === 'positive' && t.analytics.positive}
+                {analysis.sentiment === 'neutral' && t.analytics.neutral}
+                {analysis.sentiment === 'negative' && t.analytics.negative}
               </span>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-400">Engagement</p>
+              <p className="text-xs text-gray-400">{t.analytics.engagement}</p>
               <p className="text-lg font-bold text-white">{analysis.engagement}%</p>
             </div>
           </div>
@@ -170,7 +172,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
           <div className="bg-black/30 rounded-lg p-4">
             <h4 className="text-sm text-gray-400 mb-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
-              Temas principales
+              {t.analytics.mainTopics}
             </h4>
             <div className="flex flex-wrap gap-2">
               {analysis.topics.map((topic, i) => (
@@ -188,7 +190,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
         {/* Word Cloud */}
         {analysis.wordCloud.length > 0 && (
           <div className="bg-black/30 rounded-lg p-4">
-            <h4 className="text-sm text-gray-400 mb-2">Palabras frecuentes</h4>
+            <h4 className="text-sm text-gray-400 mb-2">{t.analytics.frequentWords}</h4>
             <div className="flex flex-wrap gap-2">
               {analysis.wordCloud.slice(0, 15).map((item, i) => (
                 <span
@@ -210,7 +212,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
         {/* Emote Usage */}
         {analysis.emoteUsage.length > 0 && (
           <div className="bg-black/30 rounded-lg p-4">
-            <h4 className="text-sm text-gray-400 mb-2">Emotes más usados</h4>
+            <h4 className="text-sm text-gray-400 mb-2">{t.analytics.mostUsedEmotes}</h4>
             <div className="space-y-2">
               {analysis.emoteUsage.slice(0, 5).map((emote, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -232,7 +234,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
         <div className="bg-black/30 rounded-lg p-4">
           <h4 className="text-sm text-gray-400 mb-2 flex items-center gap-2">
             <Activity className="w-4 h-4" />
-            Viewers más activos
+            {t.analytics.mostActiveViewers}
           </h4>
           <div className="space-y-2">
             {analysis.viewerInteraction.mostActiveViewers.slice(0, 5).map((viewer, i) => (
@@ -241,7 +243,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                   <span className="text-xs text-gray-500 w-4">{i + 1}.</span>
                   <span className="text-white">{viewer.username}</span>
                 </div>
-                <span className="text-sm text-gray-400">{viewer.messageCount} msgs</span>
+                <span className="text-sm text-gray-400">{viewer.messageCount} {t.analytics.msgs}</span>
               </div>
             ))}
           </div>
@@ -278,7 +280,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             }`}
           >
             {isStreamActive && <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse" />}
-            En vivo
+            {t.analytics.live}
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -288,7 +290,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                 : 'bg-white/5 text-gray-400 hover:bg-white/10'
             }`}
           >
-            Historial
+            {t.analytics.history}
           </button>
         </div>
       </div>
@@ -302,7 +304,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                 <div className="flex items-center gap-2 mb-4 text-sm text-gray-400">
                   <Clock className="w-4 h-4" />
                   <span>
-                    Sesión activa: {formatDuration(Date.now() - currentSession.startTime)}
+                    {t.analytics.activeSession}: {formatDuration(Date.now() - currentSession.startTime)}
                   </span>
                 </div>
                 {renderAnalysis(liveAnalysis || undefined)}
@@ -310,8 +312,8 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="font-medium">No hay stream activo</p>
-                <p className="text-sm mt-1">Conecta a un canal para ver analytics en vivo</p>
+                <p className="font-medium">{t.analytics.noActiveStream}</p>
+                <p className="text-sm mt-1">{t.analytics.connectToSee}</p>
               </div>
             )}
           </>
@@ -345,18 +347,18 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full mx-auto" />
-                <p className="text-gray-500 mt-2">Cargando...</p>
+                <p className="text-gray-500 mt-2">{t.analytics.loading}</p>
               </div>
             ) : dailyInsight?.sessions.length ? (
               <>
                 {/* Sessions Summary */}
                 <div className="mb-4 p-3 bg-black/30 rounded-lg">
                   <p className="text-sm text-gray-400">
-                    {dailyInsight.sessions.length} sesión(es) este día
+                    {dailyInsight.sessions.length} {t.analytics.sessionsThisDay}
                   </p>
                   <div className="flex gap-4 mt-2 text-xs text-gray-500">
                     <span>
-                      Total mensajes:{' '}
+                      {t.analytics.totalMessages}:{' '}
                       {dailyInsight.sessions.reduce((acc, s) => acc + s.messages.length, 0)}
                     </span>
                   </div>
@@ -379,14 +381,14 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                     className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
                   >
                     <Download className="w-4 h-4" />
-                    Exportar datos
+                    {t.analytics.exportData}
                   </button>
                 )}
               </>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No hay sesiones para esta fecha</p>
+                <p>{t.analytics.noSessionsDate}</p>
               </div>
             )}
           </>

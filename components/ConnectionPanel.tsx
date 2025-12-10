@@ -107,7 +107,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
         <div className="absolute inset-0 bg-twitch-brand/20 blur-xl rounded-full opacity-50 animate-pulse"></div>
       </div>
       
-      <h2 className="text-xl sm:text-2xl font-bold mb-2 text-gray-700 dark:text-white tracking-tight">{t.connection.title}</h2>
+      <h2 className="text-xl sm:text-2xl font-bold mb-2 text-purple-light dark:text-white tracking-tight">{t.connection.title}</h2>
       <p className="text-slate-500 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
           {t.connection.subtitle}
       </p>
@@ -125,7 +125,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                 onChange={handleInputChange}
                 onBlur={handleBlur}
                 placeholder={t.connection.channelPlaceholder}
-                className={`w-full bg-slate-100 dark:bg-black/50 border text-gray-700 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium placeholder:text-sky-400/70 dark:placeholder:text-zinc-500 ${localError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
+                className={`w-full bg-white dark:bg-black/50 border text-gray-800 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium placeholder-purple-light dark:placeholder:text-zinc-500 ${localError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
                 disabled={status === ConnectionStatus.CONNECTING}
                 autoComplete="off"
                 spellCheck="false"
@@ -155,9 +155,9 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                     placeholder={t.connection.tokenPlaceholder}
-                    className="w-full bg-slate-100 dark:bg-black/50 border border-slate-300 dark:border-zinc-700 text-gray-700 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono placeholder:text-sky-400/70 dark:placeholder:text-zinc-500"
+                    className="w-full bg-white dark:bg-black/50 border border-gray-300 dark:border-zinc-700 text-gray-800 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono placeholder-purple-light dark:placeholder:text-zinc-500"
                 />
-                <div className="text-[10px] text-sky-600/80 dark:text-zinc-400 mt-2 ml-1 leading-relaxed bg-slate-100 dark:bg-zinc-800/50 p-2 rounded border border-slate-200 dark:border-zinc-800">
+                <div className="text-[10px] text-purple-light dark:text-zinc-400 mt-2 ml-1 leading-relaxed bg-white/80 dark:bg-zinc-800/50 p-2 rounded border border-gray-200 dark:border-zinc-800">
                    <p className="mb-1"><strong>{t.connection.instructions}:</strong></p>
                    <ol className="list-decimal pl-3 space-y-1">
                      <li>{t.connection.step1} <a href="https://twitchtokengenerator.com/" target="_blank" rel="noopener noreferrer" className="text-twitch-brand hover:underline font-bold">twitchtokengenerator.com</a></li>

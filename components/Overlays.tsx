@@ -4,6 +4,7 @@ import { Layers, ExternalLink, Copy, CheckCircle2, Monitor, Globe, AlertCircle, 
 import { Poll, VoteRecord } from '../types';
 import { LivePoll } from './LivePoll';
 import { Button } from './Button';
+import { useI18n } from '../i18n';
 
 interface OverlaysProps {
   currentPoll: Poll | null;
@@ -15,6 +16,7 @@ interface OverlaysProps {
 }
 
 export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, theme, channelName, isVisible = true, overlayWindowRef: externalWindowRef }) => {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [overlayTheme, setOverlayTheme] = useState<'dark' | 'light'>('dark');
   const internalWindowRef = useRef<Window | null>(null);
@@ -55,7 +57,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
     try {
       const config = { theme: overlayTheme, customChannel };
       localStorage.setItem('twitch_vote_overlay_config', JSON.stringify(config));
-      setSaveStatus('Guardado');
+      setSaveStatus(t.notifications.saved);
       setTimeout(() => setSaveStatus(null), 2000);
     } catch (e) {
       console.error(e);
@@ -69,7 +71,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
         const config = JSON.parse(saved);
         if (config.theme) setOverlayTheme(config.theme);
         if (config.customChannel) setCustomChannel(config.customChannel);
-        setSaveStatus('Cargado');
+        setSaveStatus(t.common.loading);
         setTimeout(() => setSaveStatus(null), 2000);
       }
     } catch (e) {
@@ -117,22 +119,22 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 gap-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 shrink-0">
          <div className="flex items-center gap-2">
             <Layers size={16} className="text-twitch-brand dark:text-twitch-light" />
-            <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">Configuración de Overlay</span>
+            <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">{t.overlay.title}</span>
          </div>
          <div className="flex gap-2 w-full sm:w-auto">
             <button 
               onClick={loadOverlayConfig} 
               className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-twitch-brand dark:hover:text-twitch-light px-2 py-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors border border-zinc-200 dark:border-zinc-700 sm:border-0"
-              title="Cargar configuración guardada"
+              title={t.moderation.loadPreset}
             >
-              <Download size={14}/> <span className="hidden xs:inline">Cargar</span>
+              <Download size={14}/> <span className="hidden xs:inline">{t.moderation.loadPreset}</span>
             </button>
             <button 
               onClick={saveOverlayConfig} 
               className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-twitch-brand dark:hover:text-twitch-light px-2 py-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors border border-zinc-200 dark:border-zinc-700 sm:border-0"
-              title="Guardar configuración actual"
+              title={t.poll.save}
             >
-              <Save size={14}/> <span className="hidden xs:inline">Guardar</span>
+              <Save size={14}/> <span className="hidden xs:inline">{t.poll.save}</span>
             </button>
             {saveStatus && <span className="text-xs text-green-500 font-bold animate-fade-in self-center">{saveStatus}</span>}
          </div>
@@ -149,7 +151,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                         </span>
-                        <h3 className="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Vista Previa en Vivo</h3>
+                        <h3 className="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t.poll.preview}</h3>
                     </div>
                 </div>
                 
@@ -172,8 +174,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">
                             <Layers size={48} className="mx-auto text-zinc-300 dark:text-zinc-700 mb-2" />
-                            <p className="text-zinc-400 dark:text-zinc-500 font-bold">No hay votación activa</p>
-                            <p className="text-zinc-500 dark:text-zinc-600 text-xs">Crea una encuesta en el Panel para ver la vista previa.</p>
+                            <p className="text-zinc-400 dark:text-zinc-500 font-bold">{t.poll.noPollActive}</p>
+                            <p className="text-zinc-500 dark:text-zinc-600 text-xs">{t.poll.createInPanel}</p>
                         </div>
                     )}
                 </div>
@@ -188,8 +190,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                                 <Monitor size={20} className="sm:w-6 sm:h-6" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">Ventana Popout</h3>
-                                <p className="text-[10px] sm:text-xs text-zinc-500">Para "Window Capture".</p>
+                                <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">{t.poll.openOverlay}</h3>
+                                <p className="text-[10px] sm:text-xs text-zinc-500">{t.poll.obsHint}</p>
                             </div>
                         </div>
                         
@@ -198,14 +200,14 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                             <button 
                                 onClick={() => setOverlayTheme('light')}
                                 className={`p-1.5 rounded-md transition-all ${overlayTheme === 'light' ? 'bg-white text-yellow-500 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                title="Fondo Claro"
+                                title={t.overlay.light}
                             >
                                 <Sun size={14} />
                             </button>
                             <button 
                                 onClick={() => setOverlayTheme('dark')}
                                 className={`p-1.5 rounded-md transition-all ${overlayTheme === 'dark' ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                title="Fondo Oscuro"
+                                title={t.overlay.dark}
                             >
                                 <Moon size={14} />
                             </button>
@@ -218,7 +220,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                             className="w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg bg-twitch-brand hover:bg-twitch-light text-white shadow-twitch-brand/20"
                         >
                             <ExternalLink size={16} /> 
-                            Abrir Overlay
+                            {t.poll.openOverlay}
                         </button>
                     </div>
                 </div>

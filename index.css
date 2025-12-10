@@ -1,11 +1,15 @@
 @import "tailwindcss";
 
+/* Configure dark mode to use class strategy */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Custom CSS variables for theme colors */
 :root {
   --color-twitch-dark: #18181b;
   --color-twitch-light: #a970ff;
   --color-twitch-brand: #6441a5;
   --color-twitch-accent: #00f0f0;
+  --color-purple-light: #bb30eb;
 }
 
 /* Twitch brand color utilities */
@@ -23,6 +27,21 @@
 .border-twitch-light { border-color: var(--color-twitch-light); }
 .border-twitch-brand { border-color: var(--color-twitch-brand); }
 .border-twitch-accent { border-color: var(--color-twitch-accent); }
+
+/* Purple color for light theme */
+.text-purple-light { color: var(--color-purple-light); }
+.placeholder-purple-light::placeholder { color: var(--color-purple-light) !important; opacity: 0.8; }
+input.placeholder-purple-light::placeholder { color: var(--color-purple-light) !important; opacity: 0.8; }
+
+/* Light theme input improvements */
+:root:not(.dark) input.light-input {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+:root:not(.dark) input.light-input::placeholder {
+  color: var(--color-purple-light);
+  opacity: 0.8;
+}
 
 /* Keyframes */
 @keyframes scaleUp {

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { VoteRecord } from '../types';
 import { Activity } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface RecentVotesProps {
   votes: VoteRecord[];
@@ -8,6 +9,7 @@ interface RecentVotesProps {
 }
 
 export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const prevVotesLength = useRef(votes.length);
 
@@ -23,7 +25,7 @@ export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
       return (
         <div className="h-full flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600">
             <Activity size={48} className="opacity-20 mb-2" />
-            <p className="text-xs">Esperando actividad...</p>
+            <p className="text-xs">{t.nav.activity}...</p>
         </div>
       );
   }
@@ -32,7 +34,7 @@ export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
     <div className="h-full flex flex-col bg-zinc-50 dark:bg-zinc-900/50">
       {/* Header - simplified as it's inside a tab */}
       <div className="flex justify-between items-center p-2 sm:p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 sticky top-0 z-10 shrink-0">
-         <h4 className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">Últimos {Math.min(votes.length, 50)} Votos</h4>
+         <h4 className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">{t.poll.votes}: {Math.min(votes.length, 50)}</h4>
          <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>

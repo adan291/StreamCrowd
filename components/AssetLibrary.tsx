@@ -40,13 +40,13 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
   const processFile = (file: File) => {
     // 1. Validate Type
     if (!file.type.startsWith('image/')) {
-        onNotification('error', 'El archivo debe ser una imagen.');
+        onNotification('error', t.gallery.uploadHint);
         return;
     }
 
     // 2. Validate Size
     if (file.size > MAX_FILE_SIZE) {
-        onNotification('error', 'La imagen supera el límite de 40MB.');
+        onNotification('error', t.gallery.maxSize);
         return;
     }
     
@@ -97,7 +97,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                 };
 
                 onAdd(newAsset);
-                onNotification('success', 'Imagen añadida a la galería');
+                onNotification('success', t.notifications.saved);
             }
         } catch (error) {
             console.error(error);
@@ -287,7 +287,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                                 <button 
                                     onClick={() => onDelete(asset.id)}
                                     className="p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-md transition-colors shadow-lg"
-                                    title="Eliminar"
+                                    title={t.common.delete}
                                 >
                                     <Trash2 size={14} />
                                 </button>

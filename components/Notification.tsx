@@ -33,7 +33,7 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
   useEffect(() => {
     const timer = setTimeout(() => {
       onRemove(note.id);
-    }, 5000);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [note.id, onRemove]);
 

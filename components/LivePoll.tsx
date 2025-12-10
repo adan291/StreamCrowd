@@ -320,7 +320,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
   };
 
   const shareOption = (opt: PollOption, percentage: string) => {
-    const text = `${opt.label}: ${percentage}% de los votos`;
+    const text = t.poll.shareVotes.replace('{label}', opt.label).replace('{percentage}', percentage);
     navigator.clipboard.writeText(text).then(() => {
         setCopiedOptionId(opt.id);
         setTimeout(() => setCopiedOptionId(null), 1500);
@@ -341,7 +341,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
              <span className="font-bold text-sm">{data.label}</span>
           </div>
           <div className="text-xs text-zinc-500 dark:text-zinc-400">
-             Votos: <span className="text-twitch-brand dark:text-twitch-light font-bold text-base">{data.votes}</span>
+             {t.poll.votes}: <span className="text-twitch-brand dark:text-twitch-light font-bold text-base">{data.votes}</span>
           </div>
         </div>
       );
@@ -420,7 +420,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1 justify-center sm:justify-start">
              {!isOverlay && !isEditing && (
                 <span className={`text-[10px] sm:text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase tracking-wider bg-twitch-brand/10 px-1.5 sm:px-2 py-0.5 rounded truncate max-w-[150px] sm:max-w-none ${isPreview ? 'text-[9px]' : ''}`}>
-                    {displayPoll.title || 'Encuesta en Vivo'}
+                    {displayPoll.title || t.poll.liveTitle}
                 </span>
              )}
              
@@ -449,7 +449,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                  value={editQuestion}
                  onChange={e => setEditQuestion(e.target.value)}
                  className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-1 font-bold text-zinc-900 dark:text-white text-lg md:text-xl mt-1 focus:ring-2 focus:ring-twitch-brand focus:outline-none"
-                 placeholder="Pregunta de la encuesta..."
+                 placeholder={t.poll.questionPlaceholder}
               />
           ) : (
             <div className={`flex items-center gap-2 group ${isOverlay ? 'justify-center' : ''}`}>
@@ -474,8 +474,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
              
              {isEditing ? (
                  <div className="flex gap-2 mt-1">
-                     <button onClick={handleSaveEdit} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Save size={12}/> Guardar</button>
-                     <button onClick={() => setIsEditing(false)} className="bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><X size={12}/> Cancelar</button>
+                     <button onClick={handleSaveEdit} className="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><Save size={12}/> {t.poll.save}</button>
+                     <button onClick={() => setIsEditing(false)} className="bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-800 dark:text-zinc-200 px-3 py-1 rounded text-xs font-bold flex items-center gap-1"><X size={12}/> {t.poll.cancel}</button>
                  </div>
              ) : (
                 <>
@@ -610,7 +610,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 </div>
                 
                 <h3 className={`${isOverlay ? 'text-7xl mb-8' : 'text-4xl mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-widest drop-shadow-sm`}>
-                    ¡Ganador!
+                    {t.poll.winner}!
                 </h3>
 
                 <div className="relative mb-8 group">
@@ -627,7 +627,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                 <h2 className={`${isOverlay ? 'text-6xl text-zinc-900 dark:text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]' : 'text-3xl text-zinc-900 dark:text-white'} font-bold leading-tight mb-2 px-4`}>
                    {winner.label}
                 </h2>
-                <p className={`${isOverlay ? 'text-4xl text-yellow-500 dark:text-yellow-300 drop-shadow-md font-bold' : 'text-sm text-zinc-500 dark:text-zinc-400'} font-mono`}>{winner.votes} Votos</p>
+                <p className={`${isOverlay ? 'text-4xl text-yellow-500 dark:text-yellow-300 drop-shadow-md font-bold' : 'text-sm text-zinc-500 dark:text-zinc-400'} font-mono`}>{winner.votes} {t.poll.votes}</p>
             </div>
         )}
 
@@ -808,7 +808,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
       {winner && !showWinnerOverlay && !displayPoll.isActive && !isOverlay && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20">
               <button onClick={() => setShowWinnerOverlay(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-all animate-bounce">
-                  <Trophy size={14} /> Ver Ganador
+                  <Trophy size={14} /> {t.poll.winner}
               </button>
           </div>
       )}
@@ -832,9 +832,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     <ExternalLink size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">Overlay para OBS</h4>
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">{t.poll.obsOverlay}</h4>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Muestra la encuesta en tu stream con Window Capture.
+                      {t.poll.obsHint}
                     </p>
                   </div>
                 </div>

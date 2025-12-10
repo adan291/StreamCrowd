@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, FolderOpen, Trash2, Clock, Users, Shield, Sliders } from 'lucide-react';
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
+import { useI18n } from '../i18n';
 import {
   ModerationConfig,
   ModerationPreset,
@@ -24,6 +25,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
   onChange,
   onNotification,
 }) => {
+  const { t } = useI18n();
   const [presets, setPresets] = useState<ModerationPreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [showPresetList, setShowPresetList] = useState(false);
@@ -71,13 +73,13 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
 
   const handleSavePreset = () => {
     if (!presetName.trim()) {
-      onNotification?.('error', 'Enter a preset name');
+      onNotification?.('error', t.moderation.enterPresetName);
       return;
     }
     const newPreset = savePreset(presetName.trim(), config);
     setPresets(getAllPresets());
     setPresetName('');
-    onNotification?.('success', `Preset "${newPreset.name}" saved`);
+    onNotification?.('success', t.moderation.presetSaved.replace('{name}', newPreset.name));
   };
 
   const handleLoadPreset = (id: string) => {
@@ -85,7 +87,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
     if (preset) {
       onChange(preset.config);
       setShowPresetList(false);
-      onNotification?.('info', `Preset "${preset.name}" loaded`);
+      onNotification?.('info', t.moderation.presetLoaded.replace('{name}', preset.name));
     }
   };
 
@@ -94,13 +96,13 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
     const preset = presets.find(p => p.id === id);
     if (deletePreset(id)) {
       setPresets(getAllPresets());
-      onNotification?.('info', `Preset "${preset?.name}" deleted`);
+      onNotification?.('info', t.moderation.presetDeleted.replace('{name}', preset?.name || ''));
     }
   };
 
   const handleReset = () => {
     onChange(DEFAULT_MODERATION_CONFIG);
-    onNotification?.('info', 'Settings reset to defaults');
+    onNotification?.('info', t.moderation.resetDefaults);
   };
 
   return (
@@ -108,21 +110,21 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
           <Shield size={16} className="text-twitch-brand" />
-          Vote Moderation
+          {t.moderation.title}
         </h4>
         <button
           onClick={handleReset}
           className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          Reset
+          {t.moderation.reset}
         </button>
       </div>
 
       {/* Account Age Filter */}
       <div className="space-y-1">
         <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
-          Min Account Age (days)
-          <Tooltip text="Accounts younger than this will be rejected. Set to 0 to allow all." />
+          {t.moderation.minAccountAge}
+          <Tooltip text={t.moderation.minAccountAgeTooltip} />
         </label>
         <div className="relative">
           <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -141,8 +143,8 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       {/* Vote Change Toggle */}
       <div className="space-y-1">
         <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
-          Allow Vote Changes
-          <Tooltip text="When disabled, users cannot change their vote after voting." />
+          {t.moderation.allowVoteChanges}
+          <Tooltip text={t.moderation.allowVoteChangesTooltip} />
         </label>
         <button
           onClick={handleVoteChangeToggle}
@@ -153,7 +155,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
           }`}
         >
           <span className="text-sm font-medium">
-            {config.voteChangeEnabled ? 'Enabled' : 'Disabled'}
+            {config.voteChangeEnabled ? t.moderation.enabled : t.moderation.disabled}
           </span>
           <div
             className={`w-10 h-5 rounded-full relative transition-colors ${
@@ -173,8 +175,8 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       {config.voteChangeEnabled && (
         <div className="space-y-1 animate-fade-in">
           <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
-            Cooldown (seconds)
-            <Tooltip text="Time users must wait before changing their vote." />
+            {t.moderation.cooldown}
+            <Tooltip text={t.moderation.cooldownTooltip} />
           </label>
           <div className="relative">
             <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -194,14 +196,14 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
         <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
           <Sliders size={14} className="mr-1" />
-          Vote Weights (1-5)
-          <Tooltip text="Higher weights give more voting power to subscribers/followers." />
+          {t.moderation.voteWeights}
+          <Tooltip text={t.moderation.voteWeightsTooltip} />
         </label>
 
         {/* Subscriber Weight */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-600 dark:text-zinc-400">Subscriber</span>
+            <span className="text-zinc-600 dark:text-zinc-400">{t.moderation.subscriber}</span>
             <span className="font-bold text-twitch-brand">{config.weights.subscriber}x</span>
           </div>
           <input
@@ -217,7 +219,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {/* Follower Weight */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-600 dark:text-zinc-400">Follower</span>
+            <span className="text-zinc-600 dark:text-zinc-400">{t.moderation.follower}</span>
             <span className="font-bold text-blue-500">{config.weights.follower}x</span>
           </div>
           <input
@@ -231,7 +233,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         </div>
 
         <div className="text-xs text-zinc-500 dark:text-zinc-500">
-          Regular users always have weight 1x
+          {t.moderation.regularUsers}
         </div>
       </div>
 
@@ -239,7 +241,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       {/* Preset Management */}
       <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
         <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">
-          Presets
+          {t.moderation.presets}
         </label>
 
         {/* Save Preset */}
@@ -248,7 +250,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
             type="text"
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
-            placeholder="Preset name..."
+            placeholder={t.moderation.presetName}
             className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand"
           />
           <Button variant="secondary" onClick={handleSavePreset} className="shrink-0">
@@ -266,7 +268,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
           >
             <span className="flex items-center gap-2">
               <FolderOpen size={14} />
-              Load Preset
+              {t.moderation.loadPreset}
             </span>
             <span className="text-xs text-zinc-500">({presets.length})</span>
           </Button>
@@ -302,7 +304,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
 
           {showPresetList && presets.length === 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl z-50 p-4 text-center text-sm text-zinc-500">
-              No presets saved yet
+              {t.moderation.noPresets}
             </div>
           )}
         </div>

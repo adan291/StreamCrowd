@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TwitchMessage, PollOption } from '../types';
 import { MessageSquare, CheckCircle2, ArrowDown } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface ChatFeedProps {
   messages: TwitchMessage[];
@@ -9,6 +10,7 @@ interface ChatFeedProps {
 }
 
 export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options }) => {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -50,7 +52,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
          <div className="p-1 sm:p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light">
              <MessageSquare size={14} />
          </div>
-         <span className="text-[10px] sm:text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Chat en Vivo</span>
+         <span className="text-[10px] sm:text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{t.chat.liveChat}</span>
          <div className="ml-auto text-[10px] text-zinc-400 font-mono">
             {messages.length > 0 ? `${messages.length} msgs` : 'Ready'}
          </div>
@@ -64,7 +66,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
         {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">
                 <MessageSquare size={24} />
-                <span className="text-xs italic">Esperando mensajes...</span>
+                <span className="text-xs italic">{t.chat.waitingMessages}</span>
             </div>
         )}
         {messages.map((msg, i) => {
@@ -98,7 +100,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                     {hasVoted && previousVoteOption && (
                         <div 
                             className="inline-flex items-center gap-1 bg-zinc-200 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-300 dark:border-zinc-700/50 select-none opacity-80 shadow-sm"
-                            title={`Votó por: ${previousVoteOption.label}`}
+                            title={`${t.chat.votedFor}: ${previousVoteOption.label}`}
                         >
                             {previousVoteOption.image ? (
                                 <img src={previousVoteOption.image} className="w-3 h-3 rounded-full object-cover" alt="" />
@@ -128,7 +130,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
 
                       {voteMatch && hasVoted && previousVoteOption && (
                          <span className="ml-1 flex items-center gap-1 text-[10px] text-zinc-400 italic">
-                            (Ya registrado)
+                            ({t.chat.alreadyRegistered})
                          </span>
                       )}
                     </span>
@@ -145,7 +147,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
               onClick={scrollToBottom}
               className="bg-twitch-brand hover:bg-twitch-light text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-transform hover:scale-105 active:scale-95 border border-white/10"
            >
-              <ArrowDown size={14} /> Nuevos mensajes
+              <ArrowDown size={14} /> {t.chat.newMessages}
            </button>
         </div>
       )}

@@ -284,7 +284,7 @@ const App: React.FC = () => {
       try {
         localStorage.setItem('twitch_vote_assets', JSON.stringify(updated));
       } catch (e) {
-        addNotification('error', 'Espacio lleno. Elimina imágenes antiguas.');
+        addNotification('error', t.notifications.storageFull);
       }
   };
 
@@ -375,10 +375,10 @@ const App: React.FC = () => {
          twitchService.sendMessage(`!pollsync ${question}|${optLabels}`);
          
          // Send user-friendly announcement
-         twitchService.sendMessage(`📊 Nueva Encuesta: ${question}`);
+         twitchService.sendMessage(`${t.chat.newPoll}: ${question}`);
          const opts = newPoll.options.map(o => `+${o.id} ${o.label}`).join(' | ');
-         twitchService.sendMessage(`Opciones: ${opts}`);
-         twitchService.sendMessage(`Vota escribiendo +1, +2, etc.`);
+         twitchService.sendMessage(`${t.chat.options}: ${opts}`);
+         twitchService.sendMessage(t.chat.voteHint);
      }
   };
 
@@ -415,11 +415,11 @@ const App: React.FC = () => {
           twitchService.sendMessage(`!pollend`);
           
           const winner = finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b);
-          twitchService.sendMessage(`🏁 Encuesta Finalizada: ${finishedPoll.question}`);
-          twitchService.sendMessage(`🏆 Ganador: ${winner.label} con ${winner.votes} votos!`);
+          twitchService.sendMessage(`${t.chat.pollEnded}: ${finishedPoll.question}`);
+          twitchService.sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
       }
       
-      if (auto) addNotification('info', 'Encuesta finalizada por tiempo/límite.');
+      if (auto) addNotification('info', t.notifications.autoEnded);
   };
 
   const handleResetPoll = () => {
@@ -740,7 +740,7 @@ const App: React.FC = () => {
              setConnectionError(err);
              addNotification('error', err);
          } else if (newStatus === ConnectionStatus.CONNECTED) {
-             addNotification('success', 'Conectado al chat correctamente.', { channelInitial: channelName.charAt(0) });
+             addNotification('success', t.connection.connectedSuccess, { channelInitial: channelName.charAt(0) });
          }
      });
   }, []);
@@ -1257,7 +1257,7 @@ const App: React.FC = () => {
           <PollHistory history={pastPolls} onClose={() => setShowHistory(false)} />
       )}
 
-      <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 md:left-[calc(50%-10rem)] lg:left-[calc(50%-12rem)] z-[100]" />
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100]" />
     </div>
   );
 };

@@ -20,7 +20,7 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
             </div>
             <div>
               <h2 className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white">{t.history.title}</h2>
-              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs">{t.history.noPastPolls.replace('No hay encuestas anteriores', 'Resultados de sesiones anteriores')}</p>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs">{t.history.viewDetails}</p>
             </div>
           </div>
           <button 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Key, Eye, EyeOff, Check, X, Sparkles } from 'lucide-react';
 import { AIConfig, saveAIConfig, loadAIConfig, clearAIConfig } from '../services/aiAnalyticsService';
+import { useI18n } from '../i18n';
 
 interface AIConfigPanelProps {
   onConfigChange?: (config: AIConfig | null) => void;
 }
 
 export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) => {
+  const { t } = useI18n();
   const [config, setConfig] = useState<AIConfig>({
     provider: 'gemini',
     apiKey: '',
@@ -80,19 +82,19 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
     <div className="bg-white/5 dark:bg-gray-800/50 rounded-xl p-4 border border-white/10">
       <div className="flex items-center gap-2 mb-4">
         <Bot className="w-5 h-5 text-purple-400" />
-        <h3 className="font-semibold text-white">Configuración IA</h3>
+        <h3 className="font-semibold text-white">{t.aiConfig.title}</h3>
         <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
-          Opcional
+          {t.aiConfig.optional}
         </span>
       </div>
 
       <p className="text-sm text-gray-400 mb-4">
-        Conecta una IA para analizar tu chat y obtener insights avanzados al final de cada stream.
+        {t.aiConfig.description}
       </p>
 
       {/* Provider Selection */}
       <div className="mb-4">
-        <label className="text-sm text-gray-300 mb-2 block">Proveedor</label>
+        <label className="text-sm text-gray-300 mb-2 block">{t.aiConfig.provider}</label>
         <div className="flex gap-2">
           {(['gemini', 'openai', 'anthropic'] as const).map((provider) => (
             <button
@@ -114,14 +116,14 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
 
       {/* API Key Input */}
       <div className="mb-4">
-        <label className="text-sm text-gray-300 mb-2 block">API Key</label>
+        <label className="text-sm text-gray-300 mb-2 block">{t.aiConfig.apiKey}</label>
         <div className="relative">
           <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <input
             type={showKey ? 'text' : 'password'}
             value={config.apiKey}
             onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-            placeholder={`Tu ${config.provider} API key...`}
+            placeholder={t.aiConfig.apiKeyPlaceholder.replace('{provider}', config.provider)}
             className="w-full bg-black/30 border border-white/10 rounded-lg pl-10 pr-10 py-2 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
           />
           <button
@@ -141,7 +143,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
           className="flex-1 flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-all"
         >
           {saved ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-          {saved ? 'Guardado!' : 'Guardar'}
+          {saved ? t.aiConfig.saved : t.aiConfig.save}
         </button>
         
         <button
@@ -149,7 +151,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
           disabled={!config.apiKey || testing}
           className="px-4 py-2 bg-white/10 hover:bg-white/20 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-all"
         >
-          {testing ? '...' : 'Test'}
+          {testing ? '...' : t.aiConfig.test}
         </button>
         
         <button
@@ -167,15 +169,15 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
             ? 'bg-green-500/20 text-green-400' 
             : 'bg-red-500/20 text-red-400'
         }`}>
-          {testResult === 'success' ? '✓ Conexión exitosa!' : '✗ Error de conexión'}
+          {testResult === 'success' ? t.aiConfig.connectionSuccess : t.aiConfig.connectionError}
         </div>
       )}
 
       {/* Enable Toggle */}
       <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
         <div>
-          <p className="text-sm text-white font-medium">Análisis con IA</p>
-          <p className="text-xs text-gray-500">Activa para obtener insights avanzados</p>
+          <p className="text-sm text-white font-medium">{t.aiConfig.aiAnalysis}</p>
+          <p className="text-xs text-gray-500">{t.aiConfig.activateInsights}</p>
         </div>
         <button
           onClick={handleToggle}
@@ -194,21 +196,21 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
 
       {/* Info */}
       <div className="mt-4 text-xs text-gray-500">
-        <p>💡 Sin API key, se usará análisis local básico.</p>
+        <p>{t.aiConfig.noApiKeyHint}</p>
         <p className="mt-1">
           {config.provider === 'gemini' && (
             <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
-              Obtener API key de Gemini →
+              {t.aiConfig.getApiKey.replace('{provider}', 'Gemini')}
             </a>
           )}
           {config.provider === 'openai' && (
             <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
-              Obtener API key de OpenAI →
+              {t.aiConfig.getApiKey.replace('{provider}', 'OpenAI')}
             </a>
           )}
           {config.provider === 'anthropic' && (
             <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
-              Obtener API key de Anthropic →
+              {t.aiConfig.getApiKey.replace('{provider}', 'Anthropic')}
             </a>
           )}
         </p>
