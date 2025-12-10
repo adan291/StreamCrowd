@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale, ExternalLink } from 'lucide-react';
 import { ModerationStatsDisplay } from './ModerationStatsDisplay';
 import { ModerationLogViewer } from './ModerationLogViewer';
+import { useI18n } from '../i18n';
 
 interface OverlayStyles {
   textColor?: string;
@@ -48,6 +49,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
   overlayStyles = {} as OverlayStyles,
   overlayWindowRef,
 }) => {
+  const { t } = useI18n();
   // Helper for overlay font styles
   const getOverlayFontSize = (base: 'title' | 'label' | 'percent' | 'votes') => {
     const sizes = {

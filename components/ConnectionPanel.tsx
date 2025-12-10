@@ -4,6 +4,7 @@ import { ConnectionStatus } from '../types';
 import { Button } from './Button';
 import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, ShieldAlert } from 'lucide-react';
 import { Tooltip } from './Tooltip';
+import { useI18n } from '../i18n';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -14,6 +15,7 @@ interface ConnectionPanelProps {
 }
 
 export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConnect, onDisconnect, channelName, errorMessage }) => {
+  const { t } = useI18n();
   const [channel, setChannel] = useState('');
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
@@ -46,12 +48,12 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
   const validateChannel = (value: string): boolean => {
     const cleanChannel = value.trim();
     if (!cleanChannel) {
-        setLocalError('El nombre del canal es obligatorio.');
+        setLocalError(t.connection.errorChannelRequired);
         return false;
     }
     const channelRegex = /^[a-zA-Z0-9_]{3,25}$/;
     if (!channelRegex.test(cleanChannel)) {
-        setLocalError('Nombre inválido (3-25 caracteres, letras, números y _).');
+        setLocalError(t.connection.errorChannelInvalid);
         return false;
     }
     setLocalError(null);
@@ -69,7 +71,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
         const cleanToken = token.trim();
         const tokenRegex = /^(oauth:)?[a-zA-Z0-9_]{30,}$/i;
         if (!tokenRegex.test(cleanToken)) {
-            setLocalError('Token inválido. Asegúrate de copiar el "ACCESS TOKEN".');
+            setLocalError(t.connection.errorTokenInvalid);
             return;
         }
     }
@@ -95,26 +97,26 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
   if (status === ConnectionStatus.CONNECTED) return null;
 
   return (
-    <div className="bg-white/90 dark:bg-zinc-900/90 p-5 sm:p-6 md:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 backdrop-blur-md w-full max-w-md mx-auto mt-6 sm:mt-10 md:mt-20 text-center shadow-2xl animate-fade-in-up relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-twitch-brand to-twitch-accent"></div>
+    <div className="glass-card bg-gray-200/95 dark:bg-zinc-900/80 p-5 sm:p-6 md:p-8 rounded-2xl border border-gray-300 dark:border-zinc-700/50 backdrop-blur-xl w-full max-w-md mx-auto text-center shadow-2xl shadow-gray-400/40 dark:shadow-black/30 animate-fade-in-up relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-twitch-brand via-twitch-accent to-twitch-brand"></div>
 
       <div className="mb-4 sm:mb-6 flex justify-center relative">
-        <div className="p-3 sm:p-4 bg-twitch-brand/10 dark:bg-twitch-brand/20 rounded-full ring-1 ring-twitch-brand/30 relative z-10">
-          <Wifi size={32} className="sm:w-10 sm:h-10 text-twitch-brand dark:text-twitch-light" />
+        <div className="p-3 sm:p-4 bg-twitch-brand/15 dark:bg-twitch-brand/20 rounded-full ring-2 ring-twitch-brand/40 relative z-10">
+          <Wifi size={32} className="sm:w-10 sm:h-10 text-twitch-brand" />
         </div>
         <div className="absolute inset-0 bg-twitch-brand/20 blur-xl rounded-full opacity-50 animate-pulse"></div>
       </div>
       
-      <h2 className="text-xl sm:text-2xl font-bold mb-2 text-zinc-900 dark:text-white tracking-tight">Vincular Chat</h2>
-      <p className="text-zinc-500 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
-          Ingresa el canal para conectar al chat en tiempo real.
+      <h2 className="text-xl sm:text-2xl font-bold mb-2 text-gray-700 dark:text-white tracking-tight">{t.connection.title}</h2>
+      <p className="text-slate-500 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
+          {t.connection.subtitle}
       </p>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left group">
-          <label className="text-xs text-zinc-500 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
-            Canal / URL
-            <Tooltip text="El nombre de usuario o enlace de Twitch (ej. ibai)." />
+          <label className="text-xs text-slate-600 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
+            {t.connection.channelLabel}
+            <Tooltip text={t.connection.channelTooltip} />
           </label>
           <div className="relative">
               <input
@@ -122,13 +124,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                 value={channel}
                 onChange={handleInputChange}
                 onBlur={handleBlur}
-                placeholder="Ej: ibai"
-                className={`w-full bg-zinc-50 dark:bg-black/50 border text-zinc-900 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium ${localError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-zinc-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
+                placeholder={t.connection.channelPlaceholder}
+                className={`w-full bg-slate-100 dark:bg-black/50 border text-gray-700 dark:text-white rounded-lg pl-4 pr-10 py-3 focus:outline-none focus:ring-2 transition-all font-medium placeholder:text-sky-400/70 dark:placeholder:text-zinc-500 ${localError ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand/20 dark:focus:ring-twitch-light/20'}`}
                 disabled={status === ConnectionStatus.CONNECTING}
                 autoComplete="off"
                 spellCheck="false"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                   {isUrlDetected ? <LinkIcon size={16} className="text-green-500" /> : localError ? <AlertCircle size={18} className="text-red-500" /> : null}
               </div>
           </div>
@@ -139,12 +141,12 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
             <button 
                 type="button" 
                 onClick={() => setShowToken(!showToken)}
-                className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                className="text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
             >
                 <KeyRound size={12} />
-                {showToken ? 'Ocultar' : 'Access Token (Opcional)'}
+                {showToken ? t.connection.hideToken : t.connection.tokenLabel}
             </button>
-            <Tooltip text="Necesario para que el bot escriba en el chat (anunciar encuestas). Sin esto, funcionará en modo solo lectura." />
+            <Tooltip text={t.connection.tokenTooltip} />
           </div>
           {showToken && (
             <div className="animate-fade-in-down">
@@ -152,16 +154,16 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
                     type="password"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    placeholder="Ej: uo6dgg01..."
-                    className="w-full bg-zinc-50 dark:bg-black/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono"
+                    placeholder={t.connection.tokenPlaceholder}
+                    className="w-full bg-slate-100 dark:bg-black/50 border border-slate-300 dark:border-zinc-700 text-gray-700 dark:text-white rounded-lg px-4 py-3 focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light text-sm font-mono placeholder:text-sky-400/70 dark:placeholder:text-zinc-500"
                 />
-                <div className="text-[10px] text-zinc-400 mt-2 ml-1 leading-relaxed bg-zinc-100 dark:bg-zinc-800/50 p-2 rounded border border-zinc-200 dark:border-zinc-800">
-                   <p className="mb-1"><strong>Instrucciones:</strong></p>
+                <div className="text-[10px] text-sky-600/80 dark:text-zinc-400 mt-2 ml-1 leading-relaxed bg-slate-100 dark:bg-zinc-800/50 p-2 rounded border border-slate-200 dark:border-zinc-800">
+                   <p className="mb-1"><strong>{t.connection.instructions}:</strong></p>
                    <ol className="list-decimal pl-3 space-y-1">
-                     <li>Ve a <a href="https://twitchtokengenerator.com/" target="_blank" rel="noopener noreferrer" className="text-twitch-brand hover:underline font-bold">twitchtokengenerator.com</a></li>
-                     <li>Selecciona "Bot Chat Token" o Custom.</li>
-                     <li>Asegura los scopes: <b>chat:read</b> y <b>chat:edit</b>.</li>
-                     <li>Genera y copia el <strong>ACCESS TOKEN</strong> (no el Client ID).</li>
+                     <li>{t.connection.step1} <a href="https://twitchtokengenerator.com/" target="_blank" rel="noopener noreferrer" className="text-twitch-brand hover:underline font-bold">twitchtokengenerator.com</a></li>
+                     <li>{t.connection.step2}</li>
+                     <li>{t.connection.step3}</li>
+                     <li>{t.connection.step4}</li>
                    </ol>
                 </div>
             </div>
@@ -174,7 +176,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
           disabled={!channel.trim() || status === ConnectionStatus.CONNECTING}
           className="h-12 text-base shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40"
         >
-          {status === ConnectionStatus.CONNECTING ? <><Loader2 className="animate-spin" size={20} /> Conectando...</> : 'Conectar al Chat'}
+          {status === ConnectionStatus.CONNECTING ? <><Loader2 className="animate-spin" size={20} /> {t.connection.connecting}</> : t.connection.connect}
         </Button>
       </form>
       
@@ -184,7 +186,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
              {isAuthError ? <ShieldAlert size={20}/> : isNetworkError ? <Wifi size={20}/> : <XCircle size={20}/>}
           </div>
           <div className="flex flex-col">
-             <span className="font-bold mb-0.5">{isAuthError ? 'Error de Autenticación' : isNetworkError ? 'Error de Red' : 'Error de Conexión'}</span>
+             <span className="font-bold mb-0.5">{isAuthError ? t.connection.errorAuth : isNetworkError ? t.connection.errorNetwork : t.connection.errorConnection}</span>
              <span className="break-words w-full opacity-90">{displayError}</span>
           </div>
         </div>

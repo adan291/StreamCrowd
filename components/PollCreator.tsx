@@ -8,6 +8,7 @@ import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
 import { LivePoll } from './LivePoll';
 import { ModerationConfigForm } from './ModerationConfigForm';
+import { useI18n } from '../i18n';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig) => void;
@@ -19,7 +20,8 @@ interface PollCreatorProps {
 }
 
 export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange }) => {
-  const [title, setTitle] = useState('Encuesta en Vivo');
+  const { t } = useI18n();
+  const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string }[]>([
     { label: 'Opción 1', color: CHART_COLORS[0], icon: '1️⃣', image: '' }, 

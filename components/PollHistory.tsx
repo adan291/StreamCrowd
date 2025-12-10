@@ -1,6 +1,7 @@
 import React from 'react';
 import { Poll } from '../types';
 import { Trophy, Calendar, Hash, X } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface PollHistoryProps {
   history: Poll[];
@@ -8,6 +9,7 @@ interface PollHistoryProps {
 }
 
 export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) => {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white dark:bg-zinc-900 border-0 sm:border border-zinc-200 dark:border-zinc-800 w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[80vh] animate-slide-up sm:animate-scale-up">
@@ -17,8 +19,8 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
                <Calendar className="text-twitch-brand dark:text-twitch-light" size={20} />
             </div>
             <div>
-              <h2 className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white">Historial de Encuestas</h2>
-              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs">Resultados de sesiones anteriores</p>
+              <h2 className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white">{t.history.title}</h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[10px] sm:text-xs">{t.history.noPastPolls.replace('No hay encuestas anteriores', 'Resultados de sesiones anteriores')}</p>
             </div>
           </div>
           <button 
@@ -32,7 +34,7 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
         <div className="overflow-y-auto p-4 sm:p-6 space-y-3 sm:space-y-4 custom-scrollbar flex-1">
           {history.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-zinc-500">No hay encuestas finalizadas todavía.</p>
+              <p className="text-zinc-500">{t.history.noPastPolls}</p>
             </div>
           ) : (
             history.map((poll) => {
@@ -51,12 +53,12 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
                   <div className="flex flex-wrap gap-2 sm:gap-4 mb-3 sm:mb-4 text-xs sm:text-sm">
                     <div className="flex items-center gap-1.5 sm:gap-2 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
                       <Hash size={12} />
-                      <span className="text-zinc-900 dark:text-white font-bold">{poll.totalVotes}</span> votos
+                      <span className="text-zinc-900 dark:text-white font-bold">{poll.totalVotes}</span> {t.poll.votes}
                     </div>
                     {winner.votes > 0 && (
                       <div className="flex items-center gap-1.5 sm:gap-2 text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-500/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-yellow-200 dark:border-yellow-500/20">
                         <Trophy size={12} />
-                        <span className="hidden xs:inline">Ganador:</span> <span className="font-bold truncate max-w-[100px] sm:max-w-none">{winner.icon} {winner.label}</span>
+                        <span className="hidden xs:inline">{t.poll.winner}:</span> <span className="font-bold truncate max-w-[100px] sm:max-w-none">{winner.icon} {winner.label}</span>
                       </div>
                     )}
                   </div>
@@ -89,7 +91,7 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
         </div>
         
         <div className="p-3 sm:p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-2xl flex justify-end shrink-0">
-           <button onClick={onClose} className="text-zinc-500 hover:text-black dark:hover:text-white text-xs sm:text-sm font-medium px-4 py-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">Cerrar</button>
+           <button onClick={onClose} className="text-zinc-500 hover:text-black dark:hover:text-white text-xs sm:text-sm font-medium px-4 py-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">{t.common.close}</button>
         </div>
       </div>
     </div>

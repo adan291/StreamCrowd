@@ -3,6 +3,7 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Upload, Trash2, Image as ImageIcon, Grid, X, Search, FileWarning, Loader2, LayoutList, LayoutGrid, HardDrive } from 'lucide-react';
 import { MediaAsset } from '../types';
 import { NotificationType } from './Notification';
+import { useI18n } from '../i18n';
 
 interface AssetLibraryProps {
   assets: MediaAsset[];
@@ -15,6 +16,7 @@ const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB
 const BROWSER_STORAGE_LIMIT_ESTIMATE = 5 * 1024 * 1024; // ~5MB safe limit for localStorage
 
 export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDelete, onNotification }) => {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -167,7 +169,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Grid size={16} className="text-twitch-brand dark:text-twitch-light" />
-                    <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">Galería</span>
+                    <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">{t.gallery.title}</span>
                 </div>
                 <div className="flex gap-1.5 sm:gap-2">
                      <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-1.5 text-zinc-500 hover:text-black dark:hover:text-white rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="Cambiar Vista">
@@ -179,7 +181,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                         className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-2 sm:px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 sm:gap-2 transition-colors border border-zinc-300 dark:border-zinc-700 shadow-sm"
                     >
                         {isProcessing ? <Loader2 size={14} className="animate-spin"/> : <Upload size={14} />}
-                        <span className="hidden xs:inline">Subir</span>
+                        <span className="hidden xs:inline">{t.gallery.upload}</span>
                     </button>
                 </div>
             </div>
@@ -190,7 +192,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                     <input 
                         type="text" 
-                        placeholder="Buscar iconos..." 
+                        placeholder={`${t.common.search}...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light transition-all"
@@ -265,8 +267,8 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3">
                     <ImageIcon size={48} className="opacity-20" />
                     <p className="text-xs text-center max-w-[200px] leading-relaxed">
-                        Arrastra imágenes aquí o usa el botón subir.<br/>
-                        <span className="opacity-70">Soporta PNG, JPG, GIF.</span>
+                        {t.gallery.dragDrop}<br/>
+                        <span className="opacity-70">{t.gallery.uploadHint}</span>
                     </p>
                 </div>
             ) : filteredAssets.length === 0 ? (

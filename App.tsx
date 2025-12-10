@@ -9,7 +9,19 @@ import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
 import { StreamPlayer } from './components/StreamPlayer';
 import { AssetLibrary } from './components/AssetLibrary';
+import { AIConfigPanel } from './components/AIConfigPanel';
+import { StreamAnalytics } from './components/StreamAnalytics';
+import { AnimatedBackground } from './components/AnimatedBackground';
+import { LanguageSelector } from './components/LanguageSelector';
 import { twitchService } from './services/twitchService';
+import { 
+  AIConfig, 
+  StreamSession, 
+  loadAIConfig, 
+  createSession, 
+  saveSession,
+  StoredMessage,
+} from './services/aiAnalyticsService';
 import { 
   ConnectionStatus, 
   Poll, 
@@ -29,10 +41,13 @@ import {
   handleVoteChange,
 } from './types';
 import { CHART_COLORS } from './constants';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTheme } from './context';
+import { useI18n } from './i18n';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const { theme, toggleTheme, setTheme } = useTheme();
+  const { t, locale, setLocale } = useI18n();
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.DISCONNECTED);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [currentPoll, setCurrentPoll] = useState<Poll | null>(null);
@@ -43,12 +58,16 @@ const App: React.FC = () => {
   const [authToken, setAuthToken] = useState<string>('');
   const [pastPolls, setPastPolls] = useState<Poll[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   
   // Right sidebar tabs (Chat, Stream)
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
   
-  // Left column tabs (Control Panel, Gallery, Activity, Overlays)
-  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'activity' | 'overlays'>('panel');
+  // Left column tabs (Control Panel, Gallery, Data)
+  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'data'>('panel');
+  
+  // Data sub-tabs (Activity, Analytics)
+  const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('activity');
   
   // Mobile sidebar toggle
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -82,6 +101,11 @@ const App: React.FC = () => {
   
   // Popup window ref (at App level so it persists across tab changes)
   const overlayWindowRef = useRef<Window | null>(null);
+  
+  // AI Analytics State
+  const [aiConfig, setAIConfig] = useState<AIConfig | null>(null);
+  const [currentStreamSession, setCurrentStreamSession] = useState<StreamSession | null>(null);
+  const [showAIConfig, setShowAIConfig] = useState(false);
   
   // Refs for callbacks
   const pollRef = useRef<Poll | null>(null);
@@ -193,18 +217,7 @@ const App: React.FC = () => {
   }, [currentPoll, voteHistory, isOverlayMode]);
 
 
-  // Apply Theme
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
+  // Theme is now managed by ThemeProvider context
 
   useEffect(() => {
     pollRef.current = currentPoll;
@@ -233,6 +246,28 @@ const App: React.FC = () => {
         }
     }
   }, []);
+
+  // Load AI Config on mount
+  useEffect(() => {
+    const config = loadAIConfig();
+    if (config) {
+      setAIConfig(config);
+    }
+  }, []);
+
+  // Create/manage stream session when connected
+  useEffect(() => {
+    if (status === ConnectionStatus.CONNECTED && channelName && !isOverlayMode) {
+      // Create new session when connected
+      const session = createSession(channelName);
+      setCurrentStreamSession(session);
+    } else if (status === ConnectionStatus.DISCONNECTED && currentStreamSession) {
+      // Save session when disconnected
+      const finalSession = { ...currentStreamSession, endTime: Date.now() };
+      saveSession(finalSession);
+      setCurrentStreamSession(null);
+    }
+  }, [status, channelName, isOverlayMode]);
 
   const addNotification = (type: NotificationType, message: string, metadata?: { channelInitial?: string }) => {
     const id = Date.now().toString() + Math.random();
@@ -356,6 +391,25 @@ const App: React.FC = () => {
       // Add to history
       setPastPolls(prev => [finishedPoll, ...prev]);
       
+      // Save poll results to current session for analytics
+      if (currentStreamSession) {
+        const totalVotes = finishedPoll.options.reduce((acc, o) => acc + o.votes, 0);
+        const pollSummary = {
+          question: finishedPoll.question,
+          winner: finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b).label,
+          totalVotes,
+          options: finishedPoll.options.map(o => ({
+            label: o.label,
+            votes: o.votes,
+            percentage: totalVotes > 0 ? (o.votes / totalVotes) * 100 : 0,
+          })),
+        };
+        setCurrentStreamSession(prev => prev ? {
+          ...prev,
+          pollResults: [...(prev.pollResults || []), pollSummary],
+        } : null);
+      }
+      
       if (authToken) {
           // Sync end to overlay
           twitchService.sendMessage(`!pollend`);
@@ -394,6 +448,20 @@ const App: React.FC = () => {
          };
          
          setChatMessages(prev => [...prev.slice(-199), msg]); // Keep last 200
+         
+         // Store message in current session for analytics
+         if (currentStreamSession) {
+           const storedMsg: StoredMessage = {
+             username: msg.username,
+             message: msg.message,
+             timestamp: Date.now(),
+             userId: msg.userId,
+           };
+           setCurrentStreamSession(prev => prev ? {
+             ...prev,
+             messages: [...prev.messages.slice(-999), storedMsg], // Keep last 1000
+           } : null);
+         }
 
          // Process chat commands for overlay mode (broadcaster/mod only)
          const isBroadcaster = tags.badges && 'broadcaster' in tags.badges;
@@ -697,7 +765,7 @@ const App: React.FC = () => {
                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                      </span>
-                     <span>🎬 OVERLAY MODE - Para OBS</span>
+                     <span>🎬 {t.overlay.mode} - {t.overlay.forOBS}</span>
                      <span className="flex h-2 w-2 relative">
                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -717,11 +785,11 @@ const App: React.FC = () => {
              {/* Settings Panel */}
              {showOverlaySettings && (
                 <div className="absolute top-16 right-2 z-50 bg-zinc-900 rounded-xl p-4 shadow-2xl border border-zinc-700 w-64">
-                    <h3 className="text-white font-bold mb-3 text-sm">Personalizar Overlay</h3>
+                    <h3 className="text-white font-bold mb-3 text-sm">{t.overlay.title}</h3>
                     
                     {/* Background Color */}
                     <div className="mb-3">
-                        <label className="text-zinc-400 text-xs block mb-1">Fondo (Chroma Key)</label>
+                        <label className="text-zinc-400 text-xs block mb-1">{t.overlay.background} ({t.overlay.chromaKey})</label>
                         <div className="flex gap-1 flex-wrap">
                             {presetColors.map(color => (
                                 <button
@@ -737,7 +805,7 @@ const App: React.FC = () => {
                     
                     {/* Text Color */}
                     <div className="mb-3">
-                        <label className="text-zinc-400 text-xs block mb-1">Color de Texto</label>
+                        <label className="text-zinc-400 text-xs block mb-1">{t.overlay.textColor}</label>
                         <div className="flex gap-1 flex-wrap">
                             {textColors.map(color => (
                                 <button
@@ -753,7 +821,7 @@ const App: React.FC = () => {
                     
                     {/* Border Color */}
                     <div className="mb-3">
-                        <label className="text-zinc-400 text-xs block mb-1">Color de Bordes</label>
+                        <label className="text-zinc-400 text-xs block mb-1">{t.overlay.borderColor}</label>
                         <div className="flex gap-1 flex-wrap">
                             {textColors.map(color => (
                                 <button
@@ -769,7 +837,7 @@ const App: React.FC = () => {
                     
                     {/* Show Borders Toggle */}
                     <div className="flex items-center justify-between mb-3">
-                        <label className="text-zinc-400 text-xs">Mostrar Bordes</label>
+                        <label className="text-zinc-400 text-xs">{t.overlay.showBorders}</label>
                         <button
                             onClick={() => setOverlayShowBorders(!overlayShowBorders)}
                             className={`w-10 h-5 rounded-full transition-colors ${overlayShowBorders ? 'bg-green-500' : 'bg-zinc-600'}`}
@@ -780,7 +848,7 @@ const App: React.FC = () => {
                     
                     {/* Font Size */}
                     <div className="mb-3">
-                        <label className="text-zinc-400 text-xs block mb-1">Tamaño de Texto</label>
+                        <label className="text-zinc-400 text-xs block mb-1">{t.overlay.fontSize}</label>
                         <div className="flex gap-1">
                             {(['small', 'medium', 'large'] as const).map(size => (
                                 <button
@@ -796,7 +864,7 @@ const App: React.FC = () => {
                     
                     {/* Font Style */}
                     <div className="mb-3">
-                        <label className="text-zinc-400 text-xs block mb-1">Estilo de Texto</label>
+                        <label className="text-zinc-400 text-xs block mb-1">{t.overlay.fontStyle}</label>
                         <div className="flex gap-1">
                             <button
                                 onClick={() => setOverlayFontStyle('normal')}
@@ -821,23 +889,23 @@ const App: React.FC = () => {
                     
                     {/* Theme Toggle with Icons */}
                     <div className="pt-2 border-t border-zinc-700">
-                        <label className="text-zinc-400 text-xs block mb-2">Tema de Fondo</label>
+                        <label className="text-zinc-400 text-xs block mb-2">{t.overlay.theme}</label>
                         <div className="flex items-center bg-zinc-800 rounded-lg p-1">
                             <button
                                 onClick={() => setOverlayTheme('light')}
                                 className={`flex-1 p-2 rounded-md transition-all flex items-center justify-center gap-1 ${overlayTheme === 'light' ? 'bg-white text-yellow-500 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                title="Fondo Claro"
+                                title={t.overlay.light}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-                                <span className="text-xs">Claro</span>
+                                <span className="text-xs">{t.overlay.light}</span>
                             </button>
                             <button
                                 onClick={() => setOverlayTheme('dark')}
                                 className={`flex-1 p-2 rounded-md transition-all flex items-center justify-center gap-1 ${overlayTheme === 'dark' ? 'bg-zinc-900 text-blue-400 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
-                                title="Fondo Oscuro"
+                                title={t.overlay.dark}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
-                                <span className="text-xs">Oscuro</span>
+                                <span className="text-xs">{t.overlay.dark}</span>
                             </button>
                         </div>
                     </div>
@@ -864,8 +932,8 @@ const App: React.FC = () => {
              ) : (
                  <div className="h-full w-full flex items-center justify-center" style={{ color: overlayTextColor }}>
                      <div className="text-center p-8 bg-black/70 rounded-xl shadow-xl max-w-md" style={{ borderColor: overlayBorderColor, borderWidth: overlayShowBorders ? 2 : 0 }}>
-                         <p className="font-bold mb-2 text-xl">Esperando encuesta...</p>
-                         <p className="text-sm opacity-70">Crea una encuesta en el panel principal</p>
+                         <p className="font-bold mb-2 text-xl">{t.poll.waitingPoll}</p>
+                         <p className="text-sm opacity-70">{t.poll.createPollHint}</p>
                      </div>
                  </div>
              )}
@@ -875,18 +943,25 @@ const App: React.FC = () => {
 
   if (status !== ConnectionStatus.CONNECTED) {
       return (
-          <div className="min-h-screen bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 flex flex-col p-4 transition-colors duration-300">
-             <div className="flex justify-end mb-4">
-                 <button onClick={toggleTheme} className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+          <div className="min-h-screen bg-slate-200 dark:bg-black text-zinc-900 dark:text-zinc-100 flex flex-col p-4 transition-colors duration-300 relative">
+             <AnimatedBackground />
+             <div className="flex justify-end mb-4 gap-2 relative z-50">
+                 <LanguageSelector variant="icon" />
+                 <button 
+                   onClick={toggleTheme} 
+                   className="p-2 rounded-lg bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700 shadow-sm"
+                 >
                      {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                  </button>
              </div>
-             <ConnectionPanel 
-                status={status} 
-                onConnect={handleConnect} 
-                onDisconnect={handleDisconnect} 
-                errorMessage={connectionError}
-             />
+             <div className="relative z-10 flex-1 flex items-center justify-center">
+               <ConnectionPanel 
+                  status={status} 
+                  onConnect={handleConnect} 
+                  onDisconnect={handleDisconnect} 
+                  errorMessage={connectionError}
+               />
+             </div>
              <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 left-1/2 -translate-x-1/2 z-[100]" />
           </div>
       );
@@ -933,27 +1008,57 @@ const App: React.FC = () => {
          </div>
 
          <div className="flex flex-col gap-3 w-full px-2">
-             <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label="Panel" />
-             <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label="Galería" />
-             <NavButton active={leftTab === 'activity'} onClick={() => setLeftTab('activity')} icon={<Activity size={20} />} label="Actividad" />
+             <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label={t.nav.panel} />
+             <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
+             <div className="relative">
+               <NavButton active={leftTab === 'data'} onClick={() => setLeftTab('data')} icon={<BarChart3 size={20} />} label={t.nav.data} />
+               {currentStreamSession && currentStreamSession.messages.length > 0 && (
+                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+               )}
+             </div>
          </div>
 
          <div className="mt-auto flex flex-col gap-3 w-full px-2">
-             <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label="Historial" />
-             <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label="Tema" />
+             <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
+             <div className="relative">
+               <NavButton onClick={() => setShowLanguageMenu(!showLanguageMenu)} icon={<Globe size={20} />} label={t.common.language} />
+               {showLanguageMenu && (
+                 <div className="absolute left-full ml-2 bottom-0 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50 animate-scale-up min-w-[120px]">
+                   {[
+                     { code: 'es' as const, name: 'Español', flag: '🇪🇸' },
+                     { code: 'en' as const, name: 'English', flag: '🇺🇸' },
+                   ].map((lang) => (
+                     <button
+                       key={lang.code}
+                       onClick={(e) => { 
+                         e.stopPropagation(); 
+                         console.log('Button clicked, setting locale to:', lang.code);
+                         setLocale(lang.code); 
+                         setShowLanguageMenu(false); 
+                       }}
+                       className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${locale === lang.code ? 'bg-twitch-brand/10 text-twitch-brand' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'}`}
+                     >
+                       <span>{lang.flag}</span>
+                       <span className="font-medium">{lang.name}</span>
+                     </button>
+                   ))}
+                 </div>
+               )}
+             </div>
+             <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
              <button onClick={handleDisconnect} className="p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
                  <Power size={20} />
-                 <span className="text-[9px] font-bold group-hover:opacity-100 opacity-0 transition-opacity">Salir</span>
+                 <span className="text-[9px] font-bold group-hover:opacity-100 opacity-0 transition-opacity">{t.common.exit}</span>
              </button>
          </div>
       </div>
       
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around py-2 px-4 z-40 safe-area-bottom">
-          <MobileNavButton active={leftTab === 'panel'} onClick={() => { setLeftTab('panel'); setShowMobileSidebar(false); }} icon={<LayoutDashboard size={20} />} label="Panel" />
-          <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label="Galería" />
-          <MobileNavButton active={leftTab === 'activity'} onClick={() => { setLeftTab('activity'); setShowMobileSidebar(false); }} icon={<Activity size={20} />} label="Actividad" />
-          <MobileNavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label="Historial" />
+          <MobileNavButton active={leftTab === 'panel'} onClick={() => { setLeftTab('panel'); setShowMobileSidebar(false); }} icon={<LayoutDashboard size={20} />} label={t.nav.panel} />
+          <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
+          <MobileNavButton active={leftTab === 'data'} onClick={() => { setLeftTab('data'); setShowMobileSidebar(false); }} icon={<BarChart3 size={20} />} label={t.nav.data} />
+          <MobileNavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
       </div>
 
       {/* Main Content Area */}
@@ -994,11 +1099,69 @@ const App: React.FC = () => {
                         onNotification={addNotification} 
                       />
                   )}
-                  {leftTab === 'activity' && (
-                      <RecentVotes 
-                          votes={voteHistory} 
-                          options={currentPoll ? currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
-                      />
+                  {leftTab === 'data' && (
+                      <div className="h-full flex flex-col">
+                          {/* Sub-tabs header */}
+                          <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+                              <button 
+                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${dataSubTab === 'activity' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                                onClick={() => setDataSubTab('activity')}
+                              >
+                                  <Activity size={16} /> {t.nav.activity}
+                              </button>
+                              <button 
+                                className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${dataSubTab === 'analytics' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                                onClick={() => setDataSubTab('analytics')}
+                              >
+                                  <BarChart3 size={16} /> {t.nav.analytics}
+                                  {aiConfig?.enabled && (
+                                    <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded-full">IA</span>
+                                  )}
+                              </button>
+                          </div>
+                          
+                          {/* Sub-tab content */}
+                          <div className="flex-1 overflow-y-auto">
+                              {dataSubTab === 'activity' && (
+                                  <RecentVotes 
+                                      votes={voteHistory} 
+                                      options={currentPoll ? currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
+                                  />
+                              )}
+                              {dataSubTab === 'analytics' && (
+                                  <div className="p-4 space-y-4">
+                                      {/* AI Config Toggle */}
+                                      <button
+                                        onClick={() => setShowAIConfig(!showAIConfig)}
+                                        className="w-full flex items-center justify-between p-3 bg-white/5 dark:bg-gray-800/50 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Bot className="w-5 h-5 text-purple-400" />
+                                          <span className="text-white font-medium">{t.analytics.configureAI}</span>
+                                          {aiConfig?.enabled && (
+                                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
+                                              {t.analytics.aiActive}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showAIConfig ? 'rotate-90' : ''}`} />
+                                      </button>
+                                      
+                                      {/* AI Config Panel (collapsible) */}
+                                      {showAIConfig && (
+                                        <AIConfigPanel onConfigChange={setAIConfig} />
+                                      )}
+                                      
+                                      {/* Stream Analytics */}
+                                      <StreamAnalytics
+                                        currentSession={currentStreamSession}
+                                        aiConfig={aiConfig}
+                                        isStreamActive={status === ConnectionStatus.CONNECTED}
+                                      />
+                                  </div>
+                              )}
+                          </div>
+                      </div>
                   )}
 
               </div>
@@ -1062,13 +1225,13 @@ const App: React.FC = () => {
                             className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                             onClick={() => setActiveRightTab('chat')}
                           >
-                              <MessageSquare size={16} /> Chat
+                              <MessageSquare size={16} /> {t.nav.chat}
                           </button>
                           <button 
                             className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                             onClick={() => setActiveRightTab('stream')}
                           >
-                              <Tv size={16} /> Stream
+                              <Tv size={16} /> {t.nav.stream}
                           </button>
                       </div>
                       
