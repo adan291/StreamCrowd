@@ -22,6 +22,10 @@ export default defineConfig(({ mode }) => {
       },
       build: {
         chunkSizeWarningLimit: 1000, // Aumentar límite a 1MB para evitar advertencia
+      },
+      test: {
+        environment: 'jsdom',
+        globals: true,
       }
     };
 });

@@ -1,13 +1,5 @@
-export const CHART_COLORS = [
-  '#a970ff', // Twitch Purple
-  '#00f0f0', // Cyan
-  '#ff005c', // Red/Pink
-  '#ffe600', // Yellow
-  '#00ff94', // Green
-  '#ff8800', // Orange
-  '#3b82f6', // Blue
-  '#d946ef', // Fuchsia
-];
-
-export const MAX_OPTIONS = 8;
-export const MIN_OPTIONS = 2;
+/**
+ * Re-export constants from the centralized constants folder
+ * This file is kept for backward compatibility
+ */
+export { CHART_COLORS, MAX_OPTIONS, MIN_OPTIONS, STORAGE_KEYS, type StorageKey } from './constants/index';
