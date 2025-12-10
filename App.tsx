@@ -13,6 +13,7 @@ import { AIConfigPanel } from './components/AIConfigPanel';
 import { StreamAnalytics } from './components/StreamAnalytics';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
+import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
 import { twitchService } from './services/twitchService';
 import { 
   AIConfig, 
@@ -43,7 +44,7 @@ import {
 import { CHART_COLORS } from './constants';
 import { useTheme } from './context';
 import { useI18n } from './i18n';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye } from 'lucide-react';
 
 const App: React.FC = () => {
   const { theme, toggleTheme, setTheme } = useTheme();
@@ -95,6 +96,11 @@ const App: React.FC = () => {
   const [overlayFontSize, setOverlayFontSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [overlayFontStyle, setOverlayFontStyle] = useState<'normal' | 'bold' | 'italic'>('bold');
   const [overlayTheme, setOverlayTheme] = useState<'dark' | 'light'>('dark');
+  
+  // AI Vision Mascot State
+  const [showMascot, setShowMascot] = useState(true);
+  const [userDifficulty, setUserDifficulty] = useState<UserDifficulty | undefined>(undefined);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   
   // State for tracked votes to update UI efficiently
   const [votedUserIds, setVotedUserIds] = useState<Set<string>>(new Set());
@@ -739,8 +745,17 @@ const App: React.FC = () => {
          if (err) {
              setConnectionError(err);
              addNotification('error', err);
+             // Notify mascot about connection difficulty
+             setConnectionAttempts(prev => prev + 1);
+             setUserDifficulty({
+               type: 'connection_failed',
+               timestamp: Date.now(),
+               context: err
+             });
          } else if (newStatus === ConnectionStatus.CONNECTED) {
              addNotification('success', t.connection.connectedSuccess, { channelInitial: channelName.charAt(0) });
+             setConnectionAttempts(0);
+             setUserDifficulty(undefined);
          }
      });
   }, []);
@@ -751,6 +766,29 @@ const App: React.FC = () => {
           document.title = '🎬 OVERLAY - Twitch Vote';
       }
   }, [isOverlayMode]);
+
+  // AI Vision Mascot - Detect user difficulties
+  useEffect(() => {
+    if (!currentPoll || !currentPoll.isActive || isOverlayMode) return;
+    
+    // Check if poll has no votes after 30 seconds
+    const checkNoVotes = setTimeout(() => {
+      if (currentPoll && currentPoll.isActive && currentPoll.totalVotes === 0) {
+        setUserDifficulty({
+          type: 'no_votes',
+          timestamp: Date.now(),
+          context: 'La encuesta lleva activa un rato sin votos'
+        });
+      }
+    }, 30000);
+    
+    // Clear difficulty when votes come in
+    if (currentPoll.totalVotes > 0 && userDifficulty?.type === 'no_votes') {
+      setUserDifficulty(undefined);
+    }
+    
+    return () => clearTimeout(checkNoVotes);
+  }, [currentPoll, isOverlayMode]);
 
   if (isOverlayMode) {
      const presetColors = ['#00FF00', '#FF00FF', '#0000FF', '#000000', '#FFFFFF', '#1a1a2e', '#16213e'];
@@ -962,6 +1000,21 @@ const App: React.FC = () => {
                   errorMessage={connectionError}
                />
              </div>
+             
+             {/* AI Vision Mascot on connection screen - draggable */}
+             {showMascot && (
+               <AIVisionMascot
+                 chatMessages={[]}
+                 isConnected={false}
+                 hasPoll={false}
+                 pollVotes={0}
+                 userDifficulty={connectionError ? { type: 'connection_failed', timestamp: Date.now(), context: connectionError } : undefined}
+                 onDismiss={() => setShowMascot(false)}
+                 className="w-72"
+                 initialPosition={{ x: window.innerWidth - 320, y: window.innerHeight - 200 }}
+               />
+             )}
+             
              <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 left-1/2 -translate-x-1/2 z-[100]" />
           </div>
       );
@@ -1045,6 +1098,12 @@ const App: React.FC = () => {
                  </div>
                )}
              </div>
+             <NavButton 
+               active={showMascot} 
+               onClick={() => setShowMascot(!showMascot)} 
+               icon={<Eye size={20} />} 
+               label="AI Vision" 
+             />
              <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
              <button onClick={handleDisconnect} className="p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
                  <Power size={20} />
@@ -1064,6 +1123,19 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="flex-1 flex overflow-hidden relative">
+              {/* AI Vision Mascot - Draggable */}
+              {showMascot && !isOverlayMode && (
+                <AIVisionMascot
+                  chatMessages={chatMessages}
+                  isConnected={status === ConnectionStatus.CONNECTED}
+                  hasPoll={!!currentPoll}
+                  pollVotes={currentPoll?.totalVotes || 0}
+                  userDifficulty={userDifficulty}
+                  onDismiss={() => setShowMascot(false)}
+                  className="w-72"
+                />
+              )}
+              
               {/* Left Column Content */}
               <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
                   {leftTab === 'panel' && (

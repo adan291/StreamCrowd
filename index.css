@@ -428,3 +428,216 @@ html.dark {
 .dark .hover-bg:hover {
   background-color: #27272a;
 }
+
+/* AI Vision Mascot Animations */
+@keyframes floatUp {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-20px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+}
+
+.animate-float {
+  animation: floatUp 2s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Mascot blink animation */
+@keyframes blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+.mascot-eye {
+  animation: blink 4s ease-in-out infinite;
+}
+
+/* Mascot bounce for attention */
+@keyframes mascotBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.mascot-bounce {
+  animation: mascotBounce 1s ease-in-out infinite;
+}
+
+/* Glow pulse for mascot */
+@keyframes glowPulse {
+  0%, 100% { 
+    filter: drop-shadow(0 0 8px rgba(169, 112, 255, 0.5));
+  }
+  50% { 
+    filter: drop-shadow(0 0 16px rgba(169, 112, 255, 0.8));
+  }
+}
+
+.mascot-glow {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Enhanced Mascot Body Animations */
+@keyframes mascotIdle {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-2px) rotate(0deg); }
+}
+
+.mascot-idle {
+  animation: mascotIdle 3s ease-in-out infinite;
+}
+
+@keyframes mascotBounceHappy {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-8px) scale(1.02); }
+  50% { transform: translateY(0) scale(1); }
+  75% { transform: translateY(-4px) scale(1.01); }
+}
+
+.mascot-bounce {
+  animation: mascotBounceHappy 0.6s ease-in-out infinite;
+}
+
+@keyframes mascotWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-5deg) scale(1.05); }
+  50% { transform: rotate(5deg) scale(1.05); }
+  75% { transform: rotate(-3deg) scale(1.02); }
+}
+
+.mascot-wiggle {
+  animation: mascotWiggle 0.4s ease-in-out infinite;
+}
+
+@keyframes mascotDroop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(3px) rotate(-2deg); }
+}
+
+.mascot-droop {
+  animation: mascotDroop 2s ease-in-out infinite;
+}
+
+@keyframes mascotTilt {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(8deg); }
+}
+
+.mascot-tilt {
+  animation: mascotTilt 2s ease-in-out infinite;
+}
+
+@keyframes mascotShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+.mascot-shake {
+  animation: mascotShake 0.5s ease-in-out infinite;
+}
+
+/* Tear drop animation */
+@keyframes tearDrop {
+  0% { transform: translateY(0); opacity: 0.6; }
+  100% { transform: translateY(10px); opacity: 0; }
+}
+
+.animate-tear {
+  animation: tearDrop 1.5s ease-in infinite;
+}
+
+/* Sweat drop animation */
+@keyframes sweatDrop {
+  0%, 100% { transform: translateY(0); opacity: 0.7; }
+  50% { transform: translateY(3px); opacity: 0.4; }
+}
+
+.animate-sweat {
+  animation: sweatDrop 1s ease-in-out infinite;
+}
+
+/* Scanline effect for screen */
+@keyframes scanline {
+  0% { transform: translateY(0); opacity: 0.3; }
+  100% { transform: translateY(34px); opacity: 0; }
+}
+
+.animate-scanline {
+  animation: scanline 2s linear infinite;
+}
+
+/* Float animation for particles */
+@keyframes floatParticle {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(-30px) rotate(180deg); opacity: 0; }
+}
+
+.animate-float {
+  animation: floatParticle 2s ease-out infinite;
+}
+
+/* Heart beat for love emotions */
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.1); }
+  50% { transform: scale(1); }
+  75% { transform: scale(1.15); }
+}
+
+.animate-heartbeat {
+  animation: heartBeat 0.8s ease-in-out infinite;
+}
+
+/* Sparkle rotation */
+@keyframes sparkleRotate {
+  0% { transform: rotate(0deg) scale(1); opacity: 1; }
+  50% { transform: rotate(180deg) scale(1.2); opacity: 0.8; }
+  100% { transform: rotate(360deg) scale(1); opacity: 1; }
+}
+
+.animate-sparkle {
+  animation: sparkleRotate 1s linear infinite;
+}
+
+/* Emotion transition glow */
+@keyframes emotionGlow {
+  0% { filter: brightness(1) saturate(1); }
+  50% { filter: brightness(1.2) saturate(1.3); }
+  100% { filter: brightness(1) saturate(1); }
+}
+
+.emotion-glow {
+  animation: emotionGlow 1s ease-in-out;
+}
+
+/* Confetti for celebration */
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(50px) rotate(720deg); opacity: 0; }
+}
+
+.animate-confetti {
+  animation: confetti 1.5s ease-out infinite;
+}
+
+/* Pulse ring effect */
+@keyframes pulseRing {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-pulse-ring {
+  animation: pulseRing 1s ease-out infinite;
+}

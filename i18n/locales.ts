@@ -294,6 +294,40 @@ export interface Translations {
     alreadyRegistered: string;
     votedFor: string;
   };
+  mascot: {
+    title: string;
+    chatSentiment: string;
+    positive: string;
+    neutral: string;
+    negative: string;
+    messages: string;
+    votes: string;
+    activity: string;
+    helpConnectionFailed: string;
+    helpPollEmpty: string;
+    helpNoVotes: string;
+    helpRepeatedAction: string;
+    helpIdle: string;
+    msgConnectionFailed: string;
+    msgPollEmpty: string;
+    msgNoVotes: string;
+    msgRepeatedAction: string;
+    msgIdle: string;
+    msgChatPositive: string;
+    msgChatNegative: string;
+    msgChatExcited: string;
+    msgNotConnected: string;
+    msgPollGoing: string;
+    msgWaitingVotes: string;
+    msgWatching: string;
+    dragToMove: string;
+    msgLove: string;
+    msgSurprised: string;
+    msgAngry: string;
+    msgSleepy: string;
+    msgHappy: string;
+    msgSad: string;
+  };
 }
 
 export const translations: Record<Locale, Translations> = {
@@ -590,6 +624,40 @@ export const translations: Record<Locale, Translations> = {
       alreadyRegistered: 'Ya registrado',
       votedFor: 'Votó por',
     },
+    mascot: {
+      title: 'AI Vision',
+      chatSentiment: 'Sentimiento del chat',
+      positive: 'Positivo',
+      neutral: 'Neutral',
+      negative: 'Negativo',
+      messages: 'Mensajes',
+      votes: 'Votos',
+      activity: 'Actividad',
+      helpConnectionFailed: 'Verifica que el nombre del canal sea correcto y que tengas conexión a internet',
+      helpPollEmpty: 'Añade al menos 2 opciones para crear una encuesta',
+      helpNoVotes: 'Intenta anunciar la encuesta en el chat o hacer la pregunta más llamativa',
+      helpRepeatedAction: 'Parece que algo no está funcionando como esperabas',
+      helpIdle: 'Puedo ayudarte a crear encuestas, analizar el chat y más',
+      msgConnectionFailed: '¡No te preocupes! Vamos a intentarlo de nuevo',
+      msgPollEmpty: 'Hmm... parece que la encuesta necesita opciones',
+      msgNoVotes: 'El chat está muy tranquilo...',
+      msgRepeatedAction: '¿Necesitas ayuda con algo?',
+      msgIdle: '¡Aquí estoy si me necesitas!',
+      msgChatPositive: '¡Qué buen ambiente! 💜',
+      msgChatNegative: 'El chat parece un poco tenso...',
+      msgChatExcited: '¡El chat está ON FIRE! 🔥',
+      msgNotConnected: '¡Hola! Conecta un canal para empezar',
+      msgPollGoing: '¡{votes} votos! La encuesta va genial',
+      msgWaitingVotes: 'Esperando los primeros votos...',
+      msgWatching: 'Observando el chat... 👀',
+      dragToMove: 'Arrastra para mover',
+      msgLove: '¡Mucho amor en el chat! 💜',
+      msgSurprised: '¡Wow! ¿Qué pasó? 😱',
+      msgAngry: 'El chat está intenso... 😅',
+      msgSleepy: '💤 Esperando actividad...',
+      msgHappy: '¡Buen ambiente! 😊',
+      msgSad: 'El chat está triste... 😢',
+    },
   },
   en: {
     common: {
@@ -883,6 +951,40 @@ export const translations: Record<Locale, Translations> = {
       newMessages: 'New messages',
       alreadyRegistered: 'Already registered',
       votedFor: 'Voted for',
+    },
+    mascot: {
+      title: 'AI Vision',
+      chatSentiment: 'Chat sentiment',
+      positive: 'Positive',
+      neutral: 'Neutral',
+      negative: 'Negative',
+      messages: 'Messages',
+      votes: 'Votes',
+      activity: 'Activity',
+      helpConnectionFailed: 'Check that the channel name is correct and you have internet connection',
+      helpPollEmpty: 'Add at least 2 options to create a poll',
+      helpNoVotes: 'Try announcing the poll in chat or make the question more engaging',
+      helpRepeatedAction: 'Something seems to not be working as expected',
+      helpIdle: 'I can help you create polls, analyze chat and more',
+      msgConnectionFailed: "Don't worry! Let's try again",
+      msgPollEmpty: 'Hmm... looks like the poll needs options',
+      msgNoVotes: 'Chat is very quiet...',
+      msgRepeatedAction: 'Need help with something?',
+      msgIdle: "I'm here if you need me!",
+      msgChatPositive: 'Great vibes! 💜',
+      msgChatNegative: 'Chat seems a bit tense...',
+      msgChatExcited: 'Chat is ON FIRE! 🔥',
+      msgNotConnected: 'Hello! Connect a channel to start',
+      msgPollGoing: '{votes} votes! Poll is going great',
+      msgWaitingVotes: 'Waiting for the first votes...',
+      msgWatching: 'Watching the chat... 👀',
+      dragToMove: 'Drag to move',
+      msgLove: 'So much love in chat! 💜',
+      msgSurprised: 'Wow! What happened? 😱',
+      msgAngry: 'Chat is intense... 😅',
+      msgSleepy: '💤 Waiting for activity...',
+      msgHappy: 'Good vibes! 😊',
+      msgSad: 'Chat is sad... 😢',
     },
   },
 };
