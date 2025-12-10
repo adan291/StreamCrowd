@@ -9,7 +9,6 @@ import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
 import { StreamPlayer } from './components/StreamPlayer';
 import { AssetLibrary } from './components/AssetLibrary';
-import { Overlays } from './components/Overlays';
 import { twitchService } from './services/twitchService';
 import { 
   ConnectionStatus, 
@@ -30,7 +29,7 @@ import {
   handleVoteChange,
 } from './types';
 import { CHART_COLORS } from './constants';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, Layers } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -53,6 +52,9 @@ const App: React.FC = () => {
   
   // Mobile sidebar toggle
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  
+  // Desktop right sidebar collapsed state
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
@@ -885,7 +887,7 @@ const App: React.FC = () => {
                 onDisconnect={handleDisconnect} 
                 errorMessage={connectionError}
              />
-             <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed bottom-4 right-4 z-50 items-end" />
+             <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 left-1/2 -translate-x-1/2 z-[100]" />
           </div>
       );
   }
@@ -934,7 +936,6 @@ const App: React.FC = () => {
              <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label="Panel" />
              <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label="Galería" />
              <NavButton active={leftTab === 'activity'} onClick={() => setLeftTab('activity')} icon={<Activity size={20} />} label="Actividad" />
-             <NavButton active={leftTab === 'overlays'} onClick={() => setLeftTab('overlays')} icon={<Layers size={20} />} label="Overlays" />
          </div>
 
          <div className="mt-auto flex flex-col gap-3 w-full px-2">
@@ -952,7 +953,6 @@ const App: React.FC = () => {
           <MobileNavButton active={leftTab === 'panel'} onClick={() => { setLeftTab('panel'); setShowMobileSidebar(false); }} icon={<LayoutDashboard size={20} />} label="Panel" />
           <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label="Galería" />
           <MobileNavButton active={leftTab === 'activity'} onClick={() => { setLeftTab('activity'); setShowMobileSidebar(false); }} icon={<Activity size={20} />} label="Actividad" />
-          <MobileNavButton active={leftTab === 'overlays'} onClick={() => { setLeftTab('overlays'); setShowMobileSidebar(false); }} icon={<Layers size={20} />} label="Overlays" />
           <MobileNavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label="Historial" />
       </div>
 
@@ -973,6 +973,7 @@ const App: React.FC = () => {
                             moderationStats={moderationStats}
                             moderationLog={moderationLog}
                             userWeights={userWeights}
+                            overlayWindowRef={overlayWindowRef}
                           />
                       ) : (
                           <PollCreator 
@@ -999,15 +1000,7 @@ const App: React.FC = () => {
                           options={currentPoll ? currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
                       />
                   )}
-                  {leftTab === 'overlays' && (
-                      <Overlays 
-                        currentPoll={currentPoll} 
-                        voteHistory={voteHistory} 
-                        theme={theme}
-                        channelName={channelName}
-                        overlayWindowRef={overlayWindowRef}
-                      />
-                  )}
+
               </div>
 
               {/* Mobile Sidebar Overlay */}
@@ -1018,9 +1011,8 @@ const App: React.FC = () => {
                   />
               )}
 
-              {/* Right Sidebar (Chat/Stream) */}
+              {/* Right Sidebar (Chat/Stream) - Collapsible */}
               <div className={`
-                  w-full md:w-80 lg:w-96 
                   bg-white dark:bg-zinc-900 
                   border-l border-zinc-200 dark:border-zinc-800 
                   flex flex-col shrink-0 
@@ -1029,9 +1021,32 @@ const App: React.FC = () => {
                   inset-y-0 right-0 
                   z-50 md:z-auto
                   transform ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'} md:translate-x-0
-                  max-w-[85vw] md:max-w-none
                   pt-14 md:pt-0 pb-16 md:pb-0
+                  ${rightSidebarCollapsed ? 'md:w-0 md:border-l-0' : 'w-full md:w-80 lg:w-96 max-w-[85vw] md:max-w-none'}
               `}>
+                  {/* Desktop collapse toggle button */}
+                  <button 
+                    className={`
+                      hidden md:flex 
+                      absolute top-1/2 -translate-y-1/2 -left-4
+                      w-4 h-16 
+                      items-center justify-center
+                      bg-zinc-200 dark:bg-zinc-800 
+                      hover:bg-zinc-300 dark:hover:bg-zinc-700
+                      border border-zinc-300 dark:border-zinc-700
+                      rounded-l-lg
+                      text-zinc-500 dark:text-zinc-400
+                      hover:text-zinc-700 dark:hover:text-zinc-200
+                      transition-colors
+                      z-10
+                      shadow-sm
+                    `}
+                    onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+                    title={rightSidebarCollapsed ? 'Mostrar Chat/Stream' : 'Ocultar Chat/Stream'}
+                  >
+                      {rightSidebarCollapsed ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                  </button>
+
                   {/* Mobile close button */}
                   <button 
                     className="md:hidden absolute top-2 left-2 p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
@@ -1040,33 +1055,36 @@ const App: React.FC = () => {
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                   </button>
                   
-                  <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-                      <button 
-                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                        onClick={() => setActiveRightTab('chat')}
-                      >
-                          <MessageSquare size={16} /> Chat
-                      </button>
-                      <button 
-                        className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                        onClick={() => setActiveRightTab('stream')}
-                      >
-                          <Tv size={16} /> Stream
-                      </button>
-                  </div>
-                  
-                  <div className="flex-1 overflow-hidden relative">
-                      {activeRightTab === 'chat' ? (
-                          <ChatFeed 
-                            messages={chatMessages} 
-                            userVoteMap={userVoteMap} 
-                            options={currentPoll?.options} 
-                          />
-                      ) : (
-                          <div className="h-full p-2 bg-black">
-                              <StreamPlayer channel={channelName} />
-                          </div>
-                      )}
+                  {/* Sidebar content - hidden when collapsed */}
+                  <div className={`flex flex-col h-full ${rightSidebarCollapsed ? 'md:hidden' : ''}`}>
+                      <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                          <button 
+                            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                            onClick={() => setActiveRightTab('chat')}
+                          >
+                              <MessageSquare size={16} /> Chat
+                          </button>
+                          <button 
+                            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                            onClick={() => setActiveRightTab('stream')}
+                          >
+                              <Tv size={16} /> Stream
+                          </button>
+                      </div>
+                      
+                      <div className="flex-1 overflow-hidden relative">
+                          {activeRightTab === 'chat' ? (
+                              <ChatFeed 
+                                messages={chatMessages} 
+                                userVoteMap={userVoteMap} 
+                                options={currentPoll?.options} 
+                              />
+                          ) : (
+                              <div className="h-full p-2 bg-black">
+                                  <StreamPlayer channel={channelName} />
+                              </div>
+                          )}
+                      </div>
                   </div>
               </div>
           </div>
@@ -1076,7 +1094,7 @@ const App: React.FC = () => {
           <PollHistory history={pastPolls} onClose={() => setShowHistory(false)} />
       )}
 
-      <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed bottom-4 right-4 z-50 items-end" />
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 md:left-[calc(50%-10rem)] lg:left-[calc(50%-12rem)] z-[100]" />
     </div>
   );
 };

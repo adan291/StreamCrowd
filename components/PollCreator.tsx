@@ -492,19 +492,19 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                  </div>
                  
                  {/* Color Config */}
-                 <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Barra</label>
-                       <div className="h-[38px] w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-lg p-1 relative overflow-hidden">
-                           <input type="color" value={progressBarColor} onChange={e => setProgressBarColor(e.target.value)} className="w-full h-full cursor-pointer opacity-0 absolute inset-0 z-10" />
-                           <div className="w-full h-full rounded flex items-center justify-center text-xs font-mono font-bold" style={{backgroundColor: progressBarColor, color: '#fff', textShadow: '0 1px 2px black'}}>{progressBarColor}</div>
+                 <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Barra</label>
+                       <div className="w-8 h-8 rounded-lg border border-zinc-300 dark:border-zinc-700 relative overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                           <input type="color" value={progressBarColor} onChange={e => setProgressBarColor(e.target.value)} className="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
+                           <div className="w-full h-full" style={{backgroundColor: progressBarColor}} />
                        </div>
                     </div>
-                    <div className="space-y-1">
-                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">Límite</label>
-                       <div className="h-[38px] w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 rounded-lg p-1 relative overflow-hidden">
-                           <input type="color" value={limitIndicatorColor} onChange={e => setLimitIndicatorColor(e.target.value)} className="w-full h-full cursor-pointer opacity-0 absolute inset-0 z-10" />
-                           <div className="w-full h-full rounded flex items-center justify-center text-xs font-mono font-bold" style={{backgroundColor: limitIndicatorColor, color: '#fff', textShadow: '0 1px 2px black'}}>{limitIndicatorColor}</div>
+                    <div className="flex items-center gap-2">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Límite</label>
+                       <div className="w-8 h-8 rounded-lg border border-zinc-300 dark:border-zinc-700 relative overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-sm">
+                           <input type="color" value={limitIndicatorColor} onChange={e => setLimitIndicatorColor(e.target.value)} className="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
+                           <div className="w-full h-full" style={{backgroundColor: limitIndicatorColor}} />
                        </div>
                     </div>
                  </div>
@@ -543,8 +543,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
              )}
              
              <div className="flex gap-2 mb-4">
-                <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px]" title="Vista Previa"><Eye size={18} /></button>
-                <button type="button" onClick={saveTemplate} disabled={!question.trim()} className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 font-bold text-sm h-[42px] flex-1 sm:flex-none" title="Guardar como Plantilla"><Save size={16} /> <span className="hidden sm:inline">Guardar</span></button>
+                <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px] flex items-center gap-1.5" title="Vista Previa"><Eye size={16} /> <span className="hidden xs:inline">Preview</span></button>
+                <button type="button" onClick={saveTemplate} disabled={!question.trim()} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 font-bold text-sm h-[42px] flex items-center gap-1.5" title="Guardar como Plantilla"><Save size={16} /> <span className="hidden xs:inline">Guardar</span></button>
                 <div className="flex-1"></div>
              </div>
 

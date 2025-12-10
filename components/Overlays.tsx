@@ -179,54 +179,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Method 1: Browser Source */}
-                <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col">
-                    <div className="flex items-start sm:items-center gap-3 mb-4">
-                        <div className="p-2 sm:p-3 bg-blue-500/10 rounded-lg text-blue-500 shrink-0">
-                            <Globe size={20} className="sm:w-6 sm:h-6" />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white">Browser Source</h3>
-                            <p className="text-[10px] sm:text-xs text-zinc-500">Copia esta URL y añádela como "Browser Source" en OBS.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex-1 space-y-4">
-                         {/* Channel Overwrite Input */}
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider ml-1 flex items-center gap-1">
-                                Canal de Twitch (Opcional)
-                            </label>
-                            <div className="flex items-center relative">
-                                <input 
-                                    type="text" 
-                                    value={customChannel}
-                                    onChange={(e) => setCustomChannel(e.target.value)}
-                                    placeholder={channelName || "Ej: ibai"}
-                                    className="w-full bg-zinc-50 dark:bg-black/30 border border-zinc-300 dark:border-zinc-700 rounded-lg py-1.5 pl-3 pr-8 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-twitch-brand"
-                                />
-                                <Edit3 size={14} className="absolute right-3 text-zinc-400 pointer-events-none" />
-                            </div>
-                        </div>
-
-                        <div className="bg-zinc-50 dark:bg-black/30 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
-                            <code className="text-xs text-zinc-600 dark:text-zinc-400 truncate flex-1 font-mono select-all">
-                                {overlayUrl}
-                            </code>
-                            <button onClick={copyOverlayLink} className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-500" title="Copiar URL">
-                                {copied ? <CheckCircle2 size={16} className="text-green-500"/> : <Copy size={16}/>}
-                            </button>
-                        </div>
-                        
-                        <div className="flex items-start gap-2 text-[11px] text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/10 p-2 rounded border border-amber-200 dark:border-amber-900/30">
-                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                            <p>Importante: Mantén esta web abierta para que el overlay de OBS reciba los datos en tiempo real.</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Method 2: Window Capture */}
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                {/* Method 2: Window Capture - Now the main option */}
                 <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                         <div className="flex items-center gap-3">

@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
 import { Poll, VoteRecord, PollOption, ModerationStats, ModerationLogEntry, calculateWeightedTotal } from '../types';
 import { Button } from './Button';
-import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale } from 'lucide-react';
+import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale, ExternalLink } from 'lucide-react';
 import { ModerationStatsDisplay } from './ModerationStatsDisplay';
 import { ModerationLogViewer } from './ModerationLogViewer';
 
@@ -29,6 +29,7 @@ interface LivePollProps {
   moderationLog?: ModerationLogEntry[];
   userWeights?: Map<string, number>;
   overlayStyles?: OverlayStyles;
+  overlayWindowRef?: React.MutableRefObject<Window | null>;
 }
 
 export const LivePoll: React.FC<LivePollProps> = ({ 
@@ -44,7 +45,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
   moderationStats,
   moderationLog = [],
   userWeights = new Map(),
-  overlayStyles = {},
+  overlayStyles = {} as OverlayStyles,
+  overlayWindowRef,
 }) => {
   // Helper for overlay font styles
   const getOverlayFontSize = (base: 'title' | 'label' | 'percent' | 'votes') => {
@@ -283,6 +285,38 @@ export const LivePoll: React.FC<LivePollProps> = ({
     });
   };
 
+  const handleOpenOverlay = () => {
+    if (!overlayWindowRef) return;
+    
+    if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
+      overlayWindowRef.current.focus();
+      return;
+    }
+
+    const baseUrl = typeof window !== 'undefined' 
+      ? `${window.location.protocol}//${window.location.host}${window.location.pathname}`
+      : '';
+    const overlayUrl = `${baseUrl}?overlay=true`;
+
+    const width = 900;
+    const height = 700;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    
+    const newWindow = window.open(
+      overlayUrl, 
+      'TwitchVoteOverlay', 
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (newWindow) {
+      overlayWindowRef.current = newWindow;
+      newWindow.onbeforeunload = () => {
+        overlayWindowRef.current = null;
+      };
+    }
+  };
+
   const shareOption = (opt: PollOption, percentage: string) => {
     const text = `${opt.label}: ${percentage}% de los votos`;
     navigator.clipboard.writeText(text).then(() => {
@@ -333,14 +367,17 @@ export const LivePoll: React.FC<LivePollProps> = ({
     ? "flex-1 min-h-0" 
     : isPreview 
         ? "h-[180px] sm:h-[200px] shrink-0 min-h-[150px]" 
-        : "h-[200px] sm:h-[250px] lg:flex-1 lg:min-h-[250px]"; 
+        : "flex-1 min-h-[300px]"; 
   
-  // Grid Layout Logic - Stack on mobile, grid on desktop
+  // Grid Layout Logic - Stack on mobile, side by side on desktop
   const gridLayoutClass = isOverlay 
     ? "flex flex-col gap-4 sm:gap-8 h-full" 
     : isPreview 
         ? "flex flex-col gap-2 sm:gap-3 mt-3 sm:mt-4" 
-        : "flex flex-col gap-4 sm:gap-6 lg:grid lg:grid-cols-3 flex-1 min-h-0 relative z-10";
+        : "flex flex-col lg:flex-row gap-3 flex-1 min-h-0 relative z-10";
+  
+  // Sort options by votes (descending) for ranking display
+  const sortedOptions = [...displayPoll.options].sort((a, b) => b.votes - a.votes);
 
   // Title Text Size - Responsive
   const titleTextSize = isOverlay 
@@ -359,6 +396,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
         .winner-border {
            box-shadow: 0 0 0 2px #facc15, 0 0 20px rgba(250, 204, 21, 0.3);
            animation: pulseGlow 2s infinite;
+        }
+        .rank-list {
+           display: flex;
+           flex-direction: column;
+        }
+        .rank-list > div {
+           transition: transform 0.3s ease-out, opacity 0.2s ease-out;
         }
       `}</style>
 
@@ -586,8 +630,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
         )}
 
         {/* Chart */}
-        <div className={`${isOverlay ? 'bg-transparent border-0' : 'bg-zinc-50 dark:bg-zinc-950/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800/50'} flex flex-col ${chartHeightClass} lg:col-span-2 relative min-w-0`}>
-          <div ref={chartContainerRef} className="w-full h-full min-h-[250px] absolute inset-0 p-2 md:p-4">
+        <div className={`${isOverlay ? 'bg-transparent border-0' : 'bg-zinc-50 dark:bg-zinc-950/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-800/50'} flex flex-col ${chartHeightClass} lg:flex-[3] relative min-w-0`}>
+          <div ref={chartContainerRef} className="w-full h-full absolute inset-0 p-2 md:p-4">
           {shouldRenderChart && chartData.length > 0 && chartSize.width > 50 && chartSize.height > 50 ? (
                   <BarChart data={chartData} width={chartSize.width - 20} height={chartSize.height - 20} margin={{ top: 20, right: 10, left: 10, bottom: isOverlay ? 40 : 20 }}>
                       <XAxis 
@@ -661,9 +705,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
           </div>
         </div>
 
-        {/* Legend */}
-        <div className={`space-y-3 ${isOverlay ? 'grid grid-cols-2 gap-4 space-y-0 content-center w-full max-w-5xl mx-auto' : isPreview ? 'flex-1' : 'overflow-y-auto pr-1 custom-scrollbar'}`}>
-          {displayPoll.options.map((opt) => {
+        {/* Legend - Sorted by votes */}
+        <div className={`${isOverlay ? 'grid grid-cols-2 gap-4 space-y-0 content-center w-full max-w-5xl mx-auto' : isPreview ? 'space-y-2 flex-1' : 'lg:w-48 xl:w-56 space-y-1.5 overflow-y-auto pr-1 custom-scrollbar shrink-0 rank-list'}`}>
+          {sortedOptions.map((opt, rankIndex) => {
             const percentage = displayPoll.totalVotes > 0 ? ((opt.votes / displayPoll.totalVotes) * 100).toFixed(1) : "0.0";
             const isWinner = !displayPoll.isActive && winner?.id === opt.id && opt.votes > 0;
             const isAnimating = animatingOptions[opt.id];
@@ -678,20 +722,39 @@ export const LivePoll: React.FC<LivePollProps> = ({
             // Card background based on theme
             const overlayCardBg = theme === 'dark' ? 'bg-black/70' : 'bg-white/90';
 
+            // Rank badge colors
+            const rankColors = ['#facc15', '#94a3b8', '#cd7f32', '#71717a'];
+            const rankBadgeColor = rankColors[rankIndex] || rankColors[3];
+
             return (
               <div 
                 key={opt.id} 
-                className={`relative rounded-lg transition-all ${
+                className={`relative rounded-lg transition-all duration-300 ease-out ${
                     isOverlay 
                       ? `${overlayCardBg} p-4 shadow-lg backdrop-blur-sm` 
-                      : `p-3 border ${isWinner ? 'bg-yellow-100 dark:bg-yellow-500/10 border-yellow-400 winner-border' : 'bg-white dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800'}`
+                      : `p-2 border ${isWinner ? 'bg-yellow-100 dark:bg-yellow-500/10 border-yellow-400 winner-border' : 'bg-white dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800'}`
                     } ${isAnimating && !isOverlay ? 'flash-active' : ''}`}
-                style={overlayCardStyle}
+                style={{
+                  ...overlayCardStyle,
+                  order: rankIndex, // CSS order for smooth reordering
+                }}
               >
-                <div className="flex justify-between items-center mb-1 relative z-10">
-                  <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
+                <div className="flex justify-between items-center relative z-10">
+                  <div className="flex items-center gap-2 overflow-hidden min-w-0 flex-1 mr-2">
+                    {/* Rank Badge */}
+                    {!isOverlay && displayPoll.isActive && (
+                      <span 
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all duration-300"
+                        style={{ 
+                          backgroundColor: rankBadgeColor,
+                          color: rankIndex === 0 ? '#000' : '#fff',
+                        }}
+                      >
+                        {rankIndex + 1}
+                      </span>
+                    )}
                     <span 
-                      className={`rounded-lg flex items-center justify-center font-bold text-black shadow-sm shrink-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800 ${isOverlay ? 'w-14 h-14 text-xl' : 'w-10 h-10 text-xs'}`}
+                      className={`rounded flex items-center justify-center font-bold text-black shadow-sm shrink-0 overflow-hidden bg-zinc-100 dark:bg-zinc-800 ${isOverlay ? 'w-14 h-14 text-xl rounded-lg' : 'w-5 h-5 text-[9px]'}`}
                       style={{ backgroundColor: opt.image ? 'transparent' : opt.color }}
                     >
                       {opt.image ? (
@@ -701,22 +764,23 @@ export const LivePoll: React.FC<LivePollProps> = ({
                       )}
                     </span>
                     <span 
-                      className={`truncate ${isOverlay ? `${getOverlayFontSize('label')} ${getOverlayFontStyle()}` : 'text-zinc-900 dark:text-zinc-200 text-sm font-medium'}`}
+                      className={`truncate ${isOverlay ? `${getOverlayFontSize('label')} ${getOverlayFontStyle()}` : 'text-zinc-900 dark:text-zinc-200 text-[11px] font-medium'}`}
                       style={isOverlay ? { color: overlayStyles.textColor } : {}}
                     >
                       {opt.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                       <span 
-                        className={`tabular-nums ${isOverlay ? `${getOverlayFontSize('percent')} ${getOverlayFontStyle()} drop-shadow-sm` : 'font-bold text-zinc-900 dark:text-white'}`}
+                        className={`tabular-nums ${isOverlay ? `${getOverlayFontSize('percent')} ${getOverlayFontStyle()} drop-shadow-sm` : 'font-bold text-zinc-900 dark:text-white text-[11px]'}`}
                         style={isOverlay ? { color: overlayStyles.textColor } : {}}
                       >{percentage}%</span>
-                      {isDefault && !isSimulationMode && (
-                        <button onClick={() => shareOption(opt, percentage)} className="text-zinc-400 hover:text-white transition-colors">
-                           {copiedOptionId === opt.id ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
-                        </button>
-                      )}
+                      <span 
+                        className={`tabular-nums ${isOverlay ? `${getOverlayFontSize('votes')} ${getOverlayFontStyle()}` : 'text-[9px] text-zinc-400'}`}
+                        style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.8 } : {}}
+                      >
+                        ({opt.votes})
+                      </span>
                   </div>
                 </div>
                 
@@ -727,17 +791,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     style={{ width: `${percentage}%`, backgroundColor: opt.color }}
                   />
                 </div>
-                
-                <div 
-                  className={`text-right ${isOverlay ? `${getOverlayFontSize('votes')} ${getOverlayFontStyle()}` : 'text-xs text-zinc-500'} mt-1 relative z-10 flex justify-end items-center gap-1`}
-                  style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.8 } : {}}
-                >
-                  {opt.votes} votos
-                </div>
 
                 {isWinner && (
-                  <div className="absolute -top-3 -right-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black text-xs font-black px-3 py-1 rounded-full shadow-lg flex items-center gap-1 border-2 border-white/20 animate-bounce z-20">
-                    <Trophy size={14} className="fill-black" /> GANADOR
+                  <div className="absolute -top-2 -right-1 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg flex items-center gap-0.5 border border-white/20 z-20">
+                    <Trophy size={10} className="fill-black" /> WIN
                   </div>
                 )}
               </div>
@@ -759,6 +816,47 @@ export const LivePoll: React.FC<LivePollProps> = ({
         <div className="mt-4 space-y-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4">
           <ModerationStatsDisplay stats={moderationStats} />
           <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
+        </div>
+      )}
+
+      {/* OBS Overlay Section */}
+      {isDefault && poll.isActive && overlayWindowRef && !isSimulationMode && (
+        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-fade-in">
+          <div className="bg-gradient-to-r from-twitch-brand/10 to-purple-500/10 dark:from-twitch-brand/20 dark:to-purple-500/20 rounded-xl p-4 border border-twitch-brand/20">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-twitch-brand/20 rounded-lg text-twitch-brand dark:text-twitch-light shrink-0">
+                    <ExternalLink size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">Overlay para OBS</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Muestra la encuesta en tu stream con Window Capture.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenOverlay}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-twitch-brand hover:bg-twitch-light text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors shadow-lg shadow-twitch-brand/20"
+                >
+                  <ExternalLink size={16} />
+                  Abrir Overlay
+                </button>
+              </div>
+              
+              {/* Mini Tutorial */}
+              <div className="bg-zinc-100 dark:bg-zinc-900/50 rounded-lg p-3 text-xs text-zinc-600 dark:text-zinc-400">
+                <p className="font-bold text-zinc-700 dark:text-zinc-300 mb-2">📋 Pasos rápidos:</p>
+                <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+                  <li>Haz clic en <span className="font-semibold text-twitch-brand">"Abrir Overlay"</span></li>
+                  <li>En OBS: <span className="font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded">+ → Window Capture</span> → selecciona la ventana del overlay</li>
+                  <li>Aplica filtro <span className="font-mono bg-green-200 dark:bg-green-900/50 text-green-700 dark:text-green-400 px-1 rounded">Chroma Key</span>: clic derecho en la fuente → Filtros → + → Chroma Key</li>
+                  <li>Selecciona el color verde del fondo y ajusta la similitud</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
