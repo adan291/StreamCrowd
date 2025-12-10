@@ -1,6 +1,5 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { Layers, ExternalLink, Copy, CheckCircle2, Monitor, Globe, AlertCircle, Moon, Sun, Save, Download, Edit3 } from 'lucide-react';
 import { Poll, VoteRecord } from '../types';
 import { LivePoll } from './LivePoll';
@@ -11,14 +10,15 @@ interface OverlaysProps {
   voteHistory: VoteRecord[];
   theme: 'dark' | 'light';
   channelName?: string;
-  isVisible?: boolean; // New prop to control rendering overhead
+  isVisible?: boolean;
+  overlayWindowRef?: React.MutableRefObject<Window | null>;
 }
 
-export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, theme, channelName, isVisible = true }) => {
+export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, theme, channelName, isVisible = true, overlayWindowRef: externalWindowRef }) => {
   const [copied, setCopied] = useState(false);
-  const [overlayContainer, setOverlayContainer] = useState<HTMLElement | null>(null);
   const [overlayTheme, setOverlayTheme] = useState<'dark' | 'light'>('dark');
-  const overlayWindowRef = useRef<Window | null>(null);
+  const internalWindowRef = useRef<Window | null>(null);
+  const overlayWindowRef = externalWindowRef || internalWindowRef;
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [customChannel, setCustomChannel] = useState<string>('');
 
@@ -37,14 +37,8 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
     // But usually, manual input overrides prop.
   }, [channelName]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-        if (overlayWindowRef.current && !overlayWindowRef.current.closed) {
-            overlayWindowRef.current.close();
-        }
-    };
-  }, []);
+  // Note: We don't close the window on unmount anymore since the ref is managed by App
+  // This allows the popup to persist when switching tabs
 
   // Sync theme changes to the open window
   useEffect(() => {
@@ -89,84 +83,21 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
         return;
     }
 
-    const width = 800;
-    const height = 600;
+    const width = 900;
+    const height = 700;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
     
+    // Open the overlay URL directly - this gives us a full React instance with working charts
     const newWindow = window.open(
-      '', 
+      overlayUrl, 
       'TwitchVoteOverlay', 
       `width=${width},height=${height},left=${left},top=${top}`
     );
 
     if (newWindow) {
         overlayWindowRef.current = newWindow;
-
-        // Clone styles specifically for the popout to ensure fonts/resets match
-        const styles = Array.from(document.styleSheets)
-            .map(styleSheet => {
-                try {
-                    return Array.from(styleSheet.cssRules).map(rule => rule.cssText).join('');
-                } catch (e) { return ''; }
-            })
-            .join('\n');
-
-        newWindow.document.open();
-        newWindow.document.write(`
-            <!DOCTYPE html>
-            <html lang="es" class="${overlayTheme}">
-            <head>
-                <meta charset="UTF-8" />
-                <title>Overlay - TwitchVote Live</title>
-                <script src="https://cdn.tailwindcss.com"></script>
-                <script>
-                    tailwind.config = {
-                        darkMode: 'class',
-                        theme: {
-                          extend: {
-                            colors: {
-                              twitch: {
-                                dark: '#18181b',
-                                light: '#a970ff',
-                                brand: '#6441a5',
-                                accent: '#00f0f0'
-                              }
-                            },
-                            animation: {
-                              'scale-up': 'scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                              'fade-in': 'fadeIn 0.2s ease-out forwards',
-                            }
-                          }
-                        }
-                    }
-                </script>
-                <style>
-                    body { background-color: transparent !important; overflow: hidden; margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; height: 100vh; width: 100vw; }
-                    html { height: 100%; width: 100%; }
-                    #overlay-root { height: 100%; width: 100%; display: flex; flex-direction: column; }
-                    ${styles} 
-                    /* Custom scrollbar for popup */
-                    ::-webkit-scrollbar { width: 6px; }
-                    ::-webkit-scrollbar-track { background: transparent; }
-                    ::-webkit-scrollbar-thumb { background: rgba(150,150,150,0.5); border-radius: 10px; }
-                </style>
-            </head>
-            <body>
-                <div id="overlay-root"></div>
-            </body>
-            </html>
-        `);
-        newWindow.document.close();
-        
-        // Wait for DOM to be ready before setting container
-        setTimeout(() => {
-            const container = newWindow.document.getElementById('overlay-root');
-            if (container) setOverlayContainer(container);
-        }, 100);
-
         newWindow.onbeforeunload = () => {
-            setOverlayContainer(null);
             overlayWindowRef.current = null;
         };
     } else {
@@ -227,7 +158,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                 */}
                 <div className="flex-1 bg-zinc-100 dark:bg-black/50 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 relative overflow-y-auto custom-scrollbar bg-dot-pattern flex flex-col">
                     {currentPoll ? (
-                        <div className="w-full h-full p-4 relative">
+                        <div className="w-full h-full min-h-[400px] p-4 relative">
                              <LivePoll 
                                 poll={currentPoll} 
                                 voteHistory={voteHistory} 
@@ -330,10 +261,10 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
                     <div className="flex-1 flex flex-col justify-end">
                         <button 
                             onClick={handlePopout}
-                            className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg ${overlayContainer ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-twitch-brand hover:bg-twitch-light text-white shadow-twitch-brand/20'}`}
+                            className="w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg bg-twitch-brand hover:bg-twitch-light text-white shadow-twitch-brand/20"
                         >
                             <ExternalLink size={16} /> 
-                            {overlayContainer ? 'Enfocar Ventana' : 'Abrir Overlay'}
+                            Abrir Overlay
                         </button>
                     </div>
                 </div>
@@ -342,21 +273,7 @@ export const Overlays: React.FC<OverlaysProps> = ({ currentPoll, voteHistory, th
          </div>
       </div>
 
-      {/* Render Portal for Popout */}
-      {overlayContainer && currentPoll && createPortal(
-          <div className="w-full h-full overflow-y-auto p-4 bg-transparent animate-fade-in">
-                <LivePoll 
-                    poll={currentPoll} 
-                    voteHistory={voteHistory} 
-                    onStop={()=>{}} 
-                    onReset={()=>{}} 
-                    theme={overlayTheme}
-                    variant="overlay"
-                    shouldRenderChart={true}
-                />
-          </div>,
-          overlayContainer
-      )}
+
     </div>
   );
 };

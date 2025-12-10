@@ -1,9 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { Poll, VoteRecord, PollOption } from '../types';
+import { BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
+import { Poll, VoteRecord, PollOption, ModerationStats, ModerationLogEntry, calculateWeightedTotal } from '../types';
 import { Button } from './Button';
-import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical } from 'lucide-react';
+import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale } from 'lucide-react';
+import { ModerationStatsDisplay } from './ModerationStatsDisplay';
+import { ModerationLogViewer } from './ModerationLogViewer';
+
+interface OverlayStyles {
+  textColor?: string;
+  borderColor?: string;
+  showBorders?: boolean;
+  fontSize?: 'small' | 'medium' | 'large';
+  fontStyle?: 'normal' | 'bold' | 'italic';
+}
 
 interface LivePollProps {
   poll: Poll;
@@ -15,6 +25,10 @@ interface LivePollProps {
   theme?: 'light' | 'dark';
   variant?: 'default' | 'preview' | 'overlay';
   shouldRenderChart?: boolean;
+  moderationStats?: ModerationStats;
+  moderationLog?: ModerationLogEntry[];
+  userWeights?: Map<string, number>;
+  overlayStyles?: OverlayStyles;
 }
 
 export const LivePoll: React.FC<LivePollProps> = ({ 
@@ -26,8 +40,30 @@ export const LivePoll: React.FC<LivePollProps> = ({
   onSimulateVote,
   theme = 'dark',
   variant = 'default',
-  shouldRenderChart = true
+  shouldRenderChart = true,
+  moderationStats,
+  moderationLog = [],
+  userWeights = new Map(),
+  overlayStyles = {},
 }) => {
+  // Helper for overlay font styles
+  const getOverlayFontSize = (base: 'title' | 'label' | 'percent' | 'votes') => {
+    const sizes = {
+      small: { title: 'text-3xl', label: 'text-lg', percent: 'text-xl', votes: 'text-sm' },
+      medium: { title: 'text-5xl', label: 'text-2xl', percent: 'text-3xl', votes: 'text-lg' },
+      large: { title: 'text-7xl', label: 'text-3xl', percent: 'text-4xl', votes: 'text-xl' },
+    };
+    return sizes[overlayStyles.fontSize || 'medium'][base];
+  };
+  
+  const getOverlayFontStyle = () => {
+    switch (overlayStyles.fontStyle) {
+      case 'italic': return 'italic';
+      case 'bold': return 'font-bold';
+      default: return 'font-normal';
+    }
+  };
+
   const [showConfirmStop, setShowConfirmStop] = useState(false);
   const [prevVotes, setPrevVotes] = useState<{[key: number]: number}>({});
   const [animatingOptions, setAnimatingOptions] = useState<{[key: number]: boolean}>({});
@@ -39,11 +75,45 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Simulation Mode State
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [simulatedPoll, setSimulatedPoll] = useState<Poll | null>(null);
+  
+  // Chart container dimensions to avoid negative dimension warnings
+  const [chartSize, setChartSize] = useState<{width: number, height: number}>({width: 400, height: 250});
+  const chartContainerRef = React.useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const updateSize = () => {
+      if (chartContainerRef.current) {
+        const rect = chartContainerRef.current.getBoundingClientRect();
+        if (rect.width > 50 && rect.height > 50) {
+          setChartSize({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+        }
+      }
+    };
+    
+    // Initial measurement with delays
+    const timers = [
+      setTimeout(updateSize, 50),
+      setTimeout(updateSize, 200),
+      setTimeout(updateSize, 500),
+    ];
+    
+    // Listen for resize
+    const handleResize = () => updateSize();
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [variant]);
 
   // Editing state
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(poll.title || '');
   const [editQuestion, setEditQuestion] = useState(poll.question);
+  
+  // Moderation panel state
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
 
   // Constants based on variant
   const isOverlay = variant === 'overlay';
@@ -164,6 +234,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const winner = !displayPoll.isActive && displayPoll.totalVotes > 0
     ? displayPoll.options.reduce((prev, current) => (prev.votes > current.votes) ? prev : current)
     : null;
+    
+  // Calculate weighted totals
+  const weightedTotal = calculateWeightedTotal(voteHistory, userWeights);
+  const hasWeightedVotes = userWeights.size > 0 && weightedTotal !== voteHistory.length;
 
   const handleStopClick = () => {
     if (showConfirmStop) {
@@ -332,7 +406,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
               />
           ) : (
             <div className={`flex items-center gap-2 group ${isOverlay ? 'justify-center' : ''}`}>
-                <h2 className={`font-bold text-zinc-900 dark:text-white leading-tight break-words text-center md:text-left ${titleTextSize}`}>
+                <h2 
+                  className={`leading-tight break-words text-center md:text-left ${isOverlay ? `${getOverlayFontSize('title')} ${getOverlayFontStyle()} drop-shadow-lg tracking-tight` : `${titleTextSize} font-bold text-zinc-900 dark:text-white`}`}
+                  style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                >
                     {displayPoll.question}
                 </h2>
                 {isDefault && displayPoll.isActive && onUpdate && !isSimulationMode && (
@@ -343,7 +420,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
             </div>
           )}
           
-          <div className={`flex flex-wrap items-center gap-2 sm:gap-4 text-zinc-500 dark:text-zinc-400 text-sm mt-2 ${isOverlay ? 'text-zinc-200 justify-center mt-4' : ''}`}>
+          <div 
+            className={`flex flex-wrap items-center gap-2 sm:gap-4 text-sm mt-2 ${isOverlay ? 'justify-center mt-4' : 'text-zinc-500 dark:text-zinc-400'}`}
+            style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.9 } : {}}
+          >
              
              {isEditing ? (
                  <div className="flex gap-2 mt-1">
@@ -352,9 +432,18 @@ export const LivePoll: React.FC<LivePollProps> = ({
                  </div>
              ) : (
                 <>
-                    <span className={`flex items-center gap-1 px-2 py-1 rounded ${isOverlay ? 'bg-zinc-900/50 dark:bg-black/50 text-white text-xl font-bold backdrop-blur-sm' : 'bg-zinc-200/50 dark:bg-zinc-800/50'}`}>
+                    <span 
+                      className={`flex items-center gap-1 px-2 py-1 rounded ${isOverlay ? `${theme === 'dark' ? 'bg-black/50' : 'bg-white/80'} text-xl font-bold backdrop-blur-sm` : 'bg-zinc-200/50 dark:bg-zinc-800/50'}`}
+                      style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                    >
                     <Users size={isOverlay ? 24 : 14} /> {displayPoll.totalVotes} votes
                     </span>
+                    
+                    {hasWeightedVotes && !isOverlay && (
+                      <span className="flex items-center gap-1 px-2 py-1 rounded bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light border border-twitch-brand/20">
+                        <Scale size={14} /> {weightedTotal} weighted
+                      </span>
+                    )}
                     
                     {maxVoteLimit > 0 && !isOverlay && (
                     <span className="flex items-center gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-1 rounded">
@@ -363,13 +452,19 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     )}
 
                     {timeLeft !== null && (
-                        <span className={`flex items-center gap-1 px-2 py-1 rounded border tabular-nums ${isOverlay ? 'text-xl font-bold bg-zinc-900/50 dark:bg-black/50 text-white border-white/10 backdrop-blur-sm' : 'text-sm font-bold border-zinc-200 dark:border-zinc-700'} ${timeLeft <= 10 ? 'text-red-500 border-red-500/50 animate-pulse' : isOverlay ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                        <span 
+                          className={`flex items-center gap-1 px-2 py-1 rounded border tabular-nums ${isOverlay ? `text-xl font-bold ${theme === 'dark' ? 'bg-black/50 border-white/10' : 'bg-white/80 border-black/10'} backdrop-blur-sm` : 'text-sm font-bold border-zinc-200 dark:border-zinc-700'} ${timeLeft <= 10 ? 'text-red-500 border-red-500/50 animate-pulse' : ''}`}
+                          style={isOverlay && timeLeft > 10 ? { color: overlayStyles.textColor } : {}}
+                        >
                            <Clock size={isOverlay ? 24 : 14} /> {formatTime(timeLeft)}
                         </span>
                     )}
 
                     {!displayPoll.isActive && (
-                        <span className={`text-zinc-500 dark:text-zinc-400 px-2 py-1 rounded ${isOverlay ? 'bg-black/50 text-white text-lg' : 'bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700'}`}>
+                        <span 
+                          className={`px-2 py-1 rounded ${isOverlay ? `${theme === 'dark' ? 'bg-black/50' : 'bg-white/80'} text-lg backdrop-blur-sm` : 'bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400'}`}
+                          style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                        >
                             Finalizada
                         </span>
                     )}
@@ -399,6 +494,19 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     className={isSimulationMode ? "ring-2 ring-offset-2 ring-twitch-brand dark:ring-offset-black" : ""}
                  >
                      <FlaskConical size={18} />
+                 </Button>
+             )}
+             
+             {/* Moderation Panel Toggle */}
+             {moderationStats && !isSimulationMode && (
+                 <Button 
+                    variant={showModerationPanel ? "primary" : "ghost"} 
+                    onClick={() => setShowModerationPanel(!showModerationPanel)} 
+                    size="sm" 
+                    title={showModerationPanel ? "Hide Moderation" : "Show Moderation Stats"}
+                    className={showModerationPanel ? "ring-2 ring-offset-2 ring-twitch-brand dark:ring-offset-black" : ""}
+                 >
+                     <Shield size={18} />
                  </Button>
              )}
 
@@ -478,10 +586,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
 
         {/* Chart */}
         <div className={`${isOverlay ? 'bg-transparent border-0' : 'bg-zinc-50 dark:bg-zinc-950/50 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800/50'} flex flex-col ${chartHeightClass} lg:col-span-2 relative min-w-0`}>
-          {shouldRenderChart && chartData.length > 0 ? (
-              <div className="w-full h-full min-h-[1px] absolute inset-0 p-2 md:p-4">
-                  <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
-                    <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: isOverlay ? 40 : 20 }}>
+          <div ref={chartContainerRef} className="w-full h-full min-h-[250px] absolute inset-0 p-2 md:p-4">
+          {shouldRenderChart && chartData.length > 0 && chartSize.width > 50 && chartSize.height > 50 ? (
+                  <BarChart data={chartData} width={chartSize.width - 20} height={chartSize.height - 20} margin={{ top: 20, right: 10, left: 10, bottom: isOverlay ? 40 : 20 }}>
                       <XAxis 
                         dataKey="name" 
                         stroke={tickColor} 
@@ -545,13 +652,12 @@ export const LivePoll: React.FC<LivePollProps> = ({
                         })}
                       </Bar>
                     </BarChart>
-                  </ResponsiveContainer>
-              </div>
           ) : (
              <div className="w-full h-full flex items-center justify-center text-zinc-500 text-xs">
-                {/* Placeholder */}
+                {/* Loading chart... */}
              </div>
           )}
+          </div>
         </div>
 
         {/* Legend */}
@@ -560,15 +666,26 @@ export const LivePoll: React.FC<LivePollProps> = ({
             const percentage = displayPoll.totalVotes > 0 ? ((opt.votes / displayPoll.totalVotes) * 100).toFixed(1) : "0.0";
             const isWinner = !displayPoll.isActive && winner?.id === opt.id && opt.votes > 0;
             const isAnimating = animatingOptions[opt.id];
+            
+            // Overlay custom styles
+            const overlayCardStyle = isOverlay ? {
+              borderColor: overlayStyles.showBorders ? overlayStyles.borderColor : 'transparent',
+              borderWidth: overlayStyles.showBorders ? 2 : 0,
+              color: overlayStyles.textColor,
+            } : {};
+
+            // Card background based on theme
+            const overlayCardBg = theme === 'dark' ? 'bg-black/70' : 'bg-white/90';
 
             return (
               <div 
                 key={opt.id} 
                 className={`relative rounded-lg transition-all ${
                     isOverlay 
-                      ? 'bg-zinc-200/90 dark:bg-black/80 border-2 border-zinc-300 dark:border-white/10 p-4 text-zinc-900 dark:text-white shadow-lg backdrop-blur-sm' 
+                      ? `${overlayCardBg} p-4 shadow-lg backdrop-blur-sm` 
                       : `p-3 border ${isWinner ? 'bg-yellow-100 dark:bg-yellow-500/10 border-yellow-400 winner-border' : 'bg-white dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-800'}`
                     } ${isAnimating && !isOverlay ? 'flash-active' : ''}`}
+                style={overlayCardStyle}
               >
                 <div className="flex justify-between items-center mb-1 relative z-10">
                   <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1 mr-2">
@@ -582,12 +699,18 @@ export const LivePoll: React.FC<LivePollProps> = ({
                           <span>+{opt.id}</span>
                       )}
                     </span>
-                    <span className={`font-medium truncate ${isOverlay ? 'text-2xl font-bold' : 'text-zinc-900 dark:text-zinc-200 text-sm'}`}>
+                    <span 
+                      className={`truncate ${isOverlay ? `${getOverlayFontSize('label')} ${getOverlayFontStyle()}` : 'text-zinc-900 dark:text-zinc-200 text-sm font-medium'}`}
+                      style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                    >
                       {opt.label}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                      <span className={`font-bold tabular-nums ${isOverlay ? 'text-3xl drop-shadow-sm' : 'text-zinc-900 dark:text-white'}`}>{percentage}%</span>
+                      <span 
+                        className={`tabular-nums ${isOverlay ? `${getOverlayFontSize('percent')} ${getOverlayFontStyle()} drop-shadow-sm` : 'font-bold text-zinc-900 dark:text-white'}`}
+                        style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                      >{percentage}%</span>
                       {isDefault && !isSimulationMode && (
                         <button onClick={() => shareOption(opt, percentage)} className="text-zinc-400 hover:text-white transition-colors">
                            {copiedOptionId === opt.id ? <CheckCircle2 size={14} className="text-green-500" /> : <Copy size={14} />}
@@ -604,7 +727,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
                   />
                 </div>
                 
-                <div className={`text-right ${isOverlay ? 'text-lg text-zinc-600 dark:text-zinc-300 font-bold' : 'text-xs text-zinc-500'} mt-1 relative z-10 flex justify-end items-center gap-1`}>
+                <div 
+                  className={`text-right ${isOverlay ? `${getOverlayFontSize('votes')} ${getOverlayFontStyle()}` : 'text-xs text-zinc-500'} mt-1 relative z-10 flex justify-end items-center gap-1`}
+                  style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.8 } : {}}
+                >
                   {opt.votes} votos
                 </div>
 
@@ -625,6 +751,14 @@ export const LivePoll: React.FC<LivePollProps> = ({
                   <Trophy size={14} /> Ver Ganador
               </button>
           </div>
+      )}
+      
+      {/* Moderation Panel */}
+      {showModerationPanel && moderationStats && isDefault && !isSimulationMode && (
+        <div className="mt-4 space-y-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4">
+          <ModerationStatsDisplay stats={moderationStats} />
+          <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
+        </div>
       )}
     </div>
   );

@@ -1,21 +1,24 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield } from 'lucide-react';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
-import { SavedPoll, MediaAsset, Poll } from '../types';
+import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
 import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
 import { LivePoll } from './LivePoll';
+import { ModerationConfigForm } from './ModerationConfigForm';
 
 interface PollCreatorProps {
-  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number) => void;
+  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig) => void;
   onNotification?: (type: NotificationType, message: string) => void;
   mediaLibrary?: MediaAsset[];
   onAddAsset?: (asset: MediaAsset) => void;
+  moderationConfig?: ModerationConfig;
+  onModerationConfigChange?: (config: ModerationConfig) => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange }) => {
   const [title, setTitle] = useState('Encuesta en Vivo');
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string }[]>([
@@ -36,6 +39,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   
   // Modal for preset confirmation
   const [showPresetConfirm, setShowPresetConfirm] = useState<'yesno' | 'rating' | 'abc' | null>(null);
+  
+  // Moderation panel state
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
+  const [localModerationConfig, setLocalModerationConfig] = useState<ModerationConfig>(moderationConfig);
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -225,8 +232,13 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     // If the input is empty string, it's undefined. If it's '0', it's 0.
     const dur = duration !== '' ? parseInt(duration, 10) : undefined;
     
-    (onCreate as any)(title.trim() || 'Encuesta en Vivo', question, options, max, dur, progressBarColor, limitIndicatorColor);
+    onCreate(title.trim() || 'Encuesta en Vivo', question, options, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig);
     setShowConfirm(false);
+  };
+  
+  const handleModerationConfigChange = (config: ModerationConfig) => {
+    setLocalModerationConfig(config);
+    onModerationConfigChange?.(config);
   };
 
   const saveTemplate = () => {
@@ -496,6 +508,38 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                     </div>
                  </div>
              </div>
+             
+             {/* Moderation Toggle Button */}
+             <div className="mb-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowModerationPanel(!showModerationPanel)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                    showModerationPanel 
+                      ? 'bg-twitch-brand/10 border-twitch-brand/30 text-twitch-brand dark:text-twitch-light' 
+                      : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-twitch-brand/50'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 font-bold text-sm">
+                    <Shield size={16} />
+                    Vote Moderation
+                  </span>
+                  <span className="text-xs">
+                    {showModerationPanel ? '▲ Hide' : '▼ Configure'}
+                  </span>
+                </button>
+             </div>
+             
+             {/* Moderation Config Form */}
+             {showModerationPanel && (
+               <div className="mb-4 animate-fade-in">
+                 <ModerationConfigForm
+                   config={localModerationConfig}
+                   onChange={handleModerationConfigChange}
+                   onNotification={onNotification}
+                 />
+               </div>
+             )}
              
              <div className="flex gap-2 mb-4">
                 <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px]" title="Vista Previa"><Eye size={18} /></button>

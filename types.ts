@@ -62,3 +62,51 @@ export interface TwitchMessage {
   id?: string;
   userId?: string;
 }
+
+// Re-export moderation types from voteModerationService
+export type {
+  RejectionReason,
+  ModerationConfig,
+  VoteValidationResult,
+  ModerationLogEntry,
+  ModerationStats,
+  ModerationPreset,
+  UserVoteState,
+  VoteValidationInput,
+} from './services/voteModerationService';
+
+export {
+  DEFAULT_MODERATION_CONFIG,
+  DEFAULT_MODERATION_STATS,
+  validateAccountAge,
+  validateCooldown,
+  canChangeVote,
+  validateVote,
+  isValidWeight,
+  calculateWeight,
+  calculateWeightedTotal,
+  createLogEntry,
+  addLogEntry,
+  getLogEntries,
+  groupLogByReason,
+  exportLogToCSV,
+  clearLogEntries,
+  clearAllLogEntries,
+  updateStats,
+  calculateAcceptanceRate,
+  shouldShowWarning,
+  handleVoteChange,
+  savePreset,
+  loadPreset,
+  deletePreset,
+  getAllPresets,
+  formatPresetSummary,
+  clearAllPresets,
+} from './services/voteModerationService';
+
+// Extended Poll type with moderation support
+export interface ModeratedPoll extends Poll {
+  moderationConfig: import('./services/voteModerationService').ModerationConfig;
+  moderationStats: import('./services/voteModerationService').ModerationStats;
+  moderationLog: import('./services/voteModerationService').ModerationLogEntry[];
+}
