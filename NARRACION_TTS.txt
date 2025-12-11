@@ -1,0 +1,45 @@
+Bienvenido a Twitch Vote, la herramienta definitiva para crear encuestas interactivas en tu stream.
+
+...
+
+Soy tu asistente AI Vision, y te voy a mostrar todas las funciones de la aplicación. Vamos a explorar juntos.
+
+...
+
+Empecemos con el creador de encuestas. Aquí puedes diseñar encuestas personalizadas con colores, iconos e imágenes. Usa los presets rápidos como Sí o No, o crea tus propias opciones con claves de voto únicas.
+
+...
+
+También tenemos la ruleta de la suerte. Perfecta para sorteos y giveaways. Busca el botón de ruleta en el creador de encuestas, y usa las opciones para elegir un ganador al azar. Tus viewers van a flipar.
+
+...
+
+Cuando activas una encuesta, los votos aparecen en tiempo real con gráficos animados. Los viewers votan escribiendo más uno, más dos, o claves personalizadas como más pizza. Y lo mejor, pueden cambiar su voto si se arrepienten.
+
+...
+
+Para mantener tus encuestas justas, tenemos el sistema de moderación anti spam. Configura cooldowns entre votos, pesos especiales para suscriptores y seguidores, y revisa los logs detallados de cada voto procesado.
+
+...
+
+El overlay para OBS es una ventana especial que puedes capturar directamente. Personaliza los colores, las fuentes, y usa Chroma Key para integrarlo perfectamente en tu stream. También funciona con comandos del chat.
+
+...
+
+El panel de sonidos te da efectos de audio ocho bits generados al instante. Redobles de tambor, risas, buzzers, y mucho más. También puedes subir tus propios archivos de audio para personalizar tu stream.
+
+...
+
+En la sección de chat en vivo puedes monitorear todo lo que pasa en el chat de Twitch. Los votos se resaltan automáticamente y puedes ver el historial completo de quién votó qué.
+
+...
+
+La sección de analytics con inteligencia artificial analiza el sentimiento del chat, las palabras más frecuentes y el engagement de tu audiencia. Conecta Open AI o Gemini para obtener insights avanzados en tiempo real.
+
+...
+
+Por último, la galería de medios te permite guardar imágenes para usar como iconos en tus encuestas. Todo se almacena localmente en tu navegador, así que tus assets están siempre disponibles.
+
+...
+
+Y eso es todo. Ya conoces Twitch Vote. Conecta tu canal de Twitch y empieza a crear encuestas interactivas que enganchen a tu audiencia. Estaré aquí si necesitas ayuda. Nos vemos en el stream.

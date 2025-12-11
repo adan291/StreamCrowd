@@ -92,9 +92,21 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({ options, onClose }) 
 
     // Calculate winner after spin
     setTimeout(() => {
-      // Normalize angle to 0-360
-      const normalizedAngle = (360 - (totalRotation % 360) + 90) % 360;
-      const winnerIndex = Math.floor(normalizedAngle / segmentAngle) % options.length;
+      // El puntero está arriba (0 grados = 12 en punto)
+      // Los segmentos se dibujan empezando desde -90 grados (arriba)
+      // Necesitamos calcular qué segmento está bajo el puntero después de la rotación
+      
+      // Normalizar la rotación final a 0-360
+      const finalRotation = totalRotation % 360;
+      
+      // El puntero apunta hacia arriba (0 grados en coordenadas de pantalla)
+      // Cuando la rueda rota X grados en sentido horario, el segmento que estaba
+      // a -X grados ahora está bajo el puntero
+      // Como los segmentos empiezan en el índice 0 arriba, necesitamos calcular
+      // qué índice quedó bajo el puntero
+      
+      const pointerAngle = (360 - finalRotation + 360) % 360;
+      const winnerIndex = Math.floor(pointerAngle / segmentAngle) % options.length;
       
       setWinner(options[winnerIndex]);
       setShowWinner(true);
