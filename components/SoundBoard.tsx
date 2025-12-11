@@ -55,6 +55,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -67,6 +68,16 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
       }
     }
   }, []);
+
+  // Actualizar volumen dinámicamente mientras suena
+  useEffect(() => {
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.value = isMuted ? 0 : volume;
+    }
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
 
   const bitSounds: BitSound[] = [
     { id: 'fart', name: 'Pedorreta', icon: <Wind size={24} />, color: '#8B4513' },
@@ -101,7 +112,8 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
       const now = ctx.currentTime;
       const masterGain = ctx.createGain();
       masterGain.connect(ctx.destination);
-      masterGain.gain.value = volume * 0.5;
+      masterGain.gain.value = volume;
+      masterGainRef.current = masterGain; // Guardar referencia para control dinámico
 
       const playTone = (freq: number, start: number, duration: number, type: OscillatorType = 'sine') => {
         const osc = ctx.createOscillator();
@@ -110,10 +122,10 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
         gain.connect(masterGain);
         osc.frequency.value = freq;
         osc.type = type;
-        gain.gain.setValueAtTime(0.4, now + start);
-        gain.gain.linearRampToValueAtTime(0.01, now + start + duration);
+        gain.gain.setValueAtTime(0.5, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
         osc.start(now + start);
-        osc.stop(now + start + duration);
+        osc.stop(now + start + duration + 0.1);
       };
 
       let duration = 1;
@@ -326,7 +338,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
       <div className="bg-zinc-900 rounded-2xl p-6 max-w-2xl w-full mx-4 relative max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 Panel de Sonidos v2</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 Panel de Sonidos</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Volume2 size={16} className="text-zinc-400" />
