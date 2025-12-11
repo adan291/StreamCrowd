@@ -75,10 +75,38 @@ export interface DailyInsight {
 
 const STORAGE_KEY = 'twitch_ai_config';
 const SESSIONS_KEY = 'twitch_stream_sessions';
+const ENCRYPTION_KEY = 'TwitchVoteLive2024'; // Simple obfuscation key
+
+// Simple encryption/decryption for API keys (not military-grade, but better than plaintext)
+const encryptKey = (text: string): string => {
+  if (!text) return '';
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    const charCode = text.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length);
+    result += String.fromCharCode(charCode);
+  }
+  return btoa(result); // Base64 encode
+};
+
+const decryptKey = (encoded: string): string => {
+  if (!encoded) return '';
+  try {
+    const text = atob(encoded); // Base64 decode
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const charCode = text.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length);
+      result += String.fromCharCode(charCode);
+    }
+    return result;
+  } catch {
+    return encoded; // Return as-is if decryption fails (legacy plaintext)
+  }
+};
 
 // Get API key from environment variable (more secure) or localStorage
 const getEnvApiKey = (): string | null => {
   // Vite exposes env variables with VITE_ prefix
+  // In production build, this is baked in at compile time
   return import.meta.env.VITE_GEMINI_API_KEY || null;
 };
 
@@ -88,7 +116,7 @@ export const saveAIConfig = (config: AIConfig): void => {
   const envKey = getEnvApiKey();
   const configToSave = envKey && config.apiKey === envKey 
     ? { ...config, apiKey: '' } // Don't duplicate env key in storage
-    : config;
+    : { ...config, apiKey: encryptKey(config.apiKey) }; // Encrypt the key
   localStorage.setItem(STORAGE_KEY, JSON.stringify(configToSave));
 };
 
@@ -102,6 +130,9 @@ export const loadAIConfig = (): AIConfig | null => {
       // Prefer env key over stored key
       if (envKey) {
         config.apiKey = envKey;
+      } else if (config.apiKey) {
+        // Decrypt stored key
+        config.apiKey = decryptKey(config.apiKey);
       }
       return config;
     } catch {

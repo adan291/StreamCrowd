@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Key, Eye, EyeOff, Check, X, Sparkles, Shield } from 'lucide-react';
+import { Bot, Key, Eye, EyeOff, Check, X, Sparkles, Shield, Copy, Download } from 'lucide-react';
 import { AIConfig, saveAIConfig, loadAIConfig, clearAIConfig, isUsingEnvKey } from '../services/aiAnalyticsService';
 import { useI18n } from '../i18n';
 
@@ -19,6 +19,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
   const [usingEnvKey, setUsingEnvKey] = useState(false);
+  const [copiedEnv, setCopiedEnv] = useState(false);
 
   useEffect(() => {
     setUsingEnvKey(isUsingEnvKey());
@@ -51,6 +52,42 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
       saveAIConfig(newConfig);
       onConfigChange?.(newConfig);
     }
+  };
+
+  // Get the env variable name based on provider
+  const getEnvVarName = () => {
+    switch (config.provider) {
+      case 'gemini': return 'VITE_GEMINI_API_KEY';
+      case 'openai': return 'VITE_OPENAI_API_KEY';
+      case 'anthropic': return 'VITE_ANTHROPIC_API_KEY';
+      default: return 'VITE_API_KEY';
+    }
+  };
+
+  // Copy env line to clipboard
+  const copyEnvToClipboard = async () => {
+    if (!config.apiKey) return;
+    const envLine = `${getEnvVarName()}=${config.apiKey}`;
+    try {
+      await navigator.clipboard.writeText(envLine);
+      setCopiedEnv(true);
+      setTimeout(() => setCopiedEnv(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Download .env.local file
+  const downloadEnvFile = () => {
+    if (!config.apiKey) return;
+    const content = `# API Key for ${config.provider}\n${getEnvVarName()}=${config.apiKey}\n`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '.env.local';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const testConnection = async () => {
@@ -227,24 +264,52 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
         </button>
       </div>
 
-      {/* Env Key Indicator */}
-      {usingEnvKey && (
-        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg mb-4">
+      {/* Security Status */}
+      {usingEnvKey ? (
+        <div className="flex items-center gap-2 p-2 mt-4 bg-green-500/10 border border-green-500/30 rounded-lg">
           <Shield className="w-4 h-4 text-green-400" />
           <span className="text-xs text-green-400">
-            🔒 API Key cargada desde .env.local (más seguro)
+            🔒 API Key integrada en la aplicación
           </span>
+        </div>
+      ) : config.apiKey && (
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="w-4 h-4 text-blue-400" />
+            <span className="text-xs text-blue-400">
+              🔒 API Key guardada de forma segura (cifrada)
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mb-2">
+            Para desarrollo, puedes guardarla en .env.local:
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={copyEnvToClipboard}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs transition-all"
+            >
+              {copiedEnv ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copiedEnv ? '¡Copiado!' : 'Copiar línea'}
+            </button>
+            <button
+              onClick={downloadEnvFile}
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg text-xs transition-all"
+            >
+              <Download className="w-3 h-3" />
+              .env.local
+            </button>
+          </div>
+          {copiedEnv && (
+            <p className="text-xs text-blue-300 mt-2">
+              ✓ Copiado: {getEnvVarName()}=***
+            </p>
+          )}
         </div>
       )}
 
       {/* Info */}
       <div className="mt-4 text-xs text-gray-500">
         <p>{t.aiConfig.noApiKeyHint}</p>
-        {!usingEnvKey && (
-          <p className="mt-1 text-yellow-500/80">
-            💡 Tip: Guarda tu API key en .env.local como VITE_GEMINI_API_KEY para mayor seguridad
-          </p>
-        )}
         <p className="mt-1">
           {config.provider === 'gemini' && (
             <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
