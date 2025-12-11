@@ -139,9 +139,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Determine which poll data to display
   const displayPoll = (isSimulationMode && isDefault && simulatedPoll) ? simulatedPoll : poll;
 
+  // Track if we already triggered the time-up sequence
+  const timeUpTriggeredRef = useRef(false);
+
   // Timer Logic (always track real poll time)
   useEffect(() => {
     if (poll.isActive && poll.duration) {
+       timeUpTriggeredRef.current = false;
        const elapsed = Math.floor((Date.now() - poll.startTime) / 1000);
        const remaining = Math.max(0, poll.duration - elapsed);
        setTimeLeft(remaining);
@@ -152,7 +156,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
          setCountdownNumber(remaining);
        }
 
-       if (remaining === 0) {
+       if (remaining === 0 && !timeUpTriggeredRef.current) {
+           timeUpTriggeredRef.current = true;
            setShowTimeUpAnimation(true);
            setTimeout(() => {
              onStop(true);
@@ -160,7 +165,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
            setTimeout(() => {
              setShowTimeUpAnimation(false);
            }, 1800);
-       } else {
+       } else if (remaining > 0) {
            const interval = setInterval(() => {
                const newElapsed = Math.floor((Date.now() - poll.startTime) / 1000);
                const newRemaining = Math.max(0, poll.duration! - newElapsed);
@@ -170,12 +175,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
                if (newRemaining <= 5 && newRemaining > 0) {
                  setShowCountdown(true);
                  setCountdownNumber(newRemaining);
-               } else {
+               } else if (newRemaining > 5) {
                  setShowCountdown(false);
                  setCountdownNumber(null);
                }
                
-               if (newRemaining === 0) {
+               if (newRemaining === 0 && !timeUpTriggeredRef.current) {
+                   timeUpTriggeredRef.current = true;
                    setShowCountdown(false);
                    setShowTimeUpAnimation(true);
                    // First show "Time Up" animation (1.5s), then stop poll, then winner will show
@@ -190,7 +196,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
            }, 1000);
            return () => clearInterval(interval);
        }
-    } else {
+    } else if (!poll.isActive) {
+        // Only reset time display when poll is not active, but don't touch animations
         setTimeLeft(null);
         setShowCountdown(false);
         setCountdownNumber(null);
