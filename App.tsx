@@ -129,22 +129,25 @@ const App: React.FC = () => {
     onStepChange: (step: TourStep) => {
       // Execute navigation actions for each step
       if (step.action) {
-        const { leftTab: newLeftTab, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll } = step.action;
+        const { leftTab: newLeftTab, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll, showSoundBoard: showSoundBoardAction } = step.action;
         
         if (newLeftTab) setLeftTab(newLeftTab);
         if (newDataSubTab) setDataSubTab(newDataSubTab);
         if (rightTab) setActiveRightTab(rightTab);
         if (showModeration !== undefined) setDemoForceModeration(showModeration);
         
-        // Create a demo poll if needed
+        // Handle SoundBoard - close it when moving to other steps
+        setShowSoundBoard(showSoundBoardAction === true);
+        
+        // Create a demo poll if needed (with spinner-friendly options)
         if (createDemoPoll && !poll.currentPoll) {
           poll.createPoll({
             title: 'Demo',
             question: '¿Qué prefieres?',
             options: [
-              { label: 'Opción A', color: '#a970ff' },
-              { label: 'Opción B', color: '#00f0f0' },
-              { label: 'Opción C', color: '#ff6b6b' },
+              { label: 'Pizza', color: '#a970ff', voteKey: 'pizza' },
+              { label: 'Burger', color: '#00f0f0', voteKey: 'burger' },
+              { label: 'Tacos', color: '#ff6b6b', voteKey: 'tacos' },
             ],
           });
         }
@@ -153,6 +156,7 @@ const App: React.FC = () => {
     onEnd: () => {
       // Reset demo state when tour ends
       setDemoForceModeration(false);
+      setShowSoundBoard(false);
       setLeftTab('panel');
     },
   });
@@ -867,7 +871,8 @@ const App: React.FC = () => {
           <NavButton 
             onClick={() => setShowSoundBoard(true)} 
             icon={<Volume2 size={20} />} 
-            label="Sonidos" 
+            label="Sonidos"
+            dataTour="soundboard"
           />
         </div>
 
@@ -1171,9 +1176,10 @@ const App: React.FC = () => {
   );
 };
 
-const NavButton: React.FC<{ active?: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
+const NavButton: React.FC<{ active?: boolean; onClick: () => void; icon: React.ReactNode; label: string; dataTour?: string }> = ({ active, onClick, icon, label, dataTour }) => (
   <button 
     onClick={onClick} 
+    data-tour={dataTour}
     className={`w-full p-2 lg:p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${active ? 'bg-twitch-brand text-white shadow-lg shadow-twitch-brand/30' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white'}`}
   >
     {icon}
