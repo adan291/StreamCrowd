@@ -146,10 +146,11 @@ class TwitchService {
           }
         });
 
-        this.client.on('connected', (addr, port) => {
-          console.log(`Connected to ${addr}:${port}`);
-          this.reconnectAttempts = 0; // Reset on successful connection
-          if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.CONNECTED);
+        this.client.on('connected', () => {
+          this.reconnectAttempts = 0;
+          if (this.statusChangeCallback) {
+            this.statusChangeCallback(ConnectionStatus.CONNECTED);
+          }
         });
 
         this.client.on('disconnected', (reason) => {
@@ -162,7 +163,6 @@ class TwitchService {
         });
 
         this.client.connect().catch((err) => {
-          console.error("Twitch Connection Error:", err);
           this.handleConnectionError(err);
         });
     } catch (error) {

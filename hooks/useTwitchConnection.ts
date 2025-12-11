@@ -97,24 +97,32 @@ export function useTwitchConnection(
   const [channelAvatar, setChannelAvatar] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
 
-  // Track if we've set up the status change listener
+  // Store callback ref to avoid stale closures
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
+
+  // Store setters in refs so the callback always has fresh references
+  const setStatusRef = useRef(setStatus);
+  const setErrorRef = useRef(setError);
+  setStatusRef.current = setStatus;
+  setErrorRef.current = setError;
+
+  // Set up status change listener - must be done synchronously before any connect call
+  // Using a ref to track setup and useEffect for cleanup
   const listenerSetupRef = useRef(false);
-
-  // Set up status change listener once
-  useEffect(() => {
-    if (listenerSetupRef.current) return;
+  
+  if (!listenerSetupRef.current) {
     listenerSetupRef.current = true;
-
     twitchService.onStatusChange((newStatus, errorMsg) => {
-      setStatus(newStatus);
+      setStatusRef.current(newStatus);
       if (errorMsg) {
-        setError(errorMsg);
+        setErrorRef.current(errorMsg);
       } else if (newStatus === ConnectionStatus.CONNECTED) {
-        setError(null);
+        setErrorRef.current(null);
       }
-      onStatusChange?.(newStatus, errorMsg);
+      onStatusChangeRef.current?.(newStatus, errorMsg);
     });
-  }, [onStatusChange]);
+  }
 
   /**
    * Connect to a Twitch channel

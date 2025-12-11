@@ -31,6 +31,7 @@ interface LivePollProps {
   userWeights?: Map<string, number>;
   overlayStyles?: OverlayStyles;
   overlayWindowRef?: React.MutableRefObject<Window | null>;
+  forceShowModeration?: boolean; // External control for demo tour
 }
 
 export const LivePoll: React.FC<LivePollProps> = ({ 
@@ -48,6 +49,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
   userWeights = new Map(),
   overlayStyles = {} as OverlayStyles,
   overlayWindowRef,
+  forceShowModeration,
 }) => {
   const { t } = useI18n();
   // Helper for overlay font styles
@@ -118,6 +120,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
   
   // Moderation panel state
   const [showModerationPanel, setShowModerationPanel] = useState(false);
+
+  // Sync with external control (for demo tour)
+  useEffect(() => {
+    if (forceShowModeration !== undefined) {
+      setShowModerationPanel(forceShowModeration);
+    }
+  }, [forceShowModeration]);
 
   // Constants based on variant
   const isOverlay = variant === 'overlay';
@@ -369,7 +378,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
     ? "flex-1 min-h-0" 
     : isPreview 
         ? "h-[180px] sm:h-[200px] shrink-0 min-h-[150px]" 
-        : "flex-1 min-h-[300px]"; 
+        : "flex-1 min-h-[200px] sm:min-h-[250px] md:min-h-[300px] max-h-[50vh] lg:max-h-none"; 
   
   // Grid Layout Logic - Stack on mobile, side by side on desktop
   const gridLayoutClass = isOverlay 
@@ -815,15 +824,17 @@ export const LivePoll: React.FC<LivePollProps> = ({
       
       {/* Moderation Panel */}
       {showModerationPanel && moderationStats && isDefault && !isSimulationMode && (
-        <div className="mt-4 space-y-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4">
-          <ModerationStatsDisplay stats={moderationStats} />
-          <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
+        <div className="mt-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4" data-tour="moderation">
+          <div className="max-h-[50vh] overflow-y-auto custom-scrollbar space-y-4 pr-1">
+            <ModerationStatsDisplay stats={moderationStats} />
+            <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
+          </div>
         </div>
       )}
 
       {/* OBS Overlay Section */}
       {isDefault && poll.isActive && overlayWindowRef && !isSimulationMode && (
-        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-fade-in">
+        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-fade-in" data-tour="overlay">
           <div className="bg-gradient-to-r from-twitch-brand/10 to-purple-500/10 dark:from-twitch-brand/20 dark:to-purple-500/20 rounded-xl p-4 border border-twitch-brand/20">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

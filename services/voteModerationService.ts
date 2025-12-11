@@ -8,7 +8,9 @@ export type RejectionReason =
   | 'ACCOUNT_TOO_YOUNG'
   | 'COOLDOWN_ACTIVE'
   | 'VOTE_CHANGE_DISABLED'
-  | 'INVALID_OPTION';
+  | 'INVALID_OPTION'
+  | 'NOT_WHITELISTED'
+  | 'BLACKLISTED';
 
 // Configuration for vote moderation
 export interface ModerationConfig {
@@ -19,6 +21,14 @@ export interface ModerationConfig {
     subscriber: number;                 // 1-5
     follower: number;                   // 1-5
     regular: number;                    // always 1
+  };
+  whitelist: {
+    enabled: boolean;                   // If true, only whitelisted users can vote
+    usernames: string[];                // List of allowed usernames (case-insensitive)
+  };
+  blacklist: {
+    enabled: boolean;                   // If true, blacklisted users cannot vote
+    usernames: string[];                // List of blocked usernames (case-insensitive)
   };
 }
 
@@ -74,6 +84,14 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
     follower: 1,
     regular: 1,
   },
+  whitelist: {
+    enabled: false,
+    usernames: [],
+  },
+  blacklist: {
+    enabled: false,
+    usernames: [],
+  },
 };
 
 // Default moderation statistics
@@ -85,6 +103,8 @@ export const DEFAULT_MODERATION_STATS: ModerationStats = {
     COOLDOWN_ACTIVE: 0,
     VOTE_CHANGE_DISABLED: 0,
     INVALID_OPTION: 0,
+    NOT_WHITELISTED: 0,
+    BLACKLISTED: 0,
   },
   acceptanceRate: 100,
 };
@@ -155,6 +175,7 @@ export function canChangeVote(hasVoted: boolean, voteChangeEnabled: boolean): bo
  * Input parameters for vote validation
  */
 export interface VoteValidationInput {
+  username?: string;              // For whitelist validation
   accountAgeDays: number;
   hasVoted: boolean;
   lastVoteTime: number;
@@ -177,6 +198,36 @@ export function validateVote(
   input: VoteValidationInput,
   config: ModerationConfig
 ): VoteValidationResult {
+  const normalizedUsername = input.username?.toLowerCase() || '';
+
+  // Step 0a: Check blacklist first (blocked users)
+  if (config.blacklist?.enabled && config.blacklist.usernames.length > 0) {
+    const isBlacklisted = config.blacklist.usernames.some(
+      (name) => name.toLowerCase() === normalizedUsername
+    );
+    if (isBlacklisted) {
+      return {
+        isValid: false,
+        rejectionReason: 'BLACKLISTED',
+        weight: 0,
+      };
+    }
+  }
+
+  // Step 0b: Check whitelist if enabled
+  if (config.whitelist?.enabled && config.whitelist.usernames.length > 0) {
+    const isWhitelisted = config.whitelist.usernames.some(
+      (name) => name.toLowerCase() === normalizedUsername
+    );
+    if (!isWhitelisted) {
+      return {
+        isValid: false,
+        rejectionReason: 'NOT_WHITELISTED',
+        weight: 0,
+      };
+    }
+  }
+
   // Step 1: Check account age filter (Requirement 1.2)
   if (!validateAccountAge(input.accountAgeDays, config.minAccountAgeDays)) {
     return {
@@ -371,6 +422,8 @@ export function groupLogByReason(entries: ModerationLogEntry[]): Record<Rejectio
     COOLDOWN_ACTIVE: 0,
     VOTE_CHANGE_DISABLED: 0,
     INVALID_OPTION: 0,
+    NOT_WHITELISTED: 0,
+    BLACKLISTED: 0,
   };
 
   for (const entry of entries) {

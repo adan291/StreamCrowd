@@ -180,12 +180,24 @@ export interface Translations {
     presetDeleted: string;
     enterPresetName: string;
     resetDefaults: string;
+    whitelist: string;
+    whitelistTooltip: string;
+    whitelistEnabled: string;
+    whitelistPlaceholder: string;
+    whitelistCount: string;
+    blacklist: string;
+    blacklistTooltip: string;
+    blacklistEnabled: string;
+    blacklistPlaceholder: string;
+    blacklistCount: string;
     reasons: {
       accountTooNew: string;
       cooldownActive: string;
       alreadyVoted: string;
       invalidOption: string;
       voteChangeCooldown: string;
+      notWhitelisted: string;
+      blacklisted: string;
     };
   };
   gallery: {
@@ -511,12 +523,24 @@ export const translations: Record<Locale, Translations> = {
       presetDeleted: 'Preset "{name}" eliminado',
       enterPresetName: 'Ingresa un nombre para el preset',
       resetDefaults: 'Configuración restablecida',
+      whitelist: 'Lista Blanca de Votantes',
+      whitelistTooltip: 'Solo estos usuarios podrán votar. Un nombre por línea.',
+      whitelistEnabled: 'Activar lista blanca',
+      whitelistPlaceholder: 'usuario1\nusuario2\nusuario3',
+      whitelistCount: '{count} usuarios',
+      blacklist: 'Lista Negra (Excluidos)',
+      blacklistTooltip: 'Estos usuarios NO podrán votar. Un nombre por línea.',
+      blacklistEnabled: 'Activar lista negra',
+      blacklistPlaceholder: 'troll1\nspammer2\nbot3',
+      blacklistCount: '{count} bloqueados',
       reasons: {
         accountTooNew: 'Cuenta muy nueva',
         cooldownActive: 'Cooldown activo',
         alreadyVoted: 'Ya votó',
         invalidOption: 'Opción inválida',
         voteChangeCooldown: 'Cooldown de cambio',
+        notWhitelisted: 'No en lista blanca',
+        blacklisted: 'Usuario bloqueado',
       },
     },
     gallery: {
@@ -840,12 +864,24 @@ export const translations: Record<Locale, Translations> = {
       presetDeleted: 'Preset "{name}" deleted',
       enterPresetName: 'Enter a preset name',
       resetDefaults: 'Settings reset to defaults',
+      whitelist: 'Voter Whitelist',
+      whitelistTooltip: 'Only these users will be able to vote. One name per line.',
+      whitelistEnabled: 'Enable whitelist',
+      whitelistPlaceholder: 'user1\nuser2\nuser3',
+      whitelistCount: '{count} users',
+      blacklist: 'Blacklist (Excluded)',
+      blacklistTooltip: 'These users will NOT be able to vote. One name per line.',
+      blacklistEnabled: 'Enable blacklist',
+      blacklistPlaceholder: 'troll1\nspammer2\nbot3',
+      blacklistCount: '{count} blocked',
       reasons: {
         accountTooNew: 'Account too new',
         cooldownActive: 'Cooldown active',
         alreadyVoted: 'Already voted',
         invalidOption: 'Invalid option',
         voteChangeCooldown: 'Change cooldown',
+        notWhitelisted: 'Not whitelisted',
+        blacklisted: 'User blocked',
       },
     },
     gallery: {

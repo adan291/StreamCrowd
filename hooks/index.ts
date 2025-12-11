@@ -24,3 +24,5 @@ export { useTwitchConnection } from './useTwitchConnection';
 export type { UseTwitchConnectionReturn, UseTwitchConnectionOptions } from './useTwitchConnection';
 export { useAIAnalytics } from './useAIAnalytics';
 export type { UseAIAnalyticsReturn, UseAIAnalyticsOptions } from './useAIAnalytics';
+export { useDemoTour } from './useDemoTour';
+export type { UseDemoTourReturn, UseDemoTourOptions, TourStep, TourStepAction } from './useDemoTour';

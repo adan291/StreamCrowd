@@ -177,6 +177,7 @@ export function useModeration(): UseModerationReturn {
     // Validate the vote using moderation service
     const validationResult = validateVote(
       {
+        username,
         accountAgeDays,
         hasVoted,
         lastVoteTime,

@@ -37,11 +37,16 @@ import {
   useOverlay, 
   useTwitchConnection, 
   useAIAnalytics,
+  useDemoTour,
   DEFAULT_OVERLAY_SETTINGS,
   getChannelFromUrl,
   getPollConfigFromUrl,
+  TourStep,
 } from './hooks';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye } from 'lucide-react';
+import { DemoTourOverlay } from './components/DemoTourOverlay';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye, Play } from 'lucide-react';
+
+const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
 const App: React.FC = () => {
   const { theme, toggleTheme, setTheme } = useTheme();
@@ -103,6 +108,45 @@ const App: React.FC = () => {
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
+  const [demoForceModeration, setDemoForceModeration] = useState(false);
+
+  // Demo tour hook - connects to demo channel and navigates automatically
+  const demoTour = useDemoTour({ 
+    locale,
+    onStart: () => {
+      // Auto-connect to demo channel when tour starts
+      twitchConnect(DEMO_CHANNEL);
+    },
+    onStepChange: (step: TourStep) => {
+      // Execute navigation actions for each step
+      if (step.action) {
+        const { leftTab: newLeftTab, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll } = step.action;
+        
+        if (newLeftTab) setLeftTab(newLeftTab);
+        if (newDataSubTab) setDataSubTab(newDataSubTab);
+        if (rightTab) setActiveRightTab(rightTab);
+        if (showModeration !== undefined) setDemoForceModeration(showModeration);
+        
+        // Create a demo poll if needed
+        if (createDemoPoll && !poll.currentPoll) {
+          poll.createPoll({
+            title: 'Demo',
+            question: '¿Qué prefieres?',
+            options: [
+              { label: 'Opción A', color: '#a970ff' },
+              { label: 'Opción B', color: '#00f0f0' },
+              { label: 'Opción C', color: '#ff6b6b' },
+            ],
+          });
+        }
+      }
+    },
+    onEnd: () => {
+      // Reset demo state when tour ends
+      setDemoForceModeration(false);
+      setLeftTab('panel');
+    },
+  });
   
   // Popup window ref (at App level so it persists across tab changes)
   const overlayWindowRef = useRef<Window | null>(null);
@@ -431,9 +475,8 @@ const App: React.FC = () => {
       }
     });
 
-    twitchService.onStatusChange((newStatus, err) => {
-      // Status changes are handled by useTwitchConnection hook
-    });
+    // Note: Status changes are handled by useTwitchConnection hook
+    // Do NOT call twitchService.onStatusChange here as it overwrites the hook's callback
   }, []);
 
   // Overlay Mode Render
@@ -631,16 +674,28 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-200 dark:bg-black text-zinc-900 dark:text-zinc-100 flex flex-col p-4 transition-colors duration-300 relative">
         <AnimatedBackground />
-        <div className="flex justify-end mb-4 gap-2 relative z-50">
-          <LanguageSelector variant="icon" />
+        <div className="flex justify-between mb-4 gap-2 relative z-50">
+          {/* Demo button */}
           <button 
-            onClick={toggleTheme} 
-            className="p-2 rounded-lg bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700 shadow-sm"
+            onClick={demoTour.startTour}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-twitch-brand text-white font-medium text-sm hover:from-purple-600 hover:to-twitch-light transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40"
           >
-            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            <Play size={16} />
+            <span className="hidden sm:inline">Demo</span>
           </button>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={toggleTheme} 
+              className="p-2 rounded-lg bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 transition-colors border border-zinc-200 dark:border-zinc-700 shadow-sm"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <LanguageSelector variant="icon" />
+          </div>
         </div>
-        <div className="relative z-10 flex-1 flex items-center justify-center">
+        <div className="relative z-10 flex-1 flex items-center justify-center" data-tour="connection">
           <ConnectionPanel 
             status={status} 
             onConnect={handleConnect} 
@@ -648,8 +703,8 @@ const App: React.FC = () => {
           />
         </div>
         
-        {/* AI Vision Mascot on connection screen */}
-        {aiAnalytics.showMascot && (
+        {/* AI Vision Mascot on connection screen - hidden during demo tour */}
+        {aiAnalytics.showMascot && !demoTour.isActive && (
           <AIVisionMascot
             chatMessages={[]}
             isConnected={false}
@@ -663,6 +718,19 @@ const App: React.FC = () => {
         )}
         
         <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 left-1/2 -translate-x-1/2 z-[100]" />
+        
+        {/* Demo Tour Overlay */}
+        {demoTour.isActive && demoTour.currentStepData && (
+          <DemoTourOverlay
+            step={demoTour.currentStepData}
+            currentStep={demoTour.currentStep}
+            totalSteps={demoTour.totalSteps}
+            onNext={demoTour.nextStep}
+            onPrev={demoTour.prevStep}
+            onClose={demoTour.endTour}
+            isConnected={false}
+          />
+        )}
       </div>
     );
   }
@@ -720,7 +788,18 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto flex flex-col gap-3 w-full px-2">
+          {/* 1. Historial */}
           <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
+          
+          {/* 2. AI Vision */}
+          <NavButton 
+            active={aiAnalytics.showMascot} 
+            onClick={aiAnalytics.toggleMascot} 
+            icon={<Eye size={20} />} 
+            label="AI Vision" 
+          />
+          
+          {/* 3. Idioma */}
           <div className="relative">
             <NavButton onClick={() => setShowLanguageMenu(!showLanguageMenu)} icon={<Globe size={20} />} label={t.common.language} />
             {showLanguageMenu && (
@@ -745,13 +824,11 @@ const App: React.FC = () => {
               </div>
             )}
           </div>
-          <NavButton 
-            active={aiAnalytics.showMascot} 
-            onClick={aiAnalytics.toggleMascot} 
-            icon={<Eye size={20} />} 
-            label="AI Vision" 
-          />
+          
+          {/* 4. Tema */}
           <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
+          
+          {/* 5. Desconectar */}
           <button onClick={handleDisconnect} className="p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
             <Power size={20} />
             <span className="text-[9px] font-bold group-hover:opacity-100 opacity-0 transition-opacity">{t.common.exit}</span>
@@ -770,8 +847,8 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="flex-1 flex overflow-hidden relative">
-          {/* AI Vision Mascot - Draggable */}
-          {aiAnalytics.showMascot && !isOverlayMode && (
+          {/* AI Vision Mascot - Draggable (hidden during demo tour) */}
+          {aiAnalytics.showMascot && !isOverlayMode && !demoTour.isActive && (
             <AIVisionMascot
               chatMessages={chatMessages}
               isConnected={status === ConnectionStatus.CONNECTED}
@@ -780,6 +857,7 @@ const App: React.FC = () => {
               userDifficulty={aiAnalytics.userDifficulty}
               onDismiss={aiAnalytics.toggleMascot}
               className="w-72"
+              initialPosition={{ x: window.innerWidth - 320, y: window.innerHeight - 200 }}
             />
           )}
           
@@ -787,36 +865,43 @@ const App: React.FC = () => {
           <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
             {leftTab === 'panel' && (
               poll.currentPoll ? (
-                <LivePoll 
-                  poll={poll.currentPoll} 
-                  voteHistory={poll.voteHistory} 
-                  onStop={handleStopPoll} 
-                  onReset={handleResetPoll}
-                  onUpdate={(t, q) => poll.setCurrentPoll(prev => prev ? ({...prev, title: t, question: q}) : null)}
-                  theme={theme}
-                  moderationStats={moderation.stats}
-                  moderationLog={moderation.log}
-                  userWeights={moderation.userWeights}
-                  overlayWindowRef={overlayWindowRef}
-                />
+                <div data-tour="live-poll" className="h-full">
+                  <LivePoll 
+                    poll={poll.currentPoll} 
+                    voteHistory={poll.voteHistory} 
+                    onStop={handleStopPoll} 
+                    onReset={handleResetPoll}
+                    onUpdate={(t, q) => poll.setCurrentPoll(prev => prev ? ({...prev, title: t, question: q}) : null)}
+                    theme={theme}
+                    moderationStats={moderation.stats}
+                    moderationLog={moderation.log}
+                    userWeights={moderation.userWeights}
+                    overlayWindowRef={overlayWindowRef}
+                    forceShowModeration={demoTour.isActive ? demoForceModeration : undefined}
+                  />
+                </div>
               ) : (
-                <PollCreator 
-                  onCreate={handleCreatePoll} 
-                  onNotification={addNotification}
-                  mediaLibrary={mediaLibrary}
-                  onAddAsset={handleAddAsset}
-                  moderationConfig={moderation.config}
-                  onModerationConfigChange={moderation.setConfig}
-                />
+                <div data-tour="poll-creator" className="h-full">
+                  <PollCreator 
+                    onCreate={handleCreatePoll} 
+                    onNotification={addNotification}
+                    mediaLibrary={mediaLibrary}
+                    onAddAsset={handleAddAsset}
+                    moderationConfig={moderation.config}
+                    onModerationConfigChange={moderation.setConfig}
+                  />
+                </div>
               )
             )}
             {leftTab === 'gallery' && (
-              <AssetLibrary 
-                assets={mediaLibrary} 
-                onAdd={handleAddAsset} 
-                onDelete={handleDeleteAsset} 
-                onNotification={addNotification} 
-              />
+              <div data-tour="gallery" className="h-full">
+                <AssetLibrary 
+                  assets={mediaLibrary} 
+                  onAdd={handleAddAsset} 
+                  onDelete={handleDeleteAsset} 
+                  onNotification={addNotification} 
+                />
+              </div>
             )}
             {leftTab === 'data' && (
               <div className="h-full flex flex-col">
@@ -872,11 +957,13 @@ const App: React.FC = () => {
                       )}
                       
                       {/* Stream Analytics */}
-                      <StreamAnalytics
-                        currentSession={aiAnalytics.currentSession}
-                        aiConfig={aiAnalytics.config}
-                        isStreamActive={status === ConnectionStatus.CONNECTED}
-                      />
+                      <div data-tour="analytics">
+                        <StreamAnalytics
+                          currentSession={aiAnalytics.currentSession}
+                          aiConfig={aiAnalytics.config}
+                          isStreamActive={status === ConnectionStatus.CONNECTED}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -953,7 +1040,7 @@ const App: React.FC = () => {
                 </button>
               </div>
               
-              <div className="flex-1 overflow-hidden relative">
+              <div className="flex-1 overflow-hidden relative" data-tour="chat">
                 {activeRightTab === 'chat' ? (
                   <ChatFeed 
                     messages={chatMessages} 
@@ -976,6 +1063,19 @@ const App: React.FC = () => {
       )}
 
       <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100]" />
+      
+      {/* Demo Tour Overlay - also shown when connected */}
+      {demoTour.isActive && demoTour.currentStepData && (
+        <DemoTourOverlay
+          step={demoTour.currentStepData}
+          currentStep={demoTour.currentStep}
+          totalSteps={demoTour.totalSteps}
+          onNext={demoTour.nextStep}
+          onPrev={demoTour.prevStep}
+          onClose={demoTour.endTour}
+          isConnected={true}
+        />
+      )}
     </div>
   );
 };

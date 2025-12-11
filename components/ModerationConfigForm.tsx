@@ -237,6 +237,129 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         </div>
       </div>
 
+      {/* Whitelist */}
+      <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+          {t.moderation.whitelist}
+          <Tooltip text={t.moderation.whitelistTooltip} />
+        </label>
+        
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t.moderation.whitelistEnabled}
+          </span>
+          <button
+            onClick={() => onChange({
+              ...config,
+              whitelist: {
+                ...config.whitelist,
+                enabled: !config.whitelist?.enabled,
+              },
+            })}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              config.whitelist?.enabled ? 'bg-twitch-brand' : 'bg-zinc-300 dark:bg-zinc-700'
+            }`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                config.whitelist?.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Username List */}
+        {config.whitelist?.enabled && (
+          <div className="space-y-1">
+            <textarea
+              value={config.whitelist?.usernames?.join('\n') || ''}
+              onChange={(e) => {
+                const usernames = e.target.value
+                  .split('\n')
+                  .map(u => u.trim())
+                  .filter(u => u.length > 0);
+                onChange({
+                  ...config,
+                  whitelist: {
+                    ...config.whitelist,
+                    enabled: true,
+                    usernames,
+                  },
+                });
+              }}
+              placeholder={t.moderation.whitelistPlaceholder}
+              rows={4}
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand resize-none font-mono"
+            />
+            <div className="text-xs text-zinc-500">
+              {t.moderation.whitelistCount.replace('{count}', String(config.whitelist?.usernames?.length || 0))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Blacklist */}
+      <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+          {t.moderation.blacklist}
+          <Tooltip text={t.moderation.blacklistTooltip} />
+        </label>
+        
+        {/* Enable/Disable Toggle */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t.moderation.blacklistEnabled}
+          </span>
+          <button
+            onClick={() => onChange({
+              ...config,
+              blacklist: {
+                ...config.blacklist,
+                enabled: !config.blacklist?.enabled,
+              },
+            })}
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              config.blacklist?.enabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'
+            }`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                config.blacklist?.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Username List */}
+        {config.blacklist?.enabled && (
+          <div className="space-y-1">
+            <textarea
+              value={config.blacklist?.usernames?.join('\n') || ''}
+              onChange={(e) => {
+                const usernames = e.target.value
+                  .split('\n')
+                  .map(u => u.trim())
+                  .filter(u => u.length > 0);
+                onChange({
+                  ...config,
+                  blacklist: {
+                    ...config.blacklist,
+                    enabled: true,
+                    usernames,
+                  },
+                });
+              }}
+              placeholder={t.moderation.blacklistPlaceholder}
+              rows={4}
+              className="w-full bg-white dark:bg-zinc-900 border border-red-300 dark:border-red-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 resize-none font-mono"
+            />
+            <div className="text-xs text-red-500">
+              {t.moderation.blacklistCount.replace('{count}', String(config.blacklist?.usernames?.length || 0))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Preset Management */}
       <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">

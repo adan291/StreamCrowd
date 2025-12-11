@@ -82,24 +82,24 @@ export const ModerationLogViewer: React.FC<ModerationLogViewerProps> = ({
   const totalRejected = (Object.values(groupedByReason) as number[]).reduce((sum, count) => sum + count, 0);
 
   return (
-    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-          <List size={16} className="text-twitch-brand" />
-          Moderation Log
-          <span className="text-xs font-normal text-zinc-500">({entries.length})</span>
+    <div className="space-y-3 sm:space-y-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl p-3 sm:p-4 border border-zinc-200 dark:border-zinc-800">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <List size={14} className="sm:w-4 sm:h-4 text-twitch-brand shrink-0" />
+          <span className="truncate">Log</span>
+          <span className="text-[10px] sm:text-xs font-normal text-zinc-500 shrink-0">({entries.length})</span>
         </h4>
-        <div className="flex gap-2">
+        <div className="flex gap-1 sm:gap-2 shrink-0">
           <Button
             variant="ghost"
             onClick={() => setShowGrouped(!showGrouped)}
-            className={`text-xs px-2 py-1 ${showGrouped ? 'bg-twitch-brand/10 text-twitch-brand' : ''}`}
+            className={`text-xs px-1.5 sm:px-2 py-1 ${showGrouped ? 'bg-twitch-brand/10 text-twitch-brand' : ''}`}
           >
             <Filter size={12} />
           </Button>
-          <Button variant="ghost" onClick={handleExportCSV} className="text-xs px-2 py-1">
+          <Button variant="ghost" onClick={handleExportCSV} className="text-xs px-1.5 sm:px-2 py-1">
             <Download size={12} />
-            CSV
+            <span className="hidden sm:inline">CSV</span>
           </Button>
         </div>
       </div>
@@ -125,12 +125,12 @@ export const ModerationLogViewer: React.FC<ModerationLogViewerProps> = ({
 
 
       {/* Filter Tabs */}
-      <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+      <div className="flex flex-wrap gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
         {(['ALL', 'ACCEPTED', 'REJECTED', 'VOTE_CHANGED'] as const).map((action) => (
           <button
             key={action}
             onClick={() => setFilterAction(action)}
-            className={`flex-1 text-xs font-medium py-1.5 px-2 rounded transition-colors ${
+            className={`flex-1 min-w-[60px] text-[10px] sm:text-xs font-medium py-1.5 px-1 sm:px-2 rounded transition-colors ${
               filterAction === action
                 ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -142,7 +142,7 @@ export const ModerationLogViewer: React.FC<ModerationLogViewerProps> = ({
       </div>
 
       {/* Log Entries */}
-      <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
+      <div className="max-h-48 sm:max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
         {filteredEntries.length === 0 ? (
           <div className="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm">
             {entries.length === 0 ? 'No log entries yet' : 'No entries match filter'}

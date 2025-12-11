@@ -38,52 +38,53 @@ export const ModerationStatsDisplay: React.FC<ModerationStatsDisplayProps> = ({ 
   const totalRejected = (Object.values(stats.rejectedByReason) as number[]).reduce((sum, count) => sum + count, 0);
 
   return (
-    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-          <BarChart3 size={16} className="text-twitch-brand" />
-          Moderation Stats
+    <div className="space-y-3 sm:space-y-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl p-3 sm:p-4 border border-zinc-200 dark:border-zinc-800">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 sm:gap-2">
+          <BarChart3 size={14} className="sm:w-4 sm:h-4 text-twitch-brand" />
+          <span className="truncate">Moderation Stats</span>
         </h4>
         {showWarning && (
-          <span className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded animate-pulse">
-            <AlertTriangle size={12} />
-            Low Acceptance
+          <span className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-amber-500 bg-amber-500/10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded animate-pulse shrink-0">
+            <AlertTriangle size={10} className="sm:w-3 sm:h-3" />
+            <span className="hidden xs:inline">Low Acceptance</span>
+            <span className="xs:hidden">!</span>
           </span>
         )}
       </div>
 
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1 sm:gap-2">
         {/* Total Attempts */}
-        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400 mb-1">
-            <Users size={12} />
-            Total
+        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-2 sm:p-3 border border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+            <Users size={10} className="sm:w-3 sm:h-3" />
+            <span className="truncate">Total</span>
           </div>
-          <div className="text-xl font-bold text-zinc-900 dark:text-white">
+          <div className="text-base sm:text-xl font-bold text-zinc-900 dark:text-white">
             {stats.totalAttempts}
           </div>
         </div>
 
         {/* Accepted */}
-        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 mb-1">
-            <CheckCircle size={12} />
-            Accepted
+        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-2 sm:p-3 border border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-green-600 dark:text-green-400 mb-1">
+            <CheckCircle size={10} className="sm:w-3 sm:h-3" />
+            <span className="truncate">OK</span>
           </div>
-          <div className="text-xl font-bold text-green-600 dark:text-green-400">
+          <div className="text-base sm:text-xl font-bold text-green-600 dark:text-green-400">
             {stats.acceptedVotes}
           </div>
         </div>
 
         {/* Rejected */}
-        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-1 text-xs text-red-500 mb-1">
-            <XCircle size={12} />
-            Rejected
+        <div className="bg-white dark:bg-zinc-800/50 rounded-lg p-2 sm:p-3 border border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs text-red-500 mb-1">
+            <XCircle size={10} className="sm:w-3 sm:h-3" />
+            <span className="truncate">No</span>
           </div>
-          <div className="text-xl font-bold text-red-500">
+          <div className="text-base sm:text-xl font-bold text-red-500">
             {totalRejected}
           </div>
         </div>
