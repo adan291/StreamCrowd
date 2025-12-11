@@ -29,6 +29,7 @@ export interface Poll {
   progressBarColor?: string; // Custom color for progress bar
   limitIndicatorColor?: string; // Custom color for limit alerts
   votePrefix?: string; // Custom vote prefix (default: "+")
+  voteMatchMode?: 'exact' | 'partial'; // How to match vote keywords (default: "exact")
 }
 
 export interface SavedPoll {

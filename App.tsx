@@ -297,7 +297,7 @@ const App: React.FC = () => {
     setChatMessages([]);
   };
 
-  const handleCreatePoll = (title: string, question: string, options: any[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, config?: ModerationConfig, votePrefix?: string) => {
+  const handleCreatePoll = (title: string, question: string, options: any[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, config?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => {
     const prefix = votePrefix || '+';
     const newPoll = poll.createPoll({
       title,
@@ -307,12 +307,14 @@ const App: React.FC = () => {
         color: o.color,
         icon: o.icon,
         image: o.image,
+        voteKey: o.voteKey,
       })),
       maxVotes,
       duration,
       progressBarColor,
       limitIndicatorColor,
       votePrefix: prefix,
+      voteMatchMode: voteMatchMode || 'exact',
     });
     
     // Reset moderation state for new poll
@@ -476,9 +478,28 @@ const App: React.FC = () => {
           const keyMatch = trimmedMsg.match(voteKeyRegex);
           if (keyMatch) {
             const key = keyMatch[1].toLowerCase();
-            const matchedOption = pollRef.current.options.find(o => o.voteKey?.toLowerCase() === key);
+            const matchMode = pollRef.current.voteMatchMode || 'exact';
+            const matchedOption = pollRef.current.options.find(o => {
+              if (!o.voteKey) return false;
+              const optKey = o.voteKey.toLowerCase();
+              if (matchMode === 'partial') {
+                return key.includes(optKey) || optKey.includes(key);
+              }
+              return optKey === key;
+            });
             if (matchedOption) {
               optionId = matchedOption.id;
+            }
+          }
+        }
+        
+        // Partial match mode: also check if message contains any voteKey
+        if (optionId === null && pollRef.current.voteMatchMode === 'partial') {
+          const msgLower = message.toLowerCase();
+          for (const opt of pollRef.current.options) {
+            if (opt.voteKey && msgLower.includes(`${prefix}${opt.voteKey.toLowerCase()}`)) {
+              optionId = opt.id;
+              break;
             }
           }
         }

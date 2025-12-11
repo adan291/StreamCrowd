@@ -131,6 +131,10 @@ export interface Translations {
     votePrefix: string;
     votePrefixTooltip: string;
     voteKeyTooltip: string;
+    matchMode: string;
+    matchModeTooltip: string;
+    matchExact: string;
+    matchPartial: string;
     startPoll: string;
     clearForm: string;
     templates: string;
@@ -478,6 +482,10 @@ export const translations: Record<Locale, Translations> = {
       votePrefix: 'Prefijo',
       votePrefixTooltip: 'Símbolo para votar (ej: +1, !1, #1)',
       voteKeyTooltip: 'Palabra clave para votar (ej: si, no, rojo)',
+      matchMode: 'Modo',
+      matchModeTooltip: 'Exacto: debe coincidir exactamente. Parcial: puede estar dentro del mensaje.',
+      matchExact: 'Exacto',
+      matchPartial: 'Parcial',
       startPoll: 'Iniciar Votación',
       clearForm: 'Limpiar Formulario',
       templates: 'Plantillas',
@@ -823,6 +831,10 @@ export const translations: Record<Locale, Translations> = {
       votePrefix: 'Prefix',
       votePrefixTooltip: 'Symbol to vote (e.g: +1, !1, #1)',
       voteKeyTooltip: 'Keyword to vote (e.g: yes, no, red)',
+      matchMode: 'Mode',
+      matchModeTooltip: 'Exact: must match exactly. Partial: can be within the message.',
+      matchExact: 'Exact',
+      matchPartial: 'Partial',
       startPoll: 'Start Poll',
       clearForm: 'Clear Form',
       templates: 'Templates',

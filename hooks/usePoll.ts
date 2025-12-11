@@ -15,6 +15,7 @@ export interface CreatePollConfig {
   progressBarColor?: string;
   limitIndicatorColor?: string;
   votePrefix?: string;
+  voteMatchMode?: 'exact' | 'partial';
 }
 
 export interface PollOptionConfig {
@@ -195,6 +196,7 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
       progressBarColor: config.progressBarColor,
       limitIndicatorColor: config.limitIndicatorColor,
       votePrefix: config.votePrefix || '+',
+      voteMatchMode: config.voteMatchMode || 'exact',
     };
 
     setCurrentPoll(newPoll);

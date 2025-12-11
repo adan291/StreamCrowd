@@ -168,6 +168,40 @@ button, .no-select {
   user-select: none;
 }
 
+/* Allow text selection in inputs and textareas */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+textarea,
+.select-text {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  cursor: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* Ensure inputs can be selected even inside no-select containers */
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Visible text selection in inputs */
+input::selection,
+textarea::selection {
+  background-color: var(--color-twitch-brand) !important;
+  color: white !important;
+}
+
+input::-moz-selection,
+textarea::-moz-selection {
+  background-color: var(--color-twitch-brand) !important;
+  color: white !important;
+}
+
 /* Better focus states for accessibility */
 button:focus-visible,
 input:focus-visible,
