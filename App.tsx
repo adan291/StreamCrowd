@@ -45,7 +45,8 @@ import {
   TourStep,
 } from './hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye, Play } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye, Play, Volume2 } from 'lucide-react';
+import { SoundBoard } from './components/SoundBoard';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
@@ -116,6 +117,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   const [demoForceModeration, setDemoForceModeration] = useState(false);
+  const [showSoundBoard, setShowSoundBoard] = useState(false);
 
   // Demo tour hook - connects to demo channel and navigates automatically
   const demoTour = useDemoTour({ 
@@ -857,6 +859,16 @@ const App: React.FC = () => {
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             )}
           </div>
+          
+          {/* Divider */}
+          <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+          
+          {/* Sound Board Button */}
+          <NavButton 
+            onClick={() => setShowSoundBoard(true)} 
+            icon={<Volume2 size={20} />} 
+            label="Sonidos" 
+          />
         </div>
 
         <div className="mt-auto flex flex-col gap-3 w-full px-2">
@@ -1149,6 +1161,11 @@ const App: React.FC = () => {
           onClose={demoTour.endTour}
           isConnected={true}
         />
+      )}
+      
+      {/* Sound Board Modal */}
+      {showSoundBoard && (
+        <SoundBoard onClose={() => setShowSoundBoard(false)} />
       )}
     </div>
   );

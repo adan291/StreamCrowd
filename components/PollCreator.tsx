@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3 } from 'lucide-react';
+import { SpinnerWheel } from './SpinnerWheel';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
 import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
@@ -51,6 +52,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showSpinner, setShowSpinner] = useState(false);
+  const [quickMode, setQuickMode] = useState(true); // Toggle para modo rápido
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   
@@ -76,15 +79,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       }
     }
   }, []);
-
-  const requestPreset = (type: 'yesno' | 'rating' | 'abc') => {
-      // If user has typed something, warn them
-      if (question.trim() || options.some(o => o.label !== `${t.poll.option} ${options.indexOf(o)+1}`)) {
-          setShowPresetConfirm(type);
-      } else {
-          applyPreset(type);
-      }
-  };
 
   const applyPreset = (type: 'yesno' | 'rating' | 'abc') => {
       if (type === 'yesno') {
@@ -171,25 +165,63 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     setDraggedIndex(null);
   };
 
-  // Quick Yes/No poll that creates and launches immediately
-  const quickYesNo = () => {
-    const prefix = votePrefix.trim() || '+';
-    onCreate(
-      t.poll.liveTitle, 
-      question || '¿Sí o No?', 
-      [
+  // Presets data
+  const presets = {
+    yesno: {
+      question: '¿Sí o No?',
+      options: [
         { label: 'Sí', color: '#22c55e', icon: '✅', image: '', voteKey: 'si' },
         { label: 'No', color: '#ef4444', icon: '❌', image: '', voteKey: 'no' }
-      ], 
-      undefined, 
-      undefined, 
-      progressBarColor, 
-      limitIndicatorColor, 
-      localModerationConfig, 
-      prefix, 
-      'exact'
-    );
-    if (onNotification) onNotification('success', t.poll.quickPollCreated || '¡Encuesta rápida creada!');
+      ]
+    },
+    rating: {
+      question: '¿Qué puntuación le das?',
+      options: [
+        { label: '1 - Malo', color: '#ef4444', icon: '😡', image: '', voteKey: '' },
+        { label: '2 - Regular', color: '#f97316', icon: '😐', image: '', voteKey: '' },
+        { label: '3 - Bueno', color: '#eab308', icon: '🙂', image: '', voteKey: '' },
+        { label: '4 - Muy Bueno', color: '#3b82f6', icon: '😃', image: '', voteKey: '' },
+        { label: '5 - Excelente', color: '#a855f7', icon: '🔥', image: '', voteKey: '' }
+      ]
+    },
+    abc: {
+      question: '¿Cuál prefieres?',
+      options: [
+        { label: `${t.poll.option} A`, color: CHART_COLORS[0], icon: '🅰️', image: '', voteKey: '' },
+        { label: `${t.poll.option} B`, color: CHART_COLORS[1], icon: '🅱️', image: '', voteKey: '' },
+        { label: `${t.poll.option} C`, color: CHART_COLORS[2], icon: '©️', image: '', voteKey: '' }
+      ]
+    }
+  };
+
+  // Handle preset button click - either launch immediately or set values
+  const handlePresetClick = (type: 'yesno' | 'rating' | 'abc') => {
+    const preset = presets[type];
+    const prefix = votePrefix.trim() || '+';
+    
+    if (quickMode) {
+      // Modo rápido: crear encuesta directamente
+      onCreate(
+        t.poll.liveTitle, 
+        question || preset.question, 
+        preset.options, 
+        undefined, 
+        undefined, 
+        progressBarColor, 
+        limitIndicatorColor, 
+        localModerationConfig, 
+        prefix, 
+        'exact'
+      );
+      if (onNotification) onNotification('success', t.poll.quickPollCreated || '¡Encuesta rápida creada!');
+    } else {
+      // Modo normal: solo setear valores
+      if (question.trim() || options.some(o => o.label !== `${t.poll.option} ${options.indexOf(o)+1}`)) {
+        setShowPresetConfirm(type);
+      } else {
+        applyPreset(type);
+      }
+    }
   };
 
   const handleVoteKeyChange = (index: number, value: string) => {
@@ -501,13 +533,37 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         )}
         
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4 flex-1 flex flex-col">
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              <span className="text-xs font-bold text-zinc-400 uppercase self-center mr-1 shrink-0">{t.poll.quick}:</span>
-              <button type="button" onClick={quickYesNo} className="whitespace-nowrap px-3 py-1 bg-green-500/10 dark:bg-green-500/20 rounded-full text-xs font-medium text-green-600 dark:text-green-400 border border-green-500/30 flex items-center gap-1 shadow-sm hover:bg-green-500/20 transition-colors"><Zap size={12}/> Sí/No Rápido</button>
-              <button type="button" onClick={() => requestPreset('yesno')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Check size={12} className="text-green-500"/> {t.poll.yesNo}</button>
-              <button type="button" onClick={() => requestPreset('rating')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Star size={12} className="text-yellow-500"/> 1 - 5</button>
-              <button type="button" onClick={() => requestPreset('abc')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Grid size={12} className="text-blue-500"/> A / B / C</button>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center">
+              {/* Toggle Modo Rápido */}
+              <button 
+                type="button"
+                onClick={() => setQuickMode(!quickMode)}
+                className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                  quickMode 
+                    ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/40' 
+                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 border border-zinc-300 dark:border-zinc-700'
+                }`}
+                title={quickMode ? 'Modo Rápido: Los presets crean la encuesta directamente' : 'Modo Normal: Los presets solo rellenan el formulario'}
+              >
+                <Zap size={12} className={quickMode ? 'text-green-500' : 'text-zinc-400'} />
+                <span className="hidden sm:inline">{quickMode ? 'Rápido' : 'Normal'}</span>
+                <div className={`w-6 h-3.5 rounded-full transition-colors relative ${quickMode ? 'bg-green-500' : 'bg-zinc-400'}`}>
+                  <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${quickMode ? 'translate-x-3' : 'translate-x-0.5'}`} />
+                </div>
+              </button>
+              
+              <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              
+              {/* Preset Buttons */}
+              <button type="button" onClick={() => handlePresetClick('yesno')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Check size={12} className="text-green-500"/> {t.poll.yesNo}</button>
+              <button type="button" onClick={() => handlePresetClick('rating')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Star size={12} className="text-yellow-500"/> 1 - 5</button>
+              <button type="button" onClick={() => handlePresetClick('abc')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Grid size={12} className="text-blue-500"/> A / B / C</button>
+              
+              <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              
+              {/* Tools */}
               <button type="button" onClick={() => setShowImportModal(true)} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><FileText size={12} className="text-purple-500"/> Importar</button>
+              <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> Ruleta</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -835,6 +891,21 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             </div>
           </div>
         </div>
+      )}
+
+      {/* Spinner Wheel Modal */}
+      {showSpinner && (
+        <SpinnerWheel 
+          options={options.map((opt, i) => ({
+            id: i + 1,
+            label: opt.label,
+            votes: 0,
+            color: opt.color,
+            icon: opt.icon,
+            image: opt.image
+          }))} 
+          onClose={() => setShowSpinner(false)} 
+        />
       )}
     </>
   );
