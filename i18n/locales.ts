@@ -315,6 +315,7 @@ export interface Translations {
     negative: string;
     messages: string;
     votes: string;
+    viewers: string;
     activity: string;
     helpConnectionFailed: string;
     helpPollEmpty: string;
@@ -658,6 +659,7 @@ export const translations: Record<Locale, Translations> = {
       negative: 'Negativo',
       messages: 'Mensajes',
       votes: 'Votos',
+      viewers: 'Viewers',
       activity: 'Actividad',
       helpConnectionFailed: 'Verifica que el nombre del canal sea correcto y que tengas conexión a internet',
       helpPollEmpty: 'Añade al menos 2 opciones para crear una encuesta',
@@ -999,6 +1001,7 @@ export const translations: Record<Locale, Translations> = {
       negative: 'Negative',
       messages: 'Messages',
       votes: 'Votes',
+      viewers: 'Viewers',
       activity: 'Activity',
       helpConnectionFailed: 'Check that the channel name is correct and you have internet connection',
       helpPollEmpty: 'Add at least 2 options to create a poll',

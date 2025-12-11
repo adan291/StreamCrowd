@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Key, Eye, EyeOff, Check, X, Sparkles } from 'lucide-react';
-import { AIConfig, saveAIConfig, loadAIConfig, clearAIConfig } from '../services/aiAnalyticsService';
+import { Bot, Key, Eye, EyeOff, Check, X, Sparkles, Shield } from 'lucide-react';
+import { AIConfig, saveAIConfig, loadAIConfig, clearAIConfig, isUsingEnvKey } from '../services/aiAnalyticsService';
 import { useI18n } from '../i18n';
 
 interface AIConfigPanelProps {
@@ -18,8 +18,10 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [usingEnvKey, setUsingEnvKey] = useState(false);
 
   useEffect(() => {
+    setUsingEnvKey(isUsingEnvKey());
     const stored = loadAIConfig();
     if (stored) {
       setConfig(stored);
@@ -59,17 +61,48 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
     
     try {
       if (config.provider === 'gemini') {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Responde solo: OK' }] }],
-            }),
+        // Models available in free tier (gemini-1.5-flash-8b is most reliable for free)
+        const models = ['gemini-1.5-flash-8b', 'gemini-1.5-flash', 'gemini-1.0-pro'];
+        let success = false;
+        
+        for (const model of models) {
+          try {
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: 'Say OK' }] }],
+                  generationConfig: {
+                    maxOutputTokens: 10,
+                  },
+                }),
+              }
+            );
+            
+            if (response.ok) {
+              console.log(`✓ Gemini model ${model} works!`);
+              setTestResult('success');
+              success = true;
+              break;
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              // 429 = rate limit, wait and continue
+              if (response.status === 429) {
+                console.warn(`Model ${model}: Rate limited, trying next...`);
+                continue;
+              }
+              console.warn(`Model ${model} failed:`, response.status, errorData);
+            }
+          } catch (err) {
+            console.warn(`Model ${model} error:`, err);
           }
-        );
-        setTestResult(response.ok ? 'success' : 'error');
+        }
+        
+        if (!success) {
+          setTestResult('error');
+        }
       }
     } catch {
       setTestResult('error');
@@ -194,9 +227,24 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
         </button>
       </div>
 
+      {/* Env Key Indicator */}
+      {usingEnvKey && (
+        <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg mb-4">
+          <Shield className="w-4 h-4 text-green-400" />
+          <span className="text-xs text-green-400">
+            🔒 API Key cargada desde .env.local (más seguro)
+          </span>
+        </div>
+      )}
+
       {/* Info */}
       <div className="mt-4 text-xs text-gray-500">
         <p>{t.aiConfig.noApiKeyHint}</p>
+        {!usingEnvKey && (
+          <p className="mt-1 text-yellow-500/80">
+            💡 Tip: Guarda tu API key en .env.local como VITE_GEMINI_API_KEY para mayor seguridad
+          </p>
+        )}
         <p className="mt-1">
           {config.provider === 'gemini' && (
             <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">

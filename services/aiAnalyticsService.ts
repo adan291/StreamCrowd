@@ -76,25 +76,54 @@ export interface DailyInsight {
 const STORAGE_KEY = 'twitch_ai_config';
 const SESSIONS_KEY = 'twitch_stream_sessions';
 
+// Get API key from environment variable (more secure) or localStorage
+const getEnvApiKey = (): string | null => {
+  // Vite exposes env variables with VITE_ prefix
+  return import.meta.env.VITE_GEMINI_API_KEY || null;
+};
+
 // Save/Load AI Config
 export const saveAIConfig = (config: AIConfig): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  // Don't save API key to localStorage if it's from env
+  const envKey = getEnvApiKey();
+  const configToSave = envKey && config.apiKey === envKey 
+    ? { ...config, apiKey: '' } // Don't duplicate env key in storage
+    : config;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(configToSave));
 };
 
 export const loadAIConfig = (): AIConfig | null => {
+  const envKey = getEnvApiKey();
   const stored = localStorage.getItem(STORAGE_KEY);
+  
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const config = JSON.parse(stored);
+      // Prefer env key over stored key
+      if (envKey) {
+        config.apiKey = envKey;
+      }
+      return config;
     } catch {
-      return null;
+      return envKey ? { provider: 'gemini', apiKey: envKey, enabled: true } : null;
     }
   }
+  
+  // If no stored config but env key exists, create default config
+  if (envKey) {
+    return { provider: 'gemini', apiKey: envKey, enabled: true };
+  }
+  
   return null;
 };
 
 export const clearAIConfig = (): void => {
   localStorage.removeItem(STORAGE_KEY);
+};
+
+// Check if using env-based API key
+export const isUsingEnvKey = (): boolean => {
+  return !!getEnvApiKey();
 };
 
 // Session Management
@@ -288,23 +317,36 @@ Responde SOLO con un JSON válido con esta estructura:
 
   try {
     if (config.provider === 'gemini') {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${config.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 1024,
-            },
-          }),
+      // Models available in free tier
+      const models = ['gemini-1.5-flash-8b', 'gemini-1.5-flash', 'gemini-1.0-pro'];
+      let response: Response | null = null;
+      
+      for (const model of models) {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 1024,
+              },
+            }),
+          }
+        );
+        
+        if (response.ok) {
+          console.log(`Using Gemini model: ${model}`);
+          break;
         }
-      );
+        // Skip rate-limited models
+        if (response.status === 429) continue;
+      }
 
-      if (!response.ok) {
-        console.error('Gemini API error:', response.status);
+      if (!response || !response.ok) {
+        console.error('Gemini API error: No working model found');
         return analyzeLocally(messages);
       }
 

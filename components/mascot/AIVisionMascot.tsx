@@ -313,7 +313,7 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
             {/* Quick stats */}
             <StatsGrid
               messagesCount={chatMessages.length}
-              votesCount={pollVotes}
+              viewersCount={new Set(chatMessages.map(m => m.username)).size}
               activityPercent={chatSentiment.intensity}
               t={t}
             />
@@ -357,18 +357,18 @@ const SentimentIndicator: React.FC<{ sentiment: ChatSentiment; t: any }> = ({ se
 
 const StatsGrid: React.FC<{
   messagesCount: number;
-  votesCount: number;
+  viewersCount: number;
   activityPercent: number;
   t: any;
-}> = ({ messagesCount, votesCount, activityPercent, t }) => (
+}> = ({ messagesCount, viewersCount, activityPercent, t }) => (
   <div className="grid grid-cols-3 gap-2 text-center">
     <div className="bg-gray-800/50 rounded-lg p-2">
       <div className="text-lg font-bold text-white">{messagesCount}</div>
       <div className="text-xs text-gray-400">{t.mascot.messages}</div>
     </div>
     <div className="bg-gray-800/50 rounded-lg p-2">
-      <div className="text-lg font-bold text-white">{votesCount || 0}</div>
-      <div className="text-xs text-gray-400">{t.mascot.votes}</div>
+      <div className="text-lg font-bold text-white">{viewersCount || 0}</div>
+      <div className="text-xs text-gray-400">{t.mascot.viewers}</div>
     </div>
     <div className="bg-gray-800/50 rounded-lg p-2">
       <div className="text-lg font-bold text-white">{activityPercent}%</div>
