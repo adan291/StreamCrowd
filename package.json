@@ -23,11 +23,15 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "public/ai-vision-icon.png"
     ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
     "win": {
-      "target": ["portable"],
-      "icon": "public/ai-vision-icon.svg",
+      "target": ["dir"],
+      "icon": "public/ai-vision-icon.png",
       "signAndEditExecutable": false
     },
     "mac": {
