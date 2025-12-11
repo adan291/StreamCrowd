@@ -113,6 +113,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
           {t.moderation.title}
         </h4>
         <button
+          type="button"
           onClick={handleReset}
           className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
@@ -147,6 +148,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
           <Tooltip text={t.moderation.allowVoteChangesTooltip} />
         </label>
         <button
+          type="button"
           onClick={handleVoteChangeToggle}
           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-colors ${
             config.voteChangeEnabled
@@ -250,6 +252,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
             {t.moderation.whitelistEnabled}
           </span>
           <button
+            type="button"
             onClick={() => onChange({
               ...config,
               whitelist: {
@@ -312,6 +315,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
             {t.moderation.blacklistEnabled}
           </span>
           <button
+            type="button"
             onClick={() => onChange({
               ...config,
               blacklist: {
@@ -415,6 +419,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={(e) => handleDeletePreset(preset.id, e)}
                     className="ml-2 p-1 text-zinc-400 hover:text-red-500 transition-colors"
                   >
