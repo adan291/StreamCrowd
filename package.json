@@ -27,15 +27,16 @@
     ],
     "win": {
       "target": ["portable"],
+      "icon": "public/ai-vision-icon.svg",
       "signAndEditExecutable": false
     },
     "mac": {
       "target": ["dmg"],
-      "icon": "public/icon.icns"
+      "icon": "public/ai-vision-icon.svg"
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "icon": "public/icon.png"
+      "icon": "public/ai-vision-icon.svg"
     }
   },
   "dependencies": {

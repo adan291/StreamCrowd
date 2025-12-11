@@ -14,6 +14,7 @@ export interface CreatePollConfig {
   duration?: number;
   progressBarColor?: string;
   limitIndicatorColor?: string;
+  votePrefix?: string;
 }
 
 export interface PollOptionConfig {
@@ -191,6 +192,7 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
       duration: config.duration,
       progressBarColor: config.progressBarColor,
       limitIndicatorColor: config.limitIndicatorColor,
+      votePrefix: config.votePrefix || '+',
     };
 
     setCurrentPoll(newPoll);

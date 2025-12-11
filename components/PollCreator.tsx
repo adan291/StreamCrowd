@@ -11,7 +11,7 @@ import { ModerationConfigForm } from './ModerationConfigForm';
 import { useI18n } from '../i18n';
 
 interface PollCreatorProps {
-  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig) => void;
+  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string) => void;
   onNotification?: (type: NotificationType, message: string) => void;
   mediaLibrary?: MediaAsset[];
   onAddAsset?: (asset: MediaAsset) => void;
@@ -31,6 +31,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [duration, setDuration] = useState<string>(''); // Duration in seconds
   const [progressBarColor, setProgressBarColor] = useState('#3b82f6');
   const [limitIndicatorColor, setLimitIndicatorColor] = useState('#ef4444');
+  const [votePrefix, setVotePrefix] = useState<string>('+');
   
   const [savedPolls, setSavedPolls] = useState<SavedPoll[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -233,8 +234,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     // but typically 0 means unlimited in this UI.
     // If the input is empty string, it's undefined. If it's '0', it's 0.
     const dur = duration !== '' ? parseInt(duration, 10) : undefined;
+    const prefix = votePrefix.trim() || '+';
     
-    onCreate(title.trim() || t.poll.liveTitle, question, options, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig);
+    onCreate(title.trim() || t.poll.liveTitle, question, options, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig, prefix);
     setShowConfirm(false);
   };
   
@@ -508,6 +510,17 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                            <input type="color" value={limitIndicatorColor} onChange={e => setLimitIndicatorColor(e.target.value)} className="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
                            <div className="w-full h-full" style={{backgroundColor: limitIndicatorColor}} />
                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">{t.poll.votePrefix}<Tooltip text={t.poll.votePrefixTooltip}/></label>
+                       <input 
+                         type="text" 
+                         value={votePrefix} 
+                         onChange={e => setVotePrefix(e.target.value.slice(0, 3))} 
+                         placeholder="+"
+                         maxLength={3}
+                         className="w-12 h-8 text-center bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-sm font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-twitch-brand"
+                       />
                     </div>
                  </div>
              </div>

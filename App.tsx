@@ -297,7 +297,8 @@ const App: React.FC = () => {
     setChatMessages([]);
   };
 
-  const handleCreatePoll = (title: string, question: string, options: any[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, config?: ModerationConfig) => {
+  const handleCreatePoll = (title: string, question: string, options: any[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, config?: ModerationConfig, votePrefix?: string) => {
+    const prefix = votePrefix || '+';
     const newPoll = poll.createPoll({
       title,
       question,
@@ -311,6 +312,7 @@ const App: React.FC = () => {
       duration,
       progressBarColor,
       limitIndicatorColor,
+      votePrefix: prefix,
     });
     
     // Reset moderation state for new poll
@@ -324,9 +326,9 @@ const App: React.FC = () => {
       const optLabels = newPoll.options.map(o => o.label).join('|');
       twitchService.sendMessage(`!pollsync ${question}|${optLabels}`);
       twitchService.sendMessage(`${t.chat.newPoll}: ${question}`);
-      const opts = newPoll.options.map(o => `+${o.id} ${o.label}`).join(' | ');
+      const opts = newPoll.options.map(o => `${prefix}${o.id} ${o.label}`).join(' | ');
       twitchService.sendMessage(`${t.chat.options}: ${opts}`);
-      twitchService.sendMessage(t.chat.voteHint);
+      twitchService.sendMessage(t.chat.voteHint.replace('+', prefix));
     }
   };
 
@@ -454,7 +456,11 @@ const App: React.FC = () => {
 
       // Process Vote with Moderation
       if (pollRef.current && pollRef.current.isActive) {
-        const voteMatch = message.trim().match(/^\+(\d+)$/);
+        const prefix = pollRef.current.votePrefix || '+';
+        // Escape special regex characters in prefix
+        const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const voteRegex = new RegExp(`^${escapedPrefix}(\\d+)$`);
+        const voteMatch = message.trim().match(voteRegex);
         if (voteMatch) {
           const optionId = parseInt(voteMatch[1]);
           const userId = tags['user-id'] || tags.username || 'unknown';

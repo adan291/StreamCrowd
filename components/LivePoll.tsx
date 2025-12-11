@@ -461,19 +461,31 @@ export const LivePoll: React.FC<LivePollProps> = ({
                  placeholder={t.poll.questionPlaceholder}
               />
           ) : (
-            <div className={`flex items-center gap-2 group ${isOverlay ? 'justify-center' : ''}`}>
-                <h2 
-                  className={`leading-tight break-words text-center md:text-left ${isOverlay ? `${getOverlayFontSize('title')} ${getOverlayFontStyle()} drop-shadow-lg tracking-tight` : `${titleTextSize} font-bold text-zinc-900 dark:text-white`}`}
-                  style={isOverlay ? { color: overlayStyles.textColor } : {}}
-                >
-                    {displayPoll.question}
-                </h2>
-                {isDefault && displayPoll.isActive && onUpdate && !isSimulationMode && (
-                    <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-twitch-brand transition-all p-1">
-                        <Edit2 size={16} />
-                    </button>
-                )}
-            </div>
+            <>
+              <div className={`flex items-center gap-2 group ${isOverlay ? 'justify-center' : ''}`}>
+                  <h2 
+                    className={`leading-tight break-words text-center md:text-left ${isOverlay ? `${getOverlayFontSize('title')} ${getOverlayFontStyle()} drop-shadow-lg tracking-tight` : `${titleTextSize} font-bold text-zinc-900 dark:text-white`}`}
+                    style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                  >
+                      {displayPoll.question}
+                  </h2>
+                  {isDefault && displayPoll.isActive && onUpdate && !isSimulationMode && (
+                      <button onClick={() => setIsEditing(true)} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-twitch-brand transition-all p-1">
+                          <Edit2 size={16} />
+                      </button>
+                  )}
+              </div>
+              
+              {/* Vote instruction hint */}
+              {displayPoll.isActive && !isOverlay && (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5">
+                  <span className="bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light px-1.5 py-0.5 rounded font-mono text-[10px]">{displayPoll.votePrefix || '+'}1</span>
+                  <span className="bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light px-1.5 py-0.5 rounded font-mono text-[10px]">{displayPoll.votePrefix || '+'}2</span>
+                  <span>...</span>
+                  <span className="opacity-70">{t.chat.voteHint.replace('+', displayPoll.votePrefix || '+')}</span>
+                </p>
+              )}
+            </>
           )}
           
           <div 

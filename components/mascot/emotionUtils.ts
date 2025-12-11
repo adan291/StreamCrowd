@@ -21,11 +21,14 @@ const EXCITEMENT_PATTERNS = [
 
 /**
  * Analyzes chat messages to determine overall sentiment
+ * Intensity is calculated based on:
+ * - Message frequency (messages per minute)
+ * - Emotional content (positive/negative/excitement patterns)
  */
 export const analyzeChatSentiment = (messages: TwitchMessage[]): ChatSentiment => {
   if (messages.length === 0) return { sentiment: 'neutral', intensity: 0 };
 
-  const recentMessages = messages.slice(-30);
+  const recentMessages = messages.slice(-50);
   let positiveScore = 0;
   let negativeScore = 0;
   let excitementScore = 0;
@@ -49,7 +52,16 @@ export const analyzeChatSentiment = (messages: TwitchMessage[]): ChatSentiment =
     });
   });
 
-  const intensity = Math.min(100, (positiveScore + negativeScore + excitementScore) * 3);
+  // Calculate message frequency component (0-50 points)
+  // Based on messages in last 50: 0 msgs = 0%, 25+ msgs = 50%
+  const frequencyScore = Math.min(50, recentMessages.length * 2);
+  
+  // Calculate emotional component (0-50 points)
+  // Based on emotional patterns found
+  const emotionalScore = Math.min(50, (positiveScore + negativeScore + excitementScore) * 2);
+  
+  // Combined intensity (0-100)
+  const intensity = Math.min(100, frequencyScore + emotionalScore);
 
   if (positiveScore > negativeScore * 1.5) return { sentiment: 'positive', intensity };
   if (negativeScore > positiveScore * 1.5) return { sentiment: 'negative', intensity };

@@ -128,6 +128,8 @@ export interface Translations {
     timeSec: string;
     barColor: string;
     limitColor: string;
+    votePrefix: string;
+    votePrefixTooltip: string;
     startPoll: string;
     clearForm: string;
     templates: string;
@@ -316,7 +318,7 @@ export interface Translations {
     messages: string;
     votes: string;
     viewers: string;
-    activity: string;
+    intensity: string;
     helpConnectionFailed: string;
     helpPollEmpty: string;
     helpNoVotes: string;
@@ -472,6 +474,8 @@ export const translations: Record<Locale, Translations> = {
       timeSec: 'Tiempo (Seg)',
       barColor: 'Barra',
       limitColor: 'Límite',
+      votePrefix: 'Prefijo',
+      votePrefixTooltip: 'Símbolo para votar (ej: +1, !1, #1)',
       startPoll: 'Iniciar Votación',
       clearForm: 'Limpiar Formulario',
       templates: 'Plantillas',
@@ -660,7 +664,7 @@ export const translations: Record<Locale, Translations> = {
       messages: 'Mensajes',
       votes: 'Votos',
       viewers: 'Viewers',
-      activity: 'Actividad',
+      intensity: 'Intensidad',
       helpConnectionFailed: 'Verifica que el nombre del canal sea correcto y que tengas conexión a internet',
       helpPollEmpty: 'Añade al menos 2 opciones para crear una encuesta',
       helpNoVotes: 'Intenta anunciar la encuesta en el chat o hacer la pregunta más llamativa',
@@ -814,6 +818,8 @@ export const translations: Record<Locale, Translations> = {
       timeSec: 'Time (Sec)',
       barColor: 'Bar',
       limitColor: 'Limit',
+      votePrefix: 'Prefix',
+      votePrefixTooltip: 'Symbol to vote (e.g: +1, !1, #1)',
       startPoll: 'Start Poll',
       clearForm: 'Clear Form',
       templates: 'Templates',
@@ -1002,7 +1008,7 @@ export const translations: Record<Locale, Translations> = {
       messages: 'Messages',
       votes: 'Votes',
       viewers: 'Viewers',
-      activity: 'Activity',
+      intensity: 'Intensity',
       helpConnectionFailed: 'Check that the channel name is correct and you have internet connection',
       helpPollEmpty: 'Add at least 2 options to create a poll',
       helpNoVotes: 'Try announcing the poll in chat or make the question more engaging',

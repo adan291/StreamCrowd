@@ -27,6 +27,7 @@ export interface Poll {
   duration?: number; // Duration in seconds (optional)
   progressBarColor?: string; // Custom color for progress bar
   limitIndicatorColor?: string; // Custom color for limit alerts
+  votePrefix?: string; // Custom vote prefix (default: "+")
 }
 
 export interface SavedPoll {
@@ -39,6 +40,7 @@ export interface SavedPoll {
   isFavorite?: boolean;
   progressBarColor?: string;
   limitIndicatorColor?: string;
+  votePrefix?: string;
 }
 
 export interface MediaAsset {

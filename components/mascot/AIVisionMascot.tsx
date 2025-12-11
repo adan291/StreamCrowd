@@ -380,7 +380,7 @@ const StatsGrid: React.FC<{
     </div>
     <div className="bg-gray-800/50 rounded-lg p-2">
       <div className="text-lg font-bold text-white">{activityPercent}%</div>
-      <div className="text-xs text-gray-400">{t.mascot.activity}</div>
+      <div className="text-xs text-gray-400">{t.mascot.intensity}</div>
     </div>
   </div>
 );
