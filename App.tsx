@@ -238,9 +238,25 @@ const App: React.FC = () => {
     return () => clearTimeout(checkNoVotes);
   }, [poll.currentPoll, isOverlayMode]);
 
+  // Track last notification to prevent spam
+  const lastNotificationRef = useRef<{ message: string; time: number }>({ message: '', time: 0 });
+  
   const addNotification = (type: NotificationType, message: string, metadata?: { channelInitial?: string }) => {
-    const id = Date.now().toString() + Math.random();
-    setNotifications(prev => [...prev, { id, type, message, metadata }]);
+    const now = Date.now();
+    // Prevent duplicate notifications within 3 seconds
+    if (lastNotificationRef.current.message === message && 
+        now - lastNotificationRef.current.time < 3000) {
+      return;
+    }
+    
+    lastNotificationRef.current = { message, time: now };
+    const id = now.toString() + Math.random();
+    
+    // Limit to max 3 notifications at a time
+    setNotifications(prev => {
+      const newNotifications = [...prev, { id, type, message, metadata }];
+      return newNotifications.slice(-3);
+    });
   };
 
   const removeNotification = (id: string) => {
@@ -713,7 +729,8 @@ const App: React.FC = () => {
             userDifficulty={connectionError ? { type: 'connection_failed', timestamp: Date.now(), context: connectionError } : undefined}
             onDismiss={aiAnalytics.toggleMascot}
             className="w-72"
-            initialPosition={{ x: window.innerWidth - 320, y: window.innerHeight - 200 }}
+            initialPosition={{ x: window.innerWidth - 340, y: window.innerHeight - 150 }}
+            theme={theme}
           />
         )}
         
@@ -857,7 +874,8 @@ const App: React.FC = () => {
               userDifficulty={aiAnalytics.userDifficulty}
               onDismiss={aiAnalytics.toggleMascot}
               className="w-72"
-              initialPosition={{ x: window.innerWidth - 320, y: window.innerHeight - 200 }}
+              initialPosition={{ x: window.innerWidth - 340, y: window.innerHeight - 150 }}
+              theme={theme}
             />
           )}
           

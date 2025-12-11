@@ -20,6 +20,7 @@ interface AIVisionMascotProps {
   className?: string;
   initialPosition?: MascotPosition;
   onPositionChange?: (pos: MascotPosition) => void;
+  theme?: 'light' | 'dark';
 }
 
 export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
@@ -32,6 +33,7 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
   className = '',
   initialPosition,
   onPositionChange,
+  theme = 'dark',
 }) => {
   const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -224,9 +226,11 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
       {/* Main container */}
       <div
         className={`
-          relative bg-gray-900/90 backdrop-blur-sm rounded-2xl border border-purple-500/30
-          transition-all duration-300 overflow-visible select-none
-          hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/20
+          relative backdrop-blur-sm rounded-2xl border transition-all duration-300 overflow-visible select-none
+          ${theme === 'light' 
+            ? 'bg-white/95 border-purple-300 hover:border-purple-400 hover:shadow-lg hover:shadow-purple-300/30' 
+            : 'bg-gray-900/90 border-purple-500/30 hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/20'
+          }
           ${isExpanded ? 'p-4' : 'p-3'}
           ${isDragging ? 'shadow-2xl shadow-purple-500/40 scale-105' : ''}
         `}
@@ -251,14 +255,14 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
+              <span className={`text-xs font-bold uppercase tracking-wider ${theme === 'light' ? 'text-purple-600' : 'text-purple-400'}`}>
                 {t.mascot.title}
               </span>
               <div
                 className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-500'} animate-pulse`}
               />
             </div>
-            <p className={`text-white font-medium truncate ${isExpanded ? 'text-sm' : 'text-xs'}`}>
+            <p className={`font-medium truncate ${isExpanded ? 'text-sm' : 'text-xs'} ${theme === 'light' ? 'text-gray-800' : 'text-white'}`}>
               {message}
             </p>
           </div>
