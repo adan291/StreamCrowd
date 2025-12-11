@@ -21,6 +21,8 @@ interface AIVisionMascotProps {
   initialPosition?: MascotPosition;
   onPositionChange?: (pos: MascotPosition) => void;
   theme?: 'light' | 'dark';
+  /** Real viewer count from Twitch API (optional) */
+  viewerCount?: number | null;
 }
 
 export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
@@ -34,6 +36,7 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
   initialPosition,
   onPositionChange,
   theme = 'dark',
+  viewerCount,
 }) => {
   const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -313,9 +316,10 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
             {/* Quick stats */}
             <StatsGrid
               messagesCount={chatMessages.length}
-              viewersCount={new Set(chatMessages.map(m => m.username)).size}
+              viewersCount={viewerCount ?? new Set(chatMessages.map(m => m.username)).size}
               activityPercent={chatSentiment.intensity}
               t={t}
+              isRealViewerCount={viewerCount !== undefined && viewerCount !== null}
             />
           </div>
         )}
@@ -360,15 +364,19 @@ const StatsGrid: React.FC<{
   viewersCount: number;
   activityPercent: number;
   t: any;
-}> = ({ messagesCount, viewersCount, activityPercent, t }) => (
+  isRealViewerCount?: boolean;
+}> = ({ messagesCount, viewersCount, activityPercent, t, isRealViewerCount }) => (
   <div className="grid grid-cols-3 gap-2 text-center">
     <div className="bg-gray-800/50 rounded-lg p-2">
       <div className="text-lg font-bold text-white">{messagesCount}</div>
       <div className="text-xs text-gray-400">{t.mascot.messages}</div>
     </div>
-    <div className="bg-gray-800/50 rounded-lg p-2">
+    <div className="bg-gray-800/50 rounded-lg p-2 relative">
       <div className="text-lg font-bold text-white">{viewersCount || 0}</div>
-      <div className="text-xs text-gray-400">{t.mascot.viewers}</div>
+      <div className="text-xs text-gray-400 flex items-center justify-center gap-1">
+        {t.mascot.viewers}
+        {isRealViewerCount && <span className="w-1.5 h-1.5 bg-green-500 rounded-full" title="Live count" />}
+      </div>
     </div>
     <div className="bg-gray-800/50 rounded-lg p-2">
       <div className="text-lg font-bold text-white">{activityPercent}%</div>

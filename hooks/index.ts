@@ -26,3 +26,5 @@ export { useAIAnalytics } from './useAIAnalytics';
 export type { UseAIAnalyticsReturn, UseAIAnalyticsOptions } from './useAIAnalytics';
 export { useDemoTour } from './useDemoTour';
 export type { UseDemoTourReturn, UseDemoTourOptions, TourStep, TourStepAction } from './useDemoTour';
+export { useViewerCount } from './useViewerCount';
+export type { default as UseViewerCountReturn } from './useViewerCount';

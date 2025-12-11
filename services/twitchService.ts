@@ -390,6 +390,47 @@ class TwitchService {
   public getConfig(): TwitchServiceConfig {
     return { ...this.config };
   }
+
+  /**
+   * Get the current channel name (without # prefix)
+   * @returns Channel name or empty string if not connected
+   */
+  public getCurrentChannel(): string {
+    return this.currentChannel.replace('#', '');
+  }
+
+  /**
+   * Get viewer count for a channel
+   * Uses DecAPI to get viewer count. Returns null if channel is offline.
+   * @param channel Channel name (optional, uses current channel if not provided)
+   * @returns Promise with viewer count or null if offline/unavailable
+   */
+  public async getViewerCount(channel?: string): Promise<number | null> {
+    const targetChannel = channel || this.getCurrentChannel();
+    if (!targetChannel) return null;
+
+    try {
+      // Use DecAPI - returns number if online, text message if offline
+      const response = await fetch(
+        `https://decapi.me/twitch/viewercount/${targetChannel.toLowerCase()}`
+      );
+      if (!response.ok) return null;
+      
+      const text = await response.text().catch(() => '');
+      const trimmed = text.trim();
+      
+      // DecAPI returns a message like "channel is offline" when not streaming
+      if (trimmed.toLowerCase().includes('offline') || trimmed.toLowerCase().includes('error')) {
+        return null;
+      }
+      
+      const count = parseInt(trimmed, 10);
+      return isNaN(count) ? null : count;
+    } catch {
+      // Silently fail - viewer count is not critical
+      return null;
+    }
+  }
 }
 
 export const twitchService = new TwitchService();

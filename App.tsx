@@ -38,6 +38,7 @@ import {
   useTwitchConnection, 
   useAIAnalytics,
   useDemoTour,
+  useViewerCount,
   DEFAULT_OVERLAY_SETTINGS,
   getChannelFromUrl,
   getPollConfigFromUrl,
@@ -96,6 +97,12 @@ const App: React.FC = () => {
   const moderation = useModeration();
 
   const aiAnalytics = useAIAnalytics();
+
+  // Viewer count hook - fetches real viewer count from Twitch
+  const { viewerCount } = useViewerCount({
+    enabled: status === ConnectionStatus.CONNECTED,
+    interval: 30000, // Update every 30 seconds
+  });
 
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
@@ -876,6 +883,7 @@ const App: React.FC = () => {
               className="w-72"
               initialPosition={{ x: window.innerWidth - 340, y: window.innerHeight - 150 }}
               theme={theme}
+              viewerCount={viewerCount}
             />
           )}
           
