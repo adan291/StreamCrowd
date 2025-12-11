@@ -130,6 +130,7 @@ export interface Translations {
     limitColor: string;
     votePrefix: string;
     votePrefixTooltip: string;
+    voteKeyTooltip: string;
     startPoll: string;
     clearForm: string;
     templates: string;
@@ -476,6 +477,7 @@ export const translations: Record<Locale, Translations> = {
       limitColor: 'Límite',
       votePrefix: 'Prefijo',
       votePrefixTooltip: 'Símbolo para votar (ej: +1, !1, #1)',
+      voteKeyTooltip: 'Palabra clave para votar (ej: si, no, rojo)',
       startPoll: 'Iniciar Votación',
       clearForm: 'Limpiar Formulario',
       templates: 'Plantillas',
@@ -820,6 +822,7 @@ export const translations: Record<Locale, Translations> = {
       limitColor: 'Limit',
       votePrefix: 'Prefix',
       votePrefixTooltip: 'Symbol to vote (e.g: +1, !1, #1)',
+      voteKeyTooltip: 'Keyword to vote (e.g: yes, no, red)',
       startPoll: 'Start Poll',
       clearForm: 'Clear Form',
       templates: 'Templates',

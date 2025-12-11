@@ -459,10 +459,31 @@ const App: React.FC = () => {
         const prefix = pollRef.current.votePrefix || '+';
         // Escape special regex characters in prefix
         const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const voteRegex = new RegExp(`^${escapedPrefix}(\\d+)$`);
-        const voteMatch = message.trim().match(voteRegex);
+        const trimmedMsg = message.trim().toLowerCase();
+        
+        // Try to match vote by number (e.g., +1, +2)
+        const voteRegex = new RegExp(`^${escapedPrefix}(\\d+)$`, 'i');
+        const voteMatch = trimmedMsg.match(voteRegex);
+        
+        let optionId: number | null = null;
+        
         if (voteMatch) {
-          const optionId = parseInt(voteMatch[1]);
+          // Matched by number
+          optionId = parseInt(voteMatch[1]);
+        } else {
+          // Try to match by voteKey (e.g., #chula, #rojo)
+          const voteKeyRegex = new RegExp(`^${escapedPrefix}([a-z0-9]+)$`, 'i');
+          const keyMatch = trimmedMsg.match(voteKeyRegex);
+          if (keyMatch) {
+            const key = keyMatch[1].toLowerCase();
+            const matchedOption = pollRef.current.options.find(o => o.voteKey?.toLowerCase() === key);
+            if (matchedOption) {
+              optionId = matchedOption.id;
+            }
+          }
+        }
+        
+        if (optionId !== null) {
           const userId = tags['user-id'] || tags.username || 'unknown';
           
           // Extract user attributes from Twitch tags

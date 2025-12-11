@@ -478,10 +478,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
               
               {/* Vote instruction hint */}
               {displayPoll.isActive && !isOverlay && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5">
-                  <span className="bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light px-1.5 py-0.5 rounded font-mono text-[10px]">{displayPoll.votePrefix || '+'}1</span>
-                  <span className="bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light px-1.5 py-0.5 rounded font-mono text-[10px]">{displayPoll.votePrefix || '+'}2</span>
-                  <span>...</span>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 flex flex-wrap items-center gap-1.5">
+                  {displayPoll.options.slice(0, 3).map((opt, i) => (
+                    <span key={i} className="bg-twitch-brand/10 text-twitch-brand dark:text-twitch-light px-1.5 py-0.5 rounded font-mono text-[10px]">
+                      {displayPoll.votePrefix || '+'}{opt.voteKey || opt.id}
+                    </span>
+                  ))}
+                  {displayPoll.options.length > 3 && <span>...</span>}
                   <span className="opacity-70">{t.chat.voteHint.replace('+', displayPoll.votePrefix || '+')}</span>
                 </p>
               )}

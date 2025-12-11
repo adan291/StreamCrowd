@@ -23,9 +23,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const { t } = useI18n();
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string }[]>([
-    { label: 'Opción 1', color: CHART_COLORS[0], icon: '1️⃣', image: '' }, 
-    { label: 'Opción 2', color: CHART_COLORS[1], icon: '2️⃣', image: '' }
+  const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string; voteKey?: string }[]>([
+    { label: 'Opción 1', color: CHART_COLORS[0], icon: '1️⃣', image: '', voteKey: '' }, 
+    { label: 'Opción 2', color: CHART_COLORS[1], icon: '2️⃣', image: '', voteKey: '' }
   ]);
   const [maxVotes, setMaxVotes] = useState<string>('');
   const [duration, setDuration] = useState<string>(''); // Duration in seconds
@@ -97,8 +97,15 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const addOption = () => {
     if (options.length < MAX_OPTIONS) {
       const nextColor = CHART_COLORS[options.length % CHART_COLORS.length];
-      setOptions([...options, { label: `${t.poll.option} ${options.length + 1}`, color: nextColor, icon: '', image: '' }]);
+      setOptions([...options, { label: `${t.poll.option} ${options.length + 1}`, color: nextColor, icon: '', image: '', voteKey: '' }]);
     }
+  };
+
+  const handleVoteKeyChange = (index: number, value: string) => {
+    const newOptions = [...options];
+    // Remove spaces and special characters, keep only alphanumeric
+    newOptions[index].voteKey = value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 15);
+    setOptions(newOptions);
   };
 
   const removeOption = (index: number) => {
@@ -452,9 +459,19 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                      </div>
                      <input type="file" accept="image/*" className="hidden" ref={el => fileInputRefs.current[index] = el} onChange={(e) => handleImageUpload(index, e)} />
                   </div>
-                  <div className="flex-1 relative group/input">
-                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 text-[10px] font-bold pointer-events-none">+{index+1}</span>
-                     <input type="text" value={opt.label} onChange={(e) => handleOptionChange(index, e.target.value)} className="w-full bg-white dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light" placeholder={`${t.poll.option} ${index + 1}`} />
+                  <div className="flex-1 flex gap-1.5">
+                     <input type="text" value={opt.label} onChange={(e) => handleOptionChange(index, e.target.value)} className="flex-1 bg-white dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light" placeholder={`${t.poll.option} ${index + 1}`} />
+                     <div className="relative w-24">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-mono pointer-events-none">{votePrefix}</span>
+                        <input 
+                           type="text" 
+                           value={opt.voteKey || ''} 
+                           onChange={(e) => handleVoteKeyChange(index, e.target.value)} 
+                           className="w-full bg-white dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-5 pr-2 py-2 text-xs font-mono focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light" 
+                           placeholder={`${index + 1}`}
+                           title={t.poll.voteKeyTooltip}
+                        />
+                     </div>
                   </div>
                   <div className="w-9 flex justify-center">
                       {options.length > MIN_OPTIONS ? <button type="button" onClick={() => removeOption(index)} className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg"><Trash2 size={14} /></button> : <div className="w-8"></div>}

@@ -22,6 +22,7 @@ export interface PollOptionConfig {
   color: string;
   icon?: string;
   image?: string;
+  voteKey?: string;
 }
 
 /**
@@ -184,6 +185,7 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
         color: o.color,
         icon: o.icon,
         image: o.image,
+        voteKey: o.voteKey || undefined,
       })),
       isActive: true,
       totalVotes: 0,

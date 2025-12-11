@@ -6,6 +6,7 @@ export interface PollOption {
   color: string;
   icon?: string;
   image?: string; // Base64 or URL
+  voteKey?: string; // Custom vote keyword (e.g., "chula" for #chula)
 }
 
 export interface VoteRecord {
