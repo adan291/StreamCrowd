@@ -98,50 +98,67 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
     
     try {
       if (config.provider === 'gemini') {
-        // Models available in free tier (gemini-1.5-flash-8b is most reliable for free)
-        const models = ['gemini-1.5-flash-8b', 'gemini-1.5-flash', 'gemini-1.0-pro'];
-        let success = false;
+        // First, get list of available models
+        console.log('Fetching available Gemini models...');
+        const modelsResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${config.apiKey}`
+        );
         
-        for (const model of models) {
-          try {
-            const response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: 'Say OK' }] }],
-                  generationConfig: {
-                    maxOutputTokens: 10,
-                  },
-                }),
-              }
-            );
-            
-            if (response.ok) {
-              console.log(`✓ Gemini model ${model} works!`);
-              setTestResult('success');
-              success = true;
-              break;
-            } else {
-              const errorData = await response.json().catch(() => ({}));
-              // 429 = rate limit, wait and continue
-              if (response.status === 429) {
-                console.warn(`Model ${model}: Rate limited, trying next...`);
-                continue;
-              }
-              console.warn(`Model ${model} failed:`, response.status, errorData);
-            }
-          } catch (err) {
-            console.warn(`Model ${model} error:`, err);
-          }
+        if (!modelsResponse.ok) {
+          console.error('Failed to fetch models:', modelsResponse.status);
+          setTestResult('error');
+          setTesting(false);
+          return;
         }
         
-        if (!success) {
+        const modelsData = await modelsResponse.json();
+        const availableModels = modelsData.models
+          ?.filter((m: { supportedGenerationMethods?: string[] }) => 
+            m.supportedGenerationMethods?.includes('generateContent')
+          )
+          .map((m: { name: string }) => m.name.replace('models/', ''))
+          || [];
+        
+        console.log('Available models:', availableModels);
+        
+        if (availableModels.length === 0) {
+          console.error('No models available for generateContent');
+          setTestResult('error');
+          setTesting(false);
+          return;
+        }
+        
+        // Try the first available model
+        const modelToUse = availableModels[0];
+        console.log(`Testing with model: ${modelToUse}`);
+        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${config.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'Say OK' }] }],
+              generationConfig: {
+                maxOutputTokens: 10,
+              },
+            }),
+          }
+        );
+        
+        if (response.ok) {
+          console.log(`✓ Gemini model ${modelToUse} works!`);
+          // Save the working model for later use
+          localStorage.setItem('gemini_working_model', modelToUse);
+          setTestResult('success');
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.error(`Model ${modelToUse} failed:`, response.status, errorData);
           setTestResult('error');
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('Test connection error:', err);
       setTestResult('error');
     }
     

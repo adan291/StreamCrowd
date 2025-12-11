@@ -348,36 +348,29 @@ Responde SOLO con un JSON válido con esta estructura:
 
   try {
     if (config.provider === 'gemini') {
-      // Models available in free tier
-      const models = ['gemini-1.5-flash-8b', 'gemini-1.5-flash', 'gemini-1.0-pro'];
-      let response: Response | null = null;
+      // Get the working model from localStorage (set during test) or use default
+      const savedModel = localStorage.getItem('gemini_working_model');
+      const modelToUse = savedModel || 'gemini-2.0-flash-exp'; // Default fallback
       
-      for (const model of models) {
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 1024,
-              },
-            }),
-          }
-        );
-        
-        if (response.ok) {
-          console.log(`Using Gemini model: ${model}`);
-          break;
+      console.log(`Using Gemini model: ${modelToUse}`);
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${config.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 1024,
+            },
+          }),
         }
-        // Skip rate-limited models
-        if (response.status === 429) continue;
-      }
+      );
 
-      if (!response || !response.ok) {
-        console.error('Gemini API error: No working model found');
+      if (!response.ok) {
+        console.error('Gemini API error:', response.status);
         return analyzeLocally(messages);
       }
 
