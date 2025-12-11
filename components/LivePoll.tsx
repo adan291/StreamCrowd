@@ -77,6 +77,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const [copiedOptionId, setCopiedOptionId] = useState<number | null>(null);
   const [showWinnerOverlay, setShowWinnerOverlay] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
+  const [showTimeUpAnimation, setShowTimeUpAnimation] = useState(false);
   
   // Simulation Mode State
   const [isSimulationMode, setIsSimulationMode] = useState(false);
@@ -142,16 +145,46 @@ export const LivePoll: React.FC<LivePollProps> = ({
        const elapsed = Math.floor((Date.now() - poll.startTime) / 1000);
        const remaining = Math.max(0, poll.duration - elapsed);
        setTimeLeft(remaining);
+       
+       // Show big countdown for last 5 seconds
+       if (remaining <= 5 && remaining > 0) {
+         setShowCountdown(true);
+         setCountdownNumber(remaining);
+       }
 
        if (remaining === 0) {
-           onStop(true); // Auto stop
+           setShowTimeUpAnimation(true);
+           setTimeout(() => {
+             onStop(true);
+           }, 1500);
+           setTimeout(() => {
+             setShowTimeUpAnimation(false);
+           }, 1800);
        } else {
            const interval = setInterval(() => {
                const newElapsed = Math.floor((Date.now() - poll.startTime) / 1000);
                const newRemaining = Math.max(0, poll.duration! - newElapsed);
                setTimeLeft(newRemaining);
+               
+               // Big countdown for last 5 seconds
+               if (newRemaining <= 5 && newRemaining > 0) {
+                 setShowCountdown(true);
+                 setCountdownNumber(newRemaining);
+               } else {
+                 setShowCountdown(false);
+                 setCountdownNumber(null);
+               }
+               
                if (newRemaining === 0) {
-                   onStop(true);
+                   setShowCountdown(false);
+                   setShowTimeUpAnimation(true);
+                   // First show "Time Up" animation (1.5s), then stop poll, then winner will show
+                   setTimeout(() => {
+                     onStop(true);
+                   }, 1500);
+                   setTimeout(() => {
+                     setShowTimeUpAnimation(false);
+                   }, 1800);
                    clearInterval(interval);
                }
            }, 1000);
@@ -159,6 +192,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
        }
     } else {
         setTimeLeft(null);
+        setShowCountdown(false);
+        setCountdownNumber(null);
     }
   }, [poll.isActive, poll.startTime, poll.duration]);
 
@@ -195,13 +230,14 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Show winner overlay when poll ends
   useEffect(() => {
       if (!isSimulationMode) {
-          if (!poll.isActive && poll.totalVotes > 0) {
+          if (!poll.isActive && poll.totalVotes > 0 && !showTimeUpAnimation) {
+              // Show winner overlay after time-up animation is done
               setShowWinnerOverlay(true);
           } else if (poll.isActive) {
               setShowWinnerOverlay(false);
           }
       }
-  }, [poll.isActive, poll.totalVotes, isSimulationMode]);
+  }, [poll.isActive, poll.totalVotes, isSimulationMode, showTimeUpAnimation]);
 
   useEffect(() => {
       if (isEditing) {
@@ -524,10 +560,21 @@ export const LivePoll: React.FC<LivePollProps> = ({
 
                     {timeLeft !== null && (
                         <span 
-                          className={`flex items-center gap-1 px-2 py-1 rounded border tabular-nums ${isOverlay ? `text-xl font-bold ${theme === 'dark' ? 'bg-black/50 border-white/10' : 'bg-white/80 border-black/10'} backdrop-blur-sm` : 'text-sm font-bold border-zinc-200 dark:border-zinc-700'} ${timeLeft <= 10 ? 'text-red-500 border-red-500/50 animate-pulse' : ''}`}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border tabular-nums transition-all ${
+                            isOverlay 
+                              ? `text-xl font-bold ${theme === 'dark' ? 'bg-black/50 border-white/10' : 'bg-white/80 border-black/10'} backdrop-blur-sm` 
+                              : 'text-sm font-bold border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800'
+                          } ${
+                            timeLeft <= 10 
+                              ? 'text-red-500 border-red-500/50 animate-pulse bg-red-500/10 scale-110' 
+                              : timeLeft <= 30 
+                                ? 'text-orange-500 border-orange-500/30 bg-orange-500/10' 
+                                : ''
+                          }`}
                           style={isOverlay && timeLeft > 10 ? { color: overlayStyles.textColor } : {}}
                         >
-                           <Clock size={isOverlay ? 24 : 14} /> {formatTime(timeLeft)}
+                           <Clock size={isOverlay ? 24 : 16} className={timeLeft <= 10 ? 'animate-spin-slow' : ''} /> 
+                           {formatTime(timeLeft)}
                         </span>
                     )}
 
@@ -619,39 +666,98 @@ export const LivePoll: React.FC<LivePollProps> = ({
       {/* Main Content - Displays either Real or Simulated poll based on mode */}
       <div className={gridLayoutClass}>
         
+        {/* Big Countdown Overlay - Last 5 seconds */}
+        {showCountdown && countdownNumber !== null && displayPoll.isActive && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+            <div className="relative">
+              <div className="absolute inset-0 bg-red-500/20 rounded-full blur-3xl animate-ping" style={{ width: '200px', height: '200px', marginLeft: '-100px', marginTop: '-100px' }} />
+              <span 
+                key={countdownNumber}
+                className="text-[150px] font-black text-red-500 drop-shadow-[0_0_30px_rgba(239,68,68,0.8)] animate-countdown tabular-nums"
+              >
+                {countdownNumber}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Time Up Animation */}
+        {showTimeUpAnimation && (
+          <div className="absolute inset-0 z-45 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="text-center">
+              <Clock size={80} className="mx-auto mb-4 text-red-500 animate-bounce" />
+              <h2 className="text-5xl font-black text-white uppercase tracking-widest animate-pulse">
+                ¡Tiempo!
+              </h2>
+            </div>
+          </div>
+        )}
+        
         {/* Winner Overlay */}
-        {winner && showWinnerOverlay && !displayPoll.isActive && (
-            <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg animate-fade-in p-4 text-center ${isOverlay ? 'bg-transparent' : 'bg-white/95 dark:bg-black/90 backdrop-blur-md'}`}>
+        {winner && showWinnerOverlay && !displayPoll.isActive && !showTimeUpAnimation && (
+            <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg animate-fade-in p-2 sm:p-4 text-center ${isOverlay ? 'bg-transparent' : 'bg-white/95 dark:bg-black/90 backdrop-blur-md'}`}>
+                {/* Confetti particles */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  {[...Array(20)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-2 sm:w-3 h-2 sm:h-3 animate-confetti"
+                      style={{
+                        left: `${Math.random() * 100}%`,
+                        top: '-20px',
+                        backgroundColor: ['#fbbf24', '#a855f7', '#3b82f6', '#22c55e', '#ef4444', '#f97316'][i % 6],
+                        animationDelay: `${Math.random() * 2}s`,
+                        animationDuration: `${2 + Math.random() * 2}s`,
+                        borderRadius: Math.random() > 0.5 ? '50%' : '0',
+                      }}
+                    />
+                  ))}
+                </div>
+                
                 {!isOverlay && (
-                    <div className="absolute top-0 right-0 p-4">
-                        <button onClick={() => setShowWinnerOverlay(false)} className="text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 text-xs">
-                            <Eye size={14} /> Ver Detalles
+                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+                        <button onClick={() => setShowWinnerOverlay(false)} className="text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 text-[10px] sm:text-xs bg-white/80 dark:bg-black/50 px-2 py-1 rounded-lg backdrop-blur-sm">
+                            <Eye size={12} className="sm:w-[14px] sm:h-[14px]" /> {t.poll.viewDetails || 'Ver Detalles'}
                         </button>
                     </div>
                 )}
-                <div className="mb-4 animate-bounce">
-                    <Trophy size={isOverlay ? 120 : 48} className="text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)]" />
+                
+                <div className="mb-2 sm:mb-4 relative">
+                    <div className="absolute inset-0 animate-ping">
+                      <Trophy className={`${isOverlay ? 'w-[120px] h-[120px]' : 'w-8 h-8 sm:w-12 sm:h-12'} text-yellow-400/30`} />
+                    </div>
+                    <Trophy className={`${isOverlay ? 'w-[120px] h-[120px]' : 'w-8 h-8 sm:w-12 sm:h-12'} text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.8)] animate-bounce relative z-10`} />
                 </div>
                 
-                <h3 className={`${isOverlay ? 'text-7xl mb-8' : 'text-4xl mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-widest drop-shadow-sm`}>
+                <h3 className={`${isOverlay ? 'text-5xl sm:text-7xl mb-6 sm:mb-8' : 'text-2xl sm:text-4xl mb-2 sm:mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-wider sm:tracking-widest drop-shadow-sm animate-pulse`}>
                     {t.poll.winner}!
                 </h3>
 
-                <div className="relative mb-8 group">
-                    <div className="absolute -inset-8 bg-gradient-to-r from-yellow-500/30 to-purple-600/30 rounded-full blur-2xl opacity-75 animate-spin-slow"></div>
-                    <div className={`relative ${isOverlay ? 'w-96 h-96 border-8' : 'w-48 h-48 border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_50px_rgba(250,204,21,0.4)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center`}>
+                <div className="relative mb-4 sm:mb-8 group">
+                    <div className="absolute -inset-4 sm:-inset-8 bg-gradient-to-r from-yellow-500/30 to-purple-600/30 rounded-full blur-xl sm:blur-2xl opacity-75 animate-spin-slow"></div>
+                    <div className="absolute -inset-2 sm:-inset-4 bg-yellow-400/20 rounded-full animate-ping"></div>
+                    <div 
+                      className={`relative ${isOverlay ? 'w-48 h-48 sm:w-72 sm:h-72 md:w-96 md:h-96 border-4 sm:border-8' : 'w-24 h-24 sm:w-36 sm:h-36 md:w-48 md:h-48 border-4 sm:border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.6)] sm:shadow-[0_0_60px_rgba(250,204,21,0.6)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center animate-scale-up`}
+                      style={{ backgroundColor: winner.color }}
+                    >
                         {winner.image ? (
                             <img src={winner.image} alt="Winner" className="w-full h-full object-cover" />
                         ) : (
-                            <span className={`${isOverlay ? 'text-9xl' : 'text-8xl'} select-none`}>{winner.icon || '🏆'}</span>
+                            <span className={`${isOverlay ? 'text-6xl sm:text-8xl md:text-9xl' : 'text-4xl sm:text-6xl md:text-8xl'} select-none drop-shadow-lg`}>{winner.icon || '🏆'}</span>
                         )}
                     </div>
                 </div>
 
-                <h2 className={`${isOverlay ? 'text-6xl text-zinc-900 dark:text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]' : 'text-3xl text-zinc-900 dark:text-white'} font-bold leading-tight mb-2 px-4`}>
+                <h2 className={`${isOverlay ? 'text-3xl sm:text-5xl md:text-6xl' : 'text-xl sm:text-2xl md:text-3xl'} font-bold leading-tight mb-1 sm:mb-2 px-2 sm:px-4 animate-slide-up text-zinc-900 dark:text-white ${isOverlay ? 'drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]' : ''}`}>
                    {winner.label}
                 </h2>
-                <p className={`${isOverlay ? 'text-4xl text-yellow-500 dark:text-yellow-300 drop-shadow-md font-bold' : 'text-sm text-zinc-500 dark:text-zinc-400'} font-mono`}>{winner.votes} {t.poll.votes}</p>
+                <div className={`${isOverlay ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-base sm:text-lg'} font-bold animate-slide-up`} style={{ animationDelay: '0.2s' }}>
+                  <span className="text-yellow-500 dark:text-yellow-300 drop-shadow-md">{winner.votes}</span>
+                  <span className="text-zinc-400 ml-1 sm:ml-2">{t.poll.votesLabel || 'votos'}</span>
+                </div>
+                <p className={`${isOverlay ? 'text-lg sm:text-xl md:text-2xl mt-2 sm:mt-4' : 'text-xs sm:text-sm mt-1 sm:mt-2'} text-zinc-500 dark:text-zinc-400`}>
+                  {((winner.votes / displayPoll.totalVotes) * 100).toFixed(1)}% {t.poll.ofTotal || 'del total'}
+                </p>
             </div>
         )}
 

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical } from 'lucide-react';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
 import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
@@ -48,8 +48,23 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   // Moderation panel state
   const [showModerationPanel, setShowModerationPanel] = useState(false);
   const [localModerationConfig, setLocalModerationConfig] = useState<ModerationConfig>(moderationConfig);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  // Check for duplicate voteKeys
+  const duplicateVoteKeys = useMemo(() => {
+    const keys = options.map(o => o.voteKey?.toLowerCase()).filter(k => k && k.length > 0);
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    keys.forEach(k => {
+      if (k && seen.has(k)) duplicates.add(k);
+      if (k) seen.add(k);
+    });
+    return duplicates;
+  }, [options]);
 
   useEffect(() => {
     const saved = localStorage.getItem('twitch_vote_templates');
@@ -101,6 +116,80 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       const nextColor = CHART_COLORS[options.length % CHART_COLORS.length];
       setOptions([...options, { label: `${t.poll.option} ${options.length + 1}`, color: nextColor, icon: '', image: '', voteKey: '' }]);
     }
+  };
+
+  const duplicateOption = (index: number) => {
+    if (options.length < MAX_OPTIONS) {
+      const opt = options[index];
+      const newOptions = [...options];
+      newOptions.splice(index + 1, 0, { 
+        ...opt, 
+        label: `${opt.label} (copia)`,
+        voteKey: '' // Clear voteKey to avoid duplicates
+      });
+      setOptions(newOptions);
+    }
+  };
+
+  const importOptionsFromText = () => {
+    const lines = importText.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      if (onNotification) onNotification('error', t.poll.noOptionsToImport || 'No hay opciones para importar');
+      return;
+    }
+    const newOptions = lines.slice(0, MAX_OPTIONS).map((line, i) => ({
+      label: line.trim().slice(0, 100),
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      icon: '',
+      image: '',
+      voteKey: ''
+    }));
+    setOptions(newOptions);
+    setShowImportModal(false);
+    setImportText('');
+    if (onNotification) onNotification('success', `${newOptions.length} ${t.poll.optionsImported || 'opciones importadas'}`);
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newOptions = [...options];
+    const draggedItem = newOptions[draggedIndex];
+    newOptions.splice(draggedIndex, 1);
+    newOptions.splice(index, 0, draggedItem);
+    setOptions(newOptions);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  // Quick Yes/No poll that creates and launches immediately
+  const quickYesNo = () => {
+    const prefix = votePrefix.trim() || '+';
+    onCreate(
+      t.poll.liveTitle, 
+      question || '¿Sí o No?', 
+      [
+        { label: 'Sí', color: '#22c55e', icon: '✅', image: '', voteKey: 'si' },
+        { label: 'No', color: '#ef4444', icon: '❌', image: '', voteKey: 'no' }
+      ], 
+      undefined, 
+      undefined, 
+      progressBarColor, 
+      limitIndicatorColor, 
+      localModerationConfig, 
+      prefix, 
+      'exact'
+    );
+    if (onNotification) onNotification('success', t.poll.quickPollCreated || '¡Encuesta rápida creada!');
   };
 
   const handleVoteKeyChange = (index: number, value: string) => {
@@ -414,9 +503,11 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4 flex-1 flex flex-col">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <span className="text-xs font-bold text-zinc-400 uppercase self-center mr-1 shrink-0">{t.poll.quick}:</span>
+              <button type="button" onClick={quickYesNo} className="whitespace-nowrap px-3 py-1 bg-green-500/10 dark:bg-green-500/20 rounded-full text-xs font-medium text-green-600 dark:text-green-400 border border-green-500/30 flex items-center gap-1 shadow-sm hover:bg-green-500/20 transition-colors"><Zap size={12}/> Sí/No Rápido</button>
               <button type="button" onClick={() => requestPreset('yesno')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Check size={12} className="text-green-500"/> {t.poll.yesNo}</button>
               <button type="button" onClick={() => requestPreset('rating')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Star size={12} className="text-yellow-500"/> 1 - 5</button>
               <button type="button" onClick={() => requestPreset('abc')} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><Grid size={12} className="text-blue-500"/> A / B / C</button>
+              <button type="button" onClick={() => setShowImportModal(true)} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><FileText size={12} className="text-purple-500"/> Importar</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -438,7 +529,18 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             
             <div className="space-y-2 overflow-y-auto pr-2 custom-scrollbar pb-2">
               {options.map((opt, index) => (
-                <div key={index} className="flex gap-2 items-center group animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
+                <div 
+                  key={index} 
+                  className={`flex gap-2 items-center group animate-fade-in-up ${draggedIndex === index ? 'opacity-50' : ''}`} 
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  draggable
+                  onDragStart={() => handleDragStart(index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="cursor-grab active:cursor-grabbing text-zinc-300 hover:text-zinc-500 dark:text-zinc-600 dark:hover:text-zinc-400 shrink-0" title="Arrastrar para reordenar">
+                    <GripVertical size={14} />
+                  </div>
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-sm shadow-sm relative overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-1 ring-black/5 dark:ring-white/5" style={{ backgroundColor: opt.color }} title="Color">
                      <input type="color" value={opt.color} onChange={(e) => handleColorChange(index, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                   </div>
@@ -467,24 +569,52 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                         className="flex-1 bg-white dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light select-text" 
                         placeholder={`${t.poll.option} ${index + 1}`} 
                      />
-                     <div className="relative w-24">
+                     <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-mono pointer-events-none">{votePrefix}</span>
                         <input 
                            type="text" 
                            value={opt.voteKey || ''} 
                            onChange={(e) => handleVoteKeyChange(index, e.target.value)} 
-                           className="w-full bg-white dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-5 pr-2 py-2 text-xs font-mono focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light select-text" 
-                           placeholder={`${index + 1}`}
+                           className={`w-full bg-white dark:bg-zinc-900/80 border text-zinc-900 dark:text-white rounded-lg pl-5 pr-2 py-2 text-xs font-mono focus:outline-none focus:ring-1 select-text ${
+                             opt.voteKey && duplicateVoteKeys.has(opt.voteKey.toLowerCase()) 
+                               ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                               : 'border-zinc-300 dark:border-zinc-700 focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-twitch-brand dark:focus:ring-twitch-light'
+                           }`}
+                           placeholder={`ej: ${index + 1}/casa`}
                            title={t.poll.voteKeyTooltip}
                         />
+                        {opt.voteKey && duplicateVoteKeys.has(opt.voteKey.toLowerCase()) && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" title="Clave duplicada" />
+                        )}
                      </div>
                   </div>
-                  <div className="w-9 flex justify-center">
-                      {options.length > MIN_OPTIONS ? <button type="button" onClick={() => removeOption(index)} className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg"><Trash2 size={14} /></button> : <div className="w-8"></div>}
+                  <div className="flex items-center gap-0.5">
+                      {options.length < MAX_OPTIONS && (
+                        <button type="button" onClick={() => duplicateOption(index)} className="p-1.5 text-zinc-300 hover:text-twitch-brand hover:bg-twitch-brand/10 rounded-lg transition-colors" title="Duplicar opción">
+                          <Copy size={12} />
+                        </button>
+                      )}
+                      {options.length > MIN_OPTIONS && (
+                        <button type="button" onClick={() => removeOption(index)} className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Eliminar opción">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                   </div>
                 </div>
               ))}
                {options.length < MAX_OPTIONS && <button type="button" onClick={addOption} className="w-full py-2.5 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500 rounded-lg hover:border-twitch-brand hover:text-twitch-brand dark:hover:border-twitch-light dark:hover:text-twitch-light hover:bg-twitch-brand/5 transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide mt-2"><Plus size={14} /> {t.poll.addOptionBtn}</button>}
+            </div>
+            
+            {/* Live vote preview */}
+            <div className="mt-3 p-2 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-lg">
+              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold mb-1">Los viewers votarán con:</p>
+              <div className="flex flex-wrap gap-1">
+                {options.map((opt, i) => (
+                  <span key={i} className="px-2 py-0.5 bg-white dark:bg-zinc-900 rounded text-xs font-mono text-twitch-brand dark:text-twitch-light border border-zinc-300 dark:border-zinc-700">
+                    {votePrefix}{opt.voteKey || (i + 1)}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -671,6 +801,40 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                   </div>
               </div>
           </div>
+      )}
+
+      {/* Import Options Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 w-full max-w-md rounded-2xl shadow-2xl p-6 animate-scale-up">
+            <div className="flex justify-between items-center mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+              <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <FileText size={18} className="text-purple-500"/> Importar Opciones
+              </h3>
+              <button onClick={() => { setShowImportModal(false); setImportText(''); }} className="text-zinc-500 hover:text-black dark:hover:text-white bg-zinc-100 dark:bg-zinc-800 rounded-full p-1 transition-colors">
+                <X size={18}/>
+              </button>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
+              Pega una lista de opciones, una por línea (máx. {MAX_OPTIONS}):
+            </p>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={`Opción 1\nOpción 2\nOpción 3\n...`}
+              className="w-full h-40 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg p-3 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-twitch-brand resize-none"
+            />
+            <p className="text-xs text-zinc-400 mt-2 mb-4">
+              {importText.split('\n').filter(l => l.trim()).length} opciones detectadas
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => { setShowImportModal(false); setImportText(''); }}>Cancelar</Button>
+              <Button onClick={importOptionsFromText} disabled={!importText.trim()}>
+                <FileText size={16} /> Importar
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

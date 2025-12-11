@@ -83,7 +83,10 @@ export interface Translations {
     ended: string;
     totalVotes: string;
     votes: string;
+    votesLabel: string;
     winner: string;
+    viewDetails: string;
+    ofTotal: string;
     noVotes: string;
     waitingPoll: string;
     createPollHint: string;
@@ -154,6 +157,9 @@ export interface Translations {
     completeAllFields: string;
     allOptionsNeedLabel: string;
     option: string;
+    noOptionsToImport: string;
+    optionsImported: string;
+    quickPollCreated: string;
   };
   moderation: {
     title: string;
@@ -434,7 +440,10 @@ export const translations: Record<Locale, Translations> = {
       ended: 'Finalizada',
       totalVotes: 'Votos totales',
       votes: 'votos',
+      votesLabel: 'votos',
       winner: 'Ganador',
+      viewDetails: 'Ver Detalles',
+      ofTotal: 'del total',
       noVotes: 'Sin votos aún',
       waitingPoll: 'Esperando encuesta...',
       createPollHint: 'Crea una encuesta en el panel principal',
@@ -505,6 +514,9 @@ export const translations: Record<Locale, Translations> = {
       completeAllFields: 'Completa la pregunta y todas las opciones.',
       allOptionsNeedLabel: 'Todas las opciones deben tener una etiqueta.',
       option: 'Opción',
+      noOptionsToImport: 'No hay opciones para importar',
+      optionsImported: 'opciones importadas',
+      quickPollCreated: '¡Encuesta rápida Sí/No creada!',
     },
     moderation: {
       title: 'Moderación de Votos',
@@ -783,7 +795,10 @@ export const translations: Record<Locale, Translations> = {
       ended: 'Ended',
       totalVotes: 'Total votes',
       votes: 'votes',
+      votesLabel: 'votes',
       winner: 'Winner',
+      viewDetails: 'View Details',
+      ofTotal: 'of total',
       noVotes: 'No votes yet',
       waitingPoll: 'Waiting for poll...',
       createPollHint: 'Create a poll in the main panel',
@@ -854,6 +869,9 @@ export const translations: Record<Locale, Translations> = {
       completeAllFields: 'Complete the question and all options.',
       allOptionsNeedLabel: 'All options must have a label.',
       option: 'Option',
+      noOptionsToImport: 'No options to import',
+      optionsImported: 'options imported',
+      quickPollCreated: 'Quick Yes/No poll created!',
     },
     moderation: {
       title: 'Vote Moderation',
