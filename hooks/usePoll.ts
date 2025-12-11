@@ -91,7 +91,20 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
   // Core poll state
   const [currentPoll, setCurrentPoll] = useState<Poll | null>(null);
   const [voteHistory, setVoteHistory] = useState<VoteRecord[]>([]);
-  const [pastPolls, setPastPolls] = useState<Poll[]>([]);
+  const [pastPolls, setPastPolls] = useState<Poll[]>(() => {
+    // Load past polls from localStorage on init
+    if (typeof window !== 'undefined' && !isOverlayMode) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.POLL_HISTORY);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error('Failed to load poll history:', e);
+      }
+    }
+    return [];
+  });
   const [votedUserIds, setVotedUserIds] = useState<Set<string>>(new Set());
 
   // Ref for votedUserIds to avoid stale closures
@@ -101,6 +114,19 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
   useEffect(() => {
     votedUserIdsRef.current = votedUserIds;
   }, [votedUserIds]);
+
+  // Persist past polls to localStorage
+  useEffect(() => {
+    if (!isOverlayMode && pastPolls.length > 0) {
+      try {
+        // Keep only the last 50 polls to avoid storage issues
+        const pollsToSave = pastPolls.slice(0, 50);
+        localStorage.setItem(STORAGE_KEYS.POLL_HISTORY, JSON.stringify(pollsToSave));
+      } catch (e) {
+        console.error('Failed to save poll history:', e);
+      }
+    }
+  }, [pastPolls, isOverlayMode]);
 
   // Memoize the map of UserID -> OptionID for efficient lookups
   const userVoteMap = useMemo(() => {

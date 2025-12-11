@@ -140,6 +140,43 @@ input.placeholder-purple-light::placeholder { color: var(--color-purple-light) !
   background: #52525b;
 }
 
+/* Custom scrollbar class for specific elements */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: #3f3f46 transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 10px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
 /* Safe area for mobile devices with notch */
 .safe-area-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));

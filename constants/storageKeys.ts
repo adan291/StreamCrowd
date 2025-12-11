@@ -34,6 +34,9 @@ export const STORAGE_KEYS = {
   
   // Moderation Presets
   MODERATION_PRESETS: 'twitch_vote_moderation_presets',
+  
+  // Poll History
+  POLL_HISTORY: 'twitch_vote_poll_history',
 } as const;
 
 export type StorageKey = typeof STORAGE_KEYS[keyof typeof STORAGE_KEYS];

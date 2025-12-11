@@ -85,6 +85,14 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [simulatedPoll, setSimulatedPoll] = useState<Poll | null>(null);
   
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(poll.title || '');
+  const [editQuestion, setEditQuestion] = useState(poll.question);
+  
+  // Moderation panel state
+  const [showModerationPanel, setShowModerationPanel] = useState(false);
+  
   // Chart container dimensions to avoid negative dimension warnings
   const [chartSize, setChartSize] = useState<{width: number, height: number}>({width: 400, height: 250});
   const chartContainerRef = React.useRef<HTMLDivElement>(null);
@@ -99,10 +107,11 @@ export const LivePoll: React.FC<LivePollProps> = ({
       }
     };
     
-    // Initial measurement with delays
+    // Initial measurement with delays - also triggers when showModerationPanel changes
     const timers = [
       setTimeout(updateSize, 50),
-      setTimeout(updateSize, 200),
+      setTimeout(updateSize, 150),
+      setTimeout(updateSize, 300),
       setTimeout(updateSize, 500),
     ];
     
@@ -114,15 +123,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
       timers.forEach(clearTimeout);
       window.removeEventListener('resize', handleResize);
     };
-  }, [variant]);
-
-  // Editing state
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(poll.title || '');
-  const [editQuestion, setEditQuestion] = useState(poll.question);
-  
-  // Moderation panel state
-  const [showModerationPanel, setShowModerationPanel] = useState(false);
+  }, [variant, showModerationPanel]);
 
   // Sync with external control (for demo tour)
   useEffect(() => {
@@ -139,13 +140,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Determine which poll data to display
   const displayPoll = (isSimulationMode && isDefault && simulatedPoll) ? simulatedPoll : poll;
 
-  // Track if we already triggered the time-up sequence
-  const timeUpTriggeredRef = useRef(false);
-
   // Timer Logic (always track real poll time)
   useEffect(() => {
     if (poll.isActive && poll.duration) {
-       timeUpTriggeredRef.current = false;
        const elapsed = Math.floor((Date.now() - poll.startTime) / 1000);
        const remaining = Math.max(0, poll.duration - elapsed);
        setTimeLeft(remaining);
@@ -156,16 +153,14 @@ export const LivePoll: React.FC<LivePollProps> = ({
          setCountdownNumber(remaining);
        }
 
-       if (remaining === 0 && !timeUpTriggeredRef.current) {
-           timeUpTriggeredRef.current = true;
-           setShowTimeUpAnimation(true);
-           setTimeout(() => {
-             onStop(true);
-           }, 1500);
-           setTimeout(() => {
-             setShowTimeUpAnimation(false);
-           }, 1800);
-       } else if (remaining > 0) {
+       if (remaining === 0) {
+           setShowCountdown(false);
+           // Show winner overlay BEFORE stopping (so we capture current votes)
+           if (poll.totalVotes > 0) {
+             setShowWinnerOverlay(true);
+           }
+           onStop(true);
+       } else {
            const interval = setInterval(() => {
                const newElapsed = Math.floor((Date.now() - poll.startTime) / 1000);
                const newRemaining = Math.max(0, poll.duration! - newElapsed);
@@ -175,34 +170,29 @@ export const LivePoll: React.FC<LivePollProps> = ({
                if (newRemaining <= 5 && newRemaining > 0) {
                  setShowCountdown(true);
                  setCountdownNumber(newRemaining);
-               } else if (newRemaining > 5) {
+               } else {
                  setShowCountdown(false);
                  setCountdownNumber(null);
                }
                
-               if (newRemaining === 0 && !timeUpTriggeredRef.current) {
-                   timeUpTriggeredRef.current = true;
+               if (newRemaining === 0) {
                    setShowCountdown(false);
-                   setShowTimeUpAnimation(true);
-                   // First show "Time Up" animation (1.5s), then stop poll, then winner will show
-                   setTimeout(() => {
-                     onStop(true);
-                   }, 1500);
-                   setTimeout(() => {
-                     setShowTimeUpAnimation(false);
-                   }, 1800);
+                   // Show winner overlay BEFORE stopping (so we capture current votes)
+                   if (poll.totalVotes > 0) {
+                     setShowWinnerOverlay(true);
+                   }
+                   onStop(true);
                    clearInterval(interval);
                }
            }, 1000);
            return () => clearInterval(interval);
        }
-    } else if (!poll.isActive) {
-        // Only reset time display when poll is not active, but don't touch animations
+    } else {
         setTimeLeft(null);
         setShowCountdown(false);
         setCountdownNumber(null);
     }
-  }, [poll.isActive, poll.startTime, poll.duration]);
+  }, [poll.isActive, poll.startTime, poll.duration, poll.totalVotes]);
 
   // Detect vote changes to trigger animation
   useEffect(() => {
@@ -235,16 +225,13 @@ export const LivePoll: React.FC<LivePollProps> = ({
   }, [poll, isSimulationMode]);
 
   // Show winner overlay when poll ends
+  // Auto-show winner overlay when poll ends (but user can toggle it manually anytime)
   useEffect(() => {
-      if (!isSimulationMode) {
-          if (!poll.isActive && poll.totalVotes > 0 && !showTimeUpAnimation) {
-              // Show winner overlay after time-up animation is done
-              setShowWinnerOverlay(true);
-          } else if (poll.isActive) {
-              setShowWinnerOverlay(false);
-          }
+      if (!isSimulationMode && !poll.isActive && poll.totalVotes > 0) {
+          // Auto-show winner when poll ends
+          setShowWinnerOverlay(true);
       }
-  }, [poll.isActive, poll.totalVotes, isSimulationMode, showTimeUpAnimation]);
+  }, [poll.isActive, poll.totalVotes, isSimulationMode]);
 
   useEffect(() => {
       if (isEditing) {
@@ -286,8 +273,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const progressBarColor = displayPoll.progressBarColor || (progressPercent >= 100 ? '#ef4444' : progressPercent >= 90 ? '#eab308' : '#3b82f6');
   const limitIndicatorColor = displayPoll.limitIndicatorColor || (isAtLimit ? '#ef4444' : '#eab308');
 
-  // Find winner
-  const winner = !displayPoll.isActive && displayPoll.totalVotes > 0
+  // Find winner - also calculate when showWinnerOverlay is true (for timer end)
+  const winner = ((!displayPoll.isActive || showWinnerOverlay) && displayPoll.totalVotes > 0)
     ? displayPoll.options.reduce((prev, current) => (prev.votes > current.votes) ? prev : current)
     : null;
     
@@ -414,21 +401,27 @@ export const LivePoll: React.FC<LivePollProps> = ({
     ? "h-full w-full bg-transparent p-3 sm:p-4 md:p-8 flex flex-col justify-center" 
     : isPreview 
         ? "flex flex-col animate-[fadeIn_0.5s_ease-out] relative w-full h-full" 
-        : `h-full flex flex-col animate-[fadeIn_0.5s_ease-out] relative overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 md:pb-6 ${isSimulationMode ? 'border-4 border-dashed border-twitch-brand/50 bg-twitch-brand/5 rounded-2xl' : ''}`;
+        : `h-full flex flex-col animate-[fadeIn_0.5s_ease-out] relative overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 pb-20 md:pb-6 custom-scrollbar ${isSimulationMode ? 'border-4 border-dashed border-twitch-brand/50 bg-twitch-brand/5 rounded-2xl' : ''}`;
 
   // Chart Height Logic - Fixed height for preview/mobile, flexible for desktop panel/overlay
+  // When moderation panel is open, reduce chart height to make room
   const chartHeightClass = isOverlay 
     ? "flex-1 min-h-0" 
     : isPreview 
         ? "h-[180px] sm:h-[200px] shrink-0 min-h-[150px]" 
-        : "flex-1 min-h-[200px] sm:min-h-[250px] md:min-h-[300px] max-h-[50vh] lg:max-h-none"; 
+        : showModerationPanel 
+            ? "min-h-[150px] sm:min-h-[180px] md:min-h-[200px] h-[25vh] sm:h-[28vh] md:h-[30vh] shrink-0"
+            : "min-h-[200px] sm:min-h-[250px] md:min-h-[300px] h-[35vh] sm:h-[40vh] lg:flex-1 lg:h-auto"; 
   
   // Grid Layout Logic - Stack on mobile, side by side on desktop
+  // When moderation panel is open, don't use flex-1 to allow proper sizing
   const gridLayoutClass = isOverlay 
     ? "flex flex-col gap-4 sm:gap-8 h-full" 
     : isPreview 
         ? "flex flex-col gap-2 sm:gap-3 mt-3 sm:mt-4" 
-        : "flex flex-col lg:flex-row gap-3 flex-1 min-h-0 relative z-10";
+        : showModerationPanel
+            ? "flex flex-col lg:flex-row gap-3 shrink-0 relative z-10"
+            : "flex flex-col lg:flex-row gap-3 flex-1 min-h-0 relative z-10";
   
   // Sort options by votes (descending) for ranking display
   const sortedOptions = [...displayPoll.options].sort((a, b) => b.votes - a.votes);
@@ -622,6 +615,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                  </Button>
              )}
              
+             
              {/* Moderation Panel Toggle */}
              {moderationStats && !isSimulationMode && (
                  <Button 
@@ -688,21 +682,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
           </div>
         )}
 
-        {/* Time Up Animation */}
-        {showTimeUpAnimation && (
-          <div className="absolute inset-0 z-45 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="text-center">
-              <Clock size={80} className="mx-auto mb-4 text-red-500 animate-bounce" />
-              <h2 className="text-5xl font-black text-white uppercase tracking-widest animate-pulse">
-                ¡Tiempo!
-              </h2>
-            </div>
-          </div>
-        )}
-        
-        {/* Winner Overlay */}
-        {winner && showWinnerOverlay && !displayPoll.isActive && !showTimeUpAnimation && (
-            <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg animate-fade-in p-2 sm:p-4 text-center ${isOverlay ? 'bg-transparent' : 'bg-white/95 dark:bg-black/90 backdrop-blur-md'}`}>
+        {/* Winner Overlay - Shows when manually triggered or when poll ends */}
+        {winner && showWinnerOverlay && (
+            <div className={`absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg animate-fade-in p-2 sm:p-4 text-center overflow-y-auto ${isOverlay ? 'bg-transparent' : 'bg-white/95 dark:bg-black/90 backdrop-blur-md'}`}>
                 {/* Confetti particles */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                   {[...Array(20)].map((_, i) => (
@@ -721,56 +703,70 @@ export const LivePoll: React.FC<LivePollProps> = ({
                   ))}
                 </div>
                 
-                {!isOverlay && (
-                    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
-                        <button onClick={() => setShowWinnerOverlay(false)} className="text-zinc-500 hover:text-black dark:hover:text-white flex items-center gap-1 text-[10px] sm:text-xs bg-white/80 dark:bg-black/50 px-2 py-1 rounded-lg backdrop-blur-sm">
-                            <Eye size={12} className="sm:w-[14px] sm:h-[14px]" /> {t.poll.viewDetails || 'Ver Detalles'}
-                        </button>
-                    </div>
-                )}
-                
-                <div className="mb-2 sm:mb-4 relative">
-                    <div className="absolute inset-0 animate-ping">
-                      <Trophy className={`${isOverlay ? 'w-[120px] h-[120px]' : 'w-8 h-8 sm:w-12 sm:h-12'} text-yellow-400/30`} />
-                    </div>
-                    <Trophy className={`${isOverlay ? 'w-[120px] h-[120px]' : 'w-8 h-8 sm:w-12 sm:h-12'} text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.8)] animate-bounce relative z-10`} />
-                </div>
-                
-                <h3 className={`${isOverlay ? 'text-5xl sm:text-7xl mb-6 sm:mb-8' : 'text-2xl sm:text-4xl mb-2 sm:mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-wider sm:tracking-widest drop-shadow-sm animate-pulse`}>
-                    {t.poll.winner}!
-                </h3>
-
-                <div className="relative mb-4 sm:mb-8 group">
-                    <div className="absolute -inset-4 sm:-inset-8 bg-gradient-to-r from-yellow-500/30 to-purple-600/30 rounded-full blur-xl sm:blur-2xl opacity-75 animate-spin-slow"></div>
-                    <div className="absolute -inset-2 sm:-inset-4 bg-yellow-400/20 rounded-full animate-ping"></div>
-                    <div 
-                      className={`relative ${isOverlay ? 'w-48 h-48 sm:w-72 sm:h-72 md:w-96 md:h-96 border-4 sm:border-8' : 'w-24 h-24 sm:w-36 sm:h-36 md:w-48 md:h-48 border-4 sm:border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.6)] sm:shadow-[0_0_60px_rgba(250,204,21,0.6)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center animate-scale-up`}
-                      style={{ backgroundColor: winner.color }}
+                {/* Close button - always visible */}
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10">
+                    <button 
+                      onClick={() => setShowWinnerOverlay(false)} 
+                      className={`flex items-center gap-1 text-[10px] sm:text-xs px-2 py-1 rounded-lg backdrop-blur-sm transition-all ${
+                        isOverlay 
+                          ? 'bg-black/50 text-white hover:bg-black/70 border border-white/20' 
+                          : 'bg-white/80 dark:bg-black/50 text-zinc-500 hover:text-black dark:hover:text-white'
+                      }`}
                     >
-                        {winner.image ? (
-                            <img src={winner.image} alt="Winner" className="w-full h-full object-cover" />
-                        ) : (
-                            <span className={`${isOverlay ? 'text-6xl sm:text-8xl md:text-9xl' : 'text-4xl sm:text-6xl md:text-8xl'} select-none drop-shadow-lg`}>{winner.icon || '🏆'}</span>
-                        )}
+                        <X size={14} className="sm:w-[16px] sm:h-[16px]" />
+                        {!isOverlay && <span>{t.poll.viewDetails || 'Ver Detalles'}</span>}
+                    </button>
+                </div>
+                
+                {/* Winner content wrapper - more compact for overlay mode */}
+                <div className={`flex flex-col items-center justify-center ${isOverlay ? 'py-2 scale-75 sm:scale-90 md:scale-100' : 'py-4 sm:py-0'}`}>
+                    <div className={`${isOverlay ? 'mb-1 sm:mb-2' : 'mb-2 sm:mb-4'} relative`}>
+                        <div className="absolute inset-0 animate-ping">
+                          <Trophy className={`${isOverlay ? 'w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20' : 'w-6 h-6 sm:w-10 sm:h-10 md:w-12 md:h-12'} text-yellow-400/30`} />
+                        </div>
+                        <Trophy className={`${isOverlay ? 'w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20' : 'w-6 h-6 sm:w-10 sm:h-10 md:w-12 md:h-12'} text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.8)] animate-bounce relative z-10`} />
                     </div>
-                </div>
+                    
+                    <h3 className={`${isOverlay ? 'text-2xl sm:text-4xl md:text-5xl mb-2 sm:mb-4' : 'text-xl sm:text-3xl md:text-4xl mb-2 sm:mb-4'} font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-yellow-300 uppercase tracking-wider sm:tracking-widest drop-shadow-sm animate-pulse`}>
+                        {t.poll.winner}!
+                    </h3>
 
-                <h2 className={`${isOverlay ? 'text-3xl sm:text-5xl md:text-6xl' : 'text-xl sm:text-2xl md:text-3xl'} font-bold leading-tight mb-1 sm:mb-2 px-2 sm:px-4 animate-slide-up text-zinc-900 dark:text-white ${isOverlay ? 'drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]' : ''}`}>
-                   {winner.label}
-                </h2>
-                <div className={`${isOverlay ? 'text-2xl sm:text-3xl md:text-4xl' : 'text-base sm:text-lg'} font-bold animate-slide-up`} style={{ animationDelay: '0.2s' }}>
-                  <span className="text-yellow-500 dark:text-yellow-300 drop-shadow-md">{winner.votes}</span>
-                  <span className="text-zinc-400 ml-1 sm:ml-2">{t.poll.votesLabel || 'votos'}</span>
+                    <div className={`relative ${isOverlay ? 'mb-2 sm:mb-4' : 'mb-3 sm:mb-6 md:mb-8'} group`}>
+                        <div className={`absolute ${isOverlay ? '-inset-2 sm:-inset-4' : '-inset-3 sm:-inset-6 md:-inset-8'} bg-gradient-to-r from-yellow-500/30 to-purple-600/30 rounded-full blur-lg sm:blur-xl md:blur-2xl opacity-75 animate-spin-slow`}></div>
+                        <div className={`absolute ${isOverlay ? '-inset-1 sm:-inset-2' : '-inset-1.5 sm:-inset-3 md:-inset-4'} bg-yellow-400/20 rounded-full animate-ping`}></div>
+                        <div 
+                          className={`relative ${isOverlay ? 'w-32 h-32 sm:w-48 sm:h-48 md:w-56 md:h-56 border-4 sm:border-6' : 'w-20 h-20 sm:w-28 sm:h-28 md:w-40 md:h-40 lg:w-48 lg:h-48 border-3 sm:border-4 md:border-[6px]'} rounded-full border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.5)] sm:shadow-[0_0_50px_rgba(250,204,21,0.6)] overflow-hidden bg-white dark:bg-zinc-900 flex items-center justify-center animate-scale-up`}
+                          style={{ backgroundColor: winner.color }}
+                        >
+                            {winner.image ? (
+                                <img src={winner.image} alt="Winner" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className={`${isOverlay ? 'text-4xl sm:text-6xl md:text-7xl' : 'text-3xl sm:text-5xl md:text-7xl lg:text-8xl'} select-none drop-shadow-lg`}>{winner.icon || '🏆'}</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <h2 className={`${isOverlay ? 'text-xl sm:text-3xl md:text-4xl' : 'text-lg sm:text-xl md:text-2xl lg:text-3xl'} font-bold leading-tight mb-1 sm:mb-2 px-2 sm:px-4 animate-slide-up text-zinc-900 dark:text-white ${isOverlay ? 'drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)]' : ''}`}
+                      style={isOverlay ? { color: overlayStyles.textColor } : {}}
+                    >
+                       {winner.label}
+                    </h2>
+                    <div className={`${isOverlay ? 'text-lg sm:text-2xl md:text-3xl' : 'text-sm sm:text-base md:text-lg'} font-bold animate-slide-up`} style={{ animationDelay: '0.2s' }}>
+                      <span className="text-yellow-500 dark:text-yellow-300 drop-shadow-md">{winner.votes}</span>
+                      <span className="text-zinc-400 ml-1 sm:ml-2" style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.7 } : {}}>{t.poll.votesLabel || 'votos'}</span>
+                    </div>
+                    <p className={`${isOverlay ? 'text-sm sm:text-lg md:text-xl mt-1 sm:mt-2' : 'text-[10px] sm:text-xs md:text-sm mt-1 sm:mt-2'} text-zinc-500 dark:text-zinc-400`}
+                      style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.6 } : {}}
+                    >
+                      {((winner.votes / displayPoll.totalVotes) * 100).toFixed(1)}% {t.poll.ofTotal || 'del total'}
+                    </p>
                 </div>
-                <p className={`${isOverlay ? 'text-lg sm:text-xl md:text-2xl mt-2 sm:mt-4' : 'text-xs sm:text-sm mt-1 sm:mt-2'} text-zinc-500 dark:text-zinc-400`}>
-                  {((winner.votes / displayPoll.totalVotes) * 100).toFixed(1)}% {t.poll.ofTotal || 'del total'}
-                </p>
             </div>
         )}
 
         {/* Chart */}
-        <div className={`${isOverlay ? 'bg-transparent border-0' : 'bg-zinc-50 dark:bg-zinc-950/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-800/50'} flex flex-col ${chartHeightClass} lg:flex-[3] relative min-w-0`}>
-          <div ref={chartContainerRef} className="w-full h-full absolute inset-0 p-2 md:p-4">
+        <div className={`${isOverlay ? 'bg-transparent border-0' : 'bg-zinc-50 dark:bg-zinc-950/50 rounded-lg p-3 border border-zinc-200 dark:border-zinc-800/50'} flex flex-col ${chartHeightClass} lg:flex-[3] relative min-w-0 overflow-hidden`}>
+          <div ref={chartContainerRef} className="w-full h-full flex-1 min-h-0 p-2 md:p-4">
           {shouldRenderChart && chartData.length > 0 && chartSize.width > 50 && chartSize.height > 50 ? (
                   <BarChart data={chartData} width={chartSize.width - 20} height={chartSize.height - 20} margin={{ top: 20, right: 10, left: 10, bottom: isOverlay ? 40 : 20 }}>
                       <XAxis 
@@ -942,18 +938,22 @@ export const LivePoll: React.FC<LivePollProps> = ({
         </div>
       </div>
       
-      {winner && !showWinnerOverlay && !displayPoll.isActive && !isOverlay && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20">
-              <button onClick={() => setShowWinnerOverlay(true)} className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-all animate-bounce">
-                  <Trophy size={14} /> {t.poll.winner}
+      {/* Floating Winner Button - Shows when there are votes and overlay is hidden */}
+      {displayPoll.totalVotes > 0 && !showWinnerOverlay && !isSimulationMode && (
+          <div className={`absolute ${isOverlay ? 'top-12 right-4' : 'top-16 left-1/2 -translate-x-1/2'} z-20`}>
+              <button 
+                onClick={() => setShowWinnerOverlay(true)} 
+                className={`${displayPoll.isActive ? 'bg-yellow-500/80 hover:bg-yellow-400/90' : 'bg-yellow-500 hover:bg-yellow-400 animate-bounce'} text-black font-bold ${isOverlay ? 'text-sm px-3 py-2' : 'text-xs px-4 py-1.5'} rounded-full shadow-lg flex items-center gap-2 transition-all`}
+              >
+                  <Trophy size={isOverlay ? 18 : 14} /> {displayPoll.isActive ? 'Ver Líder' : t.poll.winner}
               </button>
           </div>
       )}
       
       {/* Moderation Panel */}
       {showModerationPanel && moderationStats && isDefault && !isSimulationMode && (
-        <div className="mt-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4" data-tour="moderation">
-          <div className="max-h-[50vh] overflow-y-auto custom-scrollbar space-y-4 pr-1">
+        <div className="mt-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4 relative z-20 shrink-0" data-tour="moderation">
+          <div className="max-h-[30vh] sm:max-h-[35vh] md:max-h-[40vh] overflow-y-auto custom-scrollbar space-y-3 sm:space-y-4 pr-1">
             <ModerationStatsDisplay stats={moderationStats} />
             <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
           </div>
