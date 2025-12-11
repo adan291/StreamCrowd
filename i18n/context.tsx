@@ -30,7 +30,6 @@ export const I18nProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
 
   const setLocale = (newLocale: Locale) => {
-    console.log('Changing locale to:', newLocale);
     setLocaleState(newLocale);
     localStorage.setItem(LOCALE_STORAGE_KEY, newLocale);
     document.documentElement.lang = newLocale;

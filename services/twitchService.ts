@@ -154,7 +154,7 @@ class TwitchService {
         });
 
         this.client.on('disconnected', (reason) => {
-          console.log(`Disconnected: ${reason}`);
+          // Debug: console.log(`Disconnected: ${reason}`);
           if (!this.isManualDisconnect) {
             this.attemptReconnect();
           } else {
@@ -220,7 +220,7 @@ class TwitchService {
 
     // Calculate delay with exponential backoff
     const delay = this.calculateBackoffDelay(this.reconnectAttempts);
-    console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${delay}ms`);
+    // Debug: console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} in ${delay}ms`);
 
     if (this.statusChangeCallback) {
       this.statusChangeCallback(ConnectionStatus.CONNECTING);
