@@ -326,7 +326,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
       <div className="bg-zinc-900 rounded-2xl p-6 max-w-2xl w-full mx-4 relative max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 Panel de Sonidos</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 Panel de Sonidos v2</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Volume2 size={16} className="text-zinc-400" />
