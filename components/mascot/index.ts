@@ -5,3 +5,4 @@ export * from './useMascotDrag';
 export * from './useIdleTime';
 export { MascotFace } from './MascotFace';
 export { AIVisionMascot, default } from './AIVisionMascot';
+export type { MascotSize } from './AIVisionMascot';

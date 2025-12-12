@@ -19,4 +19,5 @@ export type {
   ChatSentiment,
   EmotionResult,
   EyeStyle,
+  MascotSize,
 } from './mascot';

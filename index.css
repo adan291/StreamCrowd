@@ -752,3 +752,105 @@ html.dark {
 .animate-confetti {
   animation: confettiFall 3s ease-out forwards;
 }
+
+
+/* Enhanced Mascot Animations */
+@keyframes mascotBounceFast {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.05); }
+}
+
+.mascot-bounce-fast {
+  animation: mascotBounceFast 0.4s ease-in-out infinite;
+}
+
+@keyframes mascotBounceSubtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.mascot-bounce-subtle {
+  animation: mascotBounceSubtle 2s ease-in-out infinite;
+}
+
+@keyframes mascotShakeFast {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-4px) rotate(-2deg); }
+  40% { transform: translateX(4px) rotate(2deg); }
+  60% { transform: translateX(-3px) rotate(-1deg); }
+  80% { transform: translateX(3px) rotate(1deg); }
+}
+
+.mascot-shake-fast {
+  animation: mascotShakeFast 0.3s ease-in-out infinite;
+}
+
+@keyframes mascotDroopSlow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(5px) rotate(-3deg); }
+}
+
+.mascot-droop-slow {
+  animation: mascotDroopSlow 4s ease-in-out infinite;
+}
+
+@keyframes mascotFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(2deg); }
+  50% { transform: translateY(-8px) rotate(0deg); }
+  75% { transform: translateY(-5px) rotate(-2deg); }
+}
+
+.mascot-float {
+  animation: mascotFloat 3s ease-in-out infinite;
+}
+
+/* Data stream animation for analyzing state */
+@keyframes dataStream {
+  0% { transform: translateY(0); opacity: 0.8; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+
+.animate-data-stream {
+  animation: dataStream 1s linear infinite;
+}
+
+/* Orbit animation for particles */
+@keyframes orbit {
+  0% { transform: rotate(0deg) translateX(30px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(30px) rotate(-360deg); }
+}
+
+.animate-orbit {
+  animation: orbit 4s linear infinite;
+}
+
+/* Glow breathing effect */
+@keyframes glowBreathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.animate-glow-breathe {
+  animation: glowBreathe 2s ease-in-out infinite;
+}
+
+/* Eye sparkle */
+@keyframes eyeSparkle {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.animate-eye-sparkle {
+  animation: eyeSparkle 1.5s ease-in-out infinite;
+}
+
+/* Antenna pulse */
+@keyframes antennaPulse {
+  0%, 100% { r: 2.5; opacity: 0.7; }
+  50% { r: 3.5; opacity: 1; }
+}
+
+.animate-antenna-pulse {
+  animation: antennaPulse 1s ease-in-out infinite;
+}

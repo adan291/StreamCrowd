@@ -1,15 +1,42 @@
 import React from 'react';
 import { Poll } from '../types';
-import { Trophy, Calendar, Hash, X } from 'lucide-react';
+import { Trophy, Calendar, Hash, X, Copy, Download, RotateCcw } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 interface PollHistoryProps {
   history: Poll[];
   onClose: () => void;
+  onLoadPoll?: (poll: Poll) => void;
+  onDownloadPoll?: (poll: Poll) => void;
 }
 
-export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) => {
+export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose, onLoadPoll, onDownloadPoll }) => {
   const { t } = useI18n();
+  
+  const handleDownload = (poll: Poll) => {
+    const data = {
+      question: poll.question,
+      options: poll.options.map(o => ({
+        label: o.label,
+        color: o.color,
+        icon: o.icon,
+        votes: o.votes
+      })),
+      totalVotes: poll.totalVotes,
+      date: new Date(poll.startTime).toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `encuesta_${poll.id}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    onDownloadPoll?.(poll);
+  };
+  
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white dark:bg-zinc-900 border-0 sm:border border-zinc-200 dark:border-zinc-800 w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[80vh] animate-slide-up sm:animate-scale-up">
@@ -42,12 +69,33 @@ export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose }) =>
               const date = new Date(poll.startTime);
               
               return (
-                <div key={poll.id} className="bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 sm:p-4 hover:border-twitch-brand/30 dark:hover:border-zinc-700 transition-colors">
+                <div key={poll.id} className="bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 sm:p-4 hover:border-twitch-brand/30 dark:hover:border-zinc-700 transition-colors group">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-0 mb-2 sm:mb-3">
-                    <h3 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-lg">{poll.question}</h3>
-                    <span className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-500 font-mono shrink-0">
-                      {date.toLocaleDateString()} {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
+                    <h3 className="font-bold text-zinc-900 dark:text-white text-sm sm:text-lg flex-1">{poll.question}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-500 font-mono shrink-0">
+                        {date.toLocaleDateString()} {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                      {/* Action buttons */}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {onLoadPoll && (
+                          <button
+                            onClick={() => { onLoadPoll(poll); onClose(); }}
+                            className="p-1.5 text-zinc-400 hover:text-twitch-brand hover:bg-twitch-brand/10 rounded-lg transition-colors"
+                            title="Reutilizar esta encuesta"
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDownload(poll)}
+                          className="p-1.5 text-zinc-400 hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
+                          title="Descargar encuesta"
+                        >
+                          <Download size={14} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="flex flex-wrap gap-2 sm:gap-4 mb-3 sm:mb-4 text-xs sm:text-sm">

@@ -239,16 +239,24 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         </div>
       </div>
 
-      {/* Whitelist */}
-      <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+      {/* Whitelist - Votantes Permitidos (Azul) */}
+      <div className={`space-y-2 pt-2 border-t transition-colors rounded-lg ${
+        config.whitelist?.enabled 
+          ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20 p-3 -mx-1' 
+          : 'border-zinc-200 dark:border-zinc-800'
+      }`}>
+        <label className={`text-xs font-bold uppercase flex items-center ${
+          config.whitelist?.enabled ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500 dark:text-zinc-400'
+        }`}>
           {t.moderation.whitelist}
           <Tooltip text={t.moderation.whitelistTooltip} />
         </label>
         
         {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className={`text-sm ${
+            config.whitelist?.enabled ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-600 dark:text-zinc-400'
+          }`}>
             {t.moderation.whitelistEnabled}
           </span>
           <button
@@ -261,7 +269,7 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
               },
             })}
             className={`relative w-11 h-6 rounded-full transition-colors ${
-              config.whitelist?.enabled ? 'bg-twitch-brand' : 'bg-zinc-300 dark:bg-zinc-700'
+              config.whitelist?.enabled ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-700'
             }`}
           >
             <div
@@ -293,25 +301,33 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
               }}
               placeholder={t.moderation.whitelistPlaceholder}
               rows={4}
-              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand resize-none font-mono"
+              className="w-full bg-white dark:bg-zinc-900 border border-blue-300 dark:border-blue-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none font-mono"
             />
-            <div className="text-xs text-zinc-500">
+            <div className="text-xs text-blue-500">
               {t.moderation.whitelistCount.replace('{count}', String(config.whitelist?.usernames?.length || 0))}
             </div>
           </div>
         )}
       </div>
 
-      {/* Blacklist */}
-      <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+      {/* Blacklist - Usuarios Excluidos (Rojo) */}
+      <div className={`space-y-2 pt-2 border-t transition-colors rounded-lg ${
+        config.blacklist?.enabled 
+          ? 'border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/20 p-3 -mx-1' 
+          : 'border-zinc-200 dark:border-zinc-800'
+      }`}>
+        <label className={`text-xs font-bold uppercase flex items-center ${
+          config.blacklist?.enabled ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400'
+        }`}>
           {t.moderation.blacklist}
           <Tooltip text={t.moderation.blacklistTooltip} />
         </label>
         
         {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+          <span className={`text-sm ${
+            config.blacklist?.enabled ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-400'
+          }`}>
             {t.moderation.blacklistEnabled}
           </span>
           <button

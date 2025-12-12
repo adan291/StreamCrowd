@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3 } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Trophy, Download, FolderUp, History } from 'lucide-react';
 import { SpinnerWheel } from './SpinnerWheel';
+import { RandomWinner } from './RandomWinner';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
 import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
@@ -10,6 +11,7 @@ import { NotificationType } from './Notification';
 import { LivePoll } from './LivePoll';
 import { ModerationConfigForm } from './ModerationConfigForm';
 import { useI18n } from '../i18n';
+import { TwitchMessage } from '../types';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
@@ -18,9 +20,12 @@ interface PollCreatorProps {
   onAddAsset?: (asset: MediaAsset) => void;
   moderationConfig?: ModerationConfig;
   onModerationConfigChange?: (config: ModerationConfig) => void;
+  chatMessages?: TwitchMessage[];
+  onShowHistory?: () => void;
+  sidebarHidden?: boolean;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false }) => {
   const { t } = useI18n();
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
@@ -53,6 +58,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [importText, setImportText] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showSpinner, setShowSpinner] = useState(false);
+  const [showRandomWinner, setShowRandomWinner] = useState(false);
   const [quickMode, setQuickMode] = useState(true); // Toggle para modo rápido
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -79,6 +85,34 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       }
     }
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Esc - Close modals
+      if (e.key === 'Escape') {
+        if (showConfirm) setShowConfirm(false);
+        else if (showPreview) setShowPreview(false);
+        else if (showImportModal) { setShowImportModal(false); setImportText(''); }
+        else if (showAssetPicker !== null) setShowAssetPicker(null);
+        else if (showPresetConfirm) setShowPresetConfirm(null);
+        else if (showSpinner) setShowSpinner(false);
+        else if (showRandomWinner) setShowRandomWinner(false);
+        else if (showTemplates) setShowTemplates(false);
+      }
+      
+      // Ctrl+Enter - Create poll (if form is valid)
+      if (e.ctrlKey && e.key === 'Enter') {
+        if (question.trim() && options.every(opt => opt.label.trim()) && options.length >= 2) {
+          e.preventDefault();
+          handlePreSubmit();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConfirm, showPreview, showImportModal, showAssetPicker, showPresetConfirm, showSpinner, showRandomWinner, showTemplates, question, options]);
 
   const applyPreset = (type: 'yesno' | 'rating' | 'abc') => {
       if (type === 'yesno') {
@@ -439,6 +473,64 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     localStorage.setItem('twitch_vote_templates', JSON.stringify(newSaved));
   };
 
+  // Export templates to JSON file
+  const exportTemplates = () => {
+    if (savedPolls.length === 0) {
+      if (onNotification) onNotification('error', 'No hay plantillas para exportar');
+      return;
+    }
+    const dataStr = JSON.stringify(savedPolls, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `plantillas_encuestas_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    if (onNotification) onNotification('success', `${savedPolls.length} plantillas exportadas`);
+  };
+
+  // Import templates from JSON file
+  const templateFileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleImportTemplates = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string) as SavedPoll[];
+        if (!Array.isArray(imported)) {
+          throw new Error('Invalid format');
+        }
+        // Validate and assign new IDs to avoid conflicts
+        const validTemplates = imported.filter(t => t.question && Array.isArray(t.options)).map(t => ({
+          ...t,
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          isFavorite: t.isFavorite || false
+        }));
+        
+        if (validTemplates.length === 0) {
+          if (onNotification) onNotification('error', 'No se encontraron plantillas válidas');
+          return;
+        }
+        
+        const newSaved = [...savedPolls, ...validTemplates];
+        localStorage.setItem('twitch_vote_templates', JSON.stringify(newSaved));
+        setSavedPolls(newSaved);
+        if (onNotification) onNotification('success', `${validTemplates.length} plantillas importadas`);
+      } catch (err) {
+        if (onNotification) onNotification('error', 'Error al leer el archivo. Asegúrate de que sea un JSON válido.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    if (templateFileInputRef.current) templateFileInputRef.current.value = '';
+  };
+
   const sortedTemplates = [...savedPolls]
     .filter(t => !filterFavorites || t.isFavorite)
     .sort((a, b) => {
@@ -475,7 +567,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   return (
     <>
       <div className="h-full flex flex-col relative p-3 sm:p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
-        <div className="flex justify-between items-center mb-4 sm:mb-6 shrink-0">
+        <div className={`flex justify-between items-center mb-4 sm:mb-6 shrink-0 transition-all duration-300 ${sidebarHidden ? 'pt-12 md:pt-0' : ''}`}>
           <h3 className="text-base sm:text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
             <span className="bg-twitch-brand w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm text-white shadow-lg shadow-twitch-brand/30">🛠️</span>
             <span className="hidden xs:inline">{t.poll.createTitle}</span>
@@ -502,6 +594,17 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             >
               <Bookmark size={14} /> <span className="hidden xs:inline">{t.poll.templates}</span>
             </button>
+            {onShowHistory && (
+              <Tooltip text="Ver historial de encuestas pasadas">
+                <button 
+                  type="button"
+                  onClick={onShowHistory}
+                  className="text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 bg-white dark:bg-zinc-900 px-2 sm:px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-twitch-brand transition-all"
+                >
+                  <History size={14} /> <span className="hidden xs:inline">Historial</span>
+                </button>
+              </Tooltip>
+            )}
           </div>
         </div>
 
@@ -514,7 +617,37 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                      <Star size={10} fill={filterFavorites ? "currentColor" : "none"} /> {t.poll.favorites}
                   </button>
                </div>
-               <button onClick={() => setShowTemplates(false)}><X size={16} className="text-zinc-500 hover:text-black dark:hover:text-white"/></button>
+               <div className="flex items-center gap-1">
+                  {/* Export templates */}
+                  <Tooltip text="Descargar plantillas como archivo JSON">
+                    <button 
+                      onClick={exportTemplates} 
+                      disabled={savedPolls.length === 0}
+                      className="p-1.5 text-zinc-400 hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </Tooltip>
+                  {/* Import templates */}
+                  <Tooltip text="Cargar plantillas desde archivo JSON">
+                    <button 
+                      onClick={() => templateFileInputRef.current?.click()} 
+                      className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                    >
+                      <FolderUp size={14} />
+                    </button>
+                  </Tooltip>
+                  <input 
+                    type="file" 
+                    ref={templateFileInputRef} 
+                    accept=".json" 
+                    onChange={handleImportTemplates} 
+                    className="hidden" 
+                  />
+                  <button onClick={() => setShowTemplates(false)} className="p-1.5 text-zinc-500 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors">
+                    <X size={16} />
+                  </button>
+               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] sm:max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
               {sortedTemplates.map(poll => (
@@ -535,35 +668,53 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         <form onSubmit={(e) => e.preventDefault()} className="space-y-4 flex-1 flex flex-col">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center">
               {/* Toggle Modo Rápido */}
-              <button 
-                type="button"
-                onClick={() => setQuickMode(!quickMode)}
-                className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold transition-all ${
-                  quickMode 
-                    ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/40' 
-                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 border border-zinc-300 dark:border-zinc-700'
-                }`}
-                title={quickMode ? 'Modo Rápido: Los presets crean la encuesta directamente' : 'Modo Normal: Los presets solo rellenan el formulario'}
-              >
-                <Zap size={12} className={quickMode ? 'text-green-500' : 'text-zinc-400'} />
-                <span className="hidden sm:inline">{quickMode ? 'Rápido' : 'Normal'}</span>
-                <div className={`w-6 h-3.5 rounded-full transition-colors relative ${quickMode ? 'bg-green-500' : 'bg-zinc-400'}`}>
-                  <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${quickMode ? 'translate-x-3' : 'translate-x-0.5'}`} />
-                </div>
-              </button>
+              <Tooltip text={quickMode ? 'Modo Rápido: Los presets crean la encuesta directamente' : 'Modo Normal: Los presets solo rellenan el formulario'}>
+                <button 
+                  type="button"
+                  onClick={() => setQuickMode(!quickMode)}
+                  className={`shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                    quickMode 
+                      ? 'bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/40' 
+                      : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 border border-zinc-300 dark:border-zinc-700'
+                  }`}
+                >
+                  <Zap size={12} className={quickMode ? 'text-green-500' : 'text-zinc-400'} />
+                  <span className="hidden sm:inline">{quickMode ? 'Rápido' : 'Normal'}</span>
+                  <div className={`w-6 h-3.5 rounded-full transition-colors relative ${quickMode ? 'bg-green-500' : 'bg-zinc-400'}`}>
+                    <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-transform ${quickMode ? 'translate-x-3' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+              </Tooltip>
               
               <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
               
-              {/* Preset Buttons */}
-              <button type="button" onClick={() => handlePresetClick('yesno')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Check size={12} className="text-green-500"/> {t.poll.yesNo}</button>
-              <button type="button" onClick={() => handlePresetClick('rating')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Star size={12} className="text-yellow-500"/> 1 - 5</button>
-              <button type="button" onClick={() => handlePresetClick('abc')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Grid size={12} className="text-blue-500"/> A / B / C</button>
+              {/* Plantillas - Presets */}
+              <Tooltip text="Encuesta rápida Sí/No">
+                <button type="button" onClick={() => handlePresetClick('yesno')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Check size={12} className="text-green-500"/> {t.poll.yesNo}</button>
+              </Tooltip>
+              <Tooltip text="Encuesta de puntuación 1-5">
+                <button type="button" onClick={() => handlePresetClick('rating')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Star size={12} className="text-yellow-500"/> 1 - 5</button>
+              </Tooltip>
+              <Tooltip text="Encuesta de opciones A/B/C">
+                <button type="button" onClick={() => handlePresetClick('abc')} className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-sm transition-colors ${quickMode ? 'bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/20' : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-twitch-brand'}`}><Grid size={12} className="text-blue-500"/> A / B / C</button>
+              </Tooltip>
               
               <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
               
-              {/* Tools */}
-              <button type="button" onClick={() => setShowImportModal(true)} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><FileText size={12} className="text-purple-500"/> Importar</button>
-              <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> Ruleta</button>
+              {/* Importar Opciones */}
+              <Tooltip text="Importar opciones desde texto">
+                <button type="button" onClick={() => setShowImportModal(true)} className="whitespace-nowrap px-3 py-1 bg-white dark:bg-zinc-900 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1 shadow-sm hover:border-twitch-brand transition-colors"><FileText size={12} className="text-purple-500"/> Opciones</button>
+              </Tooltip>
+              
+              <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+              
+              {/* Herramientas de Sorteo */}
+              <Tooltip text="Gira la ruleta con las opciones actuales">
+                <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> Ruleta</button>
+              </Tooltip>
+              <Tooltip text="Sortea un ganador entre los viewers">
+                <button type="button" onClick={() => setShowRandomWinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-full text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 flex items-center gap-1 shadow-sm hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors"><Trophy size={12} className="text-yellow-500"/> Sorteo</button>
+              </Tooltip>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -758,7 +909,12 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 <div className="flex-1"></div>
              </div>
 
-             <Button fullWidth type="button" onClick={handlePreSubmit} disabled={!question.trim() || options.some(o => !o.label.trim())} className="shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40 h-12 text-base"><Zap size={20} className="fill-current" /> {t.poll.create}</Button>
+             <Tooltip text="Atajo: Ctrl+Enter">
+               <Button fullWidth type="button" onClick={handlePreSubmit} disabled={!question.trim() || options.some(o => !o.label.trim())} className="shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40 h-12 text-base">
+                 <Zap size={20} className="fill-current" /> {t.poll.create}
+                 <span className="ml-2 text-[10px] opacity-60 hidden sm:inline bg-white/20 px-1.5 py-0.5 rounded">Ctrl+↵</span>
+               </Button>
+             </Tooltip>
           </div>
         </form>
       </div>
@@ -905,6 +1061,14 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             image: opt.image
           }))} 
           onClose={() => setShowSpinner(false)} 
+        />
+      )}
+
+      {/* Random Winner Modal */}
+      {showRandomWinner && (
+        <RandomWinner 
+          chatMessages={chatMessages}
+          onClose={() => setShowRandomWinner(false)} 
         />
       )}
     </>

@@ -1,10 +1,12 @@
 // MascotFace component - The animated face of AI Vision
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MascotEmotion, EyeStyle } from './types';
 
 interface MascotFaceProps {
   emotion: MascotEmotion;
   size?: number;
+  intensity?: number; // 0-100, affects animation speed/intensity
+  isAnalyzing?: boolean; // Show analyzing state
 }
 
 // Eye style configurations for each emotion
@@ -73,79 +75,130 @@ const getEmotionColor = (emotion: MascotEmotion): string => {
 };
 
 // Body animation class for each emotion
-const getBodyAnimation = (emotion: MascotEmotion): string => {
-  const animations: Record<MascotEmotion, string> = {
+const getBodyAnimation = (emotion: MascotEmotion, intensity: number): string => {
+  const baseAnimations: Record<MascotEmotion, string> = {
     neutral: 'mascot-idle',
-    happy: 'mascot-idle',
-    celebrating: 'mascot-bounce',
+    happy: intensity > 70 ? 'mascot-bounce' : 'mascot-idle',
+    celebrating: 'mascot-bounce-fast',
     excited: 'mascot-wiggle',
     surprised: 'mascot-shake',
-    love: 'mascot-bounce',
+    love: 'mascot-float',
     sad: 'mascot-droop',
-    angry: 'mascot-shake',
-    concerned: 'mascot-idle',
+    angry: 'mascot-shake-fast',
+    concerned: 'mascot-tilt',
     confused: 'mascot-shake',
     thinking: 'mascot-tilt',
-    sleepy: 'mascot-droop',
-    helpful: 'mascot-idle',
+    sleepy: 'mascot-droop-slow',
+    helpful: 'mascot-bounce-subtle',
   };
 
-  return animations[emotion] || animations.neutral;
+  return baseAnimations[emotion] || baseAnimations.neutral;
 };
 
-export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) => {
+export const MascotFace: React.FC<MascotFaceProps> = ({
+  emotion,
+  size = 80, 
+  intensity = 50,
+  isAnalyzing = false 
+}) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const [lookDirection, setLookDirection] = useState({ x: 0, y: 0 });
+  const [breathScale, setBreathScale] = useState(1);
+  const [particlePhase, setParticlePhase] = useState(0);
+  const animationRef = useRef<number>();
 
-  // Random blinking effect
+  // Breathing animation
   useEffect(() => {
-    const blinkInterval = setInterval(() => {
-      if (Math.random() > 0.7) {
+    let frame = 0;
+    const animate = () => {
+      frame++;
+      const breathSpeed = emotion === 'excited' ? 0.15 : emotion === 'sleepy' ? 0.03 : 0.05;
+      setBreathScale(1 + Math.sin(frame * breathSpeed) * 0.02);
+      setParticlePhase(frame * 0.02);
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    animationRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [emotion]);
+
+  // Random blinking effect - more frequent when excited
+  useEffect(() => {
+    const blinkChance = emotion === 'excited' ? 0.5 : emotion === 'sleepy' ? 0.9 : 0.7;
+    const blinkInterval = emotion === 'sleepy' ? 4000 : 2000;
+    
+    const interval = setInterval(() => {
+      if (Math.random() > blinkChance) {
         setIsBlinking(true);
-        setTimeout(() => setIsBlinking(false), 150);
+        const blinkDuration = emotion === 'sleepy' ? 400 : 150;
+        setTimeout(() => setIsBlinking(false), blinkDuration);
       }
-    }, 2000);
-    return () => clearInterval(blinkInterval);
-  }, []);
+    }, blinkInterval);
+    return () => clearInterval(interval);
+  }, [emotion]);
 
-  // Random eye movement for neutral/thinking states
+  // Eye movement - more active when analyzing or thinking
   useEffect(() => {
-    if (emotion === 'neutral' || emotion === 'thinking') {
-      const lookInterval = setInterval(() => {
+    const shouldMove = ['neutral', 'thinking', 'confused', 'helpful'].includes(emotion) || isAnalyzing;
+    if (shouldMove) {
+      const moveSpeed = isAnalyzing ? 500 : 3000;
+      const interval = setInterval(() => {
+        const range = isAnalyzing ? 4 : 3;
         setLookDirection({
-          x: (Math.random() - 0.5) * 3,
-          y: (Math.random() - 0.5) * 2,
+          x: (Math.random() - 0.5) * range,
+          y: (Math.random() - 0.5) * (range * 0.7),
         });
-      }, 3000);
-      return () => clearInterval(lookInterval);
+      }, moveSpeed);
+      return () => clearInterval(interval);
     }
     setLookDirection({ x: 0, y: 0 });
-  }, [emotion]);
+  }, [emotion, isAnalyzing]);
 
   const glowColor = getEmotionColor(emotion);
   const eyeStyle = getEyeStyle(emotion, isBlinking);
   const mouthPath = getMouthPath(emotion);
-  const bodyAnimation = getBodyAnimation(emotion);
+  const bodyAnimation = getBodyAnimation(emotion, intensity);
+  
+  // Intensity affects glow
+  const glowIntensity = Math.max(0.3, intensity / 100);
 
   return (
     <div
       className={`relative transition-all duration-300 ${bodyAnimation}`}
-      style={{ width: size, height: size }}
+      style={{ 
+        width: size, 
+        height: size,
+        transform: `scale(${breathScale})`,
+      }}
     >
       {/* Glow effect */}
       <div
-        className="absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse"
+        className="absolute inset-0 rounded-full blur-xl animate-pulse"
         style={{
           backgroundColor: glowColor,
-          animationDuration: emotion === 'celebrating' ? '0.5s' : '2s',
+          opacity: glowIntensity * 0.5,
+          animationDuration: emotion === 'celebrating' ? '0.5s' : emotion === 'sleepy' ? '4s' : '2s',
         }}
       />
 
       {/* Secondary glow for intense emotions */}
-      {(emotion === 'celebrating' || emotion === 'excited') && (
+      {(emotion === 'celebrating' || emotion === 'excited' || intensity > 80) && (
         <div
-          className="absolute inset-0 rounded-full blur-2xl opacity-30 animate-ping"
-          style={{ backgroundColor: glowColor, animationDuration: '1s' }}
+          className="absolute inset-0 rounded-full blur-2xl animate-ping"
+          style={{ backgroundColor: glowColor, opacity: 0.3, animationDuration: '1s' }}
+        />
+      )}
+
+      {/* Analyzing ring */}
+      {isAnalyzing && (
+        <div 
+          className="absolute inset-0 rounded-full border-2 border-dashed animate-spin"
+          style={{ 
+            borderColor: glowColor, 
+            opacity: 0.5,
+            animationDuration: '3s',
+          }}
         />
       )}
 
@@ -155,15 +208,33 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
         className="relative z-10 drop-shadow-lg"
         style={{ width: size, height: size }}
       >
+        <defs>
+          {/* Gradient for screen */}
+          <linearGradient id={`screenGrad-${emotion}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#2a2a4e" />
+            <stop offset="100%" stopColor="#1a1a2e" />
+          </linearGradient>
+          
+          {/* Glow filter */}
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
         {/* Screen body */}
         <rect
           x="2" y="5"
           width="46" height="40"
           rx="8"
-          fill="#1a1a2e"
+          fill={`url(#screenGrad-${emotion})`}
           stroke={glowColor}
           strokeWidth="2"
           className="transition-all duration-300"
+          filter="url(#glow)"
         />
 
         {/* Screen inner glow */}
@@ -171,12 +242,36 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
           x="5" y="8"
           width="40" height="34"
           rx="5"
-          fill={`${glowColor}20`}
+          fill={`${glowColor}15`}
           className="transition-all duration-500"
         />
 
         {/* Scan line effect */}
-        <rect x="5" y="8" width="40" height="2" fill={`${glowColor}30`} className="animate-scanline" />
+        <rect 
+          x="5" 
+          y={8 + (particlePhase * 10) % 34} 
+          width="40" 
+          height="2" 
+          fill={`${glowColor}20`} 
+        />
+
+        {/* Data stream effect when analyzing */}
+        {isAnalyzing && (
+          <>
+            {[...Array(5)].map((_, i) => (
+              <rect
+                key={i}
+                x={8 + i * 8}
+                y={10 + ((particlePhase * 20 + i * 7) % 30)}
+                width="4"
+                height="2"
+                fill={glowColor}
+                opacity={0.3 + Math.sin(particlePhase + i) * 0.2}
+                rx="1"
+              />
+            ))}
+          </>
+        )}
 
         {/* Eyebrows */}
         <Eyebrows emotion={emotion} color={glowColor} />
@@ -184,19 +279,21 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
         {/* Eyes */}
         <ellipse
           cx={17 + lookDirection.x}
-          cy={22 + lookDirection.y}
+          cy={22 + lookDirection.y + (eyeStyle.translateY || 0)}
           rx={5 * eyeStyle.scaleX}
           ry={6 * eyeStyle.scaleY}
           fill={glowColor}
           className="transition-all duration-200"
+          filter="url(#glow)"
         />
         <ellipse
           cx={33 + lookDirection.x}
-          cy={22 + lookDirection.y}
+          cy={22 + lookDirection.y + (eyeStyle.translateY || 0)}
           rx={5 * eyeStyle.scaleX}
           ry={6 * eyeStyle.scaleY}
           fill={glowColor}
           className="transition-all duration-200"
+          filter="url(#glow)"
         />
 
         {/* Eye highlights */}
@@ -212,22 +309,40 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
         {/* Cheeks for happy emotions */}
         {(emotion === 'happy' || emotion === 'celebrating' || emotion === 'excited' || emotion === 'love') && (
           <>
-            <ellipse cx="10" cy="26" rx="4" ry="2" fill="#f472b6" opacity="0.4" />
-            <ellipse cx="40" cy="26" rx="4" ry="2" fill="#f472b6" opacity="0.4" />
+            <ellipse cx="10" cy="26" rx="4" ry="2" fill="#f472b6" opacity={0.3 + Math.sin(particlePhase * 2) * 0.1} />
+            <ellipse cx="40" cy="26" rx="4" ry="2" fill="#f472b6" opacity={0.3 + Math.sin(particlePhase * 2) * 0.1} />
           </>
         )}
 
         {/* Tears for sad */}
         {emotion === 'sad' && (
           <>
-            <ellipse cx="14" cy="28" rx="1.5" ry="3" fill="#60a5fa" opacity="0.6" className="animate-tear" />
-            <ellipse cx="36" cy="29" rx="1.5" ry="3" fill="#60a5fa" opacity="0.6" className="animate-tear" style={{ animationDelay: '0.5s' }} />
+            <ellipse 
+              cx="14" 
+              cy={28 + Math.sin(particlePhase * 3) * 2} 
+              rx="1.5" 
+              ry="3" 
+              fill="#60a5fa" 
+              opacity={0.4 + Math.sin(particlePhase * 2) * 0.2} 
+            />
+            <ellipse 
+              cx="36" 
+              cy={29 + Math.sin(particlePhase * 3 + 1) * 2} 
+              rx="1.5" 
+              ry="3" 
+              fill="#60a5fa" 
+              opacity={0.4 + Math.sin(particlePhase * 2 + 1) * 0.2} 
+            />
           </>
         )}
 
         {/* Sweat for concerned */}
         {emotion === 'concerned' && (
-          <path d="M 42 14 Q 44 18 42 20 Q 40 18 42 14" fill="#60a5fa" opacity="0.7" className="animate-sweat" />
+          <path 
+            d={`M 42 ${14 + Math.sin(particlePhase * 2) * 2} Q 44 18 42 20 Q 40 18 42 ${14 + Math.sin(particlePhase * 2) * 2}`} 
+            fill="#60a5fa" 
+            opacity="0.7" 
+          />
         )}
 
         {/* Mouth */}
@@ -238,6 +353,7 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
           strokeWidth="2.5"
           strokeLinecap="round"
           className="transition-all duration-300"
+          filter="url(#glow)"
         />
 
         {/* Tongue for excited/celebrating */}
@@ -250,15 +366,46 @@ export const MascotFace: React.FC<MascotFaceProps> = ({ emotion, size = 80 }) =>
         <circle
           cx="25" cy="0" r="2.5"
           fill={glowColor}
-          className={emotion === 'celebrating' ? 'animate-ping' : 'animate-pulse'}
+          opacity={0.7 + Math.sin(particlePhase * 3) * 0.3}
+          filter="url(#glow)"
         />
 
         {/* Emotion-specific decorations */}
-        <EmotionDecorations emotion={emotion} color={glowColor} />
+        <EmotionDecorations emotion={emotion} color={glowColor} phase={particlePhase} intensity={intensity} />
       </svg>
+
+      {/* Floating particles for high intensity */}
+      {intensity > 60 && (
+        <FloatingParticles color={glowColor} count={Math.floor(intensity / 20)} phase={particlePhase} />
+      )}
     </div>
   );
 };
+
+// Floating particles component
+const FloatingParticles: React.FC<{ color: string; count: number; phase: number }> = ({ color, count, phase }) => (
+  <div className="absolute inset-0 pointer-events-none overflow-visible">
+    {[...Array(count)].map((_, i) => {
+      const angle = (i / count) * Math.PI * 2 + phase;
+      const radius = 35 + Math.sin(phase * 2 + i) * 5;
+      const x = 50 + Math.cos(angle) * radius;
+      const y = 50 + Math.sin(angle) * radius;
+      return (
+        <div
+          key={i}
+          className="absolute w-1.5 h-1.5 rounded-full"
+          style={{
+            left: `${x}%`,
+            top: `${y}%`,
+            backgroundColor: color,
+            opacity: 0.4 + Math.sin(phase + i) * 0.3,
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+      );
+    })}
+  </div>
+);
 
 // Eyebrows sub-component
 const Eyebrows: React.FC<{ emotion: MascotEmotion; color: string }> = ({ emotion, color }) => {
@@ -300,77 +447,139 @@ const Eyebrows: React.FC<{ emotion: MascotEmotion; color: string }> = ({ emotion
 };
 
 // Emotion decorations sub-component
-const EmotionDecorations: React.FC<{ emotion: MascotEmotion; color: string }> = ({ emotion, color }) => {
+const EmotionDecorations: React.FC<{ 
+  emotion: MascotEmotion; 
+  color: string; 
+  phase: number;
+  intensity: number;
+}> = ({ emotion, color, phase, intensity }) => {
   switch (emotion) {
     case 'celebrating':
       return (
         <>
-          <circle cx="6" cy="10" r="2" fill="#fbbf24" className="animate-ping" />
-          <circle cx="44" cy="10" r="2" fill="#f472b6" className="animate-ping" style={{ animationDelay: '0.2s' }} />
-          <circle cx="8" cy="42" r="1.5" fill="#4ade80" className="animate-ping" style={{ animationDelay: '0.4s' }} />
-          <circle cx="42" cy="42" r="1.5" fill="#60a5fa" className="animate-ping" style={{ animationDelay: '0.6s' }} />
+          {[...Array(6)].map((_, i) => {
+            const angle = (i / 6) * Math.PI * 2 + phase;
+            const radius = 22 + Math.sin(phase * 3 + i) * 3;
+            const x = 25 + Math.cos(angle) * radius;
+            const y = 25 + Math.sin(angle) * radius;
+            const colors = ['#fbbf24', '#f472b6', '#4ade80', '#60a5fa', '#a78bfa', '#f97316'];
+            return (
+              <circle 
+                key={i} 
+                cx={x} 
+                cy={y} 
+                r={1.5 + Math.sin(phase + i) * 0.5} 
+                fill={colors[i]} 
+                opacity={0.8}
+              />
+            );
+          })}
         </>
       );
     case 'thinking':
       return (
-        <g className="animate-float" style={{ animationDuration: '3s' }}>
-          <circle cx="44" cy="6" r="3" fill={color} opacity="0.6" />
-          <circle cx="48" cy="2" r="2" fill={color} opacity="0.4" />
-          <circle cx="50" cy="-1" r="1.5" fill={color} opacity="0.2" />
+        <g>
+          <circle cx={44 + Math.sin(phase) * 2} cy={6 + Math.cos(phase) * 1} r="3" fill={color} opacity="0.6" />
+          <circle cx={48 + Math.sin(phase + 1) * 1} cy={2 + Math.cos(phase + 1) * 1} r="2" fill={color} opacity="0.4" />
+          <circle cx={50} cy={-1} r="1.5" fill={color} opacity="0.2" />
         </g>
       );
     case 'helpful':
       return (
-        <g className="animate-pulse">
-          <path d="M 44 8 L 46 6 L 44 4 L 42 6 Z" fill={color} opacity="0.8" />
-          <path d="M 44 10 L 44 2" stroke={color} strokeWidth="1" opacity="0.6" />
-          <path d="M 40 6 L 48 6" stroke={color} strokeWidth="1" opacity="0.6" />
+        <g style={{ opacity: 0.6 + Math.sin(phase * 2) * 0.2 }}>
+          <path d="M 44 8 L 46 6 L 44 4 L 42 6 Z" fill={color} />
+          <path d="M 44 10 L 44 2" stroke={color} strokeWidth="1" />
+          <path d="M 40 6 L 48 6" stroke={color} strokeWidth="1" />
         </g>
       );
     case 'love':
       return (
         <>
-          <g className="animate-float" style={{ animationDuration: '1.5s' }}>
-            <path d="M 6 8 C 6 5 9 5 9 8 C 9 5 12 5 12 8 C 12 12 9 14 9 14 C 9 14 6 12 6 8" fill="#ec4899" />
-          </g>
-          <g className="animate-float" style={{ animationDuration: '2s', animationDelay: '0.3s' }}>
-            <path d="M 40 6 C 40 4 42 4 42 6 C 42 4 44 4 44 6 C 44 9 42 10 42 10 C 42 10 40 9 40 6" fill="#f472b6" />
-          </g>
+          {[0, 1].map(i => {
+            const baseX = i === 0 ? 6 : 40;
+            const baseY = i === 0 ? 8 : 6;
+            const floatY = Math.sin(phase * 2 + i * 2) * 3;
+            const scale = 0.8 + Math.sin(phase * 3 + i) * 0.2;
+            return (
+              <g key={i} transform={`translate(${baseX}, ${baseY + floatY}) scale(${scale})`}>
+                <path 
+                  d="M 0 2 C 0 -1 3 -1 3 2 C 3 -1 6 -1 6 2 C 6 6 3 8 3 8 C 3 8 0 6 0 2" 
+                  fill={i === 0 ? '#ec4899' : '#f472b6'} 
+                />
+              </g>
+            );
+          })}
         </>
       );
     case 'surprised':
       return (
         <>
-          <text x="44" y="10" fontSize="12" fill={color} className="animate-bounce" style={{ animationDuration: '0.3s' }}>!</text>
-          <circle cx="6" cy="10" r="2" fill={color} opacity="0.5" className="animate-ping" />
+          <text 
+            x="44" 
+            y={10 + Math.sin(phase * 5) * 2} 
+            fontSize="12" 
+            fill={color} 
+            fontWeight="bold"
+          >!</text>
+          <circle cx="6" cy="10" r={2 + Math.sin(phase * 3) * 0.5} fill={color} opacity="0.5" />
         </>
       );
     case 'sleepy':
       return (
-        <g className="animate-float" style={{ animationDuration: '3s' }}>
-          <text x="38" y="8" fontSize="8" fill={color} opacity="0.8">Z</text>
-          <text x="42" y="4" fontSize="6" fill={color} opacity="0.6">z</text>
-          <text x="45" y="1" fontSize="4" fill={color} opacity="0.4">z</text>
+        <g>
+          <text x={38 + Math.sin(phase) * 2} y={8 - phase % 10} fontSize="8" fill={color} opacity={0.8 - (phase % 10) * 0.05}>Z</text>
+          <text x={42 + Math.sin(phase + 1) * 2} y={4 - (phase + 2) % 10} fontSize="6" fill={color} opacity={0.6 - ((phase + 2) % 10) * 0.04}>z</text>
+          <text x={45 + Math.sin(phase + 2) * 2} y={1 - (phase + 4) % 10} fontSize="4" fill={color} opacity={0.4 - ((phase + 4) % 10) * 0.03}>z</text>
         </g>
       );
     case 'angry':
       return (
         <>
-          <g className="animate-float" style={{ animationDuration: '1s' }}>
-            <path d="M 6 6 Q 4 4 6 2 Q 8 4 6 6" fill="none" stroke={color} strokeWidth="1.5" opacity="0.7" />
-          </g>
-          <g className="animate-float" style={{ animationDuration: '1.2s', animationDelay: '0.2s' }}>
-            <path d="M 44 6 Q 42 4 44 2 Q 46 4 44 6" fill="none" stroke={color} strokeWidth="1.5" opacity="0.7" />
-          </g>
+          {[0, 1].map(i => {
+            const baseX = i === 0 ? 6 : 44;
+            const floatY = Math.sin(phase * 4 + i * 2) * 2;
+            return (
+              <g key={i}>
+                <path 
+                  d={`M ${baseX} ${6 + floatY} Q ${baseX - 2} ${4 + floatY} ${baseX} ${2 + floatY} Q ${baseX + 2} ${4 + floatY} ${baseX} ${6 + floatY}`} 
+                  fill="none" 
+                  stroke={color} 
+                  strokeWidth="1.5" 
+                  opacity="0.7" 
+                />
+              </g>
+            );
+          })}
         </>
       );
     case 'confused':
       return (
-        <text x="44" y="8" fontSize="10" fill={color} className="animate-bounce" style={{ animationDuration: '1s' }}>?</text>
+        <text 
+          x="44" 
+          y={8 + Math.sin(phase * 2) * 2} 
+          fontSize="10" 
+          fill={color}
+        >?</text>
       );
     case 'excited':
       return (
-        <text x="44" y="8" fontSize="10" fill={color} className="animate-bounce" style={{ animationDuration: '0.5s' }}>!</text>
+        <>
+          <text 
+            x="44" 
+            y={8 + Math.sin(phase * 4) * 2} 
+            fontSize="10" 
+            fill={color} 
+            fontWeight="bold"
+          >!</text>
+          {intensity > 70 && (
+            <text 
+              x="4" 
+              y={10 + Math.sin(phase * 4 + 1) * 2} 
+              fontSize="8" 
+              fill={color}
+            >★</text>
+          )}
+        </>
       );
     default:
       return null;

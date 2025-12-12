@@ -45,8 +45,10 @@ import {
   TourStep,
 } from './hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, BarChart3, Bot, Globe, Eye, Play, Volume2 } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Globe, Eye, Play, Volume2, Keyboard } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
+import { Tools } from './components/Tools';
+import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
@@ -111,13 +113,48 @@ const App: React.FC = () => {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
   const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'data'>('panel');
-  const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('activity');
+  const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   const [demoForceModeration, setDemoForceModeration] = useState(false);
   const [showSoundBoard, setShowSoundBoard] = useState(false);
+  const [leftSidebarHidden, setLeftSidebarHidden] = useState(false);
+  const [showTools, setShowTools] = useState(false);
+  const [miniBarPosition, setMiniBarPosition] = useState({ x: 16, y: 16 });
+  const [isDraggingMiniBar, setIsDraggingMiniBar] = useState(false);
+  const miniBarDragOffset = useRef({ x: 0, y: 0 });
+
+  // Keyboard shortcuts actions
+  const shortcutActions = useMemo(() => ({
+    createPoll: () => {
+      // This would need to trigger the poll creation - handled in PollCreator
+    },
+    stopPoll: () => {
+      if (poll.currentPoll?.isActive) {
+        poll.setCurrentPoll(prev => prev ? { ...prev, isActive: false } : null);
+      }
+    },
+    resetPoll: () => {
+      poll.resetPoll();
+    },
+    navPanel: () => setLeftTab('panel'),
+    navGallery: () => setLeftTab('gallery'),
+    navData: () => setLeftTab('data'),
+    closeModal: () => {
+      setShowHistory(false);
+      setShowTools(false);
+      setShowSoundBoard(false);
+      setShowLanguageMenu(false);
+    },
+    toggleTheme: () => toggleTheme(),
+    showHistory: () => setShowHistory(true),
+    toggleSidebar: () => setLeftSidebarHidden(prev => !prev),
+  }), [poll, toggleTheme]);
+
+  // Use keyboard shortcuts
+  useKeyboardShortcuts(shortcutActions);
 
   // Demo tour hook - connects to demo channel and navigates automatically
   const demoTour = useDemoTour({ 
@@ -167,6 +204,7 @@ const App: React.FC = () => {
   // Refs for callbacks
   const pollRef = useRef<Poll | null>(null);
   const moderationConfigRef = useRef<ModerationConfig>(DEFAULT_MODERATION_CONFIG);
+  const addMessageToSessionRef = useRef(aiAnalytics.addMessageToSession);
 
   // Sync refs with hook state
   useEffect(() => {
@@ -176,6 +214,10 @@ const App: React.FC = () => {
   useEffect(() => {
     moderationConfigRef.current = moderation.config;
   }, [moderation.config]);
+
+  useEffect(() => {
+    addMessageToSessionRef.current = aiAnalytics.addMessageToSession;
+  }, [aiAnalytics.addMessageToSession]);
 
   // Check for Overlay Mode on Mount - handle channel and poll from URL
   useEffect(() => {
@@ -389,15 +431,14 @@ const App: React.FC = () => {
       setChatMessages(prev => [...prev.slice(-199), msg]);
       
       // Store message in current session for analytics
-      if (aiAnalytics.currentSession) {
-        const storedMsg: StoredMessage = {
-          username: msg.username,
-          message: msg.message,
-          timestamp: Date.now(),
-          userId: msg.userId,
-        };
-        aiAnalytics.addMessageToSession(storedMsg);
-      }
+      // Always try to add - the function handles null session internally
+      const storedMsg: StoredMessage = {
+        username: msg.username,
+        message: msg.message,
+        timestamp: Date.now(),
+        userId: msg.userId,
+      };
+      addMessageToSessionRef.current(storedMsg);
 
       // Process chat commands for overlay mode (broadcaster/mod only)
       const isBroadcaster = tags.badges && 'broadcaster' in tags.badges;
@@ -842,9 +883,72 @@ const App: React.FC = () => {
         </div>
       </div>
       
-      {/* Sidebar / Left Navigation */}
-      <div className="hidden md:flex w-16 lg:w-20 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20">
-        <div className="mb-6">
+      {/* Floating Mini Bar - Only visible when sidebar is hidden */}
+      {leftSidebarHidden && (
+        <div 
+          className={`hidden md:flex fixed z-30 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg p-2 gap-2 items-center select-none ${isDraggingMiniBar ? 'cursor-grabbing' : ''}`}
+          style={{ left: miniBarPosition.x, top: miniBarPosition.y }}
+        >
+          {/* Drag handle - User Avatar */}
+          <div 
+            className={`cursor-grab ${isDraggingMiniBar ? 'cursor-grabbing' : ''}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingMiniBar(true);
+              miniBarDragOffset.current = {
+                x: e.clientX - miniBarPosition.x,
+                y: e.clientY - miniBarPosition.y
+              };
+              
+              const handleMouseMove = (e: MouseEvent) => {
+                const newX = Math.max(0, Math.min(window.innerWidth - 150, e.clientX - miniBarDragOffset.current.x));
+                const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - miniBarDragOffset.current.y));
+                setMiniBarPosition({ x: newX, y: newY });
+              };
+              
+              const handleMouseUp = () => {
+                setIsDraggingMiniBar(false);
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('mouseup', handleMouseUp);
+              };
+              
+              window.addEventListener('mousemove', handleMouseMove);
+              window.addEventListener('mouseup', handleMouseUp);
+            }}
+          >
+            {channelAvatar ? (
+              <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
+                {channelName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          
+          {/* Disconnect button */}
+          <button 
+            onClick={handleDisconnect} 
+            className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title={t.common.exit}
+          >
+            <Power size={18} />
+          </button>
+          
+          {/* Show sidebar button */}
+          <button
+            onClick={() => setLeftSidebarHidden(false)}
+            className="p-2 rounded-lg text-zinc-400 hover:text-twitch-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="Mostrar menú (Ctrl+B)"
+          >
+            <ChevronDown size={18} />
+          </button>
+        </div>
+      )}
+      
+      {/* Full Sidebar - Hidden when collapsed */}
+      <div className={`hidden md:flex bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20 transition-all duration-300 overflow-hidden ${leftSidebarHidden ? 'w-0 border-r-0 p-0' : 'w-16 lg:w-20'}`}>
+        {/* User Avatar */}
+        <div className="mb-2">
           {channelAvatar ? (
             <img src={channelAvatar} alt={channelName} className="w-10 h-10 rounded-full border-2 border-twitch-brand" />
           ) : (
@@ -853,10 +957,19 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
+        
+        {/* Hide Sidebar Button */}
+        <button
+          onClick={() => setLeftSidebarHidden(true)}
+          className="w-8 h-5 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors mb-4"
+          title="Ocultar menú (Ctrl+B)"
+        >
+          <ChevronDown size={16} className="rotate-180" />
+        </button>
 
+        {/* Navigation */}
         <div className="flex flex-col gap-3 w-full px-2">
           <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label={t.nav.panel} />
-          <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
           <div className="relative">
             <NavButton active={leftTab === 'data'} onClick={() => setLeftTab('data')} icon={<BarChart3 size={20} />} label={t.nav.data} />
             {aiAnalytics.currentSession && aiAnalytics.currentSession.messages.length > 0 && (
@@ -867,6 +980,9 @@ const App: React.FC = () => {
           {/* Divider */}
           <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
           
+          {/* Gallery */}
+          <NavButton active={leftTab === 'gallery'} onClick={() => setLeftTab('gallery')} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
+          
           {/* Sound Board Button */}
           <NavButton 
             onClick={() => setShowSoundBoard(true)} 
@@ -876,7 +992,8 @@ const App: React.FC = () => {
           />
         </div>
 
-        <div className="mt-auto flex flex-col gap-3 w-full px-2">
+        {/* Bottom section */}
+        <div className="mt-auto flex flex-col gap-3 w-full px-2 mb-3">
           {/* 1. Historial */}
           <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
           
@@ -914,11 +1031,16 @@ const App: React.FC = () => {
             )}
           </div>
           
-          {/* 4. Tema */}
-          <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
+          {/* 4. Tools */}
+          <NavButton onClick={() => setShowTools(true)} icon={<Keyboard size={20} />} label="Tools" />
           
-          {/* 5. Desconectar */}
-          <button onClick={handleDisconnect} className="p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
+          {/* 5. Tema */}
+          <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
+        </div>
+        
+        {/* Disconnect button */}
+        <div className="w-full px-2 mt-auto">
+          <button onClick={handleDisconnect} className="w-full p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
             <Power size={20} />
             <span className="text-[9px] font-bold group-hover:opacity-100 opacity-0 transition-opacity">{t.common.exit}</span>
           </button>
@@ -980,6 +1102,9 @@ const App: React.FC = () => {
                     onAddAsset={handleAddAsset}
                     moderationConfig={moderation.config}
                     onModerationConfigChange={moderation.setConfig}
+                    chatMessages={chatMessages}
+                    onShowHistory={() => setShowHistory(true)}
+                    sidebarHidden={leftSidebarHidden}
                   />
                 </div>
               )
@@ -996,14 +1121,8 @@ const App: React.FC = () => {
             )}
             {leftTab === 'data' && (
               <div className="h-full flex flex-col">
-                {/* Sub-tabs header */}
+                {/* Sub-tabs header - Analytics primero, luego Actividad */}
                 <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
-                  <button 
-                    className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${dataSubTab === 'activity' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                    onClick={() => setDataSubTab('activity')}
-                  >
-                    <Activity size={16} /> {t.nav.activity}
-                  </button>
                   <button 
                     className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${dataSubTab === 'analytics' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                     onClick={() => setDataSubTab('analytics')}
@@ -1012,6 +1131,12 @@ const App: React.FC = () => {
                     {aiAnalytics.config?.enabled && (
                       <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded-full">IA</span>
                     )}
+                  </button>
+                  <button 
+                    className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${dataSubTab === 'activity' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                    onClick={() => setDataSubTab('activity')}
+                  >
+                    <Activity size={16} /> {t.nav.activity}
                   </button>
                 </div>
                 
@@ -1150,7 +1275,29 @@ const App: React.FC = () => {
       </div>
 
       {showHistory && (
-        <PollHistory history={poll.pastPolls} onClose={() => setShowHistory(false)} />
+        <PollHistory 
+          history={poll.pastPolls} 
+          onClose={() => setShowHistory(false)} 
+          onLoadPoll={(pastPoll) => {
+            // Load poll data into creator by creating a new poll with same options
+            poll.createPoll({
+              title: pastPoll.title || 'Encuesta',
+              question: pastPoll.question,
+              options: pastPoll.options.map(o => ({
+                label: o.label,
+                color: o.color,
+                icon: o.icon,
+                image: o.image,
+                voteKey: o.voteKey
+              })),
+              maxVotes: pastPoll.maxVotes,
+              duration: pastPoll.duration
+            });
+            moderation.reset();
+            addNotification('success', 'Encuesta cargada del historial');
+          }}
+          onDownloadPoll={() => addNotification('success', 'Encuesta descargada')}
+        />
       )}
 
       <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100]" />
@@ -1171,6 +1318,11 @@ const App: React.FC = () => {
       {/* Sound Board Modal */}
       {showSoundBoard && (
         <SoundBoard onClose={() => setShowSoundBoard(false)} />
+      )}
+      
+      {/* Tools Modal */}
+      {showTools && (
+        <Tools onClose={() => setShowTools(false)} />
       )}
     </div>
   );

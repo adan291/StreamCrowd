@@ -14,52 +14,8 @@ interface UseMascotDragReturn {
   isDragging: boolean;
   containerRef: RefObject<HTMLDivElement>;
   handleDragStart: (e: React.MouseEvent | React.TouchEvent) => void;
+  screenQuadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
-
-/**
- * Finds the best position for the mascot that doesn't overlap with main UI
- */
-const findBestPosition = (
-  currentPos: MascotPosition,
-  mascotWidth: number,
-  mascotHeight: number
-): MascotPosition => {
-  const padding = 16;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-
-  const safeZones: MascotPosition[] = [
-    { x: viewportWidth - mascotWidth - padding, y: padding },
-    { x: viewportWidth - mascotWidth - padding, y: viewportHeight - mascotHeight - padding },
-    { x: padding, y: viewportHeight - mascotHeight - padding },
-    { x: padding, y: padding },
-    { x: viewportWidth - mascotWidth - padding, y: viewportHeight / 2 - mascotHeight / 2 },
-    { x: padding, y: viewportHeight / 2 - mascotHeight / 2 },
-  ];
-
-  const isValidPosition = (pos: MascotPosition) =>
-    pos.x >= 0 &&
-    pos.y >= 0 &&
-    pos.x + mascotWidth <= viewportWidth &&
-    pos.y + mascotHeight <= viewportHeight;
-
-  if (isValidPosition(currentPos)) return currentPos;
-
-  let bestZone = safeZones[0];
-  let minDistance = Infinity;
-
-  safeZones.forEach((zone) => {
-    const distance = Math.sqrt(
-      Math.pow(zone.x - currentPos.x, 2) + Math.pow(zone.y - currentPos.y, 2)
-    );
-    if (distance < minDistance) {
-      minDistance = distance;
-      bestZone = zone;
-    }
-  });
-
-  return bestZone;
-};
 
 /**
  * Loads saved position from localStorage
@@ -77,6 +33,46 @@ const loadSavedPosition = (initialPosition?: MascotPosition): MascotPosition => 
 };
 
 /**
+ * Clamps position within viewport bounds
+ */
+const clampPosition = (
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): MascotPosition => {
+  const padding = 8;
+  const maxX = window.innerWidth - width - padding;
+  const maxY = window.innerHeight - height - padding;
+  
+  return {
+    x: Math.max(padding, Math.min(maxX, x)),
+    y: Math.max(padding, Math.min(maxY, y)),
+  };
+};
+
+/**
+ * Determines which quadrant of the screen the mascot is in
+ */
+const getScreenQuadrant = (
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' => {
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const midX = window.innerWidth / 2;
+  const midY = window.innerHeight / 2;
+  
+  if (centerY < midY) {
+    return centerX < midX ? 'top-left' : 'top-right';
+  } else {
+    return centerX < midX ? 'bottom-left' : 'bottom-right';
+  }
+};
+
+/**
  * Custom hook for handling mascot drag & drop
  */
 export const useMascotDrag = ({
@@ -87,32 +83,40 @@ export const useMascotDrag = ({
     loadSavedPosition(initialPosition)
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [screenQuadrant, setScreenQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('bottom-right');
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef<{
-    x: number;
-    y: number;
-    posX: number;
-    posY: number;
-  } | null>(null);
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Initialize position on mount
   useEffect(() => {
-    if (position.x === -1 && position.y === -1 && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setPosition({ x: rect.left, y: rect.top });
+    if (position.x === -1 && position.y === -1) {
+      // Default to bottom-right corner
+      const defaultX = window.innerWidth - 300;
+      const defaultY = window.innerHeight - 200;
+      const newPos = { x: Math.max(16, defaultX), y: Math.max(16, defaultY) };
+      setPosition(newPos);
+      localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(newPos));
     }
-  }, [position.x, position.y]);
+  }, []);
 
-  // Handle window resize
+  // Update quadrant when position changes
+  useEffect(() => {
+    if (containerRef.current && position.x !== -1) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setScreenQuadrant(getScreenQuadrant(position.x, position.y, rect.width, rect.height));
+    }
+  }, [position]);
+
+  // Handle window resize - keep mascot in bounds
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current && position.x !== -1) {
         const rect = containerRef.current.getBoundingClientRect();
-        const newPos = findBestPosition(position, rect.width, rect.height);
-        if (newPos.x !== position.x || newPos.y !== position.y) {
-          setPosition(newPos);
-          localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(newPos));
+        const clamped = clampPosition(position.x, position.y, rect.width, rect.height);
+        if (clamped.x !== position.x || clamped.y !== position.y) {
+          setPosition(clamped);
+          localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(clamped));
         }
       }
     };
@@ -129,80 +133,79 @@ export const useMascotDrag = ({
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-      let startPosX = position.x;
-      let startPosY = position.y;
+      // Calculate offset from mouse to element position
+      let currentX = position.x;
+      let currentY = position.y;
 
       if (position.x === -1 && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        startPosX = rect.left;
-        startPosY = rect.top;
+        currentX = rect.left;
+        currentY = rect.top;
       }
 
-      dragStartRef.current = { x: clientX, y: clientY, posX: startPosX, posY: startPosY };
+      dragOffsetRef.current = {
+        x: clientX - currentX,
+        y: clientY - currentY,
+      };
+      
       setIsDragging(true);
     },
     [position]
   );
 
-  const handleDragMove = useCallback(
-    (e: MouseEvent | TouchEvent) => {
-      if (!isDragging || !dragStartRef.current || !containerRef.current) return;
+  // Global event listeners for drag
+  useEffect(() => {
+    if (!isDragging) return;
 
+    const handleDragMove = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-      const deltaX = clientX - dragStartRef.current.x;
-      const deltaY = clientY - dragStartRef.current.y;
+      // Calculate new position based on mouse position minus offset
+      const newX = clientX - dragOffsetRef.current.x;
+      const newY = clientY - dragOffsetRef.current.y;
 
-      const rect = containerRef.current.getBoundingClientRect();
-      const newX = Math.max(
-        0,
-        Math.min(window.innerWidth - rect.width, dragStartRef.current.posX + deltaX)
-      );
-      const newY = Math.max(
-        0,
-        Math.min(window.innerHeight - rect.height, dragStartRef.current.posY + deltaY)
-      );
+      // Get element dimensions for clamping
+      const width = containerRef.current?.offsetWidth || 280;
+      const height = containerRef.current?.offsetHeight || 150;
 
-      setPosition({ x: newX, y: newY });
-    },
-    [isDragging]
-  );
+      // Clamp to viewport bounds
+      const clamped = clampPosition(newX, newY, width, height);
+      setPosition(clamped);
+    };
 
-  const handleDragEnd = useCallback(() => {
-    if (isDragging && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const finalPos = findBestPosition(position, rect.width, rect.height);
-      setPosition(finalPos);
-      localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(finalPos));
-      onPositionChange?.(finalPos);
-    }
-    setIsDragging(false);
-    dragStartRef.current = null;
+    const handleDragEnd = () => {
+      setIsDragging(false);
+      
+      // Save final position
+      if (position.x !== -1) {
+        localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(position));
+        onPositionChange?.(position);
+      }
+    };
+
+    // Use passive: false for touch events to allow preventDefault
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('touchmove', handleDragMove, { passive: false });
+    window.addEventListener('touchend', handleDragEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleDragMove);
+      window.removeEventListener('touchend', handleDragEnd);
+    };
   }, [isDragging, position, onPositionChange]);
-
-  // Global event listeners for drag
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleDragMove);
-      window.addEventListener('mouseup', handleDragEnd);
-      window.addEventListener('touchmove', handleDragMove);
-      window.addEventListener('touchend', handleDragEnd);
-
-      return () => {
-        window.removeEventListener('mousemove', handleDragMove);
-        window.removeEventListener('mouseup', handleDragEnd);
-        window.removeEventListener('touchmove', handleDragMove);
-        window.removeEventListener('touchend', handleDragEnd);
-      };
-    }
-  }, [isDragging, handleDragMove, handleDragEnd]);
 
   return {
     position,
     isDragging,
     containerRef: containerRef as RefObject<HTMLDivElement>,
     handleDragStart,
+    screenQuadrant,
   };
 };
 
