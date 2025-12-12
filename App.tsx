@@ -116,6 +116,9 @@ const App: React.FC = () => {
   const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  const [rightPanelMode, setRightPanelMode] = useState<'tabs' | 'split'>('split'); // 'tabs' = one at a time, 'split' = both visible
+  const [splitRatio, setSplitRatio] = useState(50); // Percentage for chat (stream gets the rest)
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   const [demoForceModeration, setDemoForceModeration] = useState(false);
@@ -1241,32 +1244,116 @@ const App: React.FC = () => {
             
             {/* Sidebar content - hidden when collapsed */}
             <div className={`flex flex-col h-full ${rightSidebarCollapsed ? 'md:hidden' : ''}`}>
-              <div className="flex border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-                <button 
-                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                  onClick={() => setActiveRightTab('chat')}
+              {/* Header with tabs and mode toggle */}
+              <div className="flex items-center border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                {rightPanelMode === 'tabs' ? (
+                  <>
+                    <button 
+                      className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                      onClick={() => setActiveRightTab('chat')}
+                    >
+                      <MessageSquare size={16} /> {t.nav.chat}
+                    </button>
+                    <button 
+                      className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                      onClick={() => setActiveRightTab('stream')}
+                    >
+                      <Tv size={16} /> {t.nav.stream}
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex-1 py-2 px-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1"><MessageSquare size={12} /> Chat</span>
+                      <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                      <span className="flex items-center gap-1"><Tv size={12} /> Stream</span>
+                    </div>
+                  </div>
+                )}
+                {/* Mode toggle button */}
+                <button
+                  onClick={() => setRightPanelMode(rightPanelMode === 'tabs' ? 'split' : 'tabs')}
+                  className="p-2 mr-1 text-zinc-400 hover:text-twitch-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                  title={rightPanelMode === 'tabs' ? 'Ver ambos (split)' : 'Ver uno (tabs)'}
                 >
-                  <MessageSquare size={16} /> {t.nav.chat}
-                </button>
-                <button 
-                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
-                  onClick={() => setActiveRightTab('stream')}
-                >
-                  <Tv size={16} /> {t.nav.stream}
+                  {rightPanelMode === 'tabs' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                  )}
                 </button>
               </div>
               
-              <div className="flex-1 overflow-hidden relative" data-tour="chat">
-                {activeRightTab === 'chat' ? (
-                  <ChatFeed 
-                    messages={chatMessages} 
-                    userVoteMap={poll.userVoteMap} 
-                    options={poll.currentPoll?.options} 
-                  />
+              {/* Content area */}
+              <div className="flex-1 overflow-hidden relative flex flex-col" data-tour="chat">
+                {rightPanelMode === 'tabs' ? (
+                  // Tab mode - show one at a time
+                  activeRightTab === 'chat' ? (
+                    <ChatFeed 
+                      messages={chatMessages} 
+                      userVoteMap={poll.userVoteMap} 
+                      options={poll.currentPoll?.options} 
+                    />
+                  ) : (
+                    <div className="h-full p-2 bg-black">
+                      <StreamPlayer channel={channelName} />
+                    </div>
+                  )
                 ) : (
-                  <div className="h-full p-2 bg-black">
-                    <StreamPlayer channel={channelName} />
-                  </div>
+                  // Split mode - show both with draggable divider
+                  <>
+                    {/* Chat section */}
+                    <div 
+                      className="overflow-hidden shrink-0"
+                      style={{ height: `${splitRatio}%` }}
+                    >
+                      <ChatFeed 
+                        messages={chatMessages} 
+                        userVoteMap={poll.userVoteMap} 
+                        options={poll.currentPoll?.options} 
+                      />
+                    </div>
+                    
+                    {/* Draggable divider */}
+                    <div 
+                      className={`h-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-twitch-brand/50 cursor-row-resize flex items-center justify-center shrink-0 transition-colors ${isDraggingSplit ? 'bg-twitch-brand/50' : ''}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setIsDraggingSplit(true);
+                        const startY = e.clientY;
+                        const startRatio = splitRatio;
+                        const container = e.currentTarget.parentElement;
+                        if (!container) return;
+                        const containerHeight = container.offsetHeight;
+                        
+                        const handleMouseMove = (e: MouseEvent) => {
+                          const deltaY = e.clientY - startY;
+                          const deltaRatio = (deltaY / containerHeight) * 100;
+                          const newRatio = Math.min(80, Math.max(20, startRatio + deltaRatio));
+                          setSplitRatio(newRatio);
+                        };
+                        
+                        const handleMouseUp = () => {
+                          setIsDraggingSplit(false);
+                          window.removeEventListener('mousemove', handleMouseMove);
+                          window.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        window.addEventListener('mousemove', handleMouseMove);
+                        window.addEventListener('mouseup', handleMouseUp);
+                      }}
+                    >
+                      <div className="w-8 h-1 bg-zinc-400 dark:bg-zinc-600 rounded-full" />
+                    </div>
+                    
+                    {/* Stream section */}
+                    <div 
+                      className="flex-1 overflow-hidden bg-black p-1"
+                      style={{ minHeight: '20%' }}
+                    >
+                      <StreamPlayer channel={channelName} />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
