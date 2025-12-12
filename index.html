@@ -2,15 +2,58 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TwitchVote Live</title>
-    <link rel="icon" type="image/svg+xml" href="/ai-vision-icon.svg">
-    <link rel="apple-touch-icon" href="/ai-vision-icon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- SEO & Social -->
+    <title>TwitchVote Live - Encuestas Interactivas para Twitch</title>
+    <meta name="description" content="Crea encuestas interactivas en vivo para tu stream de Twitch. Análisis de chat, moderación inteligente y herramientas para streamers." />
+    <meta name="keywords" content="twitch, encuestas, polls, streaming, chat, interactivo, streamer tools" />
+    <meta name="author" content="TwitchVote" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="TwitchVote Live - Encuestas Interactivas para Twitch" />
+    <meta property="og:description" content="Crea encuestas interactivas en vivo para tu stream de Twitch." />
+    <meta property="og:image" content="/ai-vision-icon.png" />
+    <meta name="twitter:card" content="summary" />
+    
+    <!-- PWA -->
+    <meta name="theme-color" content="#9146FF" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TwitchVote" />
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/ai-vision-icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/ai-vision-icon.png" />
+    <link rel="apple-touch-icon" href="/ai-vision-icon.png" />
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://embed.twitch.tv" />
+    <link rel="preconnect" href="https://static-cdn.jtvnw.net" />
+    
+    <!-- Twitch Embed -->
     <script src="https://embed.twitch.tv/embed/v1.js"></script>
-    <link rel="stylesheet" href="/index.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/index.css" />
   </head>
   <body class="bg-zinc-100 dark:bg-[#0f0f11] bg-dot-pattern-light dark:bg-dot-pattern transition-colors duration-300 min-h-screen selection:bg-twitch-brand selection:text-white">
+    <!-- App Root -->
     <div id="root"></div>
+    
+    <!-- No-JS Fallback -->
+    <noscript>
+      <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #0f0f11; color: white; font-family: system-ui;">
+        <div style="text-align: center; padding: 2rem;">
+          <h1 style="font-size: 2rem; margin-bottom: 1rem;">TwitchVote Live</h1>
+          <p>Esta aplicación requiere JavaScript para funcionar.</p>
+          <p style="margin-top: 1rem; opacity: 0.7;">Por favor, habilita JavaScript en tu navegador.</p>
+        </div>
+      </div>
+    </noscript>
+    
+    <!-- Main Script -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

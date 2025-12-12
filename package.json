@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "vite build",
     "preview": "vite preview",
     "test": "vitest --run",
     "test:watch": "vitest",
@@ -63,6 +64,7 @@
     "jsdom": "^27.3.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.0.0",
     "vitest": "^2.1.0",
     "wait-on": "^9.0.3"
   }
