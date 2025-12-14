@@ -222,6 +222,9 @@ describe('usePoll Property Tests', () => {
         fc.property(
           createPollConfigArb,
           (config) => {
+            // Clear storage before each iteration to avoid accumulation
+            localStorage.clear();
+            
             const { result } = renderHook(() => usePoll());
             
             // Create and start a poll

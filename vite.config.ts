@@ -102,6 +102,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       globals: true,
+      exclude: ['**/node_modules/**', '**/e2e/**'],
+      setupFiles: ['./tests/setup.ts'],
     }
   };
 });
