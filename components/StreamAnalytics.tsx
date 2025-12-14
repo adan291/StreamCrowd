@@ -118,6 +118,30 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
     return generateTimeSeries(currentSession.messages);
   }, [currentSession?.messages.length]);
 
+  // Exportar mensajes a CSV
+  const exportMessagesToCSV = () => {
+    if (!currentSession?.messages.length) return;
+    
+    const headers = ['Timestamp', 'Username', 'Message', 'UserID'];
+    const rows = currentSession.messages.map(msg => {
+      const timestamp = new Date(msg.timestamp).toISOString();
+      // Escapar comillas en el mensaje
+      const escapedMsg = msg.message.replace(/"/g, '""');
+      return `"${timestamp}","${msg.username}","${escapedMsg}","${msg.userId || ''}"`;
+    });
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chat_export_${currentSession.channel}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Sentiment distribution for pie chart
   const sentimentDistribution = useMemo(() => {
     if (!currentSession?.messages.length) return [];
@@ -277,6 +301,17 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             </span>
             {currentSession?.channelName && (
               <span className="text-purple-400">#{currentSession.channelName}</span>
+            )}
+            {/* Botón exportar CSV */}
+            {metrics.totalMessages > 0 && (
+              <button
+                onClick={exportMessagesToCSV}
+                className="flex items-center gap-1 px-2 py-1 bg-white/10 hover:bg-white/20 rounded text-gray-300 hover:text-white transition-colors"
+                title="Exportar chat a CSV"
+              >
+                <Download className="w-3 h-3" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
             )}
           </div>
         </div>

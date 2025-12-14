@@ -1058,9 +1058,12 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             votes: 0,
             color: opt.color,
             icon: opt.icon,
-            image: opt.image
+            image: opt.image,
+            voteKey: opt.voteKey
           }))} 
-          onClose={() => setShowSpinner(false)} 
+          onClose={() => setShowSpinner(false)}
+          chatMessages={chatMessages}
+          votePrefix={votePrefix}
         />
       )}
 
