@@ -390,7 +390,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                 Volumen de Chat
               </h4>
               <div className="h-36">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={144}>
                   <AreaChart data={timeSeriesData}>
                     <defs>
                       <linearGradient id="colorMsgs" x1="0" y1="0" x2="0" y2="1">
@@ -415,7 +415,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                 Tendencia Emocional
               </h4>
               <div className="h-36">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={144}>
                   <LineChart data={timeSeriesData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                     <XAxis dataKey="time" tick={{ fill: '#666', fontSize: 10 }} />
@@ -441,7 +441,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                   Distribución
                 </h4>
                 <div className="h-32">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={128}>
                     <PieChart>
                       <Pie data={sentimentDistribution} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={5} dataKey="value">
                         {sentimentDistribution.map((entry, i) => (
@@ -464,7 +464,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                   Top Usuarios
                 </h4>
                 <div className="h-32">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={128}>
                     <BarChart data={metrics.topUsers.slice(0, 5).map(u => ({ name: u.username.slice(0, 10), msgs: u.count }))} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
                       <XAxis type="number" tick={{ fill: '#666', fontSize: 10 }} />
