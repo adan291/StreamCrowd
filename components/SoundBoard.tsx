@@ -22,6 +22,7 @@ import {
   Cpu,
   FolderOpen,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface BitSound {
   id: string;
@@ -46,6 +47,7 @@ const STORAGE_KEY = 'soundboard_custom_sounds';
 const MAX_DURATION_SECONDS = 30;
 
 export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'bit' | 'custom'>('bit');
   const [isMuted, setIsMuted] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -338,7 +340,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
       <div className="bg-zinc-900 rounded-2xl p-6 max-w-2xl w-full mx-4 relative max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 Panel de Sonidos</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 {t.soundboard.title}</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Volume2 size={16} className="text-zinc-400" />
@@ -372,7 +374,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
               activeTab === 'bit' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            <Cpu size={16} /> Sonidos BIT
+            <Cpu size={16} /> {t.soundboard.bitSounds}
           </button>
           <button
             onClick={() => setActiveTab('custom')}
@@ -391,7 +393,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {activeTab === 'bit' ? (
             <>
-              <p className="text-zinc-500 text-xs mb-3 text-center">Sonidos generados digitalmente (8-bit style)</p>
+              <p className="text-zinc-500 text-xs mb-3 text-center">{t.soundboard.bitDescription}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {bitSounds.map((sound) => (
                   <button
@@ -436,8 +438,8 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
               {customSounds.length === 0 ? (
                 <div className="text-center py-12 text-zinc-500">
                   <FolderOpen size={48} className="mx-auto mb-3 opacity-50" />
-                  <p>No hay sonidos personalizados</p>
-                  <p className="text-xs mt-1">Sube archivos de audio para usarlos en tu stream</p>
+                  <p>{t.soundboard.noCustomSounds}</p>
+                  <p className="text-xs mt-1">{t.soundboard.uploadHint}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

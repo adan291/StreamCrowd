@@ -16,6 +16,15 @@ export interface Translations {
     language: string;
     exit: string;
   };
+  tools: {
+    title: string;
+    subtitle: string;
+    selectLanguage: string;
+    switchTheme: string;
+    keyboardShortcuts: string;
+    keyboardShortcutsDesc: string;
+    quickAccess: string;
+  };
   connection: {
     title: string;
     subtitle: string;
@@ -65,6 +74,7 @@ export interface Translations {
     openInTwitch: string;
     copyLink: string;
     closeStream: string;
+    sounds: string;
   };
   poll: {
     title: string;
@@ -160,6 +170,9 @@ export interface Translations {
     noOptionsToImport: string;
     optionsImported: string;
     quickPollCreated: string;
+    spinnerWheel: string;
+    randomWinnerTooltip: string;
+    raffle: string;
   };
   moderation: {
     title: string;
@@ -295,6 +308,9 @@ export interface Translations {
     waitingPoll: string;
     mode: string;
     forOBS: string;
+    size: string;
+    normalSize: string;
+    largeSize: string;
   };
   notifications: {
     pollCreated: string;
@@ -355,6 +371,46 @@ export interface Translations {
     msgHappy: string;
     msgSad: string;
   };
+  soundboard: {
+    title: string;
+    bitSounds: string;
+    customSounds: string;
+    bitDescription: string;
+    noCustomSounds: string;
+    uploadHint: string;
+  };
+  randomWinner: {
+    title: string;
+    subtitle: string;
+    openOverlay: string;
+    viewers: string;
+    keyword: string;
+    subsOnly: string;
+    keywordLabel: string;
+    keywordPlaceholder: string;
+    timeLimit: string;
+    availableParticipants: string;
+    subsInChat: string;
+    usersInChat: string;
+    time: string;
+    participants: string;
+    winner: string;
+    selectWinner: string;
+    selecting: string;
+    chooseWinner: string;
+    startCollection: string;
+    finishAndChoose: string;
+    newRaffle: string;
+    resetRaffle: string;
+    clearAll: string;
+    clearAllHint: string;
+    viewersHint: string;
+    keywordHint: string;
+    waitingRaffle: string;
+  };
+  spinner: {
+    winnerTextColor: string;
+  };
 }
 
 export const translations: Record<Locale, Translations> = {
@@ -372,6 +428,15 @@ export const translations: Record<Locale, Translations> = {
       theme: 'Tema',
       language: 'Idioma',
       exit: 'Salir',
+    },
+    tools: {
+      title: 'Herramientas',
+      subtitle: 'Herramientas y configuración',
+      selectLanguage: 'Selecciona el idioma de la interfaz',
+      switchTheme: 'Cambia entre modo claro y oscuro',
+      keyboardShortcuts: 'Atajos de Teclado',
+      keyboardShortcutsDesc: 'Personaliza los atajos de la aplicación',
+      quickAccess: 'Accede rápidamente con',
     },
     connection: {
       title: 'Conectar a Twitch',
@@ -422,6 +487,7 @@ export const translations: Record<Locale, Translations> = {
       openInTwitch: 'Abrir en Twitch',
       copyLink: 'Copiar enlace',
       closeStream: 'Cerrar stream',
+      sounds: 'Sonidos',
     },
     poll: {
       title: 'Encuesta',
@@ -517,6 +583,9 @@ export const translations: Record<Locale, Translations> = {
       noOptionsToImport: 'No hay opciones para importar',
       optionsImported: 'opciones importadas',
       quickPollCreated: '¡Encuesta rápida Sí/No creada!',
+      spinnerWheel: 'Ruleta',
+      randomWinnerTooltip: 'Sortea un ganador entre los viewers',
+      raffle: 'Sorteo',
     },
     moderation: {
       title: 'Moderación de Votos',
@@ -652,6 +721,9 @@ export const translations: Record<Locale, Translations> = {
       waitingPoll: 'Esperando encuesta...',
       mode: 'OVERLAY MODE',
       forOBS: 'Para OBS',
+      size: 'Tamaño',
+      normalSize: 'Normal',
+      largeSize: 'Grande',
     },
     notifications: {
       pollCreated: 'Encuesta creada',
@@ -712,6 +784,46 @@ export const translations: Record<Locale, Translations> = {
       msgHappy: '¡Buen ambiente! 😊',
       msgSad: 'El chat está triste... 😢',
     },
+    soundboard: {
+      title: 'Panel de Sonidos',
+      bitSounds: 'Sonidos BIT',
+      customSounds: 'Mis Sonidos',
+      bitDescription: 'Sonidos generados digitalmente (8-bit style)',
+      noCustomSounds: 'No hay sonidos personalizados',
+      uploadHint: 'Sube archivos de audio para usarlos en tu stream',
+    },
+    randomWinner: {
+      title: 'Random Winner',
+      subtitle: 'Selecciona un ganador aleatorio del chat',
+      openOverlay: 'Abrir Overlay para OBS',
+      viewers: 'Viewers',
+      keyword: 'Palabra Clave',
+      subsOnly: 'Solo Suscriptores',
+      keywordLabel: 'Palabra Clave',
+      keywordPlaceholder: 'Ej: participar, sorteo, yo...',
+      timeLimit: 'Tiempo límite (segundos)',
+      availableParticipants: 'Participantes disponibles',
+      subsInChat: 'suscriptores en el chat',
+      usersInChat: 'usuarios en el chat',
+      time: 'Tiempo',
+      participants: 'Participantes',
+      winner: '¡GANADOR!',
+      selectWinner: 'Seleccionar Ganador',
+      selecting: 'Seleccionando...',
+      chooseWinner: 'Elegir Ganador',
+      startCollection: 'Iniciar Recolección',
+      finishAndChoose: 'Terminar y Elegir',
+      newRaffle: 'Nuevo Sorteo',
+      resetRaffle: 'Reiniciar sorteo',
+      clearAll: 'Limpiar Todo (Resetear Participantes)',
+      clearAllHint: 'Resetea participantes y configuración',
+      viewersHint: 'Selecciona un ganador de los usuarios que han escrito en el chat',
+      keywordHint: 'Los usuarios deben escribir la palabra clave para participar',
+      waitingRaffle: 'Esperando sorteo...',
+    },
+    spinner: {
+      winnerTextColor: 'Color de texto ganador',
+    },
   },
   en: {
     common: {
@@ -727,6 +839,15 @@ export const translations: Record<Locale, Translations> = {
       theme: 'Theme',
       language: 'Language',
       exit: 'Exit',
+    },
+    tools: {
+      title: 'Tools',
+      subtitle: 'Tools and settings',
+      selectLanguage: 'Select interface language',
+      switchTheme: 'Switch between light and dark mode',
+      keyboardShortcuts: 'Keyboard Shortcuts',
+      keyboardShortcutsDesc: 'Customize application shortcuts',
+      quickAccess: 'Quick access with',
     },
     connection: {
       title: 'Connect to Twitch',
@@ -777,6 +898,7 @@ export const translations: Record<Locale, Translations> = {
       openInTwitch: 'Open in Twitch',
       copyLink: 'Copy link',
       closeStream: 'Close stream',
+      sounds: 'Sounds',
     },
     poll: {
       title: 'Poll',
@@ -872,6 +994,9 @@ export const translations: Record<Locale, Translations> = {
       noOptionsToImport: 'No options to import',
       optionsImported: 'options imported',
       quickPollCreated: 'Quick Yes/No poll created!',
+      spinnerWheel: 'Spinner',
+      randomWinnerTooltip: 'Raffle a winner from viewers',
+      raffle: 'Raffle',
     },
     moderation: {
       title: 'Vote Moderation',
@@ -1007,6 +1132,9 @@ export const translations: Record<Locale, Translations> = {
       waitingPoll: 'Waiting for poll...',
       mode: 'OVERLAY MODE',
       forOBS: 'For OBS',
+      size: 'Size',
+      normalSize: 'Normal',
+      largeSize: 'Large',
     },
     notifications: {
       pollCreated: 'Poll created',
@@ -1066,6 +1194,46 @@ export const translations: Record<Locale, Translations> = {
       msgSleepy: '💤 Waiting for activity...',
       msgHappy: 'Good vibes! 😊',
       msgSad: 'Chat is sad... 😢',
+    },
+    soundboard: {
+      title: 'Sound Board',
+      bitSounds: 'BIT Sounds',
+      customSounds: 'My Sounds',
+      bitDescription: 'Digitally generated sounds (8-bit style)',
+      noCustomSounds: 'No custom sounds',
+      uploadHint: 'Upload audio files to use in your stream',
+    },
+    randomWinner: {
+      title: 'Random Winner',
+      subtitle: 'Select a random winner from chat',
+      openOverlay: 'Open Overlay for OBS',
+      viewers: 'Viewers',
+      keyword: 'Keyword',
+      subsOnly: 'Subscribers Only',
+      keywordLabel: 'Keyword',
+      keywordPlaceholder: 'Ex: participate, raffle, me...',
+      timeLimit: 'Time limit (seconds)',
+      availableParticipants: 'Available participants',
+      subsInChat: 'subscribers in chat',
+      usersInChat: 'users in chat',
+      time: 'Time',
+      participants: 'Participants',
+      winner: 'WINNER!',
+      selectWinner: 'Select Winner',
+      selecting: 'Selecting...',
+      chooseWinner: 'Choose Winner',
+      startCollection: 'Start Collection',
+      finishAndChoose: 'Finish and Choose',
+      newRaffle: 'New Raffle',
+      resetRaffle: 'Reset raffle',
+      clearAll: 'Clear All (Reset Participants)',
+      clearAllHint: 'Reset participants and settings',
+      viewersHint: 'Select a winner from users who have written in chat',
+      keywordHint: 'Users must type the keyword to participate',
+      waitingRaffle: 'Waiting for raffle...',
+    },
+    spinner: {
+      winnerTextColor: 'Winner text color',
     },
   },
 };

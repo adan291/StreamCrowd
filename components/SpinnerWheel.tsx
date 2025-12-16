@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PollOption, TwitchMessage } from '../types';
 import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, ExternalLink, Settings } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 type WheelMode = 'classic' | 'voting';
 
@@ -38,6 +39,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   votePrefix = '+',
   isOverlayMode = false
 }) => {
+  const { t } = useI18n();
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlayWheelSize, setOverlayWheelSize] = useState<'normal' | 'large'>('large');
@@ -334,7 +336,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   if (isOverlayMode) {
     const OverlaySettingsPanel = () => (
       <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-64">
-        <p className="text-xs text-zinc-400 mb-2 font-bold">Fondo (Chroma)</p>
+        <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.chromaKey}</p>
         <div className="flex gap-1 mb-3">
           {OVERLAY_BG_COLORS.map((color) => (
             <button 
@@ -345,7 +347,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             />
           ))}
         </div>
-        <p className="text-xs text-zinc-400 mb-2 font-bold">Color de texto ganador</p>
+        <p className="text-xs text-zinc-400 mb-2 font-bold">{t.spinner.winnerTextColor}</p>
         <div className="flex gap-1 mb-3">
           {OVERLAY_TEXT_COLORS.map((color) => (
             <button 
@@ -356,7 +358,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             />
           ))}
         </div>
-        <p className="text-xs text-zinc-400 mb-2 font-bold">Tamaño ruleta</p>
+        <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.size}</p>
         <div className="flex gap-1">
           {(['normal', 'large'] as const).map((size) => (
             <button 
@@ -364,7 +366,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
               onClick={() => setOverlayWheelSize(size)} 
               className={`flex-1 py-1.5 rounded text-xs font-medium ${overlayWheelSize === size ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300'}`}
             >
-              {size === 'normal' ? 'Normal' : 'Grande'}
+              {size === 'normal' ? t.overlay.normalSize : t.overlay.largeSize}
             </button>
           ))}
         </div>

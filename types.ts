@@ -65,6 +65,8 @@ export interface TwitchMessage {
   color?: string;
   id?: string;
   userId?: string;
+  isSubscriber?: boolean;
+  timestamp?: number;
 }
 
 // Re-export moderation types from voteModerationService

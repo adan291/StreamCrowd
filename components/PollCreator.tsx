@@ -24,9 +24,10 @@ interface PollCreatorProps {
   chatMessages?: TwitchMessage[];
   onShowHistory?: () => void;
   sidebarHidden?: boolean;
+  onClearChatMessages?: () => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages }) => {
   const { t } = useI18n();
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
@@ -712,10 +713,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               
               {/* Herramientas de Sorteo */}
               <Tooltip text="Gira la ruleta con las opciones actuales">
-                <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> Ruleta</button>
+                <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> {t.poll.spinnerWheel}</button>
               </Tooltip>
-              <Tooltip text="Sortea un ganador entre los viewers">
-                <button type="button" onClick={() => setShowRandomWinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-full text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 flex items-center gap-1 shadow-sm hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors"><Trophy size={12} className="text-yellow-500"/> Sorteo</button>
+              <Tooltip text={t.poll.randomWinnerTooltip}>
+                <button type="button" onClick={() => setShowRandomWinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-full text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 flex items-center gap-1 shadow-sm hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors"><Trophy size={12} className="text-yellow-500"/> {t.poll.raffle}</button>
               </Tooltip>
               <Tooltip text="Countdown que suma tiempo con subs y bits">
                 <button type="button" onClick={() => setShowCountdown(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
@@ -1076,7 +1077,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       {showRandomWinner && (
         <RandomWinner 
           chatMessages={chatMessages}
-          onClose={() => setShowRandomWinner(false)} 
+          onClose={() => setShowRandomWinner(false)}
+          onClearChatMessages={onClearChatMessages}
         />
       )}
 

@@ -71,7 +71,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
       {isOpen && (
         <div 
-          className="absolute right-0 mt-2 w-44 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-[100] animate-scale-up"
+          className="absolute right-0 mt-2 w-44 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-[9999] animate-scale-up"
           role="listbox"
           aria-label="Select language"
         >

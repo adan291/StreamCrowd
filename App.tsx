@@ -45,7 +45,7 @@ import {
   TourStep,
 } from './hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Globe, Eye, Play, Volume2, Keyboard } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
@@ -113,7 +113,6 @@ const App: React.FC = () => {
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
   const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'data'>('panel');
   const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
@@ -152,7 +151,6 @@ const App: React.FC = () => {
       setShowHistory(false);
       setShowTools(false);
       setShowSoundBoard(false);
-      setShowLanguageMenu(false);
     },
     toggleTheme: () => toggleTheme(),
     showHistory: () => setShowHistory(true),
@@ -426,12 +424,16 @@ const App: React.FC = () => {
   // Process Messages
   useEffect(() => {
     twitchService.onMessage((tags, message, self) => {
+      const isSubscriber = tags.subscriber === true || tags.subscriber === '1' || 
+        (tags.badges && ('subscriber' in tags.badges || 'founder' in tags.badges));
       const msg: TwitchMessage = {
         username: tags['display-name'] || tags.username || 'Anon',
         message,
         color: tags.color || '#a970ff',
         id: tags.id,
-        userId: tags['user-id']
+        userId: tags['user-id'],
+        isSubscriber: !!isSubscriber,
+        timestamp: Date.now()
       };
       
       setChatMessages(prev => [...prev.slice(-199), msg]);
@@ -978,7 +980,7 @@ const App: React.FC = () => {
       )}
       
       {/* Full Sidebar - Hidden when collapsed */}
-      <div className={`hidden md:flex bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20 transition-all duration-300 overflow-hidden ${leftSidebarHidden ? 'w-0 border-r-0 p-0' : 'w-16 lg:w-20'}`}>
+      <div className={`hidden md:flex bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20 transition-all duration-300 ${leftSidebarHidden ? 'w-0 border-r-0 p-0 overflow-hidden' : 'w-16 lg:w-20'}`}>
         {/* User Avatar */}
         <div className="mb-2">
           {channelAvatar ? (
@@ -1019,7 +1021,7 @@ const App: React.FC = () => {
           <NavButton 
             onClick={() => setShowSoundBoard(true)} 
             icon={<Volume2 size={20} />} 
-            label="Sonidos"
+            label={t.nav.sounds}
             dataTour="soundboard"
           />
         </div>
@@ -1037,37 +1039,8 @@ const App: React.FC = () => {
             label="AI Vision" 
           />
           
-          {/* 3. Idioma */}
-          <div className="relative">
-            <NavButton onClick={() => setShowLanguageMenu(!showLanguageMenu)} icon={<Globe size={20} />} label={t.common.language} />
-            {showLanguageMenu && (
-              <div className="absolute left-full ml-2 bottom-0 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-50 animate-scale-up min-w-[120px]">
-                {[
-                  { code: 'es' as const, name: 'Español', flag: '🇪🇸' },
-                  { code: 'en' as const, name: 'English', flag: '🇺🇸' },
-                ].map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setLocale(lang.code); 
-                      setShowLanguageMenu(false); 
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${locale === lang.code ? 'bg-twitch-brand/10 text-twitch-brand' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'}`}
-                  >
-                    <span>{lang.flag}</span>
-                    <span className="font-medium">{lang.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* 4. Tools */}
-          <NavButton onClick={() => setShowTools(true)} icon={<Keyboard size={20} />} label="Tools" />
-          
-          {/* 5. Tema */}
-          <NavButton onClick={toggleTheme} icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />} label={t.common.theme} />
+          {/* 3. Tools (incluye idioma y tema) */}
+          <NavButton onClick={() => setShowTools(true)} icon={<Wrench size={20} />} label="Tools" />
         </div>
         
         {/* Disconnect button */}
@@ -1137,6 +1110,7 @@ const App: React.FC = () => {
                     chatMessages={chatMessages}
                     onShowHistory={() => setShowHistory(true)}
                     sidebarHidden={leftSidebarHidden}
+                    onClearChatMessages={() => setChatMessages([])}
                   />
                 </div>
               )
@@ -1438,7 +1412,7 @@ const App: React.FC = () => {
       
       {/* Tools Modal */}
       {showTools && (
-        <Tools onClose={() => setShowTools(false)} chatMessages={chatMessages} />
+        <Tools onClose={() => setShowTools(false)} theme={theme} onToggleTheme={toggleTheme} />
       )}
     </div>
   );

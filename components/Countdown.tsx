@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
+import { useI18n } from '../i18n';
 
 interface CountdownConfig {
   initialMinutes: number;
@@ -64,6 +65,7 @@ export const Countdown: React.FC<CountdownProps> = ({
   chatMessages = [],
   isOverlayMode = false,
 }) => {
+  const { t } = useI18n();
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlaySize, setOverlaySize] = useState<'normal' | 'large' | 'huge'>('large');
@@ -235,7 +237,7 @@ export const Countdown: React.FC<CountdownProps> = ({
         </button>
         {showOverlaySettings && (
           <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-64">
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Fondo (Chroma)</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.chromaKey}</p>
             <div className="flex gap-1 mb-3">
               {OVERLAY_BG_COLORS.map((color) => (
                 <button 
@@ -246,7 +248,7 @@ export const Countdown: React.FC<CountdownProps> = ({
                 />
               ))}
             </div>
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Color de texto</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.textColor}</p>
             <div className="flex gap-1 mb-3">
               {OVERLAY_TEXT_COLORS.map((color) => (
                 <button 
@@ -257,7 +259,7 @@ export const Countdown: React.FC<CountdownProps> = ({
                 />
               ))}
             </div>
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Tamaño</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.size}</p>
             <div className="flex gap-1">
               {(['normal', 'large', 'huge'] as const).map((size) => (
                 <button 
@@ -265,7 +267,7 @@ export const Countdown: React.FC<CountdownProps> = ({
                   onClick={() => setOverlaySize(size)} 
                   className={`flex-1 py-1.5 rounded text-xs font-medium ${overlaySize === size ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300'}`}
                 >
-                  {size === 'normal' ? 'Normal' : size === 'large' ? 'Grande' : 'Enorme'}
+                  {size === 'normal' ? t.overlay.normalSize : size === 'large' ? t.overlay.largeSize : 'XL'}
                 </button>
               ))}
             </div>

@@ -12,6 +12,7 @@ import {
   Star,
   ExternalLink,
   Settings,
+  Trash2,
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
@@ -20,6 +21,7 @@ interface RandomWinnerProps {
   chatMessages: TwitchMessage[];
   onClose: () => void;
   isOverlayMode?: boolean;
+  onClearChatMessages?: () => void;
 }
 
 type Mode = 'viewers' | 'keyword';
@@ -35,7 +37,7 @@ interface WinnerState {
   participantCount: number;
 }
 
-export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClose, isOverlayMode = false }) => {
+export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClose, isOverlayMode = false, onClearChatMessages }) => {
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlaySize, setOverlaySize] = useState<'normal' | 'large'>('large');
@@ -102,7 +104,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
     const viewers = new Set<string>();
     chatMessages.forEach((msg) => {
       if (subsOnly) {
-        if (msg.badges?.includes('subscriber') || msg.badges?.includes('founder')) {
+        if (msg.isSubscriber) {
           viewers.add(msg.username);
         }
       } else {
@@ -224,7 +226,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
         </button>
         {showOverlaySettings && (
           <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-64">
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Fondo (Chroma)</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.chromaKey}</p>
             <div className="flex gap-1 mb-3">
               {OVERLAY_BG_COLORS.map((color) => (
                 <button 
@@ -235,7 +237,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
                 />
               ))}
             </div>
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Color de texto</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.textColor}</p>
             <div className="flex gap-1 mb-3">
               {OVERLAY_TEXT_COLORS.map((color) => (
                 <button 
@@ -246,7 +248,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
                 />
               ))}
             </div>
-            <p className="text-xs text-zinc-400 mb-2 font-bold">Tamaño</p>
+            <p className="text-xs text-zinc-400 mb-2 font-bold">{t.overlay.size}</p>
             <div className="flex gap-1">
               {(['normal', 'large'] as const).map((size) => (
                 <button 
@@ -254,7 +256,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
                   onClick={() => setOverlaySize(size)} 
                   className={`flex-1 py-1.5 rounded text-xs font-medium ${overlaySize === size ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300'}`}
                 >
-                  {size === 'normal' ? 'Normal' : 'Grande'}
+                  {size === 'normal' ? t.overlay.normalSize : t.overlay.largeSize}
                 </button>
               ))}
             </div>
@@ -267,7 +269,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
               {winner && !isSelecting && (
                 <div className="flex items-center gap-3 mb-3 justify-center">
                   <Crown className="text-white" size={getOverlayIconSize()} />
-                  <span className={`text-white/90 ${getOverlayTitleSize()} font-bold`}>¡GANADOR!</span>
+                  <span className={`text-white/90 ${getOverlayTitleSize()} font-bold`}>{t.randomWinner.winner}</span>
                   <Crown className="text-white" size={getOverlayIconSize()} />
                 </div>
               )}
@@ -282,7 +284,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
         ) : (
           <div className="text-center bg-black/50 rounded-2xl px-10 py-8">
             <Trophy className="text-yellow-400 mx-auto mb-3" size={overlaySize === 'large' ? 64 : 48} />
-            <p className={`text-white/70 ${overlaySize === 'large' ? 'text-2xl' : 'text-xl'}`}>Esperando sorteo...</p>
+            <p className={`text-white/70 ${overlaySize === 'large' ? 'text-2xl' : 'text-xl'}`}>{t.randomWinner.waitingRaffle}</p>
           </div>
         )}
       </div>
@@ -298,20 +300,20 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
         </button>
 
         <h2 className="text-2xl font-bold text-white text-center mb-2 flex items-center justify-center gap-2">
-          <Trophy className="text-yellow-400" /> Random Winner
+          <Trophy className="text-yellow-400" /> {t.randomWinner.title}
         </h2>
-        <p className="text-zinc-400 text-center text-sm mb-4">Selecciona un ganador aleatorio del chat</p>
+        <p className="text-zinc-400 text-center text-sm mb-4">{t.randomWinner.subtitle}</p>
 
         <button onClick={openOverlayWindow} className="w-full mb-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-500/80 hover:to-orange-500/80 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm">
-          <ExternalLink size={16} /> Abrir Overlay para OBS
+          <ExternalLink size={16} /> {t.randomWinner.openOverlay}
         </button>
 
         <div className="flex gap-2 mb-6">
           <button onClick={() => { setMode('viewers'); reset(); }} className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${mode === 'viewers' ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
-            <Users size={18} /> Viewers
+            <Users size={18} /> {t.randomWinner.viewers}
           </button>
           <button onClick={() => { setMode('keyword'); reset(); }} className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${mode === 'keyword' ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
-            <MessageSquare size={18} /> Palabra Clave
+            <MessageSquare size={18} /> {t.randomWinner.keyword}
           </button>
         </div>
 
@@ -320,16 +322,16 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
             <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-xl">
               <div className="flex items-center gap-2">
                 <Star className="text-yellow-400" size={18} />
-                <span className="text-white text-sm">Solo Suscriptores</span>
+                <span className="text-white text-sm">{t.randomWinner.subsOnly}</span>
               </div>
               <button onClick={() => setSubsOnly(!subsOnly)} className={`relative w-12 h-6 rounded-full transition-colors ${subsOnly ? 'bg-yellow-500' : 'bg-zinc-600'}`}>
                 <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${subsOnly ? 'translate-x-7' : 'translate-x-1'}`} />
               </button>
             </div>
             <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
-              <p className="text-zinc-400 text-sm">Participantes disponibles</p>
+              <p className="text-zinc-400 text-sm">{t.randomWinner.availableParticipants}</p>
               <p className="text-3xl font-bold text-white mt-1">{viewerCount}</p>
-              <p className="text-xs text-zinc-500 mt-1">{subsOnly ? 'suscriptores en el chat' : 'usuarios en el chat'}</p>
+              <p className="text-xs text-zinc-500 mt-1">{subsOnly ? t.randomWinner.subsInChat : t.randomWinner.usersInChat}</p>
             </div>
           </div>
         )}
@@ -337,21 +339,21 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
         {mode === 'keyword' && (
           <div className="space-y-4 mb-6">
             <div className="space-y-2">
-              <label className="text-zinc-400 text-xs font-bold uppercase">Palabra Clave</label>
-              <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Ej: participar, sorteo, yo..." disabled={isRunning} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 disabled:opacity-50" />
+              <label className="text-zinc-400 text-xs font-bold uppercase">{t.randomWinner.keywordLabel}</label>
+              <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t.randomWinner.keywordPlaceholder} disabled={isRunning} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 disabled:opacity-50" />
             </div>
             <div className="space-y-2">
-              <label className="text-zinc-400 text-xs font-bold uppercase flex items-center gap-1"><Clock size={14} /> Tiempo límite (segundos)</label>
+              <label className="text-zinc-400 text-xs font-bold uppercase flex items-center gap-1"><Clock size={14} /> {t.randomWinner.timeLimit}</label>
               <input type="number" value={timeLimit} onChange={(e) => setTimeLimit(Math.max(10, parseInt(e.target.value) || 60))} min="10" max="300" disabled={isRunning} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 disabled:opacity-50" />
             </div>
             {(isRunning || participants.size > 0) && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="text-center p-3 bg-zinc-800/50 rounded-xl">
-                  <p className="text-zinc-400 text-xs">Tiempo</p>
+                  <p className="text-zinc-400 text-xs">{t.randomWinner.time}</p>
                   <p className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-white'}`}>{timeLeft}s</p>
                 </div>
                 <div className="text-center p-3 bg-zinc-800/50 rounded-xl">
-                  <p className="text-zinc-400 text-xs">Participantes</p>
+                  <p className="text-zinc-400 text-xs">{t.randomWinner.participants}</p>
                   <p className="text-2xl font-bold text-green-400">{participants.size}</p>
                 </div>
               </div>
@@ -365,7 +367,7 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
               {winner && !isSelecting && (
                 <div className="flex items-center gap-2 mb-1">
                   <Crown className="text-white" size={20} />
-                  <span className="text-white/80 text-sm">¡GANADOR!</span>
+                  <span className="text-white/80 text-sm">{t.randomWinner.winner}</span>
                   <Crown className="text-white" size={20} />
                 </div>
               )}
@@ -378,27 +380,27 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
           {mode === 'viewers' && (
             <>
               <button onClick={startSelection} disabled={viewerCount === 0 || isSelecting} className="flex-1 flex items-center justify-center gap-2 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all">
-                <Sparkles size={20} /> {isSelecting ? 'Seleccionando...' : 'Seleccionar Ganador'}
+                <Sparkles size={20} /> {isSelecting ? t.randomWinner.selecting : t.randomWinner.selectWinner}
               </button>
-              <button onClick={reset} disabled={isSelecting} className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-xl transition-all">
+              <button onClick={reset} disabled={isSelecting} className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-xl transition-all" title={t.randomWinner.resetRaffle}>
                 <RotateCcw size={20} />
               </button>
             </>
           )}
           {mode === 'keyword' && !isRunning && participants.size === 0 && (
             <button onClick={startSelection} disabled={!keyword.trim()} className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all">
-              <Play size={20} /> Iniciar Recolección
+              <Play size={20} /> {t.randomWinner.startCollection}
             </button>
           )}
           {mode === 'keyword' && isRunning && (
             <button onClick={selectWinner} className="flex-1 flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-all animate-pulse">
-              <Trophy size={20} /> Terminar y Elegir ({participants.size})
+              <Trophy size={20} /> {t.randomWinner.finishAndChoose} ({participants.size})
             </button>
           )}
           {mode === 'keyword' && !isRunning && participants.size > 0 && !winner && (
             <>
               <button onClick={() => animateSelection(Array.from(participants))} disabled={isSelecting} className="flex-1 flex items-center justify-center gap-2 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-700 text-white font-bold rounded-xl transition-all">
-                <Sparkles size={20} /> {isSelecting ? 'Seleccionando...' : 'Elegir Ganador'}
+                <Sparkles size={20} /> {isSelecting ? t.randomWinner.selecting : t.randomWinner.chooseWinner}
               </button>
               <button onClick={reset} disabled={isSelecting} className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-xl transition-all">
                 <RotateCcw size={20} />
@@ -407,13 +409,26 @@ export const RandomWinner: React.FC<RandomWinnerProps> = ({ chatMessages, onClos
           )}
           {mode === 'keyword' && winner && (
             <button onClick={reset} className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded-xl transition-all">
-              <RotateCcw size={20} /> Nuevo Sorteo
+              <RotateCcw size={20} /> {t.randomWinner.newRaffle}
             </button>
           )}
         </div>
 
+        <button 
+          onClick={() => { 
+            reset(); 
+            setKeyword(''); 
+            setTimeLimit(60); 
+            setSubsOnly(false); 
+            onClearChatMessages?.();
+          }} 
+          className="w-full mt-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 font-medium rounded-xl transition-all flex items-center justify-center gap-2 text-sm border border-red-500/30"
+        >
+          <Trash2 size={16} /> {t.randomWinner.clearAll}
+        </button>
+
         <p className="text-center text-zinc-500 text-xs mt-4">
-          {mode === 'viewers' ? 'Selecciona un ganador de los usuarios que han escrito en el chat' : 'Los usuarios deben escribir la palabra clave para participar'}
+          {mode === 'viewers' ? t.randomWinner.viewersHint : t.randomWinner.keywordHint}
         </p>
       </div>
     </div>
