@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Trophy, Download, FolderUp, History } from 'lucide-react';
 import { SpinnerWheel } from './SpinnerWheel';
 import { RandomWinner } from './RandomWinner';
+import { Countdown } from './Countdown';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
 import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
@@ -59,6 +60,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showSpinner, setShowSpinner] = useState(false);
   const [showRandomWinner, setShowRandomWinner] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
   const [quickMode, setQuickMode] = useState(true); // Toggle para modo rápido
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -715,6 +717,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               <Tooltip text="Sortea un ganador entre los viewers">
                 <button type="button" onClick={() => setShowRandomWinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-full text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 flex items-center gap-1 shadow-sm hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors"><Trophy size={12} className="text-yellow-500"/> Sorteo</button>
               </Tooltip>
+              <Tooltip text="Countdown que suma tiempo con subs y bits">
+                <button type="button" onClick={() => setShowCountdown(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
+              </Tooltip>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1072,6 +1077,14 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         <RandomWinner 
           chatMessages={chatMessages}
           onClose={() => setShowRandomWinner(false)} 
+        />
+      )}
+
+      {/* Countdown Modal */}
+      {showCountdown && (
+        <Countdown 
+          chatMessages={chatMessages}
+          onClose={() => setShowCountdown(false)} 
         />
       )}
     </>

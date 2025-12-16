@@ -48,6 +48,9 @@ import { DemoTourOverlay } from './components/DemoTourOverlay';
 import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Globe, Eye, Play, Volume2, Keyboard } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
+import { Countdown } from './components/Countdown';
+import { SpinnerWheel } from './components/SpinnerWheel';
+import { RandomWinner } from './components/RandomWinner';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
@@ -599,6 +602,32 @@ const App: React.FC = () => {
     // Note: Status changes are handled by useTwitchConnection hook
     // Do NOT call twitchService.onStatusChange here as it overwrites the hook's callback
   }, []);
+
+  // Check for Component Overlay Modes
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const isCountdownOverlay = urlParams?.get('overlayCountdown') === 'true';
+  const isSpinnerOverlay = urlParams?.get('overlaySpinner') === 'true';
+  const isRandomWinnerOverlay = urlParams?.get('overlayRandomWinner') === 'true';
+  
+  // Countdown Overlay Mode Render
+  if (isCountdownOverlay) {
+    return <Countdown onClose={() => window.close()} chatMessages={chatMessages} isOverlayMode={true} />;
+  }
+
+  // Spinner Overlay Mode Render
+  if (isSpinnerOverlay) {
+    const defaultOptions = poll.currentPoll?.options || [
+      { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+      { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+      { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+    ];
+    return <SpinnerWheel options={defaultOptions} onClose={() => window.close()} chatMessages={chatMessages} isOverlayMode={true} />;
+  }
+
+  // Random Winner Overlay Mode Render
+  if (isRandomWinnerOverlay) {
+    return <RandomWinner chatMessages={chatMessages} onClose={() => window.close()} isOverlayMode={true} />;
+  }
 
   // Overlay Mode Render
   if (isOverlayMode) {
@@ -1409,7 +1438,7 @@ const App: React.FC = () => {
       
       {/* Tools Modal */}
       {showTools && (
-        <Tools onClose={() => setShowTools(false)} />
+        <Tools onClose={() => setShowTools(false)} chatMessages={chatMessages} />
       )}
     </div>
   );

@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
-import { X, Wrench, Keyboard, ChevronRight } from 'lucide-react';
+import { X, Wrench, Keyboard, ChevronRight, Clock } from 'lucide-react';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
+import { Countdown } from './Countdown';
+import { TwitchMessage } from '../types';
 
 interface ToolsProps {
   onClose: () => void;
+  chatMessages?: TwitchMessage[];
 }
 
-type ToolSection = 'main' | 'shortcuts';
+type ToolSection = 'main' | 'shortcuts' | 'countdown';
 
-export const Tools: React.FC<ToolsProps> = ({ onClose }) => {
+export const Tools: React.FC<ToolsProps> = ({ onClose, chatMessages = [] }) => {
   const [activeSection, setActiveSection] = useState<ToolSection>('main');
 
   // If showing shortcuts, render that component
   if (activeSection === 'shortcuts') {
     return <KeyboardShortcuts onClose={() => setActiveSection('main')} />;
+  }
+
+  // If showing countdown, render that component
+  if (activeSection === 'countdown') {
+    return <Countdown onClose={() => setActiveSection('main')} chatMessages={chatMessages} />;
   }
 
   // Main tools menu
@@ -41,6 +49,21 @@ export const Tools: React.FC<ToolsProps> = ({ onClose }) => {
 
         {/* Tools List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {/* Countdown Timer */}
+          <button
+            onClick={() => setActiveSection('countdown')}
+            className="w-full p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 hover:border-twitch-brand/50 hover:bg-twitch-brand/5 transition-all flex items-center gap-4 group"
+          >
+            <div className="p-3 bg-twitch-brand/20 rounded-xl group-hover:bg-twitch-brand/30 transition-colors">
+              <Clock className="text-twitch-brand" size={24} />
+            </div>
+            <div className="flex-1 text-left">
+              <h3 className="font-bold text-zinc-900 dark:text-white">Countdown Timer</h3>
+              <p className="text-xs text-zinc-500">Suma tiempo con subs, bits y donaciones</p>
+            </div>
+            <ChevronRight size={20} className="text-zinc-400 group-hover:text-twitch-brand transition-colors" />
+          </button>
+
           {/* Keyboard Shortcuts */}
           <button
             onClick={() => setActiveSection('shortcuts')}
@@ -55,13 +78,6 @@ export const Tools: React.FC<ToolsProps> = ({ onClose }) => {
             </div>
             <ChevronRight size={20} className="text-zinc-400 group-hover:text-purple-500 transition-colors" />
           </button>
-
-          {/* Placeholder for future tools */}
-          <div className="p-4 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-100/50 dark:bg-zinc-900/50">
-            <p className="text-center text-xs text-zinc-400">
-              Más herramientas próximamente...
-            </p>
-          </div>
         </div>
 
         {/* Footer */}
