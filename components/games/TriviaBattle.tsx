@@ -1,0 +1,870 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { TwitchMessage } from '../../types';
+import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, ExternalLink, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils } from 'lucide-react';
+import { loadAIConfig, AIConfig } from '../../services/aiAnalyticsService';
+
+interface Question {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  timeLimit: number;
+}
+
+interface PlayerScore {
+  oderId: string;
+  username: string;
+  color: string;
+  score: number;
+  streak: number;
+  lastAnswer: number | null;
+  answeredCurrent: boolean;
+}
+
+interface TriviaCategory {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  questions: Question[];
+}
+
+interface TriviaBattleProps {
+  chatMessages: TwitchMessage[];
+  isConnected?: boolean;
+}
+
+const GAME_CHANNEL = 'trivia_battle_sync';
+
+// Banco de preguntas predefinidas por categoría
+const QUESTION_BANK: TriviaCategory[] = [
+  {
+    id: 'general',
+    name: 'Cultura General',
+    icon: <BookOpen size={16} />,
+    questions: [
+      { id: 'g1', question: '¿Cuál es el planeta más grande del sistema solar?', options: ['Marte', 'Júpiter', 'Saturno', 'Neptuno'], correctIndex: 1, timeLimit: 15 },
+      { id: 'g2', question: '¿En qué año llegó el hombre a la Luna?', options: ['1965', '1969', '1972', '1975'], correctIndex: 1, timeLimit: 15 },
+      { id: 'g3', question: '¿Cuál es el océano más grande?', options: ['Atlántico', 'Índico', 'Pacífico', 'Ártico'], correctIndex: 2, timeLimit: 15 },
+      { id: 'g4', question: '¿Cuántos huesos tiene el cuerpo humano adulto?', options: ['186', '206', '226', '256'], correctIndex: 1, timeLimit: 15 },
+      { id: 'g5', question: '¿Cuál es el país más grande del mundo?', options: ['China', 'Estados Unidos', 'Canadá', 'Rusia'], correctIndex: 3, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'gaming',
+    name: 'Videojuegos',
+    icon: <Gamepad2 size={16} />,
+    questions: [
+      { id: 'vg1', question: '¿En qué año se lanzó el primer Super Mario Bros?', options: ['1983', '1985', '1987', '1989'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg2', question: '¿Cuál es el videojuego más vendido de la historia?', options: ['GTA V', 'Minecraft', 'Tetris', 'Wii Sports'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg3', question: '¿Qué empresa creó PlayStation?', options: ['Nintendo', 'Microsoft', 'Sony', 'Sega'], correctIndex: 2, timeLimit: 15 },
+      { id: 'vg4', question: '¿Cómo se llama el protagonista de The Legend of Zelda?', options: ['Zelda', 'Link', 'Ganon', 'Epona'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg5', question: '¿Qué juego popularizó el Battle Royale?', options: ['Fortnite', 'PUBG', 'Apex Legends', 'H1Z1'], correctIndex: 1, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'movies',
+    name: 'Cine y Series',
+    icon: <Film size={16} />,
+    questions: [
+      { id: 'm1', question: '¿Quién dirigió Titanic?', options: ['Steven Spielberg', 'James Cameron', 'Christopher Nolan', 'Martin Scorsese'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm2', question: '¿Cuántas películas hay de Harry Potter?', options: ['6', '7', '8', '9'], correctIndex: 2, timeLimit: 15 },
+      { id: 'm3', question: '¿En qué año se estrenó El Señor de los Anillos: La Comunidad del Anillo?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm4', question: '¿Qué actor interpreta a Iron Man en el MCU?', options: ['Chris Evans', 'Chris Hemsworth', 'Robert Downey Jr.', 'Mark Ruffalo'], correctIndex: 2, timeLimit: 15 },
+      { id: 'm5', question: '¿Cuál fue la primera película de Pixar?', options: ['Buscando a Nemo', 'Toy Story', 'Monsters Inc.', 'Bichos'], correctIndex: 1, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'music',
+    name: 'Música',
+    icon: <Music size={16} />,
+    questions: [
+      { id: 'mu1', question: '¿De qué país es originaria la banda Queen?', options: ['Estados Unidos', 'Reino Unido', 'Australia', 'Canadá'], correctIndex: 1, timeLimit: 15 },
+      { id: 'mu2', question: '¿Quién es conocido como el "Rey del Pop"?', options: ['Elvis Presley', 'Prince', 'Michael Jackson', 'Freddie Mercury'], correctIndex: 2, timeLimit: 15 },
+      { id: 'mu3', question: '¿Cuántos miembros tenía The Beatles?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
+      { id: 'mu4', question: '¿Qué instrumento toca Slash de Guns N\' Roses?', options: ['Batería', 'Bajo', 'Guitarra', 'Teclado'], correctIndex: 2, timeLimit: 15 },
+      { id: 'mu5', question: '¿En qué década se popularizó el reggaetón?', options: ['1980s', '1990s', '2000s', '2010s'], correctIndex: 2, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'geography',
+    name: 'Geografía',
+    icon: <Globe size={16} />,
+    questions: [
+      { id: 'geo1', question: '¿Cuál es la capital de Australia?', options: ['Sídney', 'Melbourne', 'Canberra', 'Brisbane'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo2', question: '¿Cuál es el río más largo del mundo?', options: ['Amazonas', 'Nilo', 'Yangtsé', 'Misisipi'], correctIndex: 1, timeLimit: 15 },
+      { id: 'geo3', question: '¿En qué continente está Egipto?', options: ['Asia', 'Europa', 'África', 'Oceanía'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo4', question: '¿Cuál es el país con más habitantes?', options: ['India', 'China', 'Estados Unidos', 'Indonesia'], correctIndex: 0, timeLimit: 15 },
+      { id: 'geo5', question: '¿Cuál es la montaña más alta del mundo?', options: ['K2', 'Everest', 'Kilimanjaro', 'Mont Blanc'], correctIndex: 1, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'tech',
+    name: 'Tecnología',
+    icon: <Cpu size={16} />,
+    questions: [
+      { id: 't1', question: '¿Quién fundó Microsoft?', options: ['Steve Jobs', 'Bill Gates', 'Mark Zuckerberg', 'Elon Musk'], correctIndex: 1, timeLimit: 15 },
+      { id: 't2', question: '¿En qué año se lanzó el primer iPhone?', options: ['2005', '2007', '2009', '2011'], correctIndex: 1, timeLimit: 15 },
+      { id: 't3', question: '¿Qué significa "HTML"?', options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Management Language'], correctIndex: 0, timeLimit: 20 },
+      { id: 't4', question: '¿Cuál fue la primera red social masiva?', options: ['Facebook', 'MySpace', 'Twitter', 'LinkedIn'], correctIndex: 1, timeLimit: 15 },
+      { id: 't5', question: '¿Qué empresa creó Android?', options: ['Apple', 'Microsoft', 'Google', 'Samsung'], correctIndex: 2, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'sports',
+    name: 'Deportes',
+    icon: <Dumbbell size={16} />,
+    questions: [
+      { id: 's1', question: '¿Cuántos jugadores tiene un equipo de fútbol en el campo?', options: ['9', '10', '11', '12'], correctIndex: 2, timeLimit: 15 },
+      { id: 's2', question: '¿En qué país se inventó el baloncesto?', options: ['Estados Unidos', 'Canadá', 'Reino Unido', 'España'], correctIndex: 0, timeLimit: 15 },
+      { id: 's3', question: '¿Cuántos Grand Slams hay en tenis?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
+      { id: 's4', question: '¿Cada cuántos años se celebran los Juegos Olímpicos?', options: ['2', '3', '4', '5'], correctIndex: 2, timeLimit: 15 },
+      { id: 's5', question: '¿Quién tiene más Balones de Oro?', options: ['Cristiano Ronaldo', 'Lionel Messi', 'Johan Cruyff', 'Michel Platini'], correctIndex: 1, timeLimit: 15 },
+    ]
+  },
+  {
+    id: 'food',
+    name: 'Gastronomía',
+    icon: <Utensils size={16} />,
+    questions: [
+      { id: 'f1', question: '¿De qué país es originaria la pizza?', options: ['España', 'Francia', 'Italia', 'Grecia'], correctIndex: 2, timeLimit: 15 },
+      { id: 'f2', question: '¿Cuál es el ingrediente principal del guacamole?', options: ['Tomate', 'Aguacate', 'Chile', 'Cebolla'], correctIndex: 1, timeLimit: 15 },
+      { id: 'f3', question: '¿De qué país es el sushi?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15 },
+      { id: 'f4', question: '¿Qué fruta es conocida como "la reina de las frutas"?', options: ['Mango', 'Piña', 'Fresa', 'Mangostán'], correctIndex: 3, timeLimit: 15 },
+      { id: 'f5', question: '¿Cuál es la especia más cara del mundo?', options: ['Vainilla', 'Azafrán', 'Canela', 'Cardamomo'], correctIndex: 1, timeLimit: 15 },
+    ]
+  },
+];
+
+type TriviaMode = 'manual' | 'category' | 'ai';
+
+export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConnected = true }) => {
+  const [gameState, setGameState] = useState<'setup' | 'question' | 'results' | 'final'>('setup');
+  const [triviaMode, setTriviaMode] = useState<TriviaMode>('category');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [players, setPlayers] = useState<Map<string, PlayerScore>>(new Map<string, PlayerScore>());
+  const [showCorrect, setShowCorrect] = useState(false);
+  const [answerCounts, setAnswerCounts] = useState<number[]>([0, 0, 0, 0]);
+  
+  // Category selection
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['general']);
+  const [questionsPerCategory, setQuestionsPerCategory] = useState(3);
+  
+  // AI Mode
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiQuestionCount, setAiQuestionCount] = useState(5);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+  
+  // Manual question editor
+  const [editingQuestion, setEditingQuestion] = useState('');
+  const [editingOptions, setEditingOptions] = useState(['', '', '', '']);
+  const [editingCorrect, setEditingCorrect] = useState(0);
+  const [editingTime, setEditingTime] = useState(15);
+  
+  const lastProcessedRef = useRef(0);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const playersArray = [...players.values()] as PlayerScore[];
+  const sortedPlayers = playersArray.sort((a, b) => b.score - a.score);
+  const totalAnswers = answerCounts.reduce((a, b) => a + b, 0);
+
+  // Load AI config on mount
+  useEffect(() => {
+    const config = loadAIConfig();
+    setAiConfig(config);
+  }, []);
+
+  // Setup BroadcastChannel
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel(GAME_CHANNEL);
+    return () => channelRef.current?.close();
+  }, []);
+
+  const syncToOverlay = useCallback(() => {
+    channelRef.current?.postMessage({
+      type: 'trivia_state',
+      gameState,
+      currentQuestion: currentQuestion || null,
+      questionIndex: currentQuestionIndex,
+      totalQuestions: questions.length,
+      timeLeft,
+      showCorrect,
+      answerCounts,
+      topPlayers: sortedPlayers.slice(0, 10)
+    });
+  }, [gameState, currentQuestion, currentQuestionIndex, questions.length, timeLeft, showCorrect, answerCounts, sortedPlayers]);
+
+  useEffect(() => {
+    syncToOverlay();
+  }, [syncToOverlay]);
+
+  // Process chat messages for answers
+  useEffect(() => {
+    if (!isConnected || gameState !== 'question' || !currentQuestion) return;
+    const newMessages = chatMessages.slice(lastProcessedRef.current);
+    lastProcessedRef.current = chatMessages.length;
+
+    newMessages.forEach((msg: TwitchMessage) => {
+      const msgLower = msg.message.toLowerCase().trim();
+      const oderId = msg.userId || msg.username;
+      
+      let answerIndex = -1;
+      if (['1', 'a'].includes(msgLower)) answerIndex = 0;
+      else if (['2', 'b'].includes(msgLower)) answerIndex = 1;
+      else if (['3', 'c'].includes(msgLower)) answerIndex = 2;
+      else if (['4', 'd'].includes(msgLower)) answerIndex = 3;
+      
+      if (answerIndex >= 0 && answerIndex < currentQuestion.options.length) {
+        setPlayers((prev: Map<string, PlayerScore>) => {
+          const newPlayers = new Map<string, PlayerScore>(prev);
+          const existing = newPlayers.get(oderId);
+          
+          if (existing?.answeredCurrent) return prev;
+          
+          const isCorrect = answerIndex === currentQuestion.correctIndex;
+          const timeBonus = Math.floor(timeLeft / 2);
+          const streakBonus = existing?.streak || 0;
+          const points = isCorrect ? 10 + timeBonus + (streakBonus * 2) : 0;
+          
+          newPlayers.set(oderId, {
+            oderId,
+            username: msg.username,
+            color: msg.color || '#a970ff',
+            score: (existing?.score || 0) + points,
+            streak: isCorrect ? (existing?.streak || 0) + 1 : 0,
+            lastAnswer: answerIndex,
+            answeredCurrent: true
+          });
+          
+          return newPlayers;
+        });
+        
+        setAnswerCounts((prev: number[]) => {
+          const newCounts = [...prev];
+          newCounts[answerIndex]++;
+          return newCounts;
+        });
+      }
+    });
+  }, [chatMessages, isConnected, gameState, currentQuestion, timeLeft]);
+
+  // Question timer
+  useEffect(() => {
+    if (gameState !== 'question') return;
+    
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev: number) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          setShowCorrect(true);
+          setTimeout(() => setGameState('results'), 3000);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState]);
+
+  // Generate questions from categories
+  const generateFromCategories = () => {
+    const allQuestions: Question[] = [];
+    selectedCategories.forEach((catId: string) => {
+      const category = QUESTION_BANK.find(c => c.id === catId);
+      if (category) {
+        const shuffled = [...category.questions].sort(() => Math.random() - 0.5);
+        allQuestions.push(...shuffled.slice(0, questionsPerCategory));
+      }
+    });
+    setQuestions(allQuestions.sort(() => Math.random() - 0.5));
+  };
+
+  // Generate questions with AI
+  const generateWithAI = async () => {
+    if (!aiConfig?.apiKey || !aiConfig.enabled) {
+      setAiError('Configura tu API key de IA en el panel de Analytics para usar esta función.');
+      return;
+    }
+    if (!aiTopic.trim()) {
+      setAiError('Escribe un tema para generar preguntas.');
+      return;
+    }
+
+    setIsGenerating(true);
+    setAiError(null);
+
+    const prompt = `Genera ${aiQuestionCount} preguntas de trivia sobre "${aiTopic}" para un juego de stream.
+Responde SOLO con un JSON válido con esta estructura exacta:
+{
+  "questions": [
+    {
+      "question": "¿Pregunta aquí?",
+      "options": ["Opción 1", "Opción 2", "Opción 3", "Opción 4"],
+      "correctIndex": 0
+    }
+  ]
+}
+IMPORTANTE: 
+- Cada pregunta debe tener exactamente 4 opciones
+- correctIndex es el índice (0-3) de la respuesta correcta
+- Las preguntas deben ser variadas y de dificultad media
+- Responde SOLO el JSON, sin texto adicional`;
+
+    try {
+      if (aiConfig.provider === 'gemini') {
+        const savedModel = localStorage.getItem('gemini_working_model') || 'gemini-2.0-flash-exp';
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${savedModel}:generateContent?key=${aiConfig.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+            }),
+          }
+        );
+
+        if (!response.ok) throw new Error('Error en la API de Gemini');
+
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (text) {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.questions && Array.isArray(parsed.questions)) {
+              const newQuestions: Question[] = parsed.questions.map((q: any, i: number) => ({
+                id: `ai_${Date.now()}_${i}`,
+                question: q.question,
+                options: q.options.slice(0, 4),
+                correctIndex: Math.min(q.correctIndex, 3),
+                timeLimit: 15
+              }));
+              setQuestions(newQuestions);
+              setIsGenerating(false);
+              return;
+            }
+          }
+        }
+        throw new Error('No se pudo parsear la respuesta de la IA');
+      }
+      // TODO: Add OpenAI/Anthropic support
+      throw new Error('Proveedor de IA no soportado');
+    } catch (error) {
+      console.error('AI generation error:', error);
+      setAiError(error instanceof Error ? error.message : 'Error generando preguntas');
+    }
+    setIsGenerating(false);
+  };
+
+  const startGame = () => {
+    if (questions.length === 0) return;
+    setCurrentQuestionIndex(0);
+    setPlayers(new Map<string, PlayerScore>());
+    setTimeLeft(questions[0].timeLimit);
+    setAnswerCounts([0, 0, 0, 0]);
+    setShowCorrect(false);
+    setGameState('question');
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestionIndex >= questions.length - 1) {
+      setGameState('final');
+      return;
+    }
+    
+    const nextIndex = currentQuestionIndex + 1;
+    setCurrentQuestionIndex(nextIndex);
+    setTimeLeft(questions[nextIndex].timeLimit);
+    setAnswerCounts([0, 0, 0, 0]);
+    setShowCorrect(false);
+    
+    setPlayers((prev: Map<string, PlayerScore>) => {
+      const newPlayers = new Map<string, PlayerScore>(prev);
+      newPlayers.forEach((player, key) => {
+        newPlayers.set(key, { ...player, answeredCurrent: false, lastAnswer: null });
+      });
+      return newPlayers;
+    });
+    
+    setGameState('question');
+  };
+
+  const addManualQuestion = () => {
+    if (!editingQuestion.trim() || editingOptions.filter((o: string) => o.trim()).length < 2) return;
+    
+    const newQuestion: Question = {
+      id: Date.now().toString(),
+      question: editingQuestion,
+      options: editingOptions.filter((o: string) => o.trim()),
+      correctIndex: editingCorrect,
+      timeLimit: editingTime
+    };
+    
+    setQuestions((prev: Question[]) => [...prev, newQuestion]);
+    setEditingQuestion('');
+    setEditingOptions(['', '', '', '']);
+    setEditingCorrect(0);
+  };
+
+  const removeQuestion = (id: string) => {
+    setQuestions((prev: Question[]) => prev.filter((q: Question) => q.id !== id));
+  };
+
+  const resetGame = () => {
+    setGameState('setup');
+    setCurrentQuestionIndex(0);
+    setPlayers(new Map<string, PlayerScore>());
+    setTimeLeft(0);
+    setAnswerCounts([0, 0, 0, 0]);
+    setShowCorrect(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  const toggleCategory = (catId: string) => {
+    setSelectedCategories((prev: string[]) => 
+      prev.includes(catId) 
+        ? prev.filter((c: string) => c !== catId)
+        : [...prev, catId]
+    );
+  };
+
+  const openOverlay = () => {
+    const width = 700, height = 500;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+    window.open(`${baseUrl}?overlayTrivia=true`, 'TriviaOverlay', `width=${width},height=${height},left=${left},top=${top}`);
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Setup Mode */}
+      {gameState === 'setup' && (
+        <>
+          {/* Mode Selector */}
+          <div className="flex gap-2 bg-zinc-800 rounded-xl p-2">
+            <button
+              onClick={() => setTriviaMode('category')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                triviaMode === 'category' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <BookOpen size={16} /> Categorías
+            </button>
+            <button
+              onClick={() => setTriviaMode('ai')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                triviaMode === 'ai' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Sparkles size={16} /> IA Personalizada
+            </button>
+            <button
+              onClick={() => setTriviaMode('manual')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
+                triviaMode === 'manual' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Plus size={16} /> Manual
+            </button>
+          </div>
+
+          {/* Category Mode */}
+          {triviaMode === 'category' && (
+            <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-white">Selecciona categorías</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400">Preguntas por categoría:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={questionsPerCategory}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestionsPerCategory(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
+                    className="w-12 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {QUESTION_BANK.map((cat: TriviaCategory) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleCategory(cat.id)}
+                    className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
+                      selectedCategories.includes(cat.id)
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+                    }`}
+                  >
+                    {cat.icon}
+                    <span className="truncate">{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                onClick={generateFromCategories}
+                disabled={selectedCategories.length === 0}
+                className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg"
+              >
+                Generar {selectedCategories.length * questionsPerCategory} preguntas
+              </button>
+            </div>
+          )}
+
+          {/* AI Mode */}
+          {triviaMode === 'ai' && (
+            <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-purple-400" />
+                <span className="text-sm font-medium text-white">Trivia con IA</span>
+              </div>
+              
+              {!aiConfig?.apiKey || !aiConfig.enabled ? (
+                <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={18} className="text-yellow-400 mt-0.5" />
+                    <div>
+                      <p className="text-yellow-200 text-sm font-medium">API de IA no configurada</p>
+                      <p className="text-yellow-200/70 text-xs mt-1">
+                        Ve a la pestaña "Data" → "Analytics" → "Configurar IA" para añadir tu API key de Gemini, OpenAI o Claude.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Tema de la trivia</label>
+                    <input
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiTopic(e.target.value)}
+                      placeholder="Ej: World of Warcraft, Marvel, Historia de España..."
+                      className="w-full px-3 py-2 bg-zinc-700 rounded-lg text-white text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-400">Preguntas:</span>
+                      <input
+                        type="number"
+                        min="3"
+                        max="15"
+                        value={aiQuestionCount}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiQuestionCount(Math.max(3, Math.min(15, parseInt(e.target.value) || 5)))}
+                        className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={generateWithAI}
+                      disabled={isGenerating || !aiTopic.trim()}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={16} />
+                          Generar con IA
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {aiError && (
+                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-2">
+                      <p className="text-red-300 text-xs">{aiError}</p>
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-zinc-500">
+                    <p>💡 Ejemplos de temas:</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {['League of Legends', 'Anime', 'Fútbol', 'Harry Potter', 'Minecraft', 'Ciencia'].map((topic: string) => (
+                        <button
+                          key={topic}
+                          onClick={() => setAiTopic(topic)}
+                          className="px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300"
+                        >
+                          {topic}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Manual Mode */}
+          {triviaMode === 'manual' && (
+            <div className="bg-zinc-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <HelpCircle size={16} className="text-purple-400" />
+                <span className="text-sm font-medium text-white">Añadir Pregunta Manual</span>
+              </div>
+              
+              <input
+                type="text"
+                value={editingQuestion}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingQuestion(e.target.value)}
+                placeholder="Escribe la pregunta..."
+                className="w-full px-3 py-2 bg-zinc-700 rounded-lg text-white text-sm"
+              />
+              
+              <div className="grid grid-cols-2 gap-2">
+                {editingOptions.map((opt: string, i: number) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingCorrect(i)}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        editingCorrect === i ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const newOpts = [...editingOptions];
+                        newOpts[i] = e.target.value;
+                        setEditingOptions(newOpts);
+                      }}
+                      placeholder={`Opción ${i + 1}`}
+                      className="flex-1 px-2 py-1 bg-zinc-700 rounded text-white text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Timer size={14} className="text-zinc-400" />
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={editingTime}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTime(parseInt(e.target.value) || 15)}
+                    className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                  />
+                  <span className="text-zinc-500 text-xs">seg</span>
+                </div>
+                <button
+                  onClick={addManualQuestion}
+                  disabled={!editingQuestion.trim()}
+                  className="flex items-center gap-1 px-3 py-1 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white text-sm rounded-lg"
+                >
+                  <Plus size={14} /> Añadir
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Questions List */}
+          {questions.length > 0 && (
+            <div className="bg-zinc-800/50 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-zinc-300">{questions.length} preguntas listas</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setQuestions([])}
+                    className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm rounded-lg"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={startGame}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white font-bold rounded-lg"
+                  >
+                    <Play size={16} /> ¡Empezar!
+                  </button>
+                  <button
+                    onClick={openOverlay}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {questions.map((q: Question, i: number) => (
+                  <div key={q.id} className="flex items-center gap-2 bg-zinc-700/50 rounded-lg p-2">
+                    <span className="text-xs text-zinc-500 w-6">{i + 1}.</span>
+                    <span className="flex-1 text-sm text-zinc-300 truncate">{q.question}</span>
+                    <span className="text-xs text-zinc-500">{q.timeLimit}s</span>
+                    <button
+                      onClick={() => removeQuestion(q.id)}
+                      className="p-1 text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Question Mode */}
+      {(gameState === 'question' || gameState === 'results') && currentQuestion && (
+        <>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400 text-sm">
+              Pregunta {currentQuestionIndex + 1} de {questions.length}
+            </span>
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+              timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-purple-500'
+            }`}>
+              <Timer size={16} className="text-white" />
+              <span className="text-white font-bold">{timeLeft}s</span>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4">
+            <p className="text-white text-lg font-bold text-center mb-4">
+              {currentQuestion.question}
+            </p>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {currentQuestion.options.map((option: string, i: number) => {
+                const isCorrect = i === currentQuestion.correctIndex;
+                const percentage = totalAnswers > 0 ? Math.round((answerCounts[i] / totalAnswers) * 100) : 0;
+                
+                return (
+                  <div
+                    key={i}
+                    className={`relative p-3 rounded-lg transition-all ${
+                      showCorrect
+                        ? isCorrect
+                          ? 'bg-green-500/30 ring-2 ring-green-400'
+                          : 'bg-zinc-700/50 opacity-60'
+                        : 'bg-zinc-700/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        showCorrect && isCorrect ? 'bg-green-500' : 'bg-zinc-600'
+                      } text-white`}>
+                        {showCorrect && isCorrect ? <Check size={14} /> : i + 1}
+                      </span>
+                      <span className="text-white text-sm flex-1">{option}</span>
+                      {showCorrect && (
+                        <span className="text-xs text-zinc-400">{answerCounts[i]} ({percentage}%)</span>
+                      )}
+                    </div>
+                    {showCorrect && (
+                      <div 
+                        className={`absolute bottom-0 left-0 h-1 rounded-b-lg transition-all ${
+                          isCorrect ? 'bg-green-500' : 'bg-zinc-500'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <p className="text-center text-zinc-400 text-xs mt-3">
+              Responde con <code className="bg-zinc-700 px-1 rounded">1</code> <code className="bg-zinc-700 px-1 rounded">2</code> <code className="bg-zinc-700 px-1 rounded">3</code> <code className="bg-zinc-700 px-1 rounded">4</code>
+            </p>
+          </div>
+
+          {gameState === 'results' && (
+            <div className="flex justify-center">
+              <button
+                onClick={nextQuestion}
+                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white font-bold rounded-lg"
+              >
+                {currentQuestionIndex >= questions.length - 1 ? 'Ver Resultados' : 'Siguiente Pregunta'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Final Results */}
+      {gameState === 'final' && (
+        <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-4">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Trophy size={24} className="text-yellow-400" />
+            <span className="text-xl font-bold text-white">¡Resultados Finales!</span>
+          </div>
+          
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {sortedPlayers.slice(0, 10).map((player: PlayerScore, i: number) => (
+              <div
+                key={player.oderId}
+                className={`flex items-center gap-3 p-2 rounded-lg ${
+                  i === 0 ? 'bg-yellow-500/30' : i === 1 ? 'bg-zinc-400/20' : i === 2 ? 'bg-orange-700/20' : 'bg-zinc-700/30'
+                }`}
+              >
+                <span className="text-lg w-8">
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                </span>
+                <span className="flex-1 font-medium" style={{ color: player.color }}>
+                  {player.username}
+                </span>
+                <span className="text-yellow-400 font-bold">{player.score} pts</span>
+              </div>
+            ))}
+          </div>
+          
+          <button
+            onClick={resetGame}
+            className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg"
+          >
+            <RotateCcw size={16} /> Nueva Partida
+          </button>
+        </div>
+      )}
+
+      {/* Live Leaderboard */}
+      {(gameState === 'question' || gameState === 'results') && sortedPlayers.length > 0 && (
+        <div className="bg-zinc-800/50 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Trophy size={14} className="text-yellow-400" />
+            <span className="text-xs font-medium text-zinc-400">Top 5</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sortedPlayers.slice(0, 5).map((player: PlayerScore, i: number) => (
+              <span
+                key={player.oderId}
+                className="text-xs px-2 py-1 rounded"
+                style={{ backgroundColor: player.color + '30', color: player.color }}
+              >
+                {i === 0 ? '👑' : ''} {player.username}: {player.score}
+                {player.streak > 1 && <span className="text-yellow-400"> 🔥{player.streak}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TriviaBattle;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { ConnectionPanel } from './components/ConnectionPanel';
+import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
 import { RecentVotes } from './components/RecentVotes';
@@ -45,12 +46,22 @@ import {
   TourStep,
 } from './hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2 } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
 import { SpinnerWheel } from './components/SpinnerWheel';
-import { RandomWinner } from './components/RandomWinner';
+import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
+import { JudgePanel } from './components/JudgePanel';
+import { GiveawayHub } from './components/GiveawayHub';
+import { StreamGames } from './components/StreamGames';
+import { PiumOverlay } from './components/games/PiumOverlay';
+import { RouletteOverlay } from './components/games/RouletteOverlay';
+import { FishingOverlay } from './components/games/FishingOverlay';
+import { BattleshipOverlay } from './components/games/BattleshipOverlay';
+import { DuckHuntOverlay } from './components/games/DuckHuntOverlay';
+import { PotatoOverlay } from './components/games/PotatoOverlay';
+import { TriviaOverlay } from './components/games/TriviaOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
@@ -76,6 +87,10 @@ const App: React.FC = () => {
     authToken,
     connect: twitchConnect,
     disconnect: twitchDisconnect,
+    collaborationChannels,
+    addCollaborator,
+    removeCollaborator,
+    isCollaborationActive,
   } = useTwitchConnection({
     onStatusChange: (newStatus, err) => {
       if (err) {
@@ -113,20 +128,22 @@ const App: React.FC = () => {
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream'>('chat');
-  const [leftTab, setLeftTab] = useState<'panel' | 'gallery' | 'data'>('panel');
+  const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream' | 'collab'>('chat');
+  const [leftTab, setLeftTab] = useState<'poll' | 'judge' | 'giveaway' | 'games' | 'gallery' | 'data'>('poll');
   const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
-  const [rightPanelMode, setRightPanelMode] = useState<'tabs' | 'split'>('split'); // 'tabs' = one at a time, 'split' = both visible
+  const [rightPanelMode, setRightPanelMode] = useState<'tabs' | 'split'>('tabs'); // 'tabs' = one at a time, 'split' = both visible
   const [splitRatio, setSplitRatio] = useState(50); // Percentage for chat (stream gets the rest)
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [showCollabInSplit, setShowCollabInSplit] = useState(false); // Show collab panel in split mode
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   const [demoForceModeration, setDemoForceModeration] = useState(false);
   const [showSoundBoard, setShowSoundBoard] = useState(false);
   const [leftSidebarHidden, setLeftSidebarHidden] = useState(false);
   const [showTools, setShowTools] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
   const [miniBarPosition, setMiniBarPosition] = useState({ x: 16, y: 16 });
   const [isDraggingMiniBar, setIsDraggingMiniBar] = useState(false);
   const miniBarDragOffset = useRef({ x: 0, y: 0 });
@@ -144,7 +161,7 @@ const App: React.FC = () => {
     resetPoll: () => {
       poll.resetPoll();
     },
-    navPanel: () => setLeftTab('panel'),
+    navPanel: () => setLeftTab('poll'),
     navGallery: () => setLeftTab('gallery'),
     navData: () => setLeftTab('data'),
     closeModal: () => {
@@ -198,7 +215,7 @@ const App: React.FC = () => {
       // Reset demo state when tour ends
       setDemoForceModeration(false);
       setShowSoundBoard(false);
-      setLeftTab('panel');
+      setLeftTab('poll');
     },
   });
   
@@ -423,7 +440,7 @@ const App: React.FC = () => {
 
   // Process Messages
   useEffect(() => {
-    twitchService.onMessage((tags, message, self) => {
+    twitchService.onMessage((tags, message, self, sourceChannel) => {
       const isSubscriber = tags.subscriber === true || tags.subscriber === '1' || 
         (tags.badges && ('subscriber' in tags.badges || 'founder' in tags.badges));
       const msg: TwitchMessage = {
@@ -433,7 +450,8 @@ const App: React.FC = () => {
         id: tags.id,
         userId: tags['user-id'],
         isSubscriber: !!isSubscriber,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        sourceChannel: sourceChannel, // Track which channel the message came from
       };
       
       setChatMessages(prev => [...prev.slice(-199), msg]);
@@ -610,6 +628,14 @@ const App: React.FC = () => {
   const isCountdownOverlay = urlParams?.get('overlayCountdown') === 'true';
   const isSpinnerOverlay = urlParams?.get('overlaySpinner') === 'true';
   const isRandomWinnerOverlay = urlParams?.get('overlayRandomWinner') === 'true';
+  const isJudgePanelOverlay = urlParams?.get('overlayJudgePanel') === 'true';
+  const isPiumOverlay = urlParams?.get('overlayPium') === 'true';
+  const isRouletteOverlay = urlParams?.get('overlayRoulette') === 'true';
+  const isFishingOverlay = urlParams?.get('overlayFishing') === 'true';
+  const isPotatoOverlay = urlParams?.get('overlayPotato') === 'true';
+  const isTriviaOverlay = urlParams?.get('overlayTrivia') === 'true';
+  const isBattleshipOverlay = urlParams?.get('overlayBattleship') === 'true';
+  const isDuckHuntOverlay = urlParams?.get('overlayDuckHunt') === 'true';
   
   // Countdown Overlay Mode Render
   if (isCountdownOverlay) {
@@ -628,7 +654,47 @@ const App: React.FC = () => {
 
   // Random Winner Overlay Mode Render
   if (isRandomWinnerOverlay) {
-    return <RandomWinner chatMessages={chatMessages} onClose={() => window.close()} isOverlayMode={true} />;
+    return <RandomWinnerOverlay chatMessages={chatMessages} onClose={() => window.close()} />;
+  }
+
+  // Judge Panel Overlay Mode Render
+  if (isJudgePanelOverlay) {
+    return <JudgePanel chatMessages={chatMessages} onClose={() => window.close()} isOverlayMode={true} />;
+  }
+
+  // Pium Game Overlay Mode Render
+  if (isPiumOverlay) {
+    return <PiumOverlay />;
+  }
+
+  // Casino Roulette Overlay Mode Render
+  if (isRouletteOverlay) {
+    return <RouletteOverlay />;
+  }
+
+  // Fishing Game Overlay Mode Render
+  if (isFishingOverlay) {
+    return <FishingOverlay />;
+  }
+
+  // Hot Potato Overlay Mode Render
+  if (isPotatoOverlay) {
+    return <PotatoOverlay />;
+  }
+
+  // Trivia Battle Overlay Mode Render
+  if (isTriviaOverlay) {
+    return <TriviaOverlay />;
+  }
+
+  // Battleship Game Overlay Mode Render
+  if (isBattleshipOverlay) {
+    return <BattleshipOverlay />;
+  }
+
+  // Duck Hunt Game Overlay Mode Render
+  if (isDuckHuntOverlay) {
+    return <DuckHuntOverlay />;
   }
 
   // Overlay Mode Render
@@ -895,14 +961,27 @@ const App: React.FC = () => {
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-30">
         <div className="flex items-center gap-3">
-          {channelAvatar ? (
-            <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
-              {channelName.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <div className="relative">
+            {channelAvatar ? (
+              <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
+                {channelName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            {/* Collaboration indicator */}
+            {isCollaborationActive && (
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-cyan-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold border-2 border-white dark:border-zinc-900">
+                +{collaborationChannels.length}
+              </div>
+            )}
+          </div>
           <span className="font-bold text-sm text-zinc-900 dark:text-white">{channelName}</span>
+          {isCollaborationActive && (
+            <span className="text-[10px] bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded-full font-medium">
+              Collab
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -1003,7 +1082,10 @@ const App: React.FC = () => {
 
         {/* Navigation */}
         <div className="flex flex-col gap-3 w-full px-2">
-          <NavButton active={leftTab === 'panel'} onClick={() => setLeftTab('panel')} icon={<LayoutDashboard size={20} />} label={t.nav.panel} />
+          <NavButton active={leftTab === 'poll'} onClick={() => setLeftTab('poll')} icon={<VoteIcon size={20} />} label={t.nav.poll || 'Encuesta'} dataTour="nav-poll" />
+          <NavButton active={leftTab === 'judge'} onClick={() => setLeftTab('judge')} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} dataTour="nav-judge" />
+          <NavButton active={leftTab === 'giveaway'} onClick={() => setLeftTab('giveaway')} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} dataTour="nav-giveaway" />
+          <NavButton active={leftTab === 'games'} onClick={() => setLeftTab('games')} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} dataTour="nav-games" />
           <div className="relative">
             <NavButton active={leftTab === 'data'} onClick={() => setLeftTab('data')} icon={<BarChart3 size={20} />} label={t.nav.data} />
             {aiAnalytics.currentSession && aiAnalytics.currentSession.messages.length > 0 && (
@@ -1054,10 +1136,12 @@ const App: React.FC = () => {
       
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around py-2 px-4 z-40 safe-area-bottom">
-        <MobileNavButton active={leftTab === 'panel'} onClick={() => { setLeftTab('panel'); setShowMobileSidebar(false); }} icon={<LayoutDashboard size={20} />} label={t.nav.panel} />
+        <MobileNavButton active={leftTab === 'poll'} onClick={() => { setLeftTab('poll'); setShowMobileSidebar(false); }} icon={<VoteIcon size={20} />} label={t.nav.poll || 'Encuesta'} />
+        <MobileNavButton active={leftTab === 'judge'} onClick={() => { setLeftTab('judge'); setShowMobileSidebar(false); }} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} />
+        <MobileNavButton active={leftTab === 'giveaway'} onClick={() => { setLeftTab('giveaway'); setShowMobileSidebar(false); }} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} />
+        <MobileNavButton active={leftTab === 'games'} onClick={() => { setLeftTab('games'); setShowMobileSidebar(false); }} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} />
         <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
         <MobileNavButton active={leftTab === 'data'} onClick={() => { setLeftTab('data'); setShowMobileSidebar(false); }} icon={<BarChart3 size={20} />} label={t.nav.data} />
-        <MobileNavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
       </div>
 
       {/* Main Content Area */}
@@ -1081,7 +1165,7 @@ const App: React.FC = () => {
           
           {/* Left Column Content */}
           <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
-            {leftTab === 'panel' && (
+            {leftTab === 'poll' && (
               poll.currentPoll ? (
                 <div data-tour="live-poll" className="h-full">
                   <LivePoll 
@@ -1111,9 +1195,59 @@ const App: React.FC = () => {
                     onShowHistory={() => setShowHistory(true)}
                     sidebarHidden={leftSidebarHidden}
                     onClearChatMessages={() => setChatMessages([])}
+                    userVoteMap={poll.userVoteMap}
+                    collaborationChannels={collaborationChannels}
+                    mainChannel={channelName}
+                    onAddCollaborator={addCollaborator}
+                    onRemoveCollaborator={removeCollaborator}
+                    isConnected={status === ConnectionStatus.CONNECTED}
+                    onShowCountdown={() => setShowCountdown(true)}
                   />
                 </div>
               )
+            )}
+            {leftTab === 'judge' && (
+              <div data-tour="judge-panel" className="h-full">
+                <JudgePanel 
+                  chatMessages={chatMessages}
+                  onClose={() => setLeftTab('poll')}
+                  userVoteMap={poll.userVoteMap}
+                  collaborationChannels={collaborationChannels}
+                  mainChannel={channelName}
+                  onAddCollaborator={addCollaborator}
+                  onRemoveCollaborator={removeCollaborator}
+                  isConnected={status === ConnectionStatus.CONNECTED}
+                  isEmbedded={true}
+                  mediaLibrary={mediaLibrary}
+                  onAddAsset={handleAddAsset}
+                />
+              </div>
+            )}
+            {leftTab === 'giveaway' && (
+              <div data-tour="giveaway-hub" className="h-full">
+                <GiveawayHub 
+                  chatMessages={chatMessages}
+                  isConnected={status === ConnectionStatus.CONNECTED}
+                  onClearChatMessages={() => setChatMessages([])}
+                  userVoteMap={poll.userVoteMap}
+                  collaborationChannels={collaborationChannels}
+                  mainChannel={channelName}
+                />
+              </div>
+            )}
+            {leftTab === 'games' && (
+              <div data-tour="stream-games" className="h-full">
+                <StreamGames 
+                  chatMessages={chatMessages}
+                  isConnected={status === ConnectionStatus.CONNECTED}
+                  isEmbedded={true}
+                  userVoteMap={poll.userVoteMap}
+                  collaborationChannels={collaborationChannels}
+                  mainChannel={channelName}
+                  onAddCollaborator={addCollaborator}
+                  onRemoveCollaborator={removeCollaborator}
+                />
+              </div>
             )}
             {leftTab === 'gallery' && (
               <div data-tour="gallery" className="h-full">
@@ -1263,14 +1397,37 @@ const App: React.FC = () => {
                     >
                       <Tv size={16} /> {t.nav.stream}
                     </button>
+                    <button 
+                      className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeRightTab === 'collab' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                      onClick={() => setActiveRightTab('collab')}
+                    >
+                      <Users size={16} /> 
+                      {collaborationChannels.length > 0 && (
+                        <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[10px] px-1 py-0.5 rounded-full font-bold">
+                          {collaborationChannels.length}
+                        </span>
+                      )}
+                    </button>
                   </>
                 ) : (
-                  <div className="flex-1 py-2 px-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-xs text-zinc-500">
-                      <span className="flex items-center gap-1"><MessageSquare size={12} /> Chat</span>
-                      <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                      <span className="flex items-center gap-1"><Tv size={12} /> Stream</span>
-                    </div>
+                  <div className="flex-1 py-2 px-3 flex items-center justify-end">
+                    <button
+                      onClick={() => setShowCollabInSplit(!showCollabInSplit)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        showCollabInSplit 
+                          ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400' 
+                          : 'text-zinc-500 hover:text-cyan-500 hover:bg-cyan-500/10'
+                      }`}
+                      title="Mostrar/ocultar colaboración"
+                    >
+                      <Users size={14} />
+                      <span>Colaboración</span>
+                      {collaborationChannels.length > 0 && (
+                        <span className="bg-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-[10px] px-1.5 rounded-full font-bold">
+                          {collaborationChannels.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 )}
                 {/* Mode toggle button */}
@@ -1295,16 +1452,54 @@ const App: React.FC = () => {
                     <ChatFeed 
                       messages={chatMessages} 
                       userVoteMap={poll.userVoteMap} 
-                      options={poll.currentPoll?.options} 
+                      options={poll.currentPoll?.options}
+                      collaborationChannels={collaborationChannels}
+                      mainChannel={channelName}
+                      isConnected={status === ConnectionStatus.CONNECTED}
                     />
-                  ) : (
+                  ) : activeRightTab === 'stream' ? (
                     <div className="h-full p-2 bg-black">
                       <StreamPlayer channel={channelName} />
+                    </div>
+                  ) : (
+                    // Collaboration tab
+                    <div className="h-full p-4 overflow-y-auto">
+                      <CollaborationPanel
+                        mainChannel={channelName}
+                        collaborationChannels={collaborationChannels}
+                        onAddCollaborator={addCollaborator}
+                        onRemoveCollaborator={removeCollaborator}
+                        isConnected={status === ConnectionStatus.CONNECTED}
+                      />
                     </div>
                   )
                 ) : (
                   // Split mode - show both with draggable divider
                   <>
+                    {/* Collab panel overlay in split mode */}
+                    {showCollabInSplit && (
+                      <div className="absolute inset-0 z-10 bg-white dark:bg-zinc-900 overflow-y-auto p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-bold text-zinc-800 dark:text-white flex items-center gap-2">
+                            <Users size={16} className="text-cyan-500" /> Colaboración
+                          </h3>
+                          <button
+                            onClick={() => setShowCollabInSplit(false)}
+                            className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <CollaborationPanel
+                          mainChannel={channelName}
+                          collaborationChannels={collaborationChannels}
+                          onAddCollaborator={addCollaborator}
+                          onRemoveCollaborator={removeCollaborator}
+                          isConnected={status === ConnectionStatus.CONNECTED}
+                        />
+                      </div>
+                    )}
+
                     {/* Chat section */}
                     <div 
                       className="overflow-hidden shrink-0"
@@ -1313,7 +1508,10 @@ const App: React.FC = () => {
                       <ChatFeed 
                         messages={chatMessages} 
                         userVoteMap={poll.userVoteMap} 
-                        options={poll.currentPoll?.options} 
+                        options={poll.currentPoll?.options}
+                        collaborationChannels={collaborationChannels}
+                        mainChannel={channelName}
+                        isConnected={status === ConnectionStatus.CONNECTED}
                       />
                     </div>
                     
@@ -1413,6 +1611,14 @@ const App: React.FC = () => {
       {/* Tools Modal */}
       {showTools && (
         <Tools onClose={() => setShowTools(false)} theme={theme} onToggleTheme={toggleTheme} />
+      )}
+
+      {/* Countdown Widget - Global flotante */}
+      {showCountdown && (
+        <Countdown 
+          chatMessages={chatMessages}
+          onClose={() => setShowCountdown(false)}
+        />
       )}
     </div>
   );

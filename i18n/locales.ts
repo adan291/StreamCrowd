@@ -58,6 +58,9 @@ export interface Translations {
   };
   nav: {
     panel: string;
+    poll: string;
+    judge: string;
+    giveaway: string;
     gallery: string;
     data: string;
     history: string;
@@ -75,6 +78,7 @@ export interface Translations {
     copyLink: string;
     closeStream: string;
     sounds: string;
+    games: string;
   };
   poll: {
     title: string;
@@ -411,6 +415,65 @@ export interface Translations {
   spinner: {
     winnerTextColor: string;
   };
+  collaboration: {
+    title: string;
+    mainChannel: string;
+    placeholder: string;
+    remove: string;
+    errorAdding: string;
+    helpText: string;
+    channelAdded: string;
+    channelRemoved: string;
+  };
+  games: {
+    title: string;
+    subtitle: string;
+    piumBall: string;
+    piumDesc: string;
+    casinoRoulette: string;
+    rouletteDesc: string;
+    active: string;
+    paused: string;
+    balls: string;
+    bets: string;
+    openOverlay: string;
+    clearBalls: string;
+    spin: string;
+    spinning: string;
+    reset: string;
+    autoSpin: string;
+    bettingOpen: string;
+    bettingClosed: string;
+    winners: string;
+    waitingBets: string;
+    waitingPium: string;
+    // New games
+    chatFishing: string;
+    fishingDesc: string;
+    hotPotato: string;
+    potatoDesc: string;
+    triviaBattle: string;
+    triviaDesc: string;
+    fish: string;
+    fishing: string;
+    cast: string;
+    catch: string;
+    points: string;
+    round: string;
+    join: string;
+    pass: string;
+    eliminated: string;
+    waiting: string;
+    question: string;
+    answer: string;
+    correct: string;
+    wrong: string;
+    streak: string;
+    leaderboard: string;
+    startGame: string;
+    nextRound: string;
+    finalResults: string;
+  };
 }
 
 export const translations: Record<Locale, Translations> = {
@@ -471,6 +534,9 @@ export const translations: Record<Locale, Translations> = {
     },
     nav: {
       panel: 'Panel',
+      poll: 'Encuesta',
+      judge: 'Jurado',
+      giveaway: 'Sorteos',
       gallery: 'Galería',
       data: 'Data',
       history: 'Historial',
@@ -488,6 +554,7 @@ export const translations: Record<Locale, Translations> = {
       copyLink: 'Copiar enlace',
       closeStream: 'Cerrar stream',
       sounds: 'Sonidos',
+      games: 'Juegos',
     },
     poll: {
       title: 'Encuesta',
@@ -824,6 +891,80 @@ export const translations: Record<Locale, Translations> = {
     spinner: {
       winnerTextColor: 'Color de texto ganador',
     },
+    collaboration: {
+      title: 'Colaboración',
+      mainChannel: 'Principal',
+      placeholder: 'Canal colaborador...',
+      remove: 'Quitar',
+      errorAdding: 'No se pudo agregar el canal',
+      helpText: 'Agrega canales de streamers colaboradores para ver sus mensajes y votos en tiempo real.',
+      channelAdded: 'Canal colaborador agregado',
+      channelRemoved: 'Canal colaborador eliminado',
+    },
+    games: {
+      title: 'Juegos del Stream',
+      subtitle: 'Juegos interactivos para tu stream',
+      piumBall: 'Pium Ball',
+      piumDesc: 'Los viewers lanzan bolas con !pium',
+      casinoRoulette: 'Ruleta Casino',
+      rouletteDesc: 'Apuesta con !ruleta-27',
+      active: 'Activo',
+      paused: 'Pausado',
+      balls: 'bolas',
+      bets: 'apuestas',
+      openOverlay: 'Abrir Overlay OBS',
+      clearBalls: 'Limpiar bolas',
+      spin: 'Girar',
+      spinning: 'Girando...',
+      reset: 'Reiniciar',
+      autoSpin: 'Auto-spin',
+      bettingOpen: 'Apuestas abiertas',
+      bettingClosed: 'Apuestas cerradas',
+      winners: 'ganador(es)',
+      waitingBets: 'Esperando apuestas...',
+      waitingPium: 'Esperando !pium del chat...',
+      // New games
+      chatFishing: 'Pesca de Chat',
+      fishingDesc: 'Pesca mensajes del chat',
+      hotPotato: 'Patata Caliente',
+      potatoDesc: 'Pasa la papa con !pass',
+      triviaBattle: 'Trivia Battle',
+      triviaDesc: 'Responde preguntas con 1-4',
+      fish: 'peces',
+      fishing: 'Pescando...',
+      cast: '¡Pescar!',
+      catch: '¡Captura!',
+      points: 'pts',
+      round: 'Ronda',
+      join: 'Unirse',
+      pass: 'Pasar',
+      eliminated: 'eliminado',
+      waiting: 'Esperando',
+      question: 'Pregunta',
+      answer: 'Respuesta',
+      correct: '¡Correcto!',
+      wrong: 'Incorrecto',
+      streak: 'Racha',
+      leaderboard: 'Ranking',
+      startGame: '¡Empezar!',
+      nextRound: 'Siguiente',
+      finalResults: '¡Resultados!',
+      // Battleship & Duck Hunt
+      battleship: 'Hundir la Flota',
+      battleshipDesc: 'Dispara con coordenadas A1-J10',
+      duckHunt: 'Caza de Patos',
+      duckHuntDesc: 'Escribe !pato para jugar',
+      ships: 'barcos',
+      shipsRemaining: 'barcos restantes',
+      hit: '¡Tocado!',
+      miss: 'Agua',
+      sunk: '¡Hundido!',
+      allShipsSunk: '¡Todos los barcos hundidos!',
+      shots: 'disparos',
+      ducks: 'patos',
+      shoot: 'Disparar',
+      accuracy: 'Precisión',
+    },
   },
   en: {
     common: {
@@ -882,6 +1023,9 @@ export const translations: Record<Locale, Translations> = {
     },
     nav: {
       panel: 'Panel',
+      poll: 'Poll',
+      judge: 'Judge',
+      giveaway: 'Giveaways',
       gallery: 'Gallery',
       data: 'Data',
       history: 'History',
@@ -899,6 +1043,7 @@ export const translations: Record<Locale, Translations> = {
       copyLink: 'Copy link',
       closeStream: 'Close stream',
       sounds: 'Sounds',
+      games: 'Games',
     },
     poll: {
       title: 'Poll',
@@ -1234,6 +1379,80 @@ export const translations: Record<Locale, Translations> = {
     },
     spinner: {
       winnerTextColor: 'Winner text color',
+    },
+    collaboration: {
+      title: 'Collaboration',
+      mainChannel: 'Main',
+      placeholder: 'Collaborator channel...',
+      remove: 'Remove',
+      errorAdding: 'Could not add channel',
+      helpText: 'Add collaborator streamer channels to see their messages and votes in real time.',
+      channelAdded: 'Collaborator channel added',
+      channelRemoved: 'Collaborator channel removed',
+    },
+    games: {
+      title: 'Stream Games',
+      subtitle: 'Interactive games for your stream',
+      piumBall: 'Pium Ball',
+      piumDesc: 'Viewers throw balls with !pium',
+      casinoRoulette: 'Casino Roulette',
+      rouletteDesc: 'Bet with !ruleta-27',
+      active: 'Active',
+      paused: 'Paused',
+      balls: 'balls',
+      bets: 'bets',
+      openOverlay: 'Open OBS Overlay',
+      clearBalls: 'Clear balls',
+      spin: 'Spin',
+      spinning: 'Spinning...',
+      reset: 'Reset',
+      autoSpin: 'Auto-spin',
+      bettingOpen: 'Betting open',
+      bettingClosed: 'Betting closed',
+      winners: 'winner(s)',
+      waitingBets: 'Waiting for bets...',
+      waitingPium: 'Waiting for !pium from chat...',
+      // New games
+      chatFishing: 'Chat Fishing',
+      fishingDesc: 'Fish chat messages',
+      hotPotato: 'Hot Potato',
+      potatoDesc: 'Pass the potato with !pass',
+      triviaBattle: 'Trivia Battle',
+      triviaDesc: 'Answer questions with 1-4',
+      fish: 'fish',
+      fishing: 'Fishing...',
+      cast: 'Cast!',
+      catch: 'Catch!',
+      points: 'pts',
+      round: 'Round',
+      join: 'Join',
+      pass: 'Pass',
+      eliminated: 'eliminated',
+      waiting: 'Waiting',
+      question: 'Question',
+      answer: 'Answer',
+      correct: 'Correct!',
+      wrong: 'Wrong',
+      streak: 'Streak',
+      leaderboard: 'Leaderboard',
+      startGame: 'Start!',
+      nextRound: 'Next',
+      finalResults: 'Results!',
+      // Battleship & Duck Hunt
+      battleship: 'Battleship',
+      battleshipDesc: 'Fire with coordinates A1-J10',
+      duckHunt: 'Duck Hunt',
+      duckHuntDesc: 'Type !pato to play',
+      ships: 'ships',
+      shipsRemaining: 'ships remaining',
+      hit: 'Hit!',
+      miss: 'Miss',
+      sunk: 'Sunk!',
+      allShipsSunk: 'All ships sunk!',
+      shots: 'shots',
+      ducks: 'ducks',
+      shoot: 'Shoot',
+      accuracy: 'Accuracy',
     },
   },
 };

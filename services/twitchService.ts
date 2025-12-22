@@ -1,6 +1,6 @@
 
 import tmi from 'tmi.js';
-import { ConnectionStatus } from '../types';
+import { ConnectionStatus, CollaborationChannel } from '../types';
 
 /**
  * Configuration for TwitchService reconnection behavior
@@ -14,10 +14,26 @@ export interface TwitchServiceConfig {
   reconnectMaxDelay: number;
 }
 
+/** Default colors for collaboration channels */
+const COLLABORATION_COLORS = [
+  '#a970ff', // Purple (main)
+  '#00f0f0', // Cyan
+  '#ff6b6b', // Red
+  '#4ade80', // Green
+  '#fbbf24', // Yellow
+  '#f472b6', // Pink
+  '#8b5cf6', // Violet
+  '#06b6d4', // Teal
+];
+
 /**
  * Callback type for handling incoming chat messages
+ * @param tags - TMI chat userstate tags
+ * @param message - The message content
+ * @param self - Whether the message was sent by the bot
+ * @param channel - The channel the message came from (for collaborations)
  */
-export type MessageCallback = (tags: tmi.ChatUserstate, message: string, self: boolean) => void;
+export type MessageCallback = (tags: tmi.ChatUserstate, message: string, self: boolean, channel?: string) => void;
 
 /**
  * Callback type for handling connection status changes
@@ -64,9 +80,163 @@ class TwitchService {
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private currentOptions: TwitchConnectionOptions | null = null;
   private isManualDisconnect: boolean = false;
+  
+  // Collaboration support
+  private collaborationChannels: Map<string, CollaborationChannel> = new Map();
+  private collaborationClients: Map<string, tmi.Client> = new Map();
+  private collaborationCallbacks: Map<string, ((channel: string, status: 'connected' | 'disconnected' | 'error', error?: string) => void)> = new Map();
 
   constructor(config: Partial<TwitchServiceConfig> = {}) {
     this.config = { ...DEFAULT_TWITCH_SERVICE_CONFIG, ...config };
+  }
+
+  /**
+   * Get the next available color for a collaboration channel
+   */
+  private getNextCollaborationColor(): string {
+    const usedColors = Array.from(this.collaborationChannels.values()).map(c => c.color);
+    // Main channel uses first color
+    usedColors.push(COLLABORATION_COLORS[0]);
+    
+    for (const color of COLLABORATION_COLORS) {
+      if (!usedColors.includes(color)) {
+        return color;
+      }
+    }
+    // If all colors used, cycle back
+    return COLLABORATION_COLORS[(this.collaborationChannels.size + 1) % COLLABORATION_COLORS.length];
+  }
+
+  /**
+   * Add a collaboration channel (connect to another streamer's chat)
+   * @param channel Channel name to add as collaborator
+   * @param onStatusChange Optional callback for this channel's connection status
+   * @returns Promise that resolves when connected
+   */
+  public async addCollaborationChannel(
+    channel: string,
+    onStatusChange?: (channel: string, status: 'connected' | 'disconnected' | 'error', error?: string) => void
+  ): Promise<CollaborationChannel | null> {
+    const normalizedChannel = channel.toLowerCase().replace('#', '');
+    
+    // Don't add if it's the main channel or already added
+    if (normalizedChannel === this.currentChannel.replace('#', '').toLowerCase()) {
+      return null;
+    }
+    if (this.collaborationChannels.has(normalizedChannel)) {
+      return this.collaborationChannels.get(normalizedChannel) || null;
+    }
+
+    const safeChannel = `#${normalizedChannel}`;
+    
+    // Store callback if provided
+    if (onStatusChange) {
+      this.collaborationCallbacks.set(normalizedChannel, onStatusChange);
+    }
+
+    try {
+      const collabClient = new tmi.Client({
+        channels: [safeChannel],
+        connection: {
+          secure: true,
+          reconnect: true,
+        },
+      });
+
+      // Set up message handler for this collaboration channel
+      collabClient.on('message', (msgChannel, tags, message, self) => {
+        if (this.messageCallback) {
+          this.messageCallback(tags, message, self, normalizedChannel);
+        }
+      });
+
+      collabClient.on('connected', () => {
+        const callback = this.collaborationCallbacks.get(normalizedChannel);
+        if (callback) callback(normalizedChannel, 'connected');
+      });
+
+      collabClient.on('disconnected', () => {
+        const callback = this.collaborationCallbacks.get(normalizedChannel);
+        if (callback) callback(normalizedChannel, 'disconnected');
+      });
+
+      await collabClient.connect();
+
+      const collabChannel: CollaborationChannel = {
+        name: normalizedChannel,
+        color: this.getNextCollaborationColor(),
+        isMain: false,
+        connectedAt: Date.now(),
+      };
+
+      this.collaborationChannels.set(normalizedChannel, collabChannel);
+      this.collaborationClients.set(normalizedChannel, collabClient);
+
+      return collabChannel;
+    } catch (err) {
+      const callback = this.collaborationCallbacks.get(normalizedChannel);
+      if (callback) callback(normalizedChannel, 'error', String(err));
+      return null;
+    }
+  }
+
+  /**
+   * Remove a collaboration channel
+   * @param channel Channel name to remove
+   */
+  public removeCollaborationChannel(channel: string): void {
+    const normalizedChannel = channel.toLowerCase().replace('#', '');
+    
+    const client = this.collaborationClients.get(normalizedChannel);
+    if (client) {
+      try {
+        client.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting collaboration channel', e);
+      }
+    }
+
+    this.collaborationChannels.delete(normalizedChannel);
+    this.collaborationClients.delete(normalizedChannel);
+    this.collaborationCallbacks.delete(normalizedChannel);
+  }
+
+  /**
+   * Get all collaboration channels
+   * @returns Array of collaboration channels
+   */
+  public getCollaborationChannels(): CollaborationChannel[] {
+    return Array.from(this.collaborationChannels.values());
+  }
+
+  /**
+   * Check if a channel is connected as collaborator
+   * @param channel Channel name to check
+   */
+  public isCollaborationChannel(channel: string): boolean {
+    return this.collaborationChannels.has(channel.toLowerCase().replace('#', ''));
+  }
+
+  /**
+   * Get the main channel info as CollaborationChannel
+   */
+  public getMainChannelInfo(): CollaborationChannel | null {
+    if (!this.currentChannel) return null;
+    return {
+      name: this.currentChannel.replace('#', ''),
+      color: COLLABORATION_COLORS[0],
+      isMain: true,
+      connectedAt: Date.now(),
+    };
+  }
+
+  /**
+   * Disconnect all collaboration channels
+   */
+  public disconnectAllCollaborations(): void {
+    for (const [channel] of this.collaborationClients) {
+      this.removeCollaborationChannel(channel);
+    }
   }
 
   /**
@@ -142,7 +312,9 @@ class TwitchService {
 
         this.client.on('message', (_channel, tags, message, self) => {
           if (this.messageCallback) {
-            this.messageCallback(tags, message, self);
+            // Pass the main channel name for consistency with collaboration channels
+            const mainChannel = this.currentChannel.replace('#', '');
+            this.messageCallback(tags, message, self, mainChannel);
           }
         });
 
@@ -287,6 +459,9 @@ class TwitchService {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+    
+    // Disconnect all collaboration channels first
+    this.disconnectAllCollaborations();
     
     if (this.client) {
       try {

@@ -3,12 +3,13 @@
  * 
  * Encapsulates Twitch connection state and actions.
  * Handles connection lifecycle, avatar fetching, and status management.
+ * Supports multi-channel collaboration for streamer collabs.
  * 
  * @module hooks/useTwitchConnection
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { ConnectionStatus } from '../types';
+import { ConnectionStatus, CollaborationChannel } from '../types';
 import { twitchService } from '../services/twitchService';
 
 /**
@@ -29,6 +30,14 @@ export interface UseTwitchConnectionReturn {
   connect: (channel: string, token?: string) => void;
   /** Disconnect from current channel */
   disconnect: () => void;
+  /** Collaboration channels */
+  collaborationChannels: CollaborationChannel[];
+  /** Add a collaboration channel */
+  addCollaborator: (channel: string) => Promise<CollaborationChannel | null>;
+  /** Remove a collaboration channel */
+  removeCollaborator: (channel: string) => void;
+  /** Check if collaboration mode is active */
+  isCollaborationActive: boolean;
 }
 
 /**
@@ -96,6 +105,9 @@ export function useTwitchConnection(
   const [channelName, setChannelName] = useState<string>('');
   const [channelAvatar, setChannelAvatar] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
+  
+  // Collaboration state
+  const [collaborationChannels, setCollaborationChannels] = useState<CollaborationChannel[]>([]);
 
   // Store callback ref to avoid stale closures
   const onStatusChangeRef = useRef(onStatusChange);
@@ -136,6 +148,9 @@ export function useTwitchConnection(
     }
     setStatus(ConnectionStatus.CONNECTING);
     setError(null);
+    
+    // Clear collaboration channels on new connection
+    setCollaborationChannels([]);
 
     // Fetch avatar (unless skipped for testing)
     setChannelAvatar(null);
@@ -153,7 +168,7 @@ export function useTwitchConnection(
 
   /**
    * Disconnect from current channel
-   * Cleans up all connection state
+   * Cleans up all connection state including collaborations
    */
   const disconnect = useCallback(() => {
     twitchService.disconnect();
@@ -162,7 +177,39 @@ export function useTwitchConnection(
     setChannelAvatar(null);
     setAuthToken('');
     setError(null);
+    setCollaborationChannels([]);
   }, []);
+
+  /**
+   * Add a collaboration channel
+   */
+  const addCollaborator = useCallback(async (channel: string): Promise<CollaborationChannel | null> => {
+    if (!channel.trim() || status !== ConnectionStatus.CONNECTED) return null;
+    
+    const result = await twitchService.addCollaborationChannel(channel, (ch, connStatus, err) => {
+      if (connStatus === 'error') {
+        console.error(`Collaboration channel ${ch} error:`, err);
+      }
+      // Update state when collaboration channel status changes
+      setCollaborationChannels(twitchService.getCollaborationChannels());
+    });
+    
+    if (result) {
+      setCollaborationChannels(prev => [...prev, result]);
+    }
+    
+    return result;
+  }, [status]);
+
+  /**
+   * Remove a collaboration channel
+   */
+  const removeCollaborator = useCallback((channel: string) => {
+    twitchService.removeCollaborationChannel(channel);
+    setCollaborationChannels(prev => prev.filter(c => c.name.toLowerCase() !== channel.toLowerCase()));
+  }, []);
+
+  const isCollaborationActive = collaborationChannels.length > 0;
 
   return {
     status,
@@ -172,5 +219,9 @@ export function useTwitchConnection(
     authToken,
     connect,
     disconnect,
+    collaborationChannels,
+    addCollaborator,
+    removeCollaborator,
+    isCollaborationActive,
   };
 }

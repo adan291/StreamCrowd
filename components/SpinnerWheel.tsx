@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { PollOption, TwitchMessage } from '../types';
+import { PollOption, TwitchMessage, CollaborationChannel } from '../types';
 import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, ExternalLink, Settings } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { ToolWithChat } from './ToolWithChat';
 
 type WheelMode = 'classic' | 'voting';
 
@@ -11,6 +12,12 @@ interface SpinnerWheelProps {
   chatMessages?: TwitchMessage[];
   votePrefix?: string;
   isOverlayMode?: boolean;
+  userVoteMap?: Map<string, number>;
+  collaborationChannels?: CollaborationChannel[];
+  mainChannel?: string;
+  onAddCollaborator?: (channel: string) => void;
+  onRemoveCollaborator?: (channel: string) => void;
+  isConnected?: boolean;
 }
 
 const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', '#1a1a2e', 'transparent'];
@@ -37,7 +44,13 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   onClose, 
   chatMessages = [],
   votePrefix = '+',
-  isOverlayMode = false
+  isOverlayMode = false,
+  userVoteMap = new Map(),
+  collaborationChannels = [],
+  mainChannel,
+  onAddCollaborator,
+  onRemoveCollaborator,
+  isConnected = true,
 }) => {
   const { t } = useI18n();
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
@@ -420,7 +433,16 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 
   // Normal Mode - UI completa con controles
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <ToolWithChat
+      chatMessages={chatMessages}
+      userVoteMap={userVoteMap}
+      pollOptions={currentOptions}
+      collaborationChannels={collaborationChannels}
+      mainChannel={mainChannel}
+      onAddCollaborator={onAddCollaborator}
+      onRemoveCollaborator={onRemoveCollaborator}
+      isConnected={isConnected}
+    >
       <div className="bg-zinc-900 rounded-2xl p-6 max-w-lg w-full mx-4 relative max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors">
           <X size={24} />
@@ -519,6 +541,6 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 
         {currentOptions.length === 0 && <p className="text-center text-zinc-400 mt-4">Crea una encuesta primero para usar la ruleta</p>}
       </div>
-    </div>
+    </ToolWithChat>
   );
 };

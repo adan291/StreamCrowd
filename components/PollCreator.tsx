@@ -1,12 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Trophy, Download, FolderUp, History } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Download, FolderUp, History } from 'lucide-react';
 import { SpinnerWheel } from './SpinnerWheel';
-import { RandomWinner } from './RandomWinner';
-import { Countdown } from './Countdown';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
-import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG } from '../types';
+import { SavedPoll, MediaAsset, Poll, ModerationConfig, DEFAULT_MODERATION_CONFIG, CollaborationChannel } from '../types';
 import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
 import { LivePoll } from './LivePoll';
@@ -25,9 +23,16 @@ interface PollCreatorProps {
   onShowHistory?: () => void;
   sidebarHidden?: boolean;
   onClearChatMessages?: () => void;
+  userVoteMap?: Map<string, number>;
+  collaborationChannels?: CollaborationChannel[];
+  mainChannel?: string;
+  onAddCollaborator?: (channel: string) => void;
+  onRemoveCollaborator?: (channel: string) => void;
+  isConnected?: boolean;
+  onShowCountdown?: () => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true, onShowCountdown }) => {
   const { t } = useI18n();
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
@@ -60,8 +65,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [importText, setImportText] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showSpinner, setShowSpinner] = useState(false);
-  const [showRandomWinner, setShowRandomWinner] = useState(false);
-  const [showCountdown, setShowCountdown] = useState(false);
   const [quickMode, setQuickMode] = useState(true); // Toggle para modo rápido
   
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -100,7 +103,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         else if (showAssetPicker !== null) setShowAssetPicker(null);
         else if (showPresetConfirm) setShowPresetConfirm(null);
         else if (showSpinner) setShowSpinner(false);
-        else if (showRandomWinner) setShowRandomWinner(false);
         else if (showTemplates) setShowTemplates(false);
       }
       
@@ -115,7 +117,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showConfirm, showPreview, showImportModal, showAssetPicker, showPresetConfirm, showSpinner, showRandomWinner, showTemplates, question, options]);
+  }, [showConfirm, showPreview, showImportModal, showAssetPicker, showPresetConfirm, showSpinner, showTemplates, question, options]);
 
   const applyPreset = (type: 'yesno' | 'rating' | 'abc') => {
       if (type === 'yesno') {
@@ -238,10 +240,16 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     
     if (quickMode) {
       // Modo rápido: crear encuesta directamente
+      // Apply default voteKeys (1, 2, 3...) if empty
+      const finalOptions = preset.options.map((opt, i) => ({
+        ...opt,
+        voteKey: opt.voteKey?.trim() || String(i + 1)
+      }));
+      
       onCreate(
         t.poll.liveTitle, 
         question || preset.question, 
-        preset.options, 
+        finalOptions, 
         undefined, 
         undefined, 
         progressBarColor, 
@@ -402,7 +410,13 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     const dur = duration !== '' ? parseInt(duration, 10) : undefined;
     const prefix = votePrefix.trim() || '+';
     
-    onCreate(title.trim() || t.poll.liveTitle, question, options, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig, prefix, 'exact');
+    // Apply default voteKeys (1, 2, 3...) if empty
+    const finalOptions = options.map((opt, i) => ({
+      ...opt,
+      voteKey: opt.voteKey?.trim() || String(i + 1)
+    }));
+    
+    onCreate(title.trim() || t.poll.liveTitle, question, finalOptions, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig, prefix, 'exact');
     setShowConfirm(false);
   };
   
@@ -711,15 +725,12 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               
               <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700 shrink-0" />
               
-              {/* Herramientas de Sorteo */}
+              {/* Herramientas */}
               <Tooltip text="Gira la ruleta con las opciones actuales">
                 <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> {t.poll.spinnerWheel}</button>
               </Tooltip>
-              <Tooltip text={t.poll.randomWinnerTooltip}>
-                <button type="button" onClick={() => setShowRandomWinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 dark:from-yellow-500/20 dark:to-orange-500/20 rounded-full text-xs font-medium text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 flex items-center gap-1 shadow-sm hover:from-yellow-500/20 hover:to-orange-500/20 transition-colors"><Trophy size={12} className="text-yellow-500"/> {t.poll.raffle}</button>
-              </Tooltip>
               <Tooltip text="Countdown que suma tiempo con subs y bits">
-                <button type="button" onClick={() => setShowCountdown(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
+                <button type="button" onClick={onShowCountdown} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
               </Tooltip>
           </div>
 
@@ -1070,25 +1081,15 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           onClose={() => setShowSpinner(false)}
           chatMessages={chatMessages}
           votePrefix={votePrefix}
+          userVoteMap={userVoteMap}
+          collaborationChannels={collaborationChannels}
+          mainChannel={mainChannel}
+          onAddCollaborator={onAddCollaborator}
+          onRemoveCollaborator={onRemoveCollaborator}
+          isConnected={isConnected}
         />
       )}
 
-      {/* Random Winner Modal */}
-      {showRandomWinner && (
-        <RandomWinner 
-          chatMessages={chatMessages}
-          onClose={() => setShowRandomWinner(false)}
-          onClearChatMessages={onClearChatMessages}
-        />
-      )}
-
-      {/* Countdown Modal */}
-      {showCountdown && (
-        <Countdown 
-          chatMessages={chatMessages}
-          onClose={() => setShowCountdown(false)} 
-        />
-      )}
     </>
   );
 };

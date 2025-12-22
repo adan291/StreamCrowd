@@ -13,6 +13,9 @@ import {
   Zap,
   ChevronUp,
   ExternalLink,
+  Minimize2,
+  Maximize2,
+  GripHorizontal,
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
@@ -66,6 +69,17 @@ export const Countdown: React.FC<CountdownProps> = ({
   isOverlayMode = false,
 }) => {
   const { t } = useI18n();
+  
+  // Widget flotante - Estado minimizado/expandido (debe estar antes de cualquier return condicional)
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [position, setPosition] = useState(() => {
+    const saved = localStorage.getItem('countdown_widget_position');
+    return saved ? JSON.parse(saved) : { x: 20, y: 80 };
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const widgetRef = useRef<HTMLDivElement>(null);
+  
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlaySize, setOverlaySize] = useState<'normal' | 'large' | 'huge'>('large');
@@ -218,6 +232,45 @@ export const Countdown: React.FC<CountdownProps> = ({
   const isFinalCountdown = timeLeft <= 5 && timeLeft > 0; // Últimos 5 segundos - animación especial
   const isFinished = timeLeft === 0;
 
+  // Guardar posición del widget en localStorage
+  useEffect(() => {
+    if (!isOverlayMode) {
+      localStorage.setItem('countdown_widget_position', JSON.stringify(position));
+    }
+  }, [position, isOverlayMode]);
+
+  // Drag handlers para el widget
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+    setIsDragging(true);
+    const rect = widgetRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+  };
+
+  useEffect(() => {
+    if (isOverlayMode) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const newX = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffset.current.x));
+      const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, isOverlayMode]);
+
   // Tamaños de texto para overlay
   const getOverlayTextSize = () => {
     switch (overlaySize) {
@@ -356,124 +409,167 @@ export const Countdown: React.FC<CountdownProps> = ({
     );
   }
 
-  // Normal Mode - UI completa
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-zinc-900 rounded-2xl p-6 max-w-md w-full mx-4 relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-400 hover:text-white transition-colors">
-          <X size={24} />
-        </button>
-
-        <h2 className="text-2xl font-bold text-white text-center mb-2 flex items-center justify-center gap-2">
-          <Clock className="text-twitch-brand" /> Countdown Timer
-        </h2>
-        <p className="text-zinc-400 text-center text-sm mb-4">Suma tiempo con subs, bits y más</p>
-
-        <button onClick={openOverlayWindow} className="w-full mb-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-500/80 hover:to-blue-600/80 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
-          <ExternalLink size={16} /> Abrir Overlay para OBS
-        </button>
-
-        <div className={`text-center mb-6 p-6 rounded-2xl ${isFinished ? 'bg-red-500/20 animate-pulse' : isLowTime ? 'bg-orange-500/20' : 'bg-zinc-800/50'}`}>
-          <div className={`text-6xl font-mono font-bold ${isFinished ? 'text-red-400' : isLowTime ? 'text-orange-400 animate-pulse' : 'text-white'}`}>
+  // Widget flotante - Modo minimizado
+  if (!isOverlayMode && isMinimized) {
+    return (
+      <div
+        ref={widgetRef}
+        className="fixed z-50 select-none"
+        style={{ left: position.x, top: position.y }}
+      >
+        <div
+          onMouseDown={handleMouseDown}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-sm cursor-move transition-all ${
+            isFinished ? 'bg-red-900/90 border-red-500/50' : 
+            isLowTime ? 'bg-orange-900/90 border-orange-500/50' : 
+            'bg-zinc-900/95 border-zinc-700/50'
+          } ${isRunning ? 'ring-2 ring-green-500/50' : ''}`}
+        >
+          <GripHorizontal size={14} className="text-zinc-500" />
+          <Clock size={16} className={isRunning ? 'text-green-400 animate-pulse' : 'text-cyan-400'} />
+          <span className={`font-mono font-bold text-lg ${
+            isFinished ? 'text-red-400' : isLowTime ? 'text-orange-400' : 'text-white'
+          }`}>
             {formatTime(timeLeft)}
+          </span>
+          {totalAdded > 0 && <span className="text-green-400 text-xs">+{totalAdded}s</span>}
+          <button
+            onClick={toggleRunning}
+            className={`p-1.5 rounded-lg transition-colors ${isRunning ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'}`}
+          >
+            {isRunning ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+          <button onClick={() => setIsMinimized(false)} className="p-1.5 rounded-lg bg-zinc-700/50 text-zinc-300 hover:bg-zinc-600/50 hover:text-white transition-colors">
+            <Maximize2 size={14} />
+          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Widget flotante - Modo expandido (modo normal, no overlay)
+  return (
+    <div
+      ref={widgetRef}
+      className="fixed z-50 select-none"
+      style={{ left: position.x, top: position.y }}
+    >
+      <div className={`bg-zinc-900/95 backdrop-blur-sm rounded-2xl shadow-2xl border transition-all w-80 ${
+        isFinished ? 'border-red-500/50' : isLowTime ? 'border-orange-500/50' : 'border-zinc-700/50'
+      } ${isRunning ? 'ring-2 ring-green-500/30' : ''}`}>
+        {/* Header - Draggable */}
+        <div
+          onMouseDown={handleMouseDown}
+          className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 cursor-move"
+        >
+          <div className="flex items-center gap-2">
+            <GripHorizontal size={14} className="text-zinc-500" />
+            <Clock size={16} className="text-cyan-400" />
+            <span className="text-sm font-bold text-white">Countdown</span>
+            {isRunning && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
           </div>
-          {totalAdded > 0 && <p className="text-green-400 text-sm mt-2">+{formatTime(totalAdded)} añadido</p>}
-        </div>
-
-        <div className="flex gap-2 mb-4 justify-center flex-wrap">
-          {[30, 60, 120, 300].map((secs) => (
-            <button key={secs} onClick={() => manualAddTime(secs)} className="px-3 py-2 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg text-sm font-medium transition-all flex items-center gap-1">
-              <Plus size={14} /> {secs >= 60 ? `${secs / 60}m` : `${secs}s`}
+          <div className="flex items-center gap-1">
+            <button onClick={openOverlayWindow} className="p-1.5 rounded-lg text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors" title="Abrir Overlay OBS">
+              <ExternalLink size={14} />
             </button>
-          ))}
+            <button onClick={() => setIsMinimized(true)} className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
+              <Minimize2 size={14} />
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-3 mb-6">
-          <button onClick={toggleRunning} className={`flex-1 flex items-center justify-center gap-2 py-3 font-bold rounded-xl transition-all ${isRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
-            {isRunning ? <Pause size={20} /> : <Play size={20} />} {isRunning ? 'Pausar' : 'Iniciar'}
-          </button>
-          <button onClick={reset} className="px-4 py-3 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl transition-all">
-            <RotateCcw size={20} />
-          </button>
-          <button onClick={() => setShowConfig(!showConfig)} className={`px-4 py-3 rounded-xl transition-all ${showConfig ? 'bg-twitch-brand text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`}>
-            <Settings size={20} />
-          </button>
-        </div>
+        {/* Timer Display */}
+        <div className="p-4">
+          <div className={`text-center p-4 rounded-xl mb-3 ${isFinished ? 'bg-red-500/20' : isLowTime ? 'bg-orange-500/20' : 'bg-zinc-800/50'}`}>
+            <div className={`text-4xl font-mono font-bold ${isFinished ? 'text-red-400 animate-pulse' : isLowTime ? 'text-orange-400 animate-pulse' : 'text-white'}`}>
+              {formatTime(timeLeft)}
+            </div>
+            {totalAdded > 0 && <p className="text-green-400 text-xs mt-1">+{formatTime(totalAdded)} añadido</p>}
+          </div>
 
-        {recentEvents.length > 0 && (
-          <div className="mb-4 space-y-1">
-            <p className="text-xs text-zinc-500 uppercase font-bold mb-2">Eventos recientes</p>
-            {recentEvents.map((event, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm bg-zinc-800/50 rounded-lg px-3 py-2">
-                {getEventIcon(event.type)}
-                <span className="text-zinc-300">{event.user}</span>
-                <span className="text-green-400 ml-auto">+{event.amount}s</span>
-              </div>
+          {/* Quick Add Buttons */}
+          <div className="flex gap-1.5 mb-3 justify-center">
+            {[30, 60, 120, 300].map((secs) => (
+              <button key={secs} onClick={() => manualAddTime(secs)} className="px-2 py-1.5 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg text-xs font-medium transition-all flex items-center gap-1">
+                <Plus size={12} /> {secs >= 60 ? `${secs / 60}m` : `${secs}s`}
+              </button>
             ))}
           </div>
-        )}
 
-        {showConfig && (
-          <div className="bg-zinc-800/50 rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Configuración</p>
-              <button onClick={() => setShowConfig(false)} className="text-zinc-400 hover:text-white"><ChevronUp size={18} /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Minutos</label>
-                <input type="number" min="0" max="999" value={config.initialMinutes} onChange={(e) => updateConfig('initialMinutes', parseInt(e.target.value) || 0)} className="w-full bg-zinc-700 rounded-lg px-3 py-2 text-white text-sm" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Segundos</label>
-                <input type="number" min="0" max="59" value={config.initialSeconds} onChange={(e) => updateConfig('initialSeconds', Math.min(59, parseInt(e.target.value) || 0))} className="w-full bg-zinc-700 rounded-lg px-3 py-2 text-white text-sm" />
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-zinc-700/50 rounded-lg">
-                <button onClick={() => updateConfig('enableSubs', !config.enableSubs)} className={`w-10 h-5 rounded-full transition-colors ${config.enableSubs ? 'bg-pink-500' : 'bg-zinc-600'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.enableSubs ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-                <Heart className="text-pink-500" size={18} />
-                <span className="text-sm text-white flex-1">Subs</span>
-                <input type="number" min="0" value={config.subTime} onChange={(e) => updateConfig('subTime', parseInt(e.target.value) || 0)} disabled={!config.enableSubs} className="w-16 bg-zinc-600 rounded px-2 py-1 text-white text-sm text-center disabled:opacity-50" />
-                <span className="text-xs text-zinc-400">s</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-zinc-700/50 rounded-lg">
-                <button onClick={() => updateConfig('enableBits', !config.enableBits)} className={`w-10 h-5 rounded-full transition-colors ${config.enableBits ? 'bg-yellow-500' : 'bg-zinc-600'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.enableBits ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-                <Coins className="text-yellow-500" size={18} />
-                <span className="text-sm text-white flex-1">Bits/100</span>
-                <input type="number" min="0" value={config.bitsPer100} onChange={(e) => updateConfig('bitsPer100', parseInt(e.target.value) || 0)} disabled={!config.enableBits} className="w-16 bg-zinc-600 rounded px-2 py-1 text-white text-sm text-center disabled:opacity-50" />
-                <span className="text-xs text-zinc-400">s</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-zinc-700/50 rounded-lg">
-                <button onClick={() => updateConfig('enableGiftSubs', !config.enableGiftSubs)} className={`w-10 h-5 rounded-full transition-colors ${config.enableGiftSubs ? 'bg-purple-500' : 'bg-zinc-600'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.enableGiftSubs ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-                <Gift className="text-purple-500" size={18} />
-                <span className="text-sm text-white flex-1">Gift Subs</span>
-                <input type="number" min="0" value={config.giftSubTime} onChange={(e) => updateConfig('giftSubTime', parseInt(e.target.value) || 0)} disabled={!config.enableGiftSubs} className="w-16 bg-zinc-600 rounded px-2 py-1 text-white text-sm text-center disabled:opacity-50" />
-                <span className="text-xs text-zinc-400">s</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-zinc-700/50 rounded-lg">
-                <button onClick={() => updateConfig('enableRaids', !config.enableRaids)} className={`w-10 h-5 rounded-full transition-colors ${config.enableRaids ? 'bg-orange-500' : 'bg-zinc-600'}`}>
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.enableRaids ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-                <Zap className="text-orange-500" size={18} />
-                <span className="text-sm text-white flex-1">Raids</span>
-                <input type="number" min="0" value={config.raidTime} onChange={(e) => updateConfig('raidTime', parseInt(e.target.value) || 0)} disabled={!config.enableRaids} className="w-16 bg-zinc-600 rounded px-2 py-1 text-white text-sm text-center disabled:opacity-50" />
-                <span className="text-xs text-zinc-400">s</span>
-              </div>
-            </div>
-            <button onClick={() => { setTimeLeft(config.initialMinutes * 60 + config.initialSeconds); setShowConfig(false); }} className="w-full py-2 bg-twitch-brand hover:bg-twitch-brand/80 text-white font-medium rounded-lg">
-              Aplicar tiempo inicial
+          {/* Controls */}
+          <div className="flex gap-2 mb-3">
+            <button onClick={toggleRunning} className={`flex-1 flex items-center justify-center gap-2 py-2 font-bold rounded-lg transition-all text-sm ${isRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
+              {isRunning ? <Pause size={16} /> : <Play size={16} />} {isRunning ? 'Pausar' : 'Iniciar'}
+            </button>
+            <button onClick={reset} className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-all">
+              <RotateCcw size={16} />
+            </button>
+            <button onClick={() => setShowConfig(!showConfig)} className={`px-3 py-2 rounded-lg transition-all ${showConfig ? 'bg-twitch-brand text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`}>
+              <Settings size={16} />
             </button>
           </div>
-        )}
 
-        <p className="text-center text-zinc-500 text-xs mt-4">💡 El tiempo se suma automáticamente con eventos del chat</p>
+          {/* Recent Events */}
+          {recentEvents.length > 0 && (
+            <div className="mb-3 space-y-1 max-h-24 overflow-y-auto">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold">Eventos</p>
+              {recentEvents.slice(0, 3).map((event, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs bg-zinc-800/50 rounded-lg px-2 py-1.5">
+                  {getEventIcon(event.type)}
+                  <span className="text-zinc-300 truncate flex-1">{event.user}</span>
+                  <span className="text-green-400">+{event.amount}s</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Config Panel */}
+          {showConfig && (
+            <div className="bg-zinc-800/50 rounded-xl p-3 space-y-3 max-h-64 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-white">Configuración</p>
+                <button onClick={() => setShowConfig(false)} className="text-zinc-400 hover:text-white"><ChevronUp size={14} /></button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-1">Minutos</label>
+                  <input type="number" min="0" max="999" value={config.initialMinutes} onChange={(e) => updateConfig('initialMinutes', parseInt(e.target.value) || 0)} className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-white text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-1">Segundos</label>
+                  <input type="number" min="0" max="59" value={config.initialSeconds} onChange={(e) => updateConfig('initialSeconds', Math.min(59, parseInt(e.target.value) || 0))} className="w-full bg-zinc-700 rounded-lg px-2 py-1.5 text-white text-xs" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { key: 'enableSubs', icon: Heart, color: 'pink', label: 'Subs', valueKey: 'subTime' },
+                  { key: 'enableBits', icon: Coins, color: 'yellow', label: 'Bits/100', valueKey: 'bitsPer100' },
+                  { key: 'enableGiftSubs', icon: Gift, color: 'purple', label: 'Gift Subs', valueKey: 'giftSubTime' },
+                  { key: 'enableRaids', icon: Zap, color: 'orange', label: 'Raids', valueKey: 'raidTime' },
+                ].map(({ key, icon: Icon, color, label, valueKey }) => (
+                  <div key={key} className="flex items-center gap-2 p-2 bg-zinc-700/50 rounded-lg">
+                    <button onClick={() => updateConfig(key as keyof CountdownConfig, !config[key as keyof CountdownConfig])} className={`w-8 h-4 rounded-full transition-colors ${config[key as keyof CountdownConfig] ? `bg-${color}-500` : 'bg-zinc-600'}`}>
+                      <div className={`w-3 h-3 rounded-full bg-white transition-transform ${config[key as keyof CountdownConfig] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                    <Icon className={`text-${color}-500`} size={14} />
+                    <span className="text-xs text-white flex-1">{label}</span>
+                    <input type="number" min="0" value={config[valueKey as keyof CountdownConfig] as number} onChange={(e) => updateConfig(valueKey as keyof CountdownConfig, parseInt(e.target.value) || 0)} disabled={!config[key as keyof CountdownConfig]} className="w-12 bg-zinc-600 rounded px-1.5 py-0.5 text-white text-xs text-center disabled:opacity-50" />
+                    <span className="text-[10px] text-zinc-400">s</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { setTimeLeft(config.initialMinutes * 60 + config.initialSeconds); setShowConfig(false); }} className="w-full py-1.5 bg-twitch-brand hover:bg-twitch-brand/80 text-white font-medium rounded-lg text-xs">
+                Aplicar tiempo
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

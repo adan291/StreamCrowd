@@ -1,0 +1,240 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Settings } from 'lucide-react';
+
+interface Bet {
+  visitorId: string;
+  username: string;
+  number: number;
+  color: string;
+  timestamp: number;
+}
+
+const ROULETTE_CHANNEL = 'casino_roulette_sync';
+const ROULETTE_NUMBERS = [
+  0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10,
+  5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
+];
+const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', 'transparent'];
+
+export const RouletteOverlay: React.FC = () => {
+  const [result, setResult] = useState<number | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [bets, setBets] = useState<Bet[]>([]);
+  const [bgColor, setBgColor] = useState('#00FF00');
+  const [showSettings, setShowSettings] = useState(false);
+  const [wheelSize, setWheelSize] = useState<'normal' | 'large'>('large');
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const rotationRef = useRef(0);
+  const animationRef = useRef<number>();
+  const isSpinningRef = useRef(false);
+
+  const getNumberColor = (num: number): string => {
+    if (num === 0) return '#00AA00';
+    return RED_NUMBERS.includes(num) ? '#DC2626' : '#1F2937';
+  };
+
+  const drawWheel = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 10;
+    const segmentAngle = (2 * Math.PI) / ROULETTE_NUMBERS.length;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotationRef.current * Math.PI) / 180);
+
+    ROULETTE_NUMBERS.forEach((num, i) => {
+      const startAngle = i * segmentAngle - Math.PI / 2;
+      const endAngle = startAngle + segmentAngle;
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = getNumberColor(num);
+      ctx.fill();
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.save();
+      ctx.rotate(startAngle + segmentAngle / 2);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${wheelSize === 'large' ? '14' : '12'}px sans-serif`;
+      ctx.fillText(num.toString(), radius - 30, 4);
+      ctx.restore();
+    });
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 35, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Draw pointer
+    ctx.beginPath();
+    ctx.moveTo(centerX, 20);
+    ctx.lineTo(centerX - 15, 0);
+    ctx.lineTo(centerX + 15, 0);
+    ctx.closePath();
+    ctx.fillStyle = '#FFD700';
+    ctx.fill();
+  }, [wheelSize]);
+
+  // Setup BroadcastChannel
+  useEffect(() => {
+    channelRef.current = new BroadcastChannel(ROULETTE_CHANNEL);
+    channelRef.current.onmessage = (event) => {
+      const data = event.data;
+      if (data.type === 'spin') {
+        isSpinningRef.current = true;
+        setShowResult(false);
+        setResult(null);
+        
+        const startRotation = rotationRef.current;
+        const targetRotation = data.rotation;
+        const duration = 5000;
+        const startTime = Date.now();
+        
+        const animateSpin = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          
+          rotationRef.current = startRotation + (targetRotation - startRotation) * eased;
+          drawWheel();
+          
+          if (progress < 1) {
+            animationRef.current = requestAnimationFrame(animateSpin);
+          } else {
+            rotationRef.current = targetRotation;
+            isSpinningRef.current = false;
+          }
+        };
+        
+        if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        animateSpin();
+      } else if (data.type === 'result') {
+        setResult(data.result);
+        setShowResult(true);
+        setBets(data.bets || []);
+      } else if (data.type === 'reset') {
+        setResult(null);
+        setShowResult(false);
+        setBets([]);
+      }
+    };
+    return () => {
+      channelRef.current?.close();
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [drawWheel]);
+
+  // Initial draw
+  useEffect(() => {
+    drawWheel();
+  }, [drawWheel]);
+
+  const winners = result !== null ? bets.filter(b => b.number === result) : [];
+  const size = wheelSize === 'large' ? 450 : 350;
+
+  return (
+    <div 
+      className="min-h-screen w-full flex flex-col items-center justify-center p-4" 
+      style={{ backgroundColor: bgColor }}
+    >
+      <button
+        onClick={() => setShowSettings(!showSettings)}
+        className="fixed top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg z-50"
+      >
+        <Settings size={18} />
+      </button>
+      
+      {showSettings && (
+        <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-56">
+          <p className="text-xs text-zinc-400 mb-2 font-bold">Chroma Key</p>
+          <div className="flex gap-1 mb-3">
+            {OVERLAY_BG_COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={() => setBgColor(color)}
+                className={`w-8 h-8 rounded border-2 ${bgColor === color ? 'border-white scale-110' : 'border-transparent'} ${color === 'transparent' ? 'bg-[conic-gradient(#666_25%,#888_25%_50%,#666_50%_75%,#888_75%)] bg-[length:8px_8px]' : ''}`}
+                style={{ backgroundColor: color === 'transparent' ? undefined : color }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-zinc-400 mb-2 font-bold">Tamaño</p>
+          <div className="flex gap-1">
+            {(['normal', 'large'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setWheelSize(s)}
+                className={`flex-1 py-1.5 rounded text-xs font-medium ${wheelSize === s ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300'}`}
+              >
+                {s === 'normal' ? 'Normal' : 'Grande'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Roulette Wheel */}
+      <div className="relative">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
+          <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[30px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
+        </div>
+        <canvas
+          ref={canvasRef}
+          width={size}
+          height={size}
+          className="drop-shadow-2xl"
+        />
+      </div>
+
+      {/* Result */}
+      {showResult && result !== null && (
+        <div className="mt-6 animate-bounce">
+          <div
+            className="inline-block px-10 py-5 rounded-2xl shadow-2xl"
+            style={{ backgroundColor: getNumberColor(result) }}
+          >
+            <span className="text-white font-bold text-4xl">{result}</span>
+          </div>
+          {winners.length > 0 && (
+            <div className="mt-3 bg-green-500/80 rounded-xl px-6 py-3 text-center">
+              <p className="text-white font-bold">🎉 ¡{winners.length} ganador(es)!</p>
+              <p className="text-white/90 text-sm">
+                {winners.map(w => w.username).join(', ')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!showResult && !isSpinningRef.current && (
+        <div className="mt-6 bg-black/50 rounded-xl px-6 py-3 text-center">
+          <p className="text-white/70">Esperando giro...</p>
+          {bets.length > 0 && (
+            <p className="text-white/50 text-sm">{bets.length} apuestas registradas</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default RouletteOverlay;
