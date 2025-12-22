@@ -150,6 +150,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   // Category selection
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['general']);
   const [questionsPerCategory, setQuestionsPerCategory] = useState(3);
+  const [questionTime, setQuestionTime] = useState(15); // Tiempo por pregunta configurable
   
   // AI Mode
   const [aiTopic, setAiTopic] = useState('');
@@ -281,7 +282,12 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       const category = QUESTION_BANK.find(c => c.id === catId);
       if (category) {
         const shuffled = [...category.questions].sort(() => Math.random() - 0.5);
-        allQuestions.push(...shuffled.slice(0, questionsPerCategory));
+        // Aplicar el tiempo configurado a cada pregunta
+        const questionsWithTime = shuffled.slice(0, questionsPerCategory).map(q => ({
+          ...q,
+          timeLimit: questionTime
+        }));
+        allQuestions.push(...questionsWithTime);
       }
     });
     setQuestions(allQuestions.sort(() => Math.random() - 0.5));
@@ -348,7 +354,7 @@ IMPORTANTE:
                 question: q.question,
                 options: q.options.slice(0, 4),
                 correctIndex: Math.min(q.correctIndex, 3),
-                timeLimit: 15
+                timeLimit: questionTime // Usar el tiempo configurado
               }));
               setQuestions(newQuestions);
               setIsGenerating(false);
@@ -483,18 +489,35 @@ IMPORTANTE:
           {/* Category Mode */}
           {triviaMode === 'category' && (
             <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm font-medium text-white">Selecciona categorías</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-400">Preguntas por categoría:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={questionsPerCategory}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestionsPerCategory(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
-                    className="w-12 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
-                  />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-400">Preguntas:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={questionsPerCategory}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestionsPerCategory(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
+                      className="w-12 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Timer size={14} className="text-zinc-400" />
+                    <select
+                      value={questionTime}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
+                      className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
+                    >
+                      <option value={10}>10s</option>
+                      <option value={15}>15s</option>
+                      <option value={20}>20s</option>
+                      <option value={30}>30s</option>
+                      <option value={45}>45s</option>
+                      <option value={60}>60s</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               
@@ -558,7 +581,7 @@ IMPORTANTE:
                     />
                   </div>
                   
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-zinc-400">Preguntas:</span>
                       <input
@@ -569,6 +592,21 @@ IMPORTANTE:
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiQuestionCount(Math.max(3, Math.min(15, parseInt(e.target.value) || 5)))}
                         className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
                       />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Timer size={14} className="text-zinc-400" />
+                      <select
+                        value={questionTime}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
+                        className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
+                      >
+                        <option value={10}>10s</option>
+                        <option value={15}>15s</option>
+                        <option value={20}>20s</option>
+                        <option value={30}>30s</option>
+                        <option value={45}>45s</option>
+                        <option value={60}>60s</option>
+                      </select>
                     </div>
                     
                     <button
