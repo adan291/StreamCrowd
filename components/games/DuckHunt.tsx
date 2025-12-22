@@ -12,8 +12,8 @@ interface Duck {
   vx: number;
   vy: number;
   isAlive: boolean;
-  canMove: boolean;
-  lastMoveTime: number;
+  canDodge: boolean;
+  spawnTime: number;
 }
 
 interface DuckHuntProps {
@@ -28,17 +28,18 @@ const DUCK_SIZE = 40;
 
 export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = true }) => {
   const [isActive, setIsActive] = useState(true);
-  const [ducks, setDucks] = useState<Duck[]>([]);
   const [score, setScore] = useState(0);
   const [shotsFired, setShotsFired] = useState(0);
   const [kills, setKills] = useState<{ username: string; color: string }[]>([]);
   const [lastHitPos, setLastHitPos] = useState<{ x: number; y: number; hit: boolean } | null>(null);
+  const [duckCount, setDuckCount] = useState(0);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ducksRef = useRef<Duck[]>([]);
   const animationRef = useRef<number>();
-  const lastProcessedRef = useRef(0);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  // Procesar mensajes en tiempo real
+  const processedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     channelRef.current = new BroadcastChannel(GAME_CHANNEL);
@@ -58,59 +59,84 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     syncToOverlay();
   }, [syncToOverlay]);
 
-
-  // Process chat messages for duck commands
+  // Procesar TODOS los mensajes del chat en tiempo real
   useEffect(() => {
     if (!isConnected || !isActive) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
-
-    newMessages.forEach((msg: TwitchMessage) => {
+    
+    // Procesar cada mensaje nuevo
+    chatMessages.forEach((msg: TwitchMessage) => {
+      const msgId = msg.id || `${msg.username}-${msg.timestamp}`;
+      
+      // Evitar procesar el mismo mensaje dos veces
+      if (processedIdsRef.current.has(msgId)) return;
+      processedIdsRef.current.add(msgId);
+      
+      // Limpiar IDs antiguos (mantener solo los últimos 500)
+      if (processedIdsRef.current.size > 500) {
+        const arr = Array.from(processedIdsRef.current);
+        processedIdsRef.current = new Set(arr.slice(-300));
+      }
+      
       const msgLower = msg.message.toLowerCase().trim();
       const oderId = msg.userId || msg.username;
       
+      // !pato o !duck - aparecer o esquivar
       if (msgLower === '!pato' || msgLower === '!duck') {
         const existingDuck = ducksRef.current.find((d: Duck) => d.oderId === oderId && d.isAlive);
         
         if (existingDuck) {
-          if (existingDuck.canMove) {
+          // Esquivar - cambiar dirección drásticamente
+          if (existingDuck.canDodge) {
             ducksRef.current = ducksRef.current.map((d: Duck) => {
-              if (d.oderId === oderId) {
-                const newVy = d.vy > 0 ? -4 - Math.random() * 2 : 4 + Math.random() * 2;
-                const newVx = d.vx + (Math.random() - 0.5) * 3;
-                return { ...d, vy: newVy, vx: Math.max(-5, Math.min(5, newVx)), canMove: false, lastMoveTime: Date.now() };
+              if (d.oderId === oderId && d.isAlive) {
+                // Movimiento de esquiva más dramático
+                const dodgeVy = d.vy > 0 ? -2.5 - Math.random() : 2.5 + Math.random();
+                const dodgeVx = (Math.random() - 0.5) * 2;
+                return { 
+                  ...d, 
+                  vy: dodgeVy,
+                  vx: d.vx + dodgeVx,
+                  canDodge: false
+                };
               }
               return d;
             });
+            // Cooldown de esquiva: 1 segundo
             setTimeout(() => {
               ducksRef.current = ducksRef.current.map((d: Duck) => 
-                d.oderId === oderId ? { ...d, canMove: true } : d
+                d.oderId === oderId ? { ...d, canDodge: true } : d
               );
-            }, 1500);
+            }, 1000);
           }
         } else {
-          const spawnFromLeft = Math.random() > 0.5;
+          // Crear nuevo pato INSTANTÁNEAMENTE en posición visible
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          
           const newDuck: Duck = {
             id: `duck_${Date.now()}_${Math.random()}`,
             oderId,
             username: msg.username,
             color: msg.color || '#FFD700',
-            x: spawnFromLeft ? -DUCK_SIZE : CANVAS_WIDTH + DUCK_SIZE,
-            y: 50 + Math.random() * (CANVAS_HEIGHT - 150),
-            vx: spawnFromLeft ? 2 + Math.random() * 2 : -2 - Math.random() * 2,
-            vy: (Math.random() - 0.5) * 3,
+            // Aparecer directamente en el área visible
+            x: 50 + Math.random() * (canvas.width - 100),
+            y: 50 + Math.random() * (canvas.height - 150),
+            // Velocidad LENTA para que sea más fácil apuntar
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: (Math.random() - 0.5) * 1,
             isAlive: true,
-            canMove: true,
-            lastMoveTime: Date.now()
+            canDodge: true,
+            spawnTime: Date.now()
           };
-          ducksRef.current = [...ducksRef.current, newDuck].slice(-20);
+          ducksRef.current = [...ducksRef.current, newDuck].slice(-25);
+          setDuckCount(ducksRef.current.filter(d => d.isAlive).length);
         }
-        setDucks([...ducksRef.current]);
       }
     });
   }, [chatMessages, isConnected, isActive]);
 
-  // Animation loop
+
+  // Animation loop - patos lentos y suaves
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -130,14 +156,14 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
       
       // Clouds
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      const time = Date.now() / 5000;
+      const time = Date.now() / 8000;
       for (let i = 0; i < 4; i++) {
-        const cx = ((time * 30 + i * 180) % (canvas.width + 100)) - 50;
-        const cy = 30 + i * 25;
+        const cx = ((time * 20 + i * 180) % (canvas.width + 100)) - 50;
+        const cy = 25 + i * 20;
         ctx.beginPath();
-        ctx.arc(cx, cy, 20, 0, Math.PI * 2);
-        ctx.arc(cx + 20, cy - 5, 15, 0, Math.PI * 2);
-        ctx.arc(cx + 35, cy, 18, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctx.arc(cx + 18, cy - 4, 14, 0, Math.PI * 2);
+        ctx.arc(cx + 32, cy, 16, 0, Math.PI * 2);
         ctx.fill();
       }
       
@@ -153,22 +179,28 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
         ctx.fill();
       }
 
-      // Update ducks
+      // Update ducks - movimiento MUY LENTO
       ducksRef.current = ducksRef.current.map((d: Duck) => {
         if (!d.isAlive) return d;
         let { x, y, vx, vy } = d;
-        x += vx;
-        y += vy;
         
-        if (x < DUCK_SIZE / 2) { x = DUCK_SIZE / 2; vx = Math.abs(vx) + Math.random() * 0.5; }
-        if (x > canvas.width - DUCK_SIZE / 2) { x = canvas.width - DUCK_SIZE / 2; vx = -Math.abs(vx) - Math.random() * 0.5; }
-        if (y < DUCK_SIZE / 2) { y = DUCK_SIZE / 2; vy = Math.abs(vy) + Math.random() * 0.5; }
-        if (y > canvas.height - 70) { y = canvas.height - 70; vy = -Math.abs(vy) - Math.random() * 0.5; }
+        // Movimiento suave y lento
+        x += vx * 0.7;
+        y += vy * 0.7;
         
-        vx += (Math.random() - 0.5) * 0.15;
-        vy += (Math.random() - 0.5) * 0.15;
-        vx = Math.max(-5, Math.min(5, vx));
-        vy = Math.max(-4, Math.min(4, vy));
+        // Rebote suave en paredes
+        if (x < DUCK_SIZE) { x = DUCK_SIZE; vx = Math.abs(vx) * 0.8; }
+        if (x > canvas.width - DUCK_SIZE) { x = canvas.width - DUCK_SIZE; vx = -Math.abs(vx) * 0.8; }
+        if (y < DUCK_SIZE) { y = DUCK_SIZE; vy = Math.abs(vy) * 0.8; }
+        if (y > canvas.height - 70) { y = canvas.height - 70; vy = -Math.abs(vy) * 0.8; }
+        
+        // Pequeña variación aleatoria muy suave
+        vx += (Math.random() - 0.5) * 0.05;
+        vy += (Math.random() - 0.5) * 0.05;
+        
+        // Limitar velocidad máxima (muy lenta)
+        vx = Math.max(-2, Math.min(2, vx));
+        vy = Math.max(-1.5, Math.min(1.5, vy));
         
         return { ...d, x, y, vx, vy };
       });
@@ -179,8 +211,8 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
         ctx.translate(duck.x, duck.y);
         if (duck.vx < 0) ctx.scale(-1, 1);
         
-        const flapSpeed = Math.abs(duck.vx) + Math.abs(duck.vy);
-        const wingAngle = Math.sin(Date.now() / (80 - flapSpeed * 10)) * 0.4;
+        // Wing flap animation
+        const wingAngle = Math.sin(Date.now() / 150) * 0.3;
         
         // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -229,6 +261,15 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
         ctx.fill();
         ctx.restore();
         ctx.globalAlpha = 1;
+        
+        // Dodge indicator
+        if (!duck.canDodge) {
+          ctx.fillStyle = 'rgba(255,255,0,0.5)';
+          ctx.beginPath();
+          ctx.arc(0, -DUCK_SIZE / 2 - 10, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
         ctx.restore();
         
         // Username
@@ -247,21 +288,23 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
         ctx.arc(lastHitPos.x, lastHitPos.y, 25, 0, Math.PI * 2);
         ctx.fill();
         if (lastHitPos.hit) {
-          ctx.font = 'bold 16px sans-serif';
+          ctx.font = 'bold 18px sans-serif';
           ctx.fillStyle = '#FFD700';
           ctx.textAlign = 'center';
+          ctx.shadowColor = 'rgba(0,0,0,0.8)';
+          ctx.shadowBlur = 4;
           ctx.fillText('+100', lastHitPos.x, lastHitPos.y - 30);
+          ctx.shadowBlur = 0;
         }
       }
 
-      setDucks([...ducksRef.current]);
+      setDuckCount(ducksRef.current.filter(d => d.isAlive).length);
       animationRef.current = requestAnimationFrame(animate);
     };
 
     animate();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isActive, lastHitPos]);
-
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isActive) return;
@@ -282,14 +325,15 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
       const dx = duck.x - clickX;
       const dy = duck.y - clickY;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < DUCK_SIZE * 1.2) {
+      // Radio de impacto generoso
+      if (distance < DUCK_SIZE * 1.3) {
         hitDuck = duck;
         break;
       }
     }
     
     setLastHitPos({ x: clickX, y: clickY, hit: !!hitDuck });
-    setTimeout(() => setLastHitPos(null), 300);
+    setTimeout(() => setLastHitPos(null), 400);
     
     if (hitDuck) {
       ducksRef.current = ducksRef.current.map((d: Duck) => 
@@ -299,19 +343,19 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
       setKills(prev => [...prev, { username: hitDuck!.username, color: hitDuck!.color }].slice(-10));
       setTimeout(() => {
         ducksRef.current = ducksRef.current.filter((d: Duck) => d.id !== hitDuck!.id);
-        setDucks([...ducksRef.current]);
-      }, 400);
+        setDuckCount(ducksRef.current.filter(d => d.isAlive).length);
+      }, 500);
     }
   };
 
   const resetGame = () => {
     ducksRef.current = [];
-    setDucks([]);
+    setDuckCount(0);
     setScore(0);
     setShotsFired(0);
     setKills([]);
     setLastHitPos(null);
-    lastProcessedRef.current = chatMessages.length;
+    processedIdsRef.current.clear();
   };
 
   const openOverlay = () => {
@@ -322,7 +366,6 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     window.open(`${baseUrl}?overlayDuckHunt=true`, 'DuckHuntOverlay', `width=${width},height=${height},left=${left},top=${top}`);
   };
 
-  const aliveDucks = ducks.filter((d: Duck) => d.isAlive).length;
   const accuracy = shotsFired > 0 ? Math.round((kills.length / shotsFired) * 100) : 0;
 
   return (
@@ -362,10 +405,10 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
 
       <div className="bg-zinc-800/50 rounded-xl p-3">
         <p className="text-zinc-400 text-sm text-center">
-          Viewers escriben <span className="text-yellow-400 font-bold">!pato</span> para aparecer como pato
+          Viewers escriben <span className="text-yellow-400 font-bold">!pato</span> para aparecer instantáneamente
         </p>
         <p className="text-zinc-500 text-xs text-center mt-1">
-          Pueden escribir !pato de nuevo para esquivar • El streamer hace clic para disparar
+          Escribir !pato de nuevo = esquivar (cooldown 1s) • Streamer hace clic para disparar
         </p>
       </div>
 
@@ -379,7 +422,7 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
           style={{ aspectRatio: `${CANVAS_WIDTH}/${CANVAS_HEIGHT}` }}
         />
         <div className="absolute top-2 left-2 bg-black/50 rounded-lg px-2 py-1">
-          <span className="text-white text-xs">🦆 {aliveDucks} patos</span>
+          <span className="text-white text-xs">🦆 {duckCount} patos</span>
         </div>
         <div className="absolute top-2 right-2 bg-black/50 rounded-lg px-2 py-1">
           <span className="text-white text-xs">💥 {shotsFired} disparos</span>

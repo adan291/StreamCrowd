@@ -111,19 +111,21 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
     });
   }, [chatMessages, isActive, isConnected, getRarity]);
 
-  // Check if hook catches a fish
+  // Check if hook catches a fish - hitbox más pequeña pero más precisa
   const checkCatch = useCallback((currentDepth: number): CaughtFish | null => {
     const hookX = hookPosition.x;
-    const hookY = 50 + currentDepth;
+    const hookY = 50 + currentDepth + 20; // Centro del anzuelo (donde está el cebo)
     
-    for (let i = 0; i < fishRef.current.length; i++) {
-      const fish = fishRef.current[i];
+    // Ordenar peces por distancia para pescar el más cercano
+    const fishWithDistance = fishRef.current.map(fish => {
       const dx = fish.x - hookX;
       const dy = fish.y - hookY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Radio de captura muy generoso
-      const catchRadius = fish.size + 40;
+      return { fish, distance: Math.sqrt(dx * dx + dy * dy) };
+    }).sort((a, b) => a.distance - b.distance);
+    
+    for (const { fish, distance } of fishWithDistance) {
+      // Radio de captura más pequeño pero seguro: tamaño del pez + 25px
+      const catchRadius = fish.size + 25;
       
       if (distance < catchRadius) {
         const caught: CaughtFish = {
@@ -144,32 +146,37 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
     return null;
   }, [hookPosition.x]);
 
-  // Fishing action - smoother and more forgiving
+  // Fishing action - más fluida y precisa
   const castLine = useCallback(() => {
     if (isFishing) return;
     setIsFishing(true);
     setLastCatch(null);
     
     const maxDepth = 260;
-    const downSpeed = 3;
-    const upSpeed = 5;
+    const downSpeed = 2.5; // Un poco más lento para mejor precisión
+    const upSpeed = 6;
     let currentDepth = 0;
     let goingDown = true;
     let caughtSomething: CaughtFish | null = null;
+    let frameCount = 0;
     
     const animateFishing = () => {
+      frameCount++;
+      
       if (goingDown) {
         currentDepth += downSpeed;
         setHookDepth(currentDepth);
         
-        // Check for catch continuously while going down
-        const caught = checkCatch(currentDepth);
-        if (caught) {
-          caughtSomething = caught;
-          goingDown = false;
-          setCaughtFish(prev => [caught, ...prev].slice(0, 10));
-          setLastCatch(caught);
-          setTotalPoints(prev => prev + caught.points);
+        // Verificar captura cada 2 frames para mejor rendimiento pero buena precisión
+        if (frameCount % 2 === 0) {
+          const caught = checkCatch(currentDepth);
+          if (caught) {
+            caughtSomething = caught;
+            goingDown = false;
+            setCaughtFish(prev => [caught, ...prev].slice(0, 10));
+            setLastCatch(caught);
+            setTotalPoints(prev => prev + caught.points);
+          }
         }
         
         if (currentDepth >= maxDepth) {
@@ -178,7 +185,7 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
         
         requestAnimationFrame(animateFishing);
       } else {
-        // Going up
+        // Subiendo
         currentDepth -= upSpeed;
         setHookDepth(Math.max(0, currentDepth));
         
@@ -337,28 +344,39 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
       ctx.lineTo(hookPosition.x, 50 + hookDepth);
       ctx.stroke();
       
-      // Hook with bait
-      ctx.strokeStyle = '#C0C0C0';
+      // Hook with bait - más visible
+      ctx.strokeStyle = '#D4D4D4';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(hookPosition.x, 50 + hookDepth + 12, 12, 0, Math.PI);
+      ctx.arc(hookPosition.x, 50 + hookDepth + 12, 10, 0, Math.PI);
       ctx.stroke();
       
-      // Bait (worm)
-      ctx.fillStyle = '#FF6B6B';
+      // Bait (worm) - más grande y visible
+      ctx.fillStyle = '#FF5555';
       ctx.beginPath();
-      ctx.ellipse(hookPosition.x, 50 + hookDepth + 20, 4, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(hookPosition.x, 50 + hookDepth + 20, 5, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FF8888';
+      ctx.beginPath();
+      ctx.ellipse(hookPosition.x - 2, 50 + hookDepth + 18, 2, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Catch zone indicator when fishing
+      // Catch zone indicator when fishing - más pequeño y preciso
       if (isFishing) {
-        ctx.strokeStyle = 'rgba(255,215,0,0.4)';
+        // Zona de captura real (más pequeña)
+        ctx.strokeStyle = 'rgba(0,255,100,0.5)';
         ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
+        ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.arc(hookPosition.x, 50 + hookDepth, 50, 0, Math.PI * 2);
+        ctx.arc(hookPosition.x, 50 + hookDepth + 20, 35, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        
+        // Punto central del anzuelo
+        ctx.fillStyle = 'rgba(255,255,0,0.8)';
+        ctx.beginPath();
+        ctx.arc(hookPosition.x, 50 + hookDepth + 20, 4, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       setFishCount(fishRef.current.length);
