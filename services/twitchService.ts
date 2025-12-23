@@ -46,6 +46,45 @@ export type StatusCallback = (status: ConnectionStatus, error?: string) => void;
 export type ReconnectAttemptCallback = (attempt: number, maxAttempts: number) => void;
 
 /**
+ * Subscription tier types
+ */
+export type SubTier = 'Prime' | '1000' | '2000' | '3000';
+
+/**
+ * Stream event data for subscriptions, follows, raids, cheers, etc.
+ */
+export interface StreamEventData {
+  type: 'sub' | 'resub' | 'subgift' | 'submysterygift' | 'primepaidupgrade' | 'giftpaidupgrade' | 'anongiftpaidupgrade' | 'raid' | 'cheer' | 'hosted';
+  username: string;
+  displayName: string;
+  userId?: string;
+  channel: string;
+  timestamp: number;
+  // Sub specific
+  tier?: SubTier;
+  months?: number;
+  cumulativeMonths?: number;
+  streakMonths?: number;
+  message?: string;
+  // Gift specific
+  recipientUsername?: string;
+  recipientDisplayName?: string;
+  giftCount?: number;
+  senderCount?: number;
+  gifterUsername?: string;
+  gifterDisplayName?: string;
+  // Raid specific
+  viewerCount?: number;
+  // Cheer/Bits specific
+  bits?: number;
+}
+
+/**
+ * Callback type for handling stream events (subs, resubs, gifts)
+ */
+export type StreamEventCallback = (event: StreamEventData) => void;
+
+/**
  * Options for establishing a Twitch connection
  */
 export interface TwitchConnectionOptions {
@@ -73,6 +112,7 @@ class TwitchService {
   private messageCallback: MessageCallback | null = null;
   private statusChangeCallback: StatusCallback | null = null;
   private reconnectAttemptCallback: ReconnectAttemptCallback | null = null;
+  private streamEventCallback: StreamEventCallback | null = null;
   private currentChannel: string = '';
   private isAnonymous: boolean = false;
   private config: TwitchServiceConfig;
@@ -324,6 +364,154 @@ class TwitchService {
           }
         });
 
+        // Subscription event
+        this.client.on('subscription', (channel, username, method, message, userstate) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'sub',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              tier: this.parseTier(method?.plan),
+              message: message || undefined,
+            });
+          }
+        });
+
+        // Resub event
+        this.client.on('resub', (channel, username, months, message, userstate, methods) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'resub',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              tier: this.parseTier(methods?.plan),
+              months: months,
+              cumulativeMonths: parseInt(userstate['msg-param-cumulative-months'] || '0', 10) || months,
+              streakMonths: parseInt(userstate['msg-param-streak-months'] || '0', 10) || undefined,
+              message: message || undefined,
+            });
+          }
+        });
+
+        // Gift sub event (single gift)
+        this.client.on('subgift', (channel, username, streakMonths, recipient, methods, userstate) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'subgift',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              tier: this.parseTier(methods?.plan),
+              recipientUsername: recipient,
+              recipientDisplayName: userstate['msg-param-recipient-display-name'] || recipient,
+              giftCount: 1,
+              gifterUsername: username,
+              gifterDisplayName: userstate['display-name'] || username,
+            });
+          }
+        });
+
+        // Mystery gift (mass gift subs)
+        this.client.on('submysterygift', (channel, username, numbOfSubs, methods, userstate) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'submysterygift',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              tier: this.parseTier(methods?.plan),
+              giftCount: numbOfSubs,
+              senderCount: parseInt(userstate['msg-param-sender-count'] || '0', 10) || undefined,
+              gifterUsername: username,
+              gifterDisplayName: userstate['display-name'] || username,
+            });
+          }
+        });
+
+        // Prime paid upgrade
+        this.client.on('primepaidupgrade', (channel, username, methods, userstate) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'primepaidupgrade',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              tier: this.parseTier(methods?.plan),
+            });
+          }
+        });
+
+        // Gift paid upgrade
+        this.client.on('giftpaidupgrade', (channel, username, sender, userstate) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'giftpaidupgrade',
+              username: username,
+              displayName: userstate['display-name'] || username,
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              gifterUsername: sender,
+            });
+          }
+        });
+
+        // Raid event
+        this.client.on('raided', (channel, username, viewers) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'raid',
+              username: username,
+              displayName: username,
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              viewerCount: viewers,
+            });
+          }
+        });
+
+        // Cheer/Bits event
+        this.client.on('cheer', (channel, userstate, message) => {
+          if (this.streamEventCallback) {
+            this.streamEventCallback({
+              type: 'cheer',
+              username: userstate.username || userstate['display-name'] || 'anonymous',
+              displayName: userstate['display-name'] || userstate.username || 'Anonymous',
+              userId: userstate['user-id'],
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              bits: parseInt(userstate.bits || '0', 10),
+              message: message,
+            });
+          }
+        });
+
+        // Hosted event (when someone hosts you)
+        this.client.on('hosted', (channel, username, viewers, autohost) => {
+          if (this.streamEventCallback && !autohost) {
+            this.streamEventCallback({
+              type: 'hosted',
+              username: username,
+              displayName: username,
+              channel: channel.replace('#', ''),
+              timestamp: Date.now(),
+              viewerCount: viewers,
+            });
+          }
+        });
+
         this.client.on('connected', () => {
           this.reconnectAttempts = 0;
           if (this.statusChangeCallback) {
@@ -346,6 +534,18 @@ class TwitchService {
     } catch (error) {
         console.error("Failed to initialize Twitch Client:", error);
         if (this.statusChangeCallback) this.statusChangeCallback(ConnectionStatus.ERROR, "Error interno al inicializar cliente.");
+    }
+  }
+
+  /**
+   * Parse subscription tier from TMI method plan
+   */
+  private parseTier(plan?: string): SubTier {
+    switch (plan) {
+      case 'Prime': return 'Prime';
+      case '2000': return '2000';
+      case '3000': return '3000';
+      default: return '1000';
     }
   }
 
@@ -529,6 +729,14 @@ class TwitchService {
    */
   public onReconnectAttempt(callback: ReconnectAttemptCallback): void {
     this.reconnectAttemptCallback = callback;
+  }
+
+  /**
+   * Set the stream event callback (subs, resubs, gifts, etc.)
+   * @param callback Function to call when a stream event occurs
+   */
+  public onStreamEvent(callback: StreamEventCallback): void {
+    this.streamEventCallback = callback;
   }
 
   /**
@@ -848,6 +1056,316 @@ class TwitchService {
       };
     } catch (err) {
       console.error('Error validating token:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get bits leaderboard for a channel
+   * Requires OAuth token with bits:read scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @param period 'day' | 'week' | 'month' | 'year' | 'all'
+   * @returns Promise with leaderboard data or null if failed
+   */
+  public async getBitsLeaderboard(
+    token: string, 
+    broadcasterId: string, 
+    period: 'day' | 'week' | 'month' | 'year' | 'all' = 'all'
+  ): Promise<{ rank: number; username: string; bits: number }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/bits/leaderboard');
+      url.searchParams.set('count', '100');
+      url.searchParams.set('period', period);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to get bits leaderboard:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((entry: any) => ({
+        rank: entry.rank,
+        username: entry.user_name || entry.user_login,
+        bits: entry.score,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting bits leaderboard:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get clips for a channel
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @param first Number of clips to fetch (max 100)
+   * @returns Promise with clips data or null if failed
+   */
+  public async getClips(
+    token: string, 
+    broadcasterId: string, 
+    first: number = 20
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; creatorName: string; thumbnailUrl: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/clips?broadcaster_id=${broadcasterId}&first=${first}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get clips:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((clip: any) => ({
+        id: clip.id,
+        title: clip.title,
+        url: clip.url,
+        viewCount: clip.view_count,
+        createdAt: clip.created_at,
+        creatorName: clip.creator_name,
+        thumbnailUrl: clip.thumbnail_url,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting clips:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get VODs/videos for a channel
+   * @param token OAuth token
+   * @param userId User ID
+   * @param type 'all' | 'upload' | 'archive' | 'highlight'
+   * @param first Number of videos to fetch (max 100)
+   * @returns Promise with videos data or null if failed
+   */
+  public async getVideos(
+    token: string, 
+    userId: string, 
+    type: 'all' | 'upload' | 'archive' | 'highlight' = 'all',
+    first: number = 20
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; duration: string; thumbnailUrl: string; type: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/videos');
+      url.searchParams.set('user_id', userId);
+      url.searchParams.set('first', first.toString());
+      if (type !== 'all') url.searchParams.set('type', type);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to get videos:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((video: any) => ({
+        id: video.id,
+        title: video.title,
+        url: video.url,
+        viewCount: video.view_count,
+        createdAt: video.created_at,
+        duration: video.duration,
+        thumbnailUrl: video.thumbnail_url.replace('%{width}', '320').replace('%{height}', '180'),
+        type: video.type,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting videos:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get moderators for a channel
+   * Requires OAuth token with moderation:read scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with moderators list or null if failed
+   */
+  public async getModerators(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get moderators:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((mod: any) => ({
+        id: mod.user_id,
+        username: mod.user_login,
+        displayName: mod.user_name,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting moderators:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get VIPs for a channel
+   * Requires OAuth token with channel:read:vips scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with VIPs list or null if failed
+   */
+  public async getVIPs(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get VIPs:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((vip: any) => ({
+        id: vip.user_id,
+        username: vip.user_login,
+        displayName: vip.user_name,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting VIPs:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get channel info (title, game, tags, etc.)
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with channel info or null if failed
+   */
+  public async getChannelInfo(token: string, broadcasterId: string): Promise<{
+    title: string;
+    gameName: string;
+    gameId: string;
+    language: string;
+    tags: string[];
+  } | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/channels?broadcaster_id=${broadcasterId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get channel info:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      const channel = data.data?.[0];
+      if (!channel) return null;
+      
+      return {
+        title: channel.title,
+        gameName: channel.game_name,
+        gameId: channel.game_id,
+        language: channel.broadcaster_language,
+        tags: channel.tags || [],
+      };
+    } catch (err) {
+      console.error('Error getting channel info:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get stream info (if live)
+   * @param token OAuth token
+   * @param userId User ID
+   * @returns Promise with stream info or null if offline/failed
+   */
+  public async getStreamInfo(token: string, userId: string): Promise<{
+    id: string;
+    title: string;
+    gameName: string;
+    viewerCount: number;
+    startedAt: string;
+    thumbnailUrl: string;
+    isMature: boolean;
+  } | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/streams?user_id=${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get stream info:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      const stream = data.data?.[0];
+      if (!stream) return null; // Offline
+      
+      return {
+        id: stream.id,
+        title: stream.title,
+        gameName: stream.game_name,
+        viewerCount: stream.viewer_count,
+        startedAt: stream.started_at,
+        thumbnailUrl: stream.thumbnail_url.replace('{width}', '640').replace('{height}', '360'),
+        isMature: stream.is_mature,
+      };
+    } catch (err) {
+      console.error('Error getting stream info:', err);
       return null;
     }
   }

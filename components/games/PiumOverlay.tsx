@@ -236,29 +236,35 @@ export const PiumOverlay: React.FC = () => {
         
         // Username with background
         if (username) {
-          const displayName = username.slice(0, 5);
+          const displayName = username.slice(0, 7);
           
-          ctx.font = '500 6px Arial, sans-serif';
+          ctx.font = 'bold 8px Arial, sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           
           const textWidth = ctx.measureText(displayName).width;
           const labelX = Math.round(x);
-          const labelY = Math.round(y + radius + 7);
-          const paddingX = 2;
-          const paddingY = 1;
+          const labelY = Math.round(y + radius + 9);
+          const paddingX = 4;
+          const boxWidth = Math.round(textWidth + paddingX * 2);
+          const boxHeight = 12;
           
-          // Background pill
-          ctx.fillStyle = 'rgba(0,0,0,0.85)';
+          // Background
+          ctx.fillStyle = 'rgba(0,0,0,0.9)';
           ctx.beginPath();
           ctx.roundRect(
-            Math.round(labelX - textWidth / 2 - paddingX),
-            Math.round(labelY - 3 - paddingY),
-            Math.round(textWidth + paddingX * 2),
-            Math.round(6 + paddingY * 2),
-            2
+            Math.round(labelX - boxWidth / 2),
+            Math.round(labelY - boxHeight / 2),
+            boxWidth,
+            boxHeight,
+            3
           );
           ctx.fill();
+          
+          // Border
+          ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
           
           // Text
           ctx.fillStyle = '#ffffff';

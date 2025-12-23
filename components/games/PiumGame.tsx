@@ -21,9 +21,9 @@ interface PiumGameProps {
 }
 
 const GAME_CHANNEL = 'pium_game_sync';
-const BALL_RADIUS = 12;
+const BALL_RADIUS = 24;
 const FRICTION = 0.985;
-const POCKET_RADIUS = 18;
+const POCKET_RADIUS = 36;
 const TABLE_COLOR = '#0a6b35';
 const TABLE_FELT = '#0d7a3e';
 const BORDER_COLOR = '#4a2c1a';
@@ -31,9 +31,9 @@ const WOOD_LIGHT = '#6b4423';
 const WOOD_DARK = '#3d2415';
 const COLORS = ['#FFD700', '#1E90FF', '#FF4500', '#9932CC', '#00CED1', '#FF69B4', '#32CD32', '#FF6347', '#4169E1', '#FFA500'];
 
-// Canvas dimensions (high res for crisp rendering)
-const CANVAS_WIDTH = 700;
-const CANVAS_HEIGHT = 380;
+// Canvas dimensions (higher resolution for crisp text when scaled)
+const CANVAS_WIDTH = 1400;
+const CANVAS_HEIGHT = 760;
 
 export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = true }) => {
   const [isActive, setIsActive] = useState(true);
@@ -56,13 +56,13 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const getPockets = useCallback(() => {
     const w = CANVAS_WIDTH;
     const h = CANVAS_HEIGHT;
-    const margin = 22;
+    const margin = 44;
     return [
       { x: margin, y: margin },
-      { x: w / 2, y: margin - 3 },
+      { x: w / 2, y: margin - 6 },
       { x: w - margin, y: margin },
       { x: margin, y: h - margin },
-      { x: w / 2, y: h - margin + 3 },
+      { x: w / 2, y: h - margin + 6 },
       { x: w - margin, y: h - margin },
     ];
   }, []);
@@ -117,7 +117,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
 
   // Get spawn position for new balls (random but on right side of cue ball)
   const getSpawnPosition = useCallback(() => {
-    const margin = 40; // Distance from walls
+    const margin = 80; // Distance from walls
     const cueBallX = CANVAS_WIDTH * 0.2; // Cue ball position
     
     // Spawn area: from right of cue ball to right edge
@@ -304,7 +304,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const drawWoodBorder = useCallback((ctx: CanvasRenderingContext2D) => {
     const w = CANVAS_WIDTH;
     const h = CANVAS_HEIGHT;
-    const borderWidth = 18;
+    const borderWidth = 36;
     
     // Outer border gradient
     const borderGrad = ctx.createLinearGradient(0, 0, 0, h);
@@ -339,13 +339,13 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     // Rail cushions
     ctx.fillStyle = '#0a5c2e';
     // Top rail
-    ctx.fillRect(borderWidth + 30, borderWidth, w - borderWidth * 2 - 60, 6);
+    ctx.fillRect(borderWidth + 60, borderWidth, w - borderWidth * 2 - 120, 12);
     // Bottom rail
-    ctx.fillRect(borderWidth + 30, h - borderWidth - 6, w - borderWidth * 2 - 60, 6);
+    ctx.fillRect(borderWidth + 60, h - borderWidth - 12, w - borderWidth * 2 - 120, 12);
     // Left rail
-    ctx.fillRect(borderWidth, borderWidth + 30, 6, h - borderWidth * 2 - 60);
+    ctx.fillRect(borderWidth, borderWidth + 60, 12, h - borderWidth * 2 - 120);
     // Right rail
-    ctx.fillRect(w - borderWidth - 6, borderWidth + 30, 6, h - borderWidth * 2 - 60);
+    ctx.fillRect(w - borderWidth - 12, borderWidth + 60, 12, h - borderWidth * 2 - 120);
     
     // Decorative diamonds on rails
     ctx.fillStyle = '#c9a959';
@@ -353,11 +353,11 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     diamondPositions.forEach(pos => {
       // Top
       ctx.beginPath();
-      ctx.arc(w * pos, borderWidth / 2, 3, 0, Math.PI * 2);
+      ctx.arc(w * pos, borderWidth / 2, 6, 0, Math.PI * 2);
       ctx.fill();
       // Bottom
       ctx.beginPath();
-      ctx.arc(w * pos, h - borderWidth / 2, 3, 0, Math.PI * 2);
+      ctx.arc(w * pos, h - borderWidth / 2, 6, 0, Math.PI * 2);
       ctx.fill();
     });
   }, []);
@@ -408,30 +408,36 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     
     // Username label with background
     if (showName && username) {
-      const displayName = username.slice(0, 5);
+      const displayName = username.slice(0, 8);
       
-      // Use crisp font rendering
-      ctx.font = '500 6px Arial, sans-serif';
+      // Larger font for high-res canvas
+      ctx.font = 'bold 16px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
       const textWidth = ctx.measureText(displayName).width;
       const labelX = Math.round(x);
-      const labelY = Math.round(y + radius + 7);
-      const paddingX = 2;
-      const paddingY = 1;
+      const labelY = Math.round(y + radius + 18);
+      const paddingX = 8;
+      const boxWidth = Math.round(textWidth + paddingX * 2);
+      const boxHeight = 24;
       
-      // Background pill (rounded coords for crisp edges)
-      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      // Background with border for better contrast
+      ctx.fillStyle = 'rgba(0,0,0,0.9)';
       ctx.beginPath();
       ctx.roundRect(
-        Math.round(labelX - textWidth / 2 - paddingX),
-        Math.round(labelY - 3 - paddingY),
-        Math.round(textWidth + paddingX * 2),
-        Math.round(6 + paddingY * 2),
-        2
+        Math.round(labelX - boxWidth / 2),
+        Math.round(labelY - boxHeight / 2),
+        boxWidth,
+        boxHeight,
+        6
       );
       ctx.fill();
+      
+      // White border for extra pop
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
       
       // Text
       ctx.fillStyle = '#ffffff';
@@ -445,6 +451,10 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Set canvas resolution (high res for crisp rendering)
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
 
     const animate = () => {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -497,7 +507,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         ball.y += ball.vy;
         
         // Wall collision
-        const margin = 24;
+        const margin = 48;
         if (ball.x - ball.radius < margin) { ball.x = margin + ball.radius; ball.vx = -ball.vx * 0.8; playSound('wall'); }
         if (ball.x + ball.radius > CANVAS_WIDTH - margin) { ball.x = CANVAS_WIDTH - margin - ball.radius; ball.vx = -ball.vx * 0.8; playSound('wall'); }
         if (ball.y - ball.radius < margin) { ball.y = margin + ball.radius; ball.vy = -ball.vy * 0.8; playSound('wall'); }
@@ -742,14 +752,9 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
       {/* Canvas */}
       <div className="relative rounded-xl overflow-hidden shadow-2xl" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
         <canvas 
-          ref={canvasRef} 
-          width={CANVAS_WIDTH} 
-          height={CANVAS_HEIGHT} 
+          ref={canvasRef}
           className="w-full block"
-          style={{ 
-            maxWidth: '100%',
-            height: 'auto'
-          }} 
+          style={{ aspectRatio: '1400 / 760' }}
         />
         <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1">
           <span className="text-white text-xs font-medium">🎱 {activeBalls} bolas</span>

@@ -3,7 +3,7 @@ import { ConnectionPanel } from './components/ConnectionPanel';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
-import { RecentVotes } from './components/RecentVotes';
+import { StreamActivity } from './components/StreamActivity';
 import { PollHistory } from './components/PollHistory';
 import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
@@ -40,6 +40,7 @@ import {
   useAIAnalytics,
   useDemoTour,
   useViewerCount,
+  useStreamEvents,
   DEFAULT_OVERLAY_SETTINGS,
   getChannelFromUrl,
   getPollConfigFromUrl,
@@ -134,6 +135,9 @@ const App: React.FC = () => {
     enabled: status === ConnectionStatus.CONNECTED,
     interval: 30000, // Update every 30 seconds
   });
+
+  // Stream events hook - captures subs, resubs, gifts, etc.
+  const streamEventsHook = useStreamEvents();
 
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
@@ -1373,9 +1377,13 @@ const App: React.FC = () => {
                 {/* Sub-tab content */}
                 <div className="flex-1 overflow-y-auto">
                   {dataSubTab === 'activity' && (
-                    <RecentVotes 
+                    <StreamActivity 
+                      events={streamEventsHook.events}
                       votes={poll.voteHistory} 
-                      options={poll.currentPoll ? poll.currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
+                      pollOptions={poll.currentPoll ? poll.currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
+                      channelName={channelName}
+                      authToken={authToken}
+                      onEventAdded={streamEventsHook.addEvent}
                     />
                   )}
                   {dataSubTab === 'analytics' && (
