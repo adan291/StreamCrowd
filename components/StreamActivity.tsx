@@ -65,6 +65,151 @@ const REQUIRED_SCOPES = {
   videos: '', // Public - no scope needed
 };
 
+// Errores típicos de OAuth y sus soluciones
+interface OAuthErrorInfo {
+  code: string;
+  message: string;
+  scope?: string;
+  solution: string;
+  link?: string;
+}
+
+const OAUTH_ERRORS: Record<string, OAuthErrorInfo> = {
+  // Errores de autenticación
+  'invalid_token': {
+    code: '401',
+    message: 'Token inválido o expirado',
+    solution: 'Genera un nuevo token OAuth en twitchtokengenerator.com',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'token_expired': {
+    code: '401',
+    message: 'El token ha expirado',
+    solution: 'Los tokens de Twitch expiran. Genera uno nuevo.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'missing_scope_followers': {
+    code: '403',
+    message: 'Sin permiso para ver followers',
+    scope: 'moderator:read:followers',
+    solution: 'Necesitas el scope moderator:read:followers para ver seguidores recientes.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'missing_scope_subscribers': {
+    code: '403',
+    message: 'Sin permiso para ver suscriptores',
+    scope: 'channel:read:subscriptions',
+    solution: 'Necesitas el scope channel:read:subscriptions para ver la lista de subs.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'missing_scope_bits': {
+    code: '403',
+    message: 'Sin permiso para ver bits',
+    scope: 'bits:read',
+    solution: 'Necesitas el scope bits:read para ver el leaderboard de bits.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'missing_scope_moderation': {
+    code: '403',
+    message: 'Sin permiso para ver moderadores',
+    scope: 'moderation:read',
+    solution: 'Necesitas el scope moderation:read para ver la lista de mods.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  'missing_scope_vips': {
+    code: '403',
+    message: 'Sin permiso para ver VIPs',
+    scope: 'channel:read:vips',
+    solution: 'Necesitas el scope channel:read:vips para ver la lista de VIPs.',
+    link: 'https://twitchtokengenerator.com/'
+  },
+  // Errores de rate limit
+  'rate_limit': {
+    code: '429',
+    message: 'Demasiadas peticiones',
+    solution: 'Has excedido el límite de peticiones. Espera unos segundos e intenta de nuevo.'
+  },
+  // Errores de servidor
+  'server_error': {
+    code: '500',
+    message: 'Error del servidor de Twitch',
+    solution: 'Twitch está teniendo problemas. Intenta de nuevo en unos minutos.'
+  },
+  'service_unavailable': {
+    code: '503',
+    message: 'Servicio no disponible',
+    solution: 'El servicio de Twitch no está disponible temporalmente.'
+  },
+  // Errores de datos
+  'channel_not_found': {
+    code: '404',
+    message: 'Canal no encontrado',
+    solution: 'Verifica que el nombre del canal sea correcto.'
+  },
+  'not_broadcaster': {
+    code: '403',
+    message: 'No eres el broadcaster',
+    solution: 'Algunas APIs solo funcionan con el token del dueño del canal.'
+  },
+  // Error genérico
+  'unknown': {
+    code: '???',
+    message: 'Error desconocido',
+    solution: 'Ocurrió un error inesperado. Revisa la consola para más detalles.'
+  }
+};
+
+// Función para parsear errores de la API de Twitch
+const parseOAuthError = (status: number, errorBody?: string, dataType?: string): OAuthErrorInfo => {
+  // Errores de autenticación
+  if (status === 401) {
+    if (errorBody?.includes('expired')) {
+      return OAUTH_ERRORS['token_expired'];
+    }
+    return OAUTH_ERRORS['invalid_token'];
+  }
+  
+  // Errores de permisos
+  if (status === 403) {
+    // Detectar qué scope falta basado en el tipo de datos
+    if (dataType === 'followers') return OAUTH_ERRORS['missing_scope_followers'];
+    if (dataType === 'subscribers') return OAUTH_ERRORS['missing_scope_subscribers'];
+    if (dataType === 'bits') return OAUTH_ERRORS['missing_scope_bits'];
+    if (dataType === 'moderators') return OAUTH_ERRORS['missing_scope_moderation'];
+    if (dataType === 'vips') return OAUTH_ERRORS['missing_scope_vips'];
+    
+    // Si el error menciona broadcaster
+    if (errorBody?.includes('broadcaster')) {
+      return OAUTH_ERRORS['not_broadcaster'];
+    }
+    
+    return {
+      code: '403',
+      message: 'Acceso denegado',
+      solution: 'No tienes permisos para acceder a estos datos. Verifica los scopes de tu token.',
+      link: 'https://twitchtokengenerator.com/'
+    };
+  }
+  
+  // Rate limit
+  if (status === 429) {
+    return OAUTH_ERRORS['rate_limit'];
+  }
+  
+  // No encontrado
+  if (status === 404) {
+    return OAUTH_ERRORS['channel_not_found'];
+  }
+  
+  // Errores de servidor
+  if (status >= 500) {
+    if (status === 503) return OAUTH_ERRORS['service_unavailable'];
+    return OAUTH_ERRORS['server_error'];
+  }
+  
+  return OAUTH_ERRORS['unknown'];
+};
+
 // Funciones de persistencia
 export const saveEvents = (events: StreamEvent[], channelName: string): void => {
   const today = new Date().toISOString().split('T')[0];
@@ -190,7 +335,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   // Estados para fetch de API
   const [isLoading, setIsLoading] = useState(false);
   const [loadingType, setLoadingType] = useState<string>('');
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<OAuthErrorInfo | null>(null);
   const [availableScopes, setAvailableScopes] = useState<string[]>([]);
   const [showScopesInfo, setShowScopesInfo] = useState(false);
   const [fetchedData, setFetchedData] = useState<{
@@ -311,7 +456,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
@@ -328,11 +473,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       );
       
       if (!response.ok) {
-        if (response.status === 401) {
-          setFetchError('Token sin permisos. Necesitas el scope: moderator:read:followers');
-        } else {
-          setFetchError(`Error ${response.status}: ${response.statusText}`);
-        }
+        const errorBody = await response.text().catch(() => '');
+        setFetchError(parseOAuthError(response.status, errorBody, 'followers'));
         return;
       }
       
@@ -356,7 +498,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       });
       
     } catch (err) {
-      setFetchError('Error al obtener followers');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -375,13 +517,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
-        return;
-      }
-      
-      const subs = await twitchService.getSubscribers(authToken, userId);
-      if (!subs) {
-        setFetchError('Token sin permisos. Necesitas el scope: channel:read:subscriptions');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
@@ -397,33 +533,37 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         }
       );
       
-      if (response.ok) {
-        const data = await response.json();
-        const subscribers = data.data?.map((s: any) => ({
-          username: s.user_name || s.user_login,
-          tier: s.tier,
-          isGift: s.is_gift,
-        })) || [];
-        
-        setFetchedData(prev => ({ ...prev, subscribers }));
-        
-        // Convertir a eventos
-        subscribers.forEach((s: { username: string; tier: string; isGift: boolean }) => {
-          const event: StreamEvent = {
-            id: `sub_api_${s.username}_${Date.now()}`,
-            type: s.isGift ? 'gift' : 'sub',
-            username: s.username,
-            timestamp: Date.now(),
-            data: {
-              tier: s.tier as SubTier,
-            },
-          };
-          onEventAdded?.(event);
-        });
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        setFetchError(parseOAuthError(response.status, errorBody, 'subscribers'));
+        return;
       }
       
+      const data = await response.json();
+      const subscribers = data.data?.map((s: any) => ({
+        username: s.user_name || s.user_login,
+        tier: s.tier,
+        isGift: s.is_gift,
+      })) || [];
+      
+      setFetchedData(prev => ({ ...prev, subscribers }));
+      
+      // Convertir a eventos
+      subscribers.forEach((s: { username: string; tier: string; isGift: boolean }) => {
+        const event: StreamEvent = {
+          id: `sub_api_${s.username}_${Date.now()}`,
+          type: s.isGift ? 'gift' : 'sub',
+          username: s.username,
+          timestamp: Date.now(),
+          data: {
+            tier: s.tier as SubTier,
+          },
+        };
+        onEventAdded?.(event);
+      });
+      
     } catch (err) {
-      setFetchError('Error al obtener suscriptores');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -442,13 +582,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
       const leaderboard = await twitchService.getBitsLeaderboard(authToken, userId, period);
       if (!leaderboard) {
-        setFetchError('Token sin permisos. Necesitas el scope: bits:read');
+        setFetchError(OAUTH_ERRORS['missing_scope_bits']);
         return;
       }
       
@@ -469,7 +609,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       });
       
     } catch (err) {
-      setFetchError('Error al obtener bits leaderboard');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -488,20 +628,20 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
       const clips = await twitchService.getClips(authToken, userId, 50);
       if (!clips) {
-        setFetchError('Error al obtener clips');
+        setFetchError(OAUTH_ERRORS['server_error']);
         return;
       }
       
       setFetchedData(prev => ({ ...prev, clips }));
       
     } catch (err) {
-      setFetchError('Error al obtener clips');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -520,20 +660,20 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
       const videos = await twitchService.getVideos(authToken, userId, 'all', 50);
       if (!videos) {
-        setFetchError('Error al obtener videos');
+        setFetchError(OAUTH_ERRORS['server_error']);
         return;
       }
       
       setFetchedData(prev => ({ ...prev, videos }));
       
     } catch (err) {
-      setFetchError('Error al obtener videos');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -552,20 +692,20 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
       const mods = await twitchService.getModerators(authToken, userId);
       if (!mods) {
-        setFetchError('Token sin permisos. Necesitas el scope: moderation:read');
+        setFetchError(OAUTH_ERRORS['missing_scope_moderation']);
         return;
       }
       
       setFetchedData(prev => ({ ...prev, moderators: mods }));
       
     } catch (err) {
-      setFetchError('Error al obtener moderadores');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -584,20 +724,20 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     try {
       const userId = await twitchService.getUserId(authToken, channelName);
       if (!userId) {
-        setFetchError('No se pudo obtener el ID del canal');
+        setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
       const vips = await twitchService.getVIPs(authToken, userId);
       if (!vips) {
-        setFetchError('Token sin permisos. Necesitas el scope: channel:read:vips');
+        setFetchError(OAUTH_ERRORS['missing_scope_vips']);
         return;
       }
       
       setFetchedData(prev => ({ ...prev, vips }));
       
     } catch (err) {
-      setFetchError('Error al obtener VIPs');
+      setFetchError(OAUTH_ERRORS['unknown']);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -1012,13 +1152,46 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         </button>
       </div>
 
-      {/* Error */}
+      {/* Error detallado */}
       {fetchError && (
-        <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-            <span className="text-xs text-red-400">{fetchError}</span>
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-red-400">{fetchError.message}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
+                  Error {fetchError.code}
+                </span>
+              </div>
+              <p className="text-[10px] text-red-300/80 mt-1">
+                {fetchError.solution}
+              </p>
+              {fetchError.scope && (
+                <div className="mt-2 p-2 rounded bg-black/20">
+                  <p className="text-[10px] text-zinc-400">Scope necesario:</p>
+                  <code className="text-[10px] text-amber-300 font-mono">{fetchError.scope}</code>
+                </div>
+              )}
+              {fetchError.link && (
+                <a 
+                  href={fetchError.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 mt-2"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Generar nuevo token con permisos
+                </a>
+              )}
+            </div>
           </div>
+          <button
+            onClick={() => setFetchError(null)}
+            className="w-full py-1 text-[10px] text-zinc-400 hover:text-zinc-300 transition-colors"
+          >
+            Cerrar
+          </button>
         </div>
       )}
 
