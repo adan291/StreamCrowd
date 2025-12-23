@@ -67,6 +67,7 @@ import { CarreraOverlay } from './components/games/CarreraOverlay';
 import { MemoriaOverlay } from './components/games/MemoriaOverlay';
 import { PotatoOverlay } from './components/games/PotatoOverlay';
 import { TriviaOverlay } from './components/games/TriviaOverlay';
+import { PartyCoOverlay } from './components/games/PartyCoOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
@@ -664,6 +665,7 @@ const App: React.FC = () => {
   const isAhorcadoOverlay = urlParams?.get('overlayAhorcado') === 'true';
   const isCarreraOverlay = urlParams?.get('overlayCarrera') === 'true';
   const isMemoriaOverlay = urlParams?.get('overlayMemoria') === 'true';
+  const isPartyCoOverlay = urlParams?.get('overlayPartyCo') === 'true';
   
   // Countdown Overlay Mode Render
   if (isCountdownOverlay) {
@@ -748,6 +750,11 @@ const App: React.FC = () => {
   // Memoria IRL Overlay Mode Render
   if (isMemoriaOverlay) {
     return <MemoriaOverlay />;
+  }
+
+  // Party & Co Overlay Mode Render
+  if (isPartyCoOverlay) {
+    return <PartyCoOverlay />;
   }
 
   // Overlay Mode Render

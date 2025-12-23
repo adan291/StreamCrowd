@@ -21,12 +21,19 @@ interface PiumGameProps {
 }
 
 const GAME_CHANNEL = 'pium_game_sync';
-const BALL_RADIUS = 14;
+const BALL_RADIUS = 12;
 const FRICTION = 0.985;
-const POCKET_RADIUS = 22;
-const TABLE_COLOR = '#0d5c2e';
-const BORDER_COLOR = '#5c3d2e';
+const POCKET_RADIUS = 18;
+const TABLE_COLOR = '#0a6b35';
+const TABLE_FELT = '#0d7a3e';
+const BORDER_COLOR = '#4a2c1a';
+const WOOD_LIGHT = '#6b4423';
+const WOOD_DARK = '#3d2415';
 const COLORS = ['#FFD700', '#1E90FF', '#FF4500', '#9932CC', '#00CED1', '#FF69B4', '#32CD32', '#FF6347', '#4169E1', '#FFA500'];
+
+// Canvas dimensions (high res for crisp rendering)
+const CANVAS_WIDTH = 700;
+const CANVAS_HEIGHT = 380;
 
 export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = true }) => {
   const [isActive, setIsActive] = useState(true);
@@ -36,7 +43,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const [cueBallReady, setCueBallReady] = useState(true);
   const [shotPower, setShotPower] = useState(8);
   const [shotAngle, setShotAngle] = useState(0);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ballsRef = useRef<Ball[]>([]);
   const cueBallRef = useRef<Ball | null>(null);
@@ -47,18 +54,16 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
 
   // Pocket positions (6 pockets like real pool)
   const getPockets = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return [];
-    const w = canvas.width;
-    const h = canvas.height;
-    const margin = 25;
+    const w = CANVAS_WIDTH;
+    const h = CANVAS_HEIGHT;
+    const margin = 22;
     return [
-      { x: margin, y: margin }, // Top-left
-      { x: w / 2, y: margin - 5 }, // Top-center
-      { x: w - margin, y: margin }, // Top-right
-      { x: margin, y: h - margin }, // Bottom-left
-      { x: w / 2, y: h - margin + 5 }, // Bottom-center
-      { x: w - margin, y: h - margin }, // Bottom-right
+      { x: margin, y: margin },
+      { x: w / 2, y: margin - 3 },
+      { x: w - margin, y: margin },
+      { x: margin, y: h - margin },
+      { x: w / 2, y: h - margin + 3 },
+      { x: w - margin, y: h - margin },
     ];
   }, []);
 
@@ -110,27 +115,41 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     });
   }, [scores, getPockets]);
 
+  // Get spawn position for new balls (random but on right side of cue ball)
+  const getSpawnPosition = useCallback(() => {
+    const margin = 40; // Distance from walls
+    const cueBallX = CANVAS_WIDTH * 0.2; // Cue ball position
+    
+    // Spawn area: from right of cue ball to right edge
+    const minX = cueBallX + BALL_RADIUS * 4; // Start a bit after cue ball
+    const maxX = CANVAS_WIDTH - margin;
+    const minY = margin;
+    const maxY = CANVAS_HEIGHT - margin;
+    
+    // Random position in the right zone
+    const x = minX + Math.random() * (maxX - minX);
+    const y = minY + Math.random() * (maxY - minY);
+    
+    return { x, y };
+  }, []);
 
   // Add viewers as balls when they chat
   useEffect(() => {
     if (!isActive || !isConnected) return;
     const newMessages = chatMessages.slice(lastProcessedRef.current);
     lastProcessedRef.current = chatMessages.length;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
 
     newMessages.forEach((msg) => {
       const oderId = msg.userId || msg.username;
       const msgLower = msg.message.toLowerCase().trim();
       
-      // !pium shoots the cue ball - formatos: !pium, !pium 45, !pium-45-10
+      // !pium shoots the cue ball
       if (msgLower === '!pium' || msgLower.startsWith('!pium ') || msgLower.startsWith('!pium-')) {
         if (!cueBallReady || ballsRef.current.length === 0) return;
         
         let angle = shotAngle * (Math.PI / 180);
         let power = shotPower;
         
-        // Formato !pium-ANGULO-FUERZA (ej: !pium-180-15)
         if (msgLower.startsWith('!pium-')) {
           const parts = msgLower.split('-');
           if (parts[1]) {
@@ -141,9 +160,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
             const powerNum = parseInt(parts[2]);
             if (!isNaN(powerNum)) power = Math.max(3, Math.min(15, powerNum));
           }
-        }
-        // Formato !pium ANGULO (ej: !pium 45)
-        else if (msgLower.startsWith('!pium ')) {
+        } else if (msgLower.startsWith('!pium ')) {
           const parts = msgLower.split(' ');
           if (parts[1]) {
             const num = parseInt(parts[1]);
@@ -151,28 +168,60 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
           }
         }
         
-        // Shoot the cue ball
         if (cueBallRef.current) {
           cueBallRef.current.vx = Math.cos(angle) * power;
           cueBallRef.current.vy = Math.sin(angle) * power;
           setCueBallReady(false);
           playSound('hit');
-          
-          // Update shooter for scoring
           (cueBallRef.current as any).shooter = msg.username;
           (cueBallRef.current as any).shooterColor = msg.color || '#fff';
         }
         return;
       }
       
-      // Any other message adds the user as a ball (if not already on table)
+      // Any other message adds the user as a ball
       const existingBall = ballsRef.current.find(b => b.id === oderId && !b.pocketed);
       if (!existingBall) {
-        const margin = 60;
+        let pos = getSpawnPosition();
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        // Try to find a position that doesn't overlap with existing balls
+        while (attempts < maxAttempts) {
+          let overlaps = false;
+          
+          // Check against existing balls
+          for (const ball of ballsRef.current) {
+            if (ball.pocketed) continue;
+            const dx = pos.x - ball.x;
+            const dy = pos.y - ball.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < BALL_RADIUS * 3) {
+              overlaps = true;
+              break;
+            }
+          }
+          
+          // Check against pockets
+          const pockets = getPockets();
+          for (const pocket of pockets) {
+            const dx = pos.x - pocket.x;
+            const dy = pos.y - pocket.y;
+            if (Math.sqrt(dx * dx + dy * dy) < POCKET_RADIUS + BALL_RADIUS + 15) {
+              overlaps = true;
+              break;
+            }
+          }
+          
+          if (!overlaps) break;
+          pos = getSpawnPosition();
+          attempts++;
+        }
+        
         const newBall: Ball = {
           id: oderId,
-          x: margin + Math.random() * (canvas.width - margin * 2),
-          y: margin + Math.random() * (canvas.height - margin * 2),
+          x: pos.x,
+          y: pos.y,
           vx: 0,
           vy: 0,
           radius: BALL_RADIUS,
@@ -182,33 +231,19 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
           pocketed: false,
         };
         
-        // Avoid spawning on pockets
-        const pockets = getPockets();
-        for (const pocket of pockets) {
-          const dx = newBall.x - pocket.x;
-          const dy = newBall.y - pocket.y;
-          if (Math.sqrt(dx*dx + dy*dy) < POCKET_RADIUS + BALL_RADIUS + 10) {
-            newBall.x = canvas.width / 2 + (Math.random() - 0.5) * 100;
-            newBall.y = canvas.height / 2 + (Math.random() - 0.5) * 100;
-          }
-        }
-        
-        ballsRef.current = [...ballsRef.current, newBall].slice(-15);
+        ballsRef.current = [...ballsRef.current, newBall].slice(-20);
         syncToOverlay();
       }
     });
-  }, [chatMessages, isActive, isConnected, shotAngle, shotPower, playSound, syncToOverlay, getPockets, cueBallReady]);
+  }, [chatMessages, isActive, isConnected, shotAngle, shotPower, playSound, syncToOverlay, getPockets, cueBallReady, getSpawnPosition]);
 
   // Initialize cue ball
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
     if (!cueBallRef.current) {
       cueBallRef.current = {
         id: 'cue_ball',
-        x: canvas.width * 0.25,
-        y: canvas.height / 2,
+        x: CANVAS_WIDTH * 0.2,
+        y: CANVAS_HEIGHT / 2,
         vx: 0,
         vy: 0,
         radius: BALL_RADIUS,
@@ -228,7 +263,6 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     const minDist = b1.radius + b2.radius;
     
     if (dist < minDist && dist > 0) {
-      // Collision response
       const nx = dx / dist;
       const ny = dy / dist;
       const dvx = b1.vx - b2.vx;
@@ -241,7 +275,6 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         b2.vx += dvn * nx;
         b2.vy += dvn * ny;
         
-        // Separate balls
         const overlap = minDist - dist;
         b1.x -= overlap * nx * 0.5;
         b1.y -= overlap * ny * 0.5;
@@ -267,6 +300,145 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     return false;
   }, [getPockets]);
 
+  // Draw wood texture pattern
+  const drawWoodBorder = useCallback((ctx: CanvasRenderingContext2D) => {
+    const w = CANVAS_WIDTH;
+    const h = CANVAS_HEIGHT;
+    const borderWidth = 18;
+    
+    // Outer border gradient
+    const borderGrad = ctx.createLinearGradient(0, 0, 0, h);
+    borderGrad.addColorStop(0, WOOD_LIGHT);
+    borderGrad.addColorStop(0.5, BORDER_COLOR);
+    borderGrad.addColorStop(1, WOOD_DARK);
+    
+    ctx.fillStyle = borderGrad;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Inner shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(borderWidth - 3, borderWidth - 3, w - (borderWidth - 3) * 2, h - (borderWidth - 3) * 2);
+    
+    // Table felt with subtle texture
+    const feltGrad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w/2);
+    feltGrad.addColorStop(0, TABLE_FELT);
+    feltGrad.addColorStop(1, TABLE_COLOR);
+    ctx.fillStyle = feltGrad;
+    ctx.fillRect(borderWidth, borderWidth, w - borderWidth * 2, h - borderWidth * 2);
+    
+    // Felt texture lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < w; i += 4) {
+      ctx.beginPath();
+      ctx.moveTo(i, borderWidth);
+      ctx.lineTo(i, h - borderWidth);
+      ctx.stroke();
+    }
+    
+    // Rail cushions
+    ctx.fillStyle = '#0a5c2e';
+    // Top rail
+    ctx.fillRect(borderWidth + 30, borderWidth, w - borderWidth * 2 - 60, 6);
+    // Bottom rail
+    ctx.fillRect(borderWidth + 30, h - borderWidth - 6, w - borderWidth * 2 - 60, 6);
+    // Left rail
+    ctx.fillRect(borderWidth, borderWidth + 30, 6, h - borderWidth * 2 - 60);
+    // Right rail
+    ctx.fillRect(w - borderWidth - 6, borderWidth + 30, 6, h - borderWidth * 2 - 60);
+    
+    // Decorative diamonds on rails
+    ctx.fillStyle = '#c9a959';
+    const diamondPositions = [0.25, 0.5, 0.75];
+    diamondPositions.forEach(pos => {
+      // Top
+      ctx.beginPath();
+      ctx.arc(w * pos, borderWidth / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // Bottom
+      ctx.beginPath();
+      ctx.arc(w * pos, h - borderWidth / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }, []);
+
+  // Draw a ball with 3D effect
+  const drawBall = useCallback((ctx: CanvasRenderingContext2D, ball: Ball, showName: boolean = true) => {
+    const { x, y, radius, color, username, isWhite } = ball;
+    
+    // Shadow
+    ctx.beginPath();
+    ctx.arc(x + 3, y + 3, radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+    
+    // Main ball gradient
+    const gradient = ctx.createRadialGradient(
+      x - radius * 0.35, y - radius * 0.35, radius * 0.1,
+      x, y, radius
+    );
+    
+    if (isWhite) {
+      gradient.addColorStop(0, '#ffffff');
+      gradient.addColorStop(0.8, '#f0f0f0');
+      gradient.addColorStop(1, '#d0d0d0');
+    } else {
+      gradient.addColorStop(0, '#ffffff');
+      gradient.addColorStop(0.2, color);
+      gradient.addColorStop(1, shadeColor(color, -30));
+    }
+    
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Glossy highlight
+    ctx.beginPath();
+    ctx.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fill();
+    
+    // Edge definition
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Username label with background
+    if (showName && username) {
+      const displayName = username.slice(0, 5);
+      
+      // Use crisp font rendering
+      ctx.font = '500 6px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const textWidth = ctx.measureText(displayName).width;
+      const labelX = Math.round(x);
+      const labelY = Math.round(y + radius + 7);
+      const paddingX = 2;
+      const paddingY = 1;
+      
+      // Background pill (rounded coords for crisp edges)
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(
+        Math.round(labelX - textWidth / 2 - paddingX),
+        Math.round(labelY - 3 - paddingY),
+        Math.round(textWidth + paddingX * 2),
+        Math.round(6 + paddingY * 2),
+        2
+      );
+      ctx.fill();
+      
+      // Text
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(displayName, labelX, labelY);
+    }
+  }, []);
+
   // Animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -275,36 +447,39 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     if (!ctx) return;
 
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       
       // Draw table
-      ctx.fillStyle = BORDER_COLOR;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = TABLE_COLOR;
-      ctx.fillRect(15, 15, canvas.width - 30, canvas.height - 30);
-      
-      // Draw table lines
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(canvas.width * 0.25, 20);
-      ctx.lineTo(canvas.width * 0.25, canvas.height - 20);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      drawWoodBorder(ctx);
       
       // Draw pockets
       const pockets = getPockets();
       pockets.forEach(pocket => {
+        // Pocket hole
         ctx.beginPath();
-        ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = '#000';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(pocket.x, pocket.y, POCKET_RADIUS - 3, 0, Math.PI * 2);
+        ctx.arc(pocket.x, pocket.y, POCKET_RADIUS + 2, 0, Math.PI * 2);
         ctx.fillStyle = '#1a1a1a';
         ctx.fill();
+        
+        // Inner pocket
+        ctx.beginPath();
+        ctx.arc(pocket.x, pocket.y, POCKET_RADIUS, 0, Math.PI * 2);
+        const pocketGrad = ctx.createRadialGradient(pocket.x, pocket.y, 0, pocket.x, pocket.y, POCKET_RADIUS);
+        pocketGrad.addColorStop(0, '#000000');
+        pocketGrad.addColorStop(1, '#1a1a1a');
+        ctx.fillStyle = pocketGrad;
+        ctx.fill();
       });
+
+      // Draw head string line (where cue ball starts)
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([8, 4]);
+      ctx.beginPath();
+      ctx.moveTo(CANVAS_WIDTH * 0.25, 25);
+      ctx.lineTo(CANVAS_WIDTH * 0.25, CANVAS_HEIGHT - 25);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
       // Update physics
       const allBalls = [...ballsRef.current.filter(b => !b.pocketed), cueBallRef.current].filter(Boolean) as Ball[];
@@ -312,24 +487,21 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
       allBalls.forEach(ball => {
         if (ball.pocketed) return;
         
-        // Apply friction
         ball.vx *= FRICTION;
         ball.vy *= FRICTION;
         
-        // Stop if very slow
         if (Math.abs(ball.vx) < 0.05) ball.vx = 0;
         if (Math.abs(ball.vy) < 0.05) ball.vy = 0;
         
-        // Move
         ball.x += ball.vx;
         ball.y += ball.vy;
         
         // Wall collision
-        const margin = 20;
+        const margin = 24;
         if (ball.x - ball.radius < margin) { ball.x = margin + ball.radius; ball.vx = -ball.vx * 0.8; playSound('wall'); }
-        if (ball.x + ball.radius > canvas.width - margin) { ball.x = canvas.width - margin - ball.radius; ball.vx = -ball.vx * 0.8; playSound('wall'); }
+        if (ball.x + ball.radius > CANVAS_WIDTH - margin) { ball.x = CANVAS_WIDTH - margin - ball.radius; ball.vx = -ball.vx * 0.8; playSound('wall'); }
         if (ball.y - ball.radius < margin) { ball.y = margin + ball.radius; ball.vy = -ball.vy * 0.8; playSound('wall'); }
-        if (ball.y + ball.radius > canvas.height - margin) { ball.y = canvas.height - margin - ball.radius; ball.vy = -ball.vy * 0.8; playSound('wall'); }
+        if (ball.y + ball.radius > CANVAS_HEIGHT - margin) { ball.y = CANVAS_HEIGHT - margin - ball.radius; ball.vy = -ball.vy * 0.8; playSound('wall'); }
       });
 
       // Ball-ball collisions
@@ -348,7 +520,6 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
           playSound('pocket');
           setLastPocketed({ username: ball.username, color: ball.color });
           
-          // Award points to shooter
           const shooter = (cueBallRef.current as any)?.shooter;
           if (shooter) {
             setScores(prev => {
@@ -363,9 +534,8 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
 
       // Check if cue ball pocketed (foul)
       if (cueBallRef.current && !cueBallRef.current.pocketed && checkPocketCollision(cueBallRef.current)) {
-        // Reset cue ball position
-        cueBallRef.current.x = canvas.width * 0.25;
-        cueBallRef.current.y = canvas.height / 2;
+        cueBallRef.current.x = CANVAS_WIDTH * 0.2;
+        cueBallRef.current.y = CANVAS_HEIGHT / 2;
         cueBallRef.current.vx = 0;
         cueBallRef.current.vy = 0;
       }
@@ -376,87 +546,48 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         setCueBallReady(true);
       }
 
-
-      // Draw balls
+      // Draw balls (colored first, then cue ball on top)
       ballsRef.current.filter(b => !b.pocketed).forEach(ball => {
-        // Shadow
-        ctx.beginPath();
-        ctx.arc(ball.x + 2, ball.y + 2, ball.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fill();
-        
-        // Ball gradient
-        const gradient = ctx.createRadialGradient(
-          ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, 0,
-          ball.x, ball.y, ball.radius
-        );
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(0.3, ball.color);
-        gradient.addColorStop(1, ball.color);
-        
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        
-        // Username
-        ctx.font = 'bold 8px sans-serif';
-        ctx.fillStyle = '#fff';
-        ctx.textAlign = 'center';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = 2;
-        ctx.fillText(ball.username.slice(0, 8), ball.x, ball.y + ball.radius + 10);
-        ctx.shadowBlur = 0;
+        drawBall(ctx, ball, true);
       });
 
       // Draw cue ball
       if (cueBallRef.current && !cueBallRef.current.pocketed) {
-        const cue = cueBallRef.current;
-        ctx.beginPath();
-        ctx.arc(cue.x + 2, cue.y + 2, cue.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fill();
-        
-        const gradient = ctx.createRadialGradient(
-          cue.x - cue.radius * 0.3, cue.y - cue.radius * 0.3, 0,
-          cue.x, cue.y, cue.radius
-        );
-        gradient.addColorStop(0, '#ffffff');
-        gradient.addColorStop(1, '#e0e0e0');
-        
-        ctx.beginPath();
-        ctx.arc(cue.x, cue.y, cue.radius, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        drawBall(ctx, cueBallRef.current, false);
         
         // Draw aim line when ready
         if (cueBallReady && ballsRef.current.filter(b => !b.pocketed).length > 0) {
+          const cue = cueBallRef.current;
           const angle = shotAngle * (Math.PI / 180);
-          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          
+          // Aim line
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)';
           ctx.lineWidth = 2;
-          ctx.setLineDash([5, 5]);
+          ctx.setLineDash([6, 4]);
           ctx.beginPath();
           ctx.moveTo(cue.x, cue.y);
-          ctx.lineTo(cue.x + Math.cos(angle) * 80, cue.y + Math.sin(angle) * 80);
+          ctx.lineTo(cue.x + Math.cos(angle) * 70, cue.y + Math.sin(angle) * 70);
           ctx.stroke();
           ctx.setLineDash([]);
           
           // Arrow head
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          const arrowX = cue.x + Math.cos(angle) * 70;
+          const arrowY = cue.y + Math.sin(angle) * 70;
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
           ctx.beginPath();
-          const arrowX = cue.x + Math.cos(angle) * 80;
-          const arrowY = cue.y + Math.sin(angle) * 80;
           ctx.moveTo(arrowX, arrowY);
-          ctx.lineTo(arrowX - Math.cos(angle - 0.3) * 10, arrowY - Math.sin(angle - 0.3) * 10);
-          ctx.lineTo(arrowX - Math.cos(angle + 0.3) * 10, arrowY - Math.sin(angle + 0.3) * 10);
+          ctx.lineTo(arrowX - Math.cos(angle - 0.4) * 10, arrowY - Math.sin(angle - 0.4) * 10);
+          ctx.lineTo(arrowX - Math.cos(angle + 0.4) * 10, arrowY - Math.sin(angle + 0.4) * 10);
           ctx.closePath();
           ctx.fill();
+          
+          // Power indicator
+          const powerBarX = cue.x - 25;
+          const powerBarY = cue.y - cue.radius - 15;
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(powerBarX, powerBarY, 50, 6);
+          ctx.fillStyle = `hsl(${120 - shotPower * 8}, 80%, 50%)`;
+          ctx.fillRect(powerBarX, powerBarY, (shotPower / 15) * 50, 6);
         }
       }
 
@@ -466,18 +597,15 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
 
     animate();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [getPockets, checkBallCollision, checkPocketCollision, playSound, syncToOverlay, cueBallReady, shotAngle]);
+  }, [getPockets, checkBallCollision, checkPocketCollision, playSound, syncToOverlay, cueBallReady, shotAngle, shotPower, drawWoodBorder, drawBall]);
 
   const clearTable = () => {
     ballsRef.current = [];
     if (cueBallRef.current) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        cueBallRef.current.x = canvas.width * 0.25;
-        cueBallRef.current.y = canvas.height / 2;
-        cueBallRef.current.vx = 0;
-        cueBallRef.current.vy = 0;
-      }
+      cueBallRef.current.x = CANVAS_WIDTH * 0.2;
+      cueBallRef.current.y = CANVAS_HEIGHT / 2;
+      cueBallRef.current.vx = 0;
+      cueBallRef.current.vy = 0;
     }
     setCueBallReady(true);
     setLastPocketed(null);
@@ -498,7 +626,8 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const topScores = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-3">
+      {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setIsActive(!isActive)}
@@ -530,55 +659,67 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
       </div>
 
       {/* Shot controls */}
-      <div className="bg-zinc-800 rounded-xl p-3 space-y-3">
+      <div className="bg-zinc-800 rounded-xl p-3">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <label className="text-xs text-zinc-400 mb-1 block">Ángulo: {shotAngle}°</label>
+            <label className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
+              <span>Ángulo</span>
+              <span className="text-purple-400 font-mono">{shotAngle}°</span>
+            </label>
             <input
               type="range"
               min="0"
               max="360"
               value={shotAngle}
               onChange={(e) => setShotAngle(parseInt(e.target.value))}
-              className="w-full accent-purple-500"
+              className="w-full accent-purple-500 h-2"
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs text-zinc-400 mb-1 block">Fuerza: {shotPower}</label>
+            <label className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
+              <span>Fuerza</span>
+              <span className="text-orange-400 font-mono">{shotPower}</span>
+            </label>
             <input
               type="range"
               min="3"
               max="15"
               value={shotPower}
               onChange={(e) => setShotPower(parseInt(e.target.value))}
-              className="w-full accent-purple-500"
+              className="w-full accent-orange-500 h-2"
             />
           </div>
         </div>
-        <p className="text-zinc-500 text-xs text-center">
-          {cueBallReady ? '✅ Listo para disparar' : '⏳ Esperando que las bolas paren...'}
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <span className={`w-2 h-2 rounded-full ${cueBallReady ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+          <span className="text-zinc-400 text-xs">
+            {cueBallReady ? 'Listo para disparar' : 'Esperando...'}
+          </span>
+        </div>
+      </div>
+
+      {/* Instructions */}
+      <div className="bg-zinc-800/50 rounded-xl p-3 text-center">
+        <p className="text-zinc-300 text-sm">
+          Escribe en el chat para ser una bola 🎱 • <span className="text-yellow-400 font-bold">!pium</span> dispara
+        </p>
+        <p className="text-zinc-500 text-xs mt-1">
+          <code className="bg-zinc-700 px-1.5 py-0.5 rounded">!pium-180-15</code> ángulo + fuerza
         </p>
       </div>
 
-      <div className="bg-zinc-800/50 rounded-xl p-3">
-        <p className="text-zinc-400 text-sm text-center">
-          Escribe en el chat para ser una bola 🎱 • <span className="text-yellow-400 font-bold">!pium</span> dispara la bola blanca
-        </p>
-        <p className="text-zinc-500 text-xs text-center mt-1">
-          <code className="bg-zinc-700 px-1 rounded">!pium-180-15</code> = ángulo 180° + fuerza 15 • <code className="bg-zinc-700 px-1 rounded">!pium 45</code> = solo ángulo
-        </p>
-      </div>
-
+      {/* Last pocketed notification */}
       {lastPocketed && (
-        <div className="bg-green-500/20 rounded-xl p-3 text-center animate-pulse">
+        <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-3 text-center animate-pulse">
           <p className="text-white font-bold">
             🎱 ¡<span style={{ color: lastPocketed.color }}>{lastPocketed.username}</span> entró en la tronera!
           </p>
         </div>
       )}
 
+      {/* Leaderboard */}
       {topScores.length > 0 && (
-        <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-3">
+        <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Trophy size={16} className="text-yellow-400" />
@@ -590,7 +731,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
           </div>
           <div className="flex flex-wrap gap-2">
             {topScores.map(([user, score], i) => (
-              <span key={user} className="text-xs px-2 py-1 bg-zinc-700/50 rounded">
+              <span key={user} className="text-xs px-2 py-1 bg-zinc-800/80 rounded-lg">
                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`} {user}: {score}
               </span>
             ))}
@@ -598,15 +739,25 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         </div>
       )}
 
-      <div className="relative rounded-xl overflow-hidden border-4 border-amber-900">
-        <canvas ref={canvasRef} width={600} height={350} className="w-full" style={{ aspectRatio: '12/7' }} />
-        <div className="absolute top-2 left-2 bg-black/50 rounded-lg px-2 py-1">
-          <span className="text-white text-xs">🎱 {activeBalls} bolas</span>
+      {/* Canvas */}
+      <div className="relative rounded-xl overflow-hidden shadow-2xl" style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+        <canvas 
+          ref={canvasRef} 
+          width={CANVAS_WIDTH} 
+          height={CANVAS_HEIGHT} 
+          className="w-full block"
+          style={{ 
+            maxWidth: '100%',
+            height: 'auto'
+          }} 
+        />
+        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1">
+          <span className="text-white text-xs font-medium">🎱 {activeBalls} bolas</span>
         </div>
         {activeBalls === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-white text-sm bg-black/50 px-4 py-2 rounded-lg">
-              Escribe en el chat para unirte a la mesa
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <p className="text-white text-sm bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+              Escribe en el chat para unirte
             </p>
           </div>
         )}
@@ -614,5 +765,19 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
     </div>
   );
 };
+
+// Helper function to darken/lighten colors
+function shadeColor(color: string, percent: number): string {
+  const num = parseInt(color.replace('#', ''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = (num >> 16) + amt;
+  const G = (num >> 8 & 0x00FF) + amt;
+  const B = (num & 0x0000FF) + amt;
+  return '#' + (0x1000000 + 
+    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 + 
+    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 + 
+    (B < 255 ? (B < 1 ? 0 : B) : 255)
+  ).toString(16).slice(1);
+}
 
 export default PiumGame;
