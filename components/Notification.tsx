@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { AlertCircle, Info, X, CheckCircle2 } from 'lucide-react';
 
-export type NotificationType = 'success' | 'error' | 'info';
+export type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
 export interface NotificationItem {
   id: string;
@@ -45,19 +45,22 @@ const NotificationToast: React.FC<{ note: NotificationItem; onRemove: (id: strin
   const icons = {
     success: <CheckCircle2 size={18} className="text-green-400" />,
     error: <AlertCircle size={18} className="text-red-400" />,
-    info: <Info size={18} className="text-blue-400" />
+    info: <Info size={18} className="text-blue-400" />,
+    warning: <AlertCircle size={18} className="text-amber-400" />
   };
 
   const borderColors = {
     success: 'border-green-500/30',
     error: 'border-red-500/30',
-    info: 'border-blue-500/30'
+    info: 'border-blue-500/30',
+    warning: 'border-amber-500/30'
   };
 
   const roleMap = {
     success: 'status',
     error: 'alert',
-    info: 'status'
+    info: 'status',
+    warning: 'alert'
   } as const;
 
   return (

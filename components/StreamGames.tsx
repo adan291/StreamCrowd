@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair } from 'lucide-react';
+import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair, Eye, Swords, Skull, Flag, Camera } from 'lucide-react';
 import { TwitchMessage, CollaborationChannel } from '../types';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
@@ -10,8 +10,13 @@ import { HotPotato } from './games/HotPotato';
 import { TriviaBattle } from './games/TriviaBattle';
 import { BattleshipGame } from './games/BattleshipGame';
 import { DuckHunt } from './games/DuckHunt';
+import { VeoVeo } from './games/VeoVeo';
+import { PiedraPapelTijera } from './games/PiedraPapelTijera';
+import { Ahorcado } from './games/Ahorcado';
+import { CarreraEmotes } from './games/CarreraEmotes';
+import { MemoriaIRL } from './games/MemoriaIRL';
 
-type GameTab = 'pium' | 'roulette' | 'fishing' | 'potato' | 'trivia' | 'battleship' | 'duckhunt';
+type GameTab = 'pium' | 'roulette' | 'fishing' | 'potato' | 'trivia' | 'battleship' | 'duckhunt' | 'veoveo' | 'ppt' | 'ahorcado' | 'carrera' | 'memoria';
 
 interface StreamGamesProps {
   chatMessages: TwitchMessage[];
@@ -23,6 +28,7 @@ interface StreamGamesProps {
   onAddCollaborator?: (channel: string) => void;
   onRemoveCollaborator?: (channel: string) => void;
   isConnected?: boolean;
+  authToken?: string;
 }
 
 export const StreamGames: React.FC<StreamGamesProps> = ({
@@ -35,18 +41,24 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
   onAddCollaborator,
   onRemoveCollaborator,
   isConnected = true,
+  authToken,
 }) => {
   const { t } = useI18n();
   const [activeGame, setActiveGame] = useState<GameTab>('pium');
 
   const games = [
-    { id: 'pium' as GameTab, name: 'Pium Ball', icon: <Target size={16} />, cmd: '!pium' },
+    { id: 'pium' as GameTab, name: 'Billar', icon: <Target size={16} />, cmd: '!pium' },
     { id: 'roulette' as GameTab, name: 'Ruleta', icon: <CircleDot size={16} />, cmd: '!ruleta' },
     { id: 'fishing' as GameTab, name: 'Pesca', icon: <Fish size={16} />, cmd: 'chat' },
     { id: 'potato' as GameTab, name: 'Patata', icon: <Bomb size={16} />, cmd: '!papa' },
     { id: 'trivia' as GameTab, name: 'Trivia', icon: <HelpCircle size={16} />, cmd: '1-4' },
     { id: 'battleship' as GameTab, name: 'Hundir', icon: <Ship size={16} />, cmd: 'A1-J10' },
     { id: 'duckhunt' as GameTab, name: 'Patos', icon: <Crosshair size={16} />, cmd: '!pato' },
+    { id: 'veoveo' as GameTab, name: 'Veo Veo', icon: <Eye size={16} />, cmd: '!veo' },
+    { id: 'ppt' as GameTab, name: 'PPT', icon: <Swords size={16} />, cmd: '!piedra' },
+    { id: 'ahorcado' as GameTab, name: 'Ahorcado', icon: <Skull size={16} />, cmd: '!letra' },
+    { id: 'carrera' as GameTab, name: 'Carrera', icon: <Flag size={16} />, cmd: '!apostar' },
+    { id: 'memoria' as GameTab, name: 'Memoria', icon: <Camera size={16} />, cmd: 'IRL' },
   ];
 
   const content = (
@@ -117,6 +129,21 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
         )}
         {activeGame === 'duckhunt' && (
           <DuckHunt chatMessages={chatMessages} isConnected={isConnected} />
+        )}
+        {activeGame === 'veoveo' && (
+          <VeoVeo chatMessages={chatMessages} isConnected={isConnected} />
+        )}
+        {activeGame === 'ppt' && (
+          <PiedraPapelTijera chatMessages={chatMessages} isConnected={isConnected} />
+        )}
+        {activeGame === 'ahorcado' && (
+          <Ahorcado chatMessages={chatMessages} isConnected={isConnected} />
+        )}
+        {activeGame === 'carrera' && (
+          <CarreraEmotes chatMessages={chatMessages} isConnected={isConnected} authToken={authToken} channelName={mainChannel} />
+        )}
+        {activeGame === 'memoria' && (
+          <MemoriaIRL chatMessages={chatMessages} isConnected={isConnected} />
         )}
       </div>
     </div>

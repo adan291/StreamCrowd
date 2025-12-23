@@ -12,6 +12,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { ConnectionStatus, CollaborationChannel } from '../types';
 import { twitchService } from '../services/twitchService';
 
+// LocalStorage keys
+const STORAGE_KEY_CHANNEL = 'twitch_channel';
+const STORAGE_KEY_TOKEN = 'twitch_token';
+const STORAGE_KEY_TOKEN_EXPIRES = 'twitch_token_expires';
+
 /**
  * Return type for the useTwitchConnection hook
  */
@@ -38,6 +43,14 @@ export interface UseTwitchConnectionReturn {
   removeCollaborator: (channel: string) => void;
   /** Check if collaboration mode is active */
   isCollaborationActive: boolean;
+  /** Token expiration time in seconds (null if no token or unknown) */
+  tokenExpiresIn: number | null;
+  /** Whether token is expiring soon (< 10 minutes) */
+  tokenExpiringSoon: boolean;
+  /** Saved credentials from localStorage */
+  savedCredentials: { channel: string; token: string } | null;
+  /** Clear saved credentials */
+  clearSavedCredentials: () => void;
 }
 
 /**
@@ -106,6 +119,11 @@ export function useTwitchConnection(
   const [channelAvatar, setChannelAvatar] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
   
+  // Token expiration state
+  const [tokenExpiresIn, setTokenExpiresIn] = useState<number | null>(null);
+  const [tokenExpiringSoon, setTokenExpiringSoon] = useState(false);
+  const expirationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Collaboration state
   const [collaborationChannels, setCollaborationChannels] = useState<CollaborationChannel[]>([]);
 
@@ -118,6 +136,41 @@ export function useTwitchConnection(
   const setErrorRef = useRef(setError);
   setStatusRef.current = setStatus;
   setErrorRef.current = setError;
+
+  // Load saved credentials on mount
+  const [savedCredentials, setSavedCredentials] = useState<{ channel: string; token: string } | null>(() => {
+    try {
+      const channel = localStorage.getItem(STORAGE_KEY_CHANNEL);
+      const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+      const expires = localStorage.getItem(STORAGE_KEY_TOKEN_EXPIRES);
+      
+      if (channel && token) {
+        // Check if token might still be valid (stored expiration time)
+        if (expires) {
+          const expiresAt = parseInt(expires, 10);
+          if (Date.now() > expiresAt) {
+            // Token expired, clear storage
+            localStorage.removeItem(STORAGE_KEY_CHANNEL);
+            localStorage.removeItem(STORAGE_KEY_TOKEN);
+            localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+            return null;
+          }
+        }
+        return { channel, token };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Clear saved credentials
+  const clearSavedCredentials = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY_CHANNEL);
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+    setSavedCredentials(null);
+  }, []);
 
   // Set up status change listener - must be done synchronously before any connect call
   // Using a ref to track setup and useEffect for cleanup
@@ -136,6 +189,38 @@ export function useTwitchConnection(
     });
   }
 
+  // Token expiration countdown
+  useEffect(() => {
+    if (tokenExpiresIn === null || tokenExpiresIn <= 0) {
+      setTokenExpiringSoon(false);
+      return;
+    }
+
+    // Check if expiring soon (< 10 minutes = 600 seconds)
+    setTokenExpiringSoon(tokenExpiresIn < 600);
+
+    // Set up countdown timer
+    expirationTimerRef.current = setInterval(() => {
+      setTokenExpiresIn(prev => {
+        if (prev === null || prev <= 0) {
+          if (expirationTimerRef.current) {
+            clearInterval(expirationTimerRef.current);
+          }
+          return 0;
+        }
+        const newValue = prev - 1;
+        setTokenExpiringSoon(newValue < 600);
+        return newValue;
+      });
+    }, 1000);
+
+    return () => {
+      if (expirationTimerRef.current) {
+        clearInterval(expirationTimerRef.current);
+      }
+    };
+  }, [tokenExpiresIn !== null && tokenExpiresIn > 0]);
+
   /**
    * Connect to a Twitch channel
    */
@@ -143,11 +228,49 @@ export function useTwitchConnection(
     if (!channel.trim()) return;
 
     setChannelName(channel);
-    if (token) {
-      setAuthToken(token);
-    }
     setStatus(ConnectionStatus.CONNECTING);
     setError(null);
+    
+    if (token) {
+      setAuthToken(token);
+      
+      // Validate token and get expiration (non-blocking)
+      twitchService.validateToken(token).then(validation => {
+        if (validation && validation.valid) {
+          // Token is valid
+          if (validation.expiresIn > 0) {
+            // Token has expiration info - track it
+            setTokenExpiresIn(validation.expiresIn);
+          } else {
+            // Token valid but no expiration (Implicit Grant tokens)
+            // These tokens don't expire based on time, only when revoked
+            console.log('Token valid (Implicit Grant - no expiration tracking)');
+            setTokenExpiresIn(null); // No expiration to track
+          }
+          
+          // Save to localStorage
+          try {
+            localStorage.setItem(STORAGE_KEY_CHANNEL, channel);
+            localStorage.setItem(STORAGE_KEY_TOKEN, token);
+            if (validation.expiresIn > 0) {
+              const expiresAt = Date.now() + (validation.expiresIn * 1000);
+              localStorage.setItem(STORAGE_KEY_TOKEN_EXPIRES, expiresAt.toString());
+            } else {
+              // No expiration - remove any old expiration data
+              localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+            }
+            setSavedCredentials({ channel, token });
+          } catch (e) {
+            console.error('Error saving credentials to localStorage:', e);
+          }
+        } else {
+          // Token validation failed
+          console.warn('Token validation failed, continuing without expiration tracking');
+        }
+      }).catch(err => {
+        console.warn('Token validation error:', err);
+      });
+    }
     
     // Clear collaboration channels on new connection
     setCollaborationChannels([]);
@@ -164,7 +287,7 @@ export function useTwitchConnection(
     if (!skipConnection) {
       twitchService.connect(channel, token);
     }
-  }, [skipConnection]);
+  }, [skipConnection, skipAvatarFetch]);
 
   /**
    * Disconnect from current channel
@@ -178,6 +301,11 @@ export function useTwitchConnection(
     setAuthToken('');
     setError(null);
     setCollaborationChannels([]);
+    setTokenExpiresIn(null);
+    setTokenExpiringSoon(false);
+    if (expirationTimerRef.current) {
+      clearInterval(expirationTimerRef.current);
+    }
   }, []);
 
   /**
@@ -223,5 +351,9 @@ export function useTwitchConnection(
     addCollaborator,
     removeCollaborator,
     isCollaborationActive,
+    tokenExpiresIn,
+    tokenExpiringSoon,
+    savedCredentials,
+    clearSavedCredentials,
   };
 }

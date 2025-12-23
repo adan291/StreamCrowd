@@ -10,15 +10,48 @@ interface ConnectionPanelProps {
   status: ConnectionStatus;
   onConnect: (channel: string, token?: string) => void;
   errorMessage?: string | null;
+  savedCredentials?: { channel: string; token: string } | null;
+  onClearSavedCredentials?: () => void;
+  tokenExpiresIn?: number | null;
+  tokenExpiringSoon?: boolean;
 }
 
-export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConnect, errorMessage }) => {
+export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ 
+  status, 
+  onConnect, 
+  errorMessage,
+  savedCredentials,
+  onClearSavedCredentials,
+  tokenExpiresIn,
+  tokenExpiringSoon
+}) => {
   const { t } = useI18n();
   const [channel, setChannel] = useState('');
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isUrlDetected, setIsUrlDetected] = useState(false);
+
+  // Format time remaining
+  const formatTimeRemaining = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
+  // Quick reconnect with saved credentials
+  const handleQuickReconnect = () => {
+    if (savedCredentials) {
+      onConnect(savedCredentials.channel, savedCredentials.token);
+    }
+  };
 
   const extractUsername = (input: string): string => {
     const urlRegex = /^(?:https?:\/\/)?(?:www\.)?twitch\.tv\/([a-zA-Z0-9_]+)(?:\/.*)?$/i;
@@ -109,6 +142,31 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({ status, onConn
       <p className="text-slate-600 dark:text-zinc-400 mb-4 sm:mb-6 text-xs sm:text-sm">
           {t.connection.subtitle}
       </p>
+
+      {/* Quick reconnect with saved credentials */}
+      {savedCredentials && (
+        <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-lg">
+          <p className="text-sm text-green-800 dark:text-green-200 mb-2">
+            💾 Sesión guardada: <strong>{savedCredentials.channel}</strong>
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleQuickReconnect}
+              disabled={status === ConnectionStatus.CONNECTING}
+              className="flex-1 py-2 px-3 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Reconectar rápido
+            </button>
+            <button
+              onClick={onClearSavedCredentials}
+              className="py-2 px-3 bg-zinc-500 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors"
+              title="Olvidar credenciales"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left group">

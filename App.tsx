@@ -60,6 +60,11 @@ import { RouletteOverlay } from './components/games/RouletteOverlay';
 import { FishingOverlay } from './components/games/FishingOverlay';
 import { BattleshipOverlay } from './components/games/BattleshipOverlay';
 import { DuckHuntOverlay } from './components/games/DuckHuntOverlay';
+import { VeoVeoOverlay } from './components/games/VeoVeoOverlay';
+import { PPTOverlay } from './components/games/PPTOverlay';
+import { AhorcadoOverlay } from './components/games/AhorcadoOverlay';
+import { CarreraOverlay } from './components/games/CarreraOverlay';
+import { MemoriaOverlay } from './components/games/MemoriaOverlay';
 import { PotatoOverlay } from './components/games/PotatoOverlay';
 import { TriviaOverlay } from './components/games/TriviaOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
@@ -91,6 +96,10 @@ const App: React.FC = () => {
     addCollaborator,
     removeCollaborator,
     isCollaborationActive,
+    tokenExpiresIn,
+    tokenExpiringSoon,
+    savedCredentials,
+    clearSavedCredentials,
   } = useTwitchConnection({
     onStatusChange: (newStatus, err) => {
       if (err) {
@@ -285,6 +294,20 @@ const App: React.FC = () => {
       aiAnalytics.endSession();
     }
   }, [status, channelName, isOverlayMode]);
+
+  // Token expiration warning
+  const [tokenWarningShown, setTokenWarningShown] = useState(false);
+  useEffect(() => {
+    if (tokenExpiringSoon && !tokenWarningShown && status === ConnectionStatus.CONNECTED) {
+      const minutes = tokenExpiresIn ? Math.ceil(tokenExpiresIn / 60) : 0;
+      addNotification('info', `Token OAuth expira en ~${minutes}min. Solo afecta a: emotes de Twitch, lista de subs/chatters. El chat y juegos seguirán funcionando.`);
+      setTokenWarningShown(true);
+    }
+    // Reset warning flag when token is refreshed or disconnected
+    if (!tokenExpiringSoon) {
+      setTokenWarningShown(false);
+    }
+  }, [tokenExpiringSoon, tokenExpiresIn, status, tokenWarningShown]);
 
   // Set distinctive window title for OBS overlay identification
   useEffect(() => {
@@ -636,6 +659,11 @@ const App: React.FC = () => {
   const isTriviaOverlay = urlParams?.get('overlayTrivia') === 'true';
   const isBattleshipOverlay = urlParams?.get('overlayBattleship') === 'true';
   const isDuckHuntOverlay = urlParams?.get('overlayDuckHunt') === 'true';
+  const isVeoVeoOverlay = urlParams?.get('overlayVeoVeo') === 'true';
+  const isPPTOverlay = urlParams?.get('overlayPPT') === 'true';
+  const isAhorcadoOverlay = urlParams?.get('overlayAhorcado') === 'true';
+  const isCarreraOverlay = urlParams?.get('overlayCarrera') === 'true';
+  const isMemoriaOverlay = urlParams?.get('overlayMemoria') === 'true';
   
   // Countdown Overlay Mode Render
   if (isCountdownOverlay) {
@@ -695,6 +723,31 @@ const App: React.FC = () => {
   // Duck Hunt Game Overlay Mode Render
   if (isDuckHuntOverlay) {
     return <DuckHuntOverlay />;
+  }
+
+  // Veo Veo Overlay Mode Render
+  if (isVeoVeoOverlay) {
+    return <VeoVeoOverlay />;
+  }
+
+  // Piedra Papel Tijera Overlay Mode Render
+  if (isPPTOverlay) {
+    return <PPTOverlay />;
+  }
+
+  // Ahorcado Overlay Mode Render
+  if (isAhorcadoOverlay) {
+    return <AhorcadoOverlay />;
+  }
+
+  // Carrera Emotes Overlay Mode Render
+  if (isCarreraOverlay) {
+    return <CarreraOverlay />;
+  }
+
+  // Memoria IRL Overlay Mode Render
+  if (isMemoriaOverlay) {
+    return <MemoriaOverlay />;
   }
 
   // Overlay Mode Render
@@ -918,6 +971,8 @@ const App: React.FC = () => {
             status={status} 
             onConnect={handleConnect} 
             errorMessage={connectionError}
+            savedCredentials={savedCredentials}
+            onClearSavedCredentials={clearSavedCredentials}
           />
         </div>
         
@@ -1146,6 +1201,32 @@ const App: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Token Expiration Info Banner - Non-invasive */}
+        {tokenExpiringSoon && status === ConnectionStatus.CONNECTED && tokenExpiresIn !== null && (
+          <div className="bg-zinc-800 border-b border-zinc-700 text-zinc-300 px-4 py-1.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-400">🔑</span>
+              <span>
+                Token expira en <strong className="text-white">{Math.floor(tokenExpiresIn / 60)}:{(tokenExpiresIn % 60).toString().padStart(2, '0')}</strong>
+                <span className="text-zinc-500 ml-2">· Solo afecta: emotes Twitch, subs/chatters</span>
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                twitchDisconnect();
+                setTimeout(() => {
+                  if (savedCredentials) {
+                    twitchConnect(savedCredentials.channel, savedCredentials.token);
+                  }
+                }, 500);
+              }}
+              className="px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-300 hover:text-white transition-colors"
+            >
+              Renovar
+            </button>
+          </div>
+        )}
+        
         <div className="flex-1 flex overflow-hidden relative">
           {/* AI Vision Mascot - Draggable (hidden during demo tour) */}
           {aiAnalytics.showMascot && !isOverlayMode && !demoTour.isActive && (
@@ -1232,6 +1313,7 @@ const App: React.FC = () => {
                   userVoteMap={poll.userVoteMap}
                   collaborationChannels={collaborationChannels}
                   mainChannel={channelName}
+                  authToken={authToken}
                 />
               </div>
             )}
@@ -1246,6 +1328,7 @@ const App: React.FC = () => {
                   mainChannel={channelName}
                   onAddCollaborator={addCollaborator}
                   onRemoveCollaborator={removeCollaborator}
+                  authToken={authToken}
                 />
               </div>
             )}

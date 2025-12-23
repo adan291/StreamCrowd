@@ -1,7 +1,26 @@
 // AI Analytics Service - Analyzes chat and generates stream insights
 
+export type AIProvider = 'gemini' | 'openai' | 'anthropic';
+
+export interface AIProviderConfig {
+  apiKey: string;
+  enabled: boolean;
+}
+
 export interface AIConfig {
-  provider: 'gemini' | 'openai' | 'anthropic';
+  providers: {
+    gemini: AIProviderConfig;
+    openai: AIProviderConfig;
+    anthropic: AIProviderConfig;
+  };
+  // Qué proveedor usar para cada función
+  analyticsProvider: AIProvider;
+  gamesProvider: AIProvider;
+}
+
+// Config legacy para compatibilidad
+export interface LegacyAIConfig {
+  provider: AIProvider;
   apiKey: string;
   enabled: boolean;
 }
@@ -73,7 +92,8 @@ export interface DailyInsight {
   aggregatedAnalysis?: ChatAnalysis;
 }
 
-const STORAGE_KEY = 'twitch_ai_config';
+const STORAGE_KEY = 'twitch_ai_config_v2';
+const LEGACY_STORAGE_KEY = 'twitch_ai_config';
 const SESSIONS_KEY = 'twitch_stream_sessions';
 const ENCRYPTION_KEY = 'TwitchVoteLive2024'; // Simple obfuscation key
 
@@ -104,45 +124,119 @@ const decryptKey = (encoded: string): string => {
 };
 
 // Get API key from environment variable (more secure) or localStorage
-const getEnvApiKey = (): string | null => {
-  // Vite exposes env variables with VITE_ prefix
-  // In production build, this is baked in at compile time
-  return import.meta.env.VITE_GEMINI_API_KEY || null;
+const getEnvApiKey = (provider: AIProvider): string | null => {
+  switch (provider) {
+    case 'gemini': return import.meta.env.VITE_GEMINI_API_KEY || null;
+    case 'openai': return import.meta.env.VITE_OPENAI_API_KEY || null;
+    case 'anthropic': return import.meta.env.VITE_ANTHROPIC_API_KEY || null;
+    default: return null;
+  }
 };
+
+// Default empty config
+const getDefaultConfig = (): AIConfig => ({
+  providers: {
+    gemini: { apiKey: '', enabled: false },
+    openai: { apiKey: '', enabled: false },
+    anthropic: { apiKey: '', enabled: false },
+  },
+  analyticsProvider: 'gemini',
+  gamesProvider: 'gemini',
+});
 
 // Save/Load AI Config
 export const saveAIConfig = (config: AIConfig): void => {
-  // Don't save API key to localStorage if it's from env
-  const envKey = getEnvApiKey();
-  const configToSave = envKey && config.apiKey === envKey 
-    ? { ...config, apiKey: '' } // Don't duplicate env key in storage
-    : { ...config, apiKey: encryptKey(config.apiKey) }; // Encrypt the key
+  const configToSave = {
+    ...config,
+    providers: {
+      gemini: { 
+        apiKey: config.providers.gemini.apiKey ? encryptKey(config.providers.gemini.apiKey) : '',
+        enabled: config.providers.gemini.enabled 
+      },
+      openai: { 
+        apiKey: config.providers.openai.apiKey ? encryptKey(config.providers.openai.apiKey) : '',
+        enabled: config.providers.openai.enabled 
+      },
+      anthropic: { 
+        apiKey: config.providers.anthropic.apiKey ? encryptKey(config.providers.anthropic.apiKey) : '',
+        enabled: config.providers.anthropic.enabled 
+      },
+    }
+  };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(configToSave));
 };
 
-export const loadAIConfig = (): AIConfig | null => {
-  const envKey = getEnvApiKey();
+export const loadAIConfig = (): AIConfig => {
+  // Try new format first
   const stored = localStorage.getItem(STORAGE_KEY);
   
   if (stored) {
     try {
-      const config = JSON.parse(stored);
-      // Prefer env key over stored key
-      if (envKey) {
-        config.apiKey = envKey;
-      } else if (config.apiKey) {
-        // Decrypt stored key
-        config.apiKey = decryptKey(config.apiKey);
-      }
+      const config = JSON.parse(stored) as AIConfig;
+      // Decrypt keys and apply env overrides
+      (['gemini', 'openai', 'anthropic'] as AIProvider[]).forEach(provider => {
+        const envKey = getEnvApiKey(provider);
+        if (envKey) {
+          config.providers[provider].apiKey = envKey;
+          config.providers[provider].enabled = true;
+        } else if (config.providers[provider].apiKey) {
+          config.providers[provider].apiKey = decryptKey(config.providers[provider].apiKey);
+        }
+      });
       return config;
     } catch {
-      return envKey ? { provider: 'gemini', apiKey: envKey, enabled: true } : null;
+      // Fall through to legacy
     }
   }
   
-  // If no stored config but env key exists, create default config
-  if (envKey) {
-    return { provider: 'gemini', apiKey: envKey, enabled: true };
+  // Try legacy format and migrate
+  const legacyStored = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (legacyStored) {
+    try {
+      const legacy = JSON.parse(legacyStored) as LegacyAIConfig;
+      const config = getDefaultConfig();
+      const provider = legacy.provider || 'gemini';
+      config.providers[provider] = {
+        apiKey: legacy.apiKey ? decryptKey(legacy.apiKey) : '',
+        enabled: legacy.enabled
+      };
+      config.analyticsProvider = provider;
+      config.gamesProvider = provider;
+      // Save in new format
+      saveAIConfig(config);
+      return config;
+    } catch {
+      // Fall through to default
+    }
+  }
+  
+  // Check env keys
+  const config = getDefaultConfig();
+  (['gemini', 'openai', 'anthropic'] as AIProvider[]).forEach(provider => {
+    const envKey = getEnvApiKey(provider);
+    if (envKey) {
+      config.providers[provider].apiKey = envKey;
+      config.providers[provider].enabled = true;
+    }
+  });
+  
+  return config;
+};
+
+// Helper para obtener la config de un proveedor específico para una función
+export const getProviderForFunction = (config: AIConfig, fn: 'analytics' | 'games'): { provider: AIProvider; apiKey: string } | null => {
+  const provider = fn === 'analytics' ? config.analyticsProvider : config.gamesProvider;
+  const providerConfig = config.providers[provider];
+  
+  if (providerConfig.apiKey) {
+    return { provider, apiKey: providerConfig.apiKey };
+  }
+  
+  // Fallback: buscar cualquier proveedor con key
+  for (const p of ['gemini', 'openai', 'anthropic'] as AIProvider[]) {
+    if (config.providers[p].apiKey) {
+      return { provider: p, apiKey: config.providers[p].apiKey };
+    }
   }
   
   return null;
@@ -150,11 +244,15 @@ export const loadAIConfig = (): AIConfig | null => {
 
 export const clearAIConfig = (): void => {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 };
 
 // Check if using env-based API key
-export const isUsingEnvKey = (): boolean => {
-  return !!getEnvApiKey();
+export const isUsingEnvKey = (provider?: AIProvider): boolean => {
+  if (provider) {
+    return !!getEnvApiKey(provider);
+  }
+  return !!getEnvApiKey('gemini') || !!getEnvApiKey('openai') || !!getEnvApiKey('anthropic');
 };
 
 // Session Management
@@ -322,9 +420,12 @@ export const analyzeWithAI = async (
   messages: StoredMessage[],
   config: AIConfig
 ): Promise<ChatAnalysis | null> => {
-  if (!config.enabled || !config.apiKey) {
+  const providerInfo = getProviderForFunction(config, 'analytics');
+  if (!providerInfo) {
     return analyzeLocally(messages);
   }
+
+  const { provider, apiKey } = providerInfo;
 
   // Prepare chat summary for AI
   const chatSummary = messages
@@ -347,44 +448,61 @@ Responde SOLO con un JSON válido con esta estructura:
 }`;
 
   try {
-    if (config.provider === 'gemini') {
-      // Get the working model from localStorage (set during test) or use default
+    if (provider === 'gemini') {
       const savedModel = localStorage.getItem('gemini_working_model');
-      const modelToUse = savedModel || 'gemini-2.0-flash-exp'; // Default fallback
-      
-      console.log(`Using Gemini model: ${modelToUse}`);
+      const modelToUse = savedModel || 'gemini-2.0-flash-exp';
       
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${config.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 1024,
-            },
+            generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
           }),
         }
       );
 
-      if (!response.ok) {
-        console.error('Gemini API error:', response.status);
-        return analyzeLocally(messages);
-      }
+      if (!response.ok) return analyzeLocally(messages);
 
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (text) {
-        // Extract JSON from response
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const aiInsights = JSON.parse(jsonMatch[0]);
           const localAnalysis = analyzeLocally(messages);
-          
-          // Merge AI insights with local analysis
+          return {
+            ...localAnalysis,
+            sentiment: aiInsights.sentiment || localAnalysis.sentiment,
+            topics: aiInsights.topics || localAnalysis.topics,
+            engagement: aiInsights.engagement || localAnalysis.engagement,
+          };
+        }
+      }
+    } else if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!response.ok) return analyzeLocally(messages);
+
+      const data = await response.json();
+      const text = data.choices?.[0]?.message?.content;
+      
+      if (text) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const aiInsights = JSON.parse(jsonMatch[0]);
+          const localAnalysis = analyzeLocally(messages);
           return {
             ...localAnalysis,
             sentiment: aiInsights.sentiment || localAnalysis.sentiment,
@@ -394,7 +512,6 @@ Responde SOLO con un JSON válido con esta estructura:
         }
       }
     }
-    // Add support for other providers here (OpenAI, Anthropic)
     
     return analyzeLocally(messages);
   } catch (error) {
@@ -406,7 +523,7 @@ Responde SOLO con un JSON válido con esta estructura:
 // Generate daily report
 export const generateDailyReport = async (
   date: string,
-  config: AIConfig | null
+  config: AIConfig
 ): Promise<DailyInsight> => {
   const sessions = getSessionsByDate(date);
   
@@ -415,7 +532,8 @@ export const generateDailyReport = async (
   
   let aggregatedAnalysis: ChatAnalysis | undefined;
   if (allMessages.length > 0) {
-    if (config?.enabled && config.apiKey) {
+    const providerInfo = getProviderForFunction(config, 'analytics');
+    if (providerInfo) {
       aggregatedAnalysis = await analyzeWithAI(allMessages, config) || undefined;
     } else {
       aggregatedAnalysis = analyzeLocally(allMessages);

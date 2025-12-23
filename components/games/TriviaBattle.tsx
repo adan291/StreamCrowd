@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, ExternalLink, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils } from 'lucide-react';
-import { loadAIConfig, AIConfig } from '../../services/aiAnalyticsService';
+import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
 
 interface Question {
   id: string;
@@ -34,6 +34,60 @@ interface TriviaBattleProps {
 }
 
 const GAME_CHANNEL = 'trivia_battle_sync';
+const CUSTOM_QUESTIONS_KEY = 'trivia_custom_questions';
+
+// Funciones para persistencia de preguntas personalizadas
+interface SavedCategory {
+  id: string;
+  name: string;
+  topic: string;
+  questions: Question[];
+  createdAt: number;
+}
+
+const loadCustomCategories = (): SavedCategory[] => {
+  try {
+    const saved = localStorage.getItem(CUSTOM_QUESTIONS_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomCategory = (topic: string, questions: Question[]): SavedCategory => {
+  const categories = loadCustomCategories();
+  const id = `custom_${Date.now()}`;
+  const newCategory: SavedCategory = {
+    id,
+    name: topic,
+    topic,
+    questions,
+    createdAt: Date.now()
+  };
+  
+  // Buscar si ya existe una categoría con el mismo tema
+  const existingIndex = categories.findIndex(c => c.topic.toLowerCase() === topic.toLowerCase());
+  if (existingIndex >= 0) {
+    // Añadir preguntas a la categoría existente
+    categories[existingIndex].questions = [
+      ...categories[existingIndex].questions,
+      ...questions
+    ];
+    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(categories));
+    return categories[existingIndex];
+  } else {
+    // Crear nueva categoría
+    categories.push(newCategory);
+    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(categories));
+    return newCategory;
+  }
+};
+
+const deleteCustomCategory = (categoryId: string): void => {
+  const categories = loadCustomCategories();
+  const filtered = categories.filter(c => c.id !== categoryId);
+  localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(filtered));
+};
 
 // Banco de preguntas predefinidas por categoría
 const QUESTION_BANK: TriviaCategory[] = [
@@ -158,6 +212,11 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+  const [aiSuccess, setAiSuccess] = useState<string | null>(null);
+  
+  // Custom saved categories
+  const [customCategories, setCustomCategories] = useState<SavedCategory[]>([]);
+  const [selectedCustomCategories, setSelectedCustomCategories] = useState<string[]>([]);
   
   // Manual question editor
   const [editingQuestion, setEditingQuestion] = useState('');
@@ -174,10 +233,11 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   const sortedPlayers = playersArray.sort((a, b) => b.score - a.score);
   const totalAnswers = answerCounts.reduce((a, b) => a + b, 0);
 
-  // Load AI config on mount
+  // Load AI config and custom categories on mount
   useEffect(() => {
     const config = loadAIConfig();
     setAiConfig(config);
+    setCustomCategories(loadCustomCategories());
   }, []);
 
   // Setup BroadcastChannel
@@ -275,9 +335,11 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
     };
   }, [gameState]);
 
-  // Generate questions from categories
+  // Generate questions from categories (including custom)
   const generateFromCategories = () => {
     const allQuestions: Question[] = [];
+    
+    // Default categories
     selectedCategories.forEach((catId: string) => {
       const category = QUESTION_BANK.find(c => c.id === catId);
       if (category) {
@@ -290,12 +352,29 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
         allQuestions.push(...questionsWithTime);
       }
     });
+    
+    // Custom categories
+    selectedCustomCategories.forEach((catId: string) => {
+      const category = customCategories.find(c => c.id === catId);
+      if (category) {
+        const shuffled = [...category.questions].sort(() => Math.random() - 0.5);
+        const questionsWithTime = shuffled.slice(0, questionsPerCategory).map(q => ({
+          ...q,
+          timeLimit: questionTime
+        }));
+        allQuestions.push(...questionsWithTime);
+      }
+    });
+    
     setQuestions(allQuestions.sort(() => Math.random() - 0.5));
   };
 
   // Generate questions with AI
   const generateWithAI = async () => {
-    if (!aiConfig?.apiKey || !aiConfig.enabled) {
+    const config = loadAIConfig();
+    const providerInfo = config ? getProviderForFunction(config, 'games') : null;
+    
+    if (!providerInfo) {
       setAiError('Configura tu API key de IA en el panel de Analytics para usar esta función.');
       return;
     }
@@ -306,6 +385,8 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
 
     setIsGenerating(true);
     setAiError(null);
+
+    const { provider, apiKey } = providerInfo;
 
     const prompt = `Genera ${aiQuestionCount} preguntas de trivia sobre "${aiTopic}" para un juego de stream.
 Responde SOLO con un JSON válido con esta estructura exacta:
@@ -325,10 +406,12 @@ IMPORTANTE:
 - Responde SOLO el JSON, sin texto adicional`;
 
     try {
-      if (aiConfig.provider === 'gemini') {
+      let text = '';
+      
+      if (provider === 'gemini') {
         const savedModel = localStorage.getItem('gemini_working_model') || 'gemini-2.0-flash-exp';
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${savedModel}:generateContent?key=${aiConfig.apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${savedModel}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -342,30 +425,51 @@ IMPORTANTE:
         if (!response.ok) throw new Error('Error en la API de Gemini');
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (text) {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (parsed.questions && Array.isArray(parsed.questions)) {
-              const newQuestions: Question[] = parsed.questions.map((q: any, i: number) => ({
-                id: `ai_${Date.now()}_${i}`,
-                question: q.question,
-                options: q.options.slice(0, 4),
-                correctIndex: Math.min(q.correctIndex, 3),
-                timeLimit: questionTime // Usar el tiempo configurado
-              }));
-              setQuestions(newQuestions);
-              setIsGenerating(false);
-              return;
-            }
+        text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      } else if (provider === 'openai') {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) throw new Error('Error en la API de OpenAI');
+
+        const data = await response.json();
+        text = data.choices?.[0]?.message?.content || '';
+      }
+      
+      if (text) {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.questions && Array.isArray(parsed.questions)) {
+            const newQuestions: Question[] = parsed.questions.map((q: any, i: number) => ({
+              id: `ai_${Date.now()}_${i}`,
+              question: q.question,
+              options: q.options.slice(0, 4),
+              correctIndex: Math.min(q.correctIndex, 3),
+              timeLimit: questionTime
+            }));
+            // AÑADIR a las existentes en lugar de reemplazar
+            setQuestions(prev => [...prev, ...newQuestions]);
+            
+            // Guardar en localStorage para persistencia
+            const savedCategory = saveCustomCategory(aiTopic, newQuestions);
+            setCustomCategories(loadCustomCategories());
+            setAiSuccess(`✅ ${newQuestions.length} preguntas guardadas en "${aiTopic}"`);
+            setTimeout(() => setAiSuccess(null), 4000);
+            
+            setIsGenerating(false);
+            return;
           }
         }
-        throw new Error('No se pudo parsear la respuesta de la IA');
       }
-      // TODO: Add OpenAI/Anthropic support
-      throw new Error('Proveedor de IA no soportado');
+      throw new Error('No se pudo parsear la respuesta de la IA');
     } catch (error) {
       console.error('AI generation error:', error);
       setAiError(error instanceof Error ? error.message : 'Error generando preguntas');
@@ -445,6 +549,20 @@ IMPORTANTE:
     );
   };
 
+  const toggleCustomCategory = (catId: string) => {
+    setSelectedCustomCategories((prev: string[]) => 
+      prev.includes(catId) 
+        ? prev.filter((c: string) => c !== catId)
+        : [...prev, catId]
+    );
+  };
+
+  const handleDeleteCustomCategory = (catId: string) => {
+    deleteCustomCategory(catId);
+    setCustomCategories(loadCustomCategories());
+    setSelectedCustomCategories(prev => prev.filter(c => c !== catId));
+  };
+
   const openOverlay = () => {
     const width = 700, height = 500;
     const left = (window.screen.width - width) / 2;
@@ -521,29 +639,71 @@ IMPORTANTE:
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {QUESTION_BANK.map((cat: TriviaCategory) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => toggleCategory(cat.id)}
-                    className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
-                      selectedCategories.includes(cat.id)
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-                    }`}
-                  >
-                    {cat.icon}
-                    <span className="truncate">{cat.name}</span>
-                  </button>
-                ))}
+              {/* Default Categories */}
+              <div>
+                <span className="text-xs text-zinc-400 mb-2 block">Categorías predefinidas</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {QUESTION_BANK.map((cat: TriviaCategory) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
+                        selectedCategories.includes(cat.id)
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+                      }`}
+                    >
+                      {cat.icon}
+                      <span className="truncate">{cat.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+              
+              {/* Custom Categories (AI Generated) */}
+              {customCategories.length > 0 && (
+                <div>
+                  <span className="text-xs text-zinc-400 mb-2 block flex items-center gap-1">
+                    <Sparkles size={12} className="text-purple-400" />
+                    Categorías personalizadas (IA)
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {customCategories.map((cat: SavedCategory) => (
+                      <div key={cat.id} className="relative group">
+                        <button
+                          onClick={() => toggleCustomCategory(cat.id)}
+                          className={`w-full flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
+                            selectedCustomCategories.includes(cat.id)
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                              : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
+                          }`}
+                        >
+                          <Sparkles size={14} />
+                          <span className="truncate flex-1 text-left">{cat.name}</span>
+                          <span className="text-xs opacity-70">{cat.questions.length}</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCustomCategory(cat.id);
+                          }}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Eliminar categoría"
+                        >
+                          <Trash2 size={10} className="text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <button
                 onClick={generateFromCategories}
-                disabled={selectedCategories.length === 0}
+                disabled={selectedCategories.length === 0 && selectedCustomCategories.length === 0}
                 className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg"
               >
-                Generar {selectedCategories.length * questionsPerCategory} preguntas
+                Generar {(selectedCategories.length + selectedCustomCategories.length) * questionsPerCategory} preguntas
               </button>
             </div>
           )}
@@ -556,7 +716,10 @@ IMPORTANTE:
                 <span className="text-sm font-medium text-white">Trivia con IA</span>
               </div>
               
-              {!aiConfig?.apiKey || !aiConfig.enabled ? (
+              {(() => {
+                const config = loadAIConfig();
+                const providerInfo = config ? getProviderForFunction(config, 'games') : null;
+                return !providerInfo ? (
                 <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <AlertCircle size={18} className="text-yellow-400 mt-0.5" />
@@ -634,6 +797,12 @@ IMPORTANTE:
                     </div>
                   )}
                   
+                  {aiSuccess && (
+                    <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-2">
+                      <p className="text-green-300 text-xs">{aiSuccess}</p>
+                    </div>
+                  )}
+                  
                   <div className="text-xs text-zinc-500">
                     <p>💡 Ejemplos de temas:</p>
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -649,7 +818,8 @@ IMPORTANTE:
                     </div>
                   </div>
                 </>
-              )}
+              );
+              })()}
             </div>
           )}
 

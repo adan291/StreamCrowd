@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PollOption, TwitchMessage, CollaborationChannel } from '../types';
-import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, ExternalLink, Settings } from 'lucide-react';
+import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, ExternalLink, Settings, UserPlus, Trash2, Download, Upload } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
 
@@ -81,6 +81,12 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   });
   const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
   const lastProcessedIndexRef = useRef(0);
+
+  // Manual participants state
+  const [manualParticipants, setManualParticipants] = useState<string[]>([]);
+  const [manualParticipantInput, setManualParticipantInput] = useState('');
+  const [manualParticipantError, setManualParticipantError] = useState<string | null>(null);
+  const manualParticipantsFileRef = useRef<HTMLInputElement>(null);
 
   // Refs para mantener valores actuales en el handler
   const stateRef = useRef({ rotation, isSpinning, winner, showWinner, options: currentOptions });
@@ -327,6 +333,99 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   const startVoting = () => { resetVotes(); setVotingTimeLeft(votingDuration); setIsVotingActive(true); };
   const stopVoting = () => { setIsVotingActive(false); };
 
+  // Manual participants functions
+  const addManualParticipant = () => {
+    const name = manualParticipantInput.trim();
+    if (!name) return;
+    
+    // Check for duplicates (case insensitive)
+    if (manualParticipants.some(p => p.toLowerCase() === name.toLowerCase())) {
+      setManualParticipantError('Este participante ya está en la lista');
+      setTimeout(() => setManualParticipantError(null), 2000);
+      return;
+    }
+    
+    setManualParticipants(prev => [...prev, name]);
+    setManualParticipantInput('');
+    setManualParticipantError(null);
+  };
+
+  const removeManualParticipant = (index: number) => {
+    setManualParticipants(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearManualParticipants = () => {
+    setManualParticipants([]);
+  };
+
+  // Export manual participants to file
+  const exportManualParticipants = () => {
+    if (manualParticipants.length === 0) return;
+    
+    const content = manualParticipants.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `participantes_ruleta_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Import manual participants from file
+  const importManualParticipants = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+      
+      const lines = content.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0);
+      const existingLower = new Set(manualParticipants.map(p => p.toLowerCase()));
+      
+      let added = 0;
+      let duplicates = 0;
+      const newParticipants: string[] = [];
+      
+      lines.forEach(name => {
+        if (existingLower.has(name.toLowerCase())) {
+          duplicates++;
+        } else {
+          newParticipants.push(name);
+          existingLower.add(name.toLowerCase());
+          added++;
+        }
+      });
+      
+      setManualParticipants(prev => [...prev, ...newParticipants]);
+      
+      if (duplicates > 0 || added > 0) {
+        setManualParticipantError(`Añadidos: ${added}${duplicates > 0 ? `, Duplicados: ${duplicates}` : ''}`);
+        setTimeout(() => setManualParticipantError(null), 3000);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const spinManualParticipants = () => {
+    if (isSpinning || manualParticipants.length === 0) return;
+    
+    // Create temporary options from manual participants
+    const tempOptions: PollOption[] = manualParticipants.map((name, index) => ({
+      id: index,
+      label: name,
+      color: `hsl(${(index * 360) / manualParticipants.length}, 70%, 50%)`,
+      votes: 0,
+    }));
+    
+    setCurrentOptions(tempOptions);
+    syncToOverlay({ options: tempOptions });
+    
+    // Wait for canvas to update then spin
+    setTimeout(() => {
+      spin();
+    }, 100);
+  };
+
   const openOverlayWindow = () => {
     const width = 450;
     const height = 500;
@@ -462,6 +561,101 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           <button onClick={() => setMode('voting')} disabled={isSpinning || isVotingActive} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${mode === 'voting' ? 'bg-twitch-brand text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} disabled:opacity-50`}>
             <BarChart3 size={18} /> Por Votos
           </button>
+        </div>
+
+        {/* Manual participants section */}
+        <div className="bg-zinc-800/50 rounded-xl p-4 mb-4 space-y-3 border border-dashed border-zinc-600">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-zinc-300 font-medium flex items-center gap-2">
+              <UserPlus size={16} className="text-purple-400" />
+              Participantes manuales
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={exportManualParticipants}
+                disabled={manualParticipants.length === 0}
+                className="p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Exportar participantes"
+              >
+                <Download size={14} />
+              </button>
+              <label className="p-1.5 text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700 rounded transition-colors cursor-pointer" title="Importar participantes">
+                <Upload size={14} />
+                <input
+                  ref={manualParticipantsFileRef}
+                  type="file"
+                  accept=".txt,.csv"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && importManualParticipants(e.target.files[0])}
+                />
+              </label>
+              {manualParticipants.length > 0 && (
+                <button 
+                  onClick={clearManualParticipants}
+                  className="p-1.5 text-red-400 hover:text-red-300 hover:bg-zinc-700 rounded transition-colors"
+                  title="Limpiar todos"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={manualParticipantInput} 
+              onChange={(e) => setManualParticipantInput(e.target.value)} 
+              placeholder="Nombre del participante" 
+              onKeyDown={(e) => e.key === 'Enter' && addManualParticipant()}
+              disabled={isSpinning}
+              className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50" 
+            />
+            <button 
+              onClick={addManualParticipant}
+              disabled={!manualParticipantInput.trim() || isSpinning}
+              className="px-3 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+            >
+              <UserPlus size={18} />
+            </button>
+          </div>
+          
+          {manualParticipantError && (
+            <p className={`text-xs ${manualParticipantError.includes('Añadidos') ? 'text-green-400' : 'text-red-400'}`}>{manualParticipantError}</p>
+          )}
+          
+          {manualParticipants.length > 0 && (
+            <>
+              <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                {manualParticipants.map((name, index) => (
+                  <span 
+                    key={index}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-white"
+                    style={{ backgroundColor: `hsl(${(index * 360) / manualParticipants.length}, 70%, 40%)` }}
+                  >
+                    {name}
+                    <button 
+                      onClick={() => removeManualParticipant(index)}
+                      className="hover:text-red-300 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button 
+                onClick={spinManualParticipants}
+                disabled={isSpinning || manualParticipants.length < 2}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 disabled:from-zinc-600 disabled:to-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all"
+              >
+                <Play size={16} /> Sortear entre {manualParticipants.length} participantes
+              </button>
+            </>
+          )}
+          
+          <p className="text-xs text-zinc-500 text-center">
+            Añade participantes manualmente para sortear entre ellos
+          </p>
         </div>
 
         {mode === 'voting' && (

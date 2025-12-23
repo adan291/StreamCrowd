@@ -141,6 +141,9 @@ class TwitchService {
           secure: true,
           reconnect: true,
         },
+        options: {
+          skipUpdatingEmotesets: true,
+        },
       });
 
       // Set up message handler for this collaboration channel
@@ -290,6 +293,9 @@ class TwitchService {
         secure: true,
         reconnect: false, // We handle reconnection ourselves
       },
+      options: {
+        skipUpdatingEmotesets: true, // Disable emote fetching to avoid CORS errors with deprecated Kraken API
+      },
     };
 
     // If token is provided, add identity to enable sending messages
@@ -420,6 +426,9 @@ class TwitchService {
           connection: {
             secure: true,
             reconnect: false,
+          },
+          options: {
+            skipUpdatingEmotesets: true,
           },
         };
 
@@ -603,6 +612,242 @@ class TwitchService {
       return isNaN(count) ? null : count;
     } catch {
       // Silently fail - viewer count is not critical
+      return null;
+    }
+  }
+
+  /**
+   * Get chatters (users in chat) for a channel
+   * Requires OAuth token with moderator:read:chatters scope
+   * @param token OAuth token with required scope
+   * @param broadcasterId Broadcaster user ID
+   * @param moderatorId Moderator user ID (usually same as broadcaster)
+   * @returns Promise with array of usernames or null if failed
+   */
+  public async getChatters(token: string, broadcasterId: string, moderatorId: string): Promise<string[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5', // Public Twitch client ID
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get chatters:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((user: { user_login: string }) => user.user_login) || [];
+    } catch (err) {
+      console.error('Error getting chatters:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get subscribers for a channel
+   * Requires OAuth token with channel:read:subscriptions scope
+   * @param token OAuth token with required scope
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with array of subscriber usernames or null if failed
+   */
+  public async getSubscribers(token: string, broadcasterId: string): Promise<string[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const allSubs: string[] = [];
+      let cursor: string | undefined;
+      
+      do {
+        const url = new URL('https://api.twitch.tv/helix/subscriptions');
+        url.searchParams.set('broadcaster_id', broadcasterId);
+        url.searchParams.set('first', '100');
+        if (cursor) url.searchParams.set('after', cursor);
+        
+        const response = await fetch(url.toString(), {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to get subscribers:', response.status);
+          return null;
+        }
+        
+        const data = await response.json();
+        const subs = data.data?.map((sub: { user_login: string }) => sub.user_login) || [];
+        allSubs.push(...subs);
+        cursor = data.pagination?.cursor;
+      } while (cursor);
+      
+      return allSubs;
+    } catch (err) {
+      console.error('Error getting subscribers:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get user ID from username
+   * @param token OAuth token
+   * @param username Username to look up
+   * @returns Promise with user ID or null if not found
+   */
+  public async getUserId(token: string, username: string): Promise<string | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/users?login=${username.toLowerCase()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.[0]?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get channel emotes (subscriber emotes)
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with array of emotes or null if failed
+   */
+  public async getChannelEmotes(token: string, broadcasterId: string): Promise<{ code: string; url: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/emotes?broadcaster_id=${broadcasterId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Error fetching channel emotes:', response.status, response.statusText);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (data.data && Array.isArray(data.data)) {
+        return data.data.map((e: any) => ({
+          code: e.name,
+          url: e.images?.url_1x || `https://static-cdn.jtvnw.net/emoticons/v2/${e.id}/default/dark/1.0`
+        }));
+      }
+      
+      return [];
+    } catch (err) {
+      console.error('Error getting channel emotes:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get global Twitch emotes
+   * @param token OAuth token
+   * @returns Promise with array of emotes or null if failed
+   */
+  public async getGlobalEmotes(token: string): Promise<{ code: string; url: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        'https://api.twitch.tv/helix/chat/emotes/global',
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      
+      if (data.data && Array.isArray(data.data)) {
+        return data.data.map((e: any) => ({
+          code: e.name,
+          url: e.images?.url_1x || `https://static-cdn.jtvnw.net/emoticons/v2/${e.id}/default/dark/1.0`
+        }));
+      }
+      
+      return [];
+    } catch (err) {
+      console.error('Error getting global emotes:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Validate OAuth token and get expiration info
+   * @param token OAuth token to validate
+   * @returns Token info including expires_in (seconds) or null if invalid
+   */
+  public async validateToken(token: string): Promise<{ 
+    valid: boolean; 
+    expiresIn: number; 
+    login?: string;
+    userId?: string;
+    scopes?: string[];
+  } | null> {
+    try {
+      // Clean token - remove 'oauth:' prefix if present
+      let cleanToken = token.trim();
+      if (cleanToken.toLowerCase().startsWith('oauth:')) {
+        cleanToken = cleanToken.substring(6);
+      }
+      
+      console.log('Validating token...');
+      
+      const response = await fetch('https://id.twitch.tv/oauth2/validate', {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`
+        }
+      });
+      
+      console.log('Validation response status:', response.status);
+      
+      if (!response.ok) {
+        console.warn('Token validation response not ok:', response.status);
+        return { valid: false, expiresIn: 0 };
+      }
+      
+      const data = await response.json();
+      console.log('Token validation data:', { 
+        login: data.login, 
+        expires_in: data.expires_in,
+        scopes: data.scopes 
+      });
+      
+      return {
+        valid: true,
+        expiresIn: data.expires_in || 0,
+        login: data.login,
+        userId: data.user_id,
+        scopes: data.scopes || []
+      };
+    } catch (err) {
+      console.error('Error validating token:', err);
       return null;
     }
   }

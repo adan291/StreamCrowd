@@ -23,9 +23,16 @@ import {
   Download,
   Upload,
   AlertTriangle,
+  UserPlus,
+  X,
+  RefreshCw,
+  Loader2,
+  Ban,
+  Shield,
 } from 'lucide-react';
 import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel } from '../types';
 import { useI18n } from '../i18n';
+import { twitchService } from '../services/twitchService';
 
 interface GiveawayHubProps {
   chatMessages: TwitchMessage[];
@@ -34,6 +41,7 @@ interface GiveawayHubProps {
   userVoteMap?: Map<string, number>;
   collaborationChannels?: CollaborationChannel[];
   mainChannel?: string;
+  authToken?: string;
 }
 
 type TabType = 'raffle' | 'active';
@@ -75,6 +83,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   chatMessages,
   isConnected,
   onClearChatMessages,
+  authToken,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabType>('raffle');
@@ -86,18 +95,32 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   // RAFFLE STATE
   // ============================================
   const [raffleMode, setRaffleMode] = useState<RaffleMode>('viewers');
+  const [raffleTitle, setRaffleTitle] = useState('');
   const [subsOnly, setSubsOnly] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [timeLimit, setTimeLimit] = useState(60);
   const [useTimer, setUseTimer] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [participants, setParticipants] = useState<Set<string>>(new Set());
+  
+  // Separate participants for each mode
+  const [viewersParticipants, setViewersParticipants] = useState<Set<string>>(new Set());
+  const [keywordParticipants, setKeywordParticipants] = useState<Set<string>>(new Set());
+  const viewersParticipantsRef = useRef<Set<string>>(new Set());
+  const keywordParticipantsRef = useRef<Set<string>>(new Set());
+  const viewersManualRef = useRef<Set<string>>(new Set());
+  const keywordManualRef = useRef<Set<string>>(new Set());
+  
+  // Legacy refs for compatibility - point to current mode
+  const participantsRef = raffleMode === 'viewers' ? viewersParticipantsRef : keywordParticipantsRef;
+  const participants = raffleMode === 'viewers' ? viewersParticipants : keywordParticipants;
+  const setParticipants = raffleMode === 'viewers' ? setViewersParticipants : setKeywordParticipants;
+  const manualParticipantsRef = raffleMode === 'viewers' ? viewersManualRef : keywordManualRef;
+  
   const [winner, setWinner] = useState<string | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [displayName, setDisplayName] = useState<string>('');
   const startTimeRef = useRef<number>(0);
-  const participantsRef = useRef<Set<string>>(new Set());
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   // ============================================
@@ -116,6 +139,37 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   
   const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null);
   const processedMessagesRef = useRef<Set<string>>(new Set());
+  
+  // Manual participant input
+  const [manualParticipant, setManualParticipant] = useState('');
+  const [manualParticipantError, setManualParticipantError] = useState<string | null>(null);
+  const [threadManualParticipant, setThreadManualParticipant] = useState<{ [threadId: string]: string }>({});
+  const [threadManualError, setThreadManualError] = useState<{ [threadId: string]: string | null }>({});
+  const participantsFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Blacklist (banned users from raffles)
+  const [blacklist, setBlacklist] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('giveaway_blacklist');
+    if (saved) {
+      try {
+        return new Set(JSON.parse(saved));
+      } catch { return new Set(); }
+    }
+    return new Set();
+  });
+  const [showBlacklistModal, setShowBlacklistModal] = useState(false);
+  const [blacklistInput, setBlacklistInput] = useState('');
+  const blacklistFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Loading states for API calls
+  const [isLoadingChatters, setIsLoadingChatters] = useState(false);
+  const [isLoadingSubs, setIsLoadingSubs] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // Save blacklist to localStorage
+  useEffect(() => {
+    localStorage.setItem('giveaway_blacklist', JSON.stringify(Array.from(blacklist)));
+  }, [blacklist]);
 
   const activeThreadCount = threads.filter(t => t.isActive).length;
 
@@ -311,12 +365,12 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     syncToOverlay({ winner: null, isSelecting: false, displayName: '' });
 
     if (!useTimer && raffleMode === 'viewers') {
-      const viewers = getViewers();
-      if (viewers.length === 0) return;
-      animateSelection(viewers);
+      // Use combined list (viewers + manual participants)
+      const allParticipants = getAllParticipants();
+      if (allParticipants.length === 0) return;
+      animateSelection(allParticipants);
     } else {
-      participantsRef.current = new Set();
-      setParticipants(new Set());
+      // Keep existing manual participants, only reset the timestamp for new chat participants
       startTimeRef.current = Date.now();
       if (useTimer) setTimeLeft(timeLimit);
       setIsRunning(true);
@@ -325,31 +379,41 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
   const finishAndSelectWinner = () => {
     setIsRunning(false);
-    const participantList: string[] = Array.from(participantsRef.current);
+    // Use all participants (manual + from chat)
+    const participantList: string[] = Array.from(participantsRef.current) as string[];
     if (participantList.length === 0) return;
     animateSelection(participantList);
   };
 
   const animateSelection = (candidates: string[]) => {
+    // Filter out blacklisted users before selection
+    const filteredCandidates = filterBlacklisted(candidates);
+    
+    if (filteredCandidates.length === 0) {
+      setManualParticipantError('No hay participantes válidos (todos están en la lista de prohibidos)');
+      setTimeout(() => setManualParticipantError(null), 3000);
+      return;
+    }
+    
     setIsSelecting(true);
     syncToOverlay({ isSelecting: true, winner: null });
     let iterations = 0;
     const maxIterations = 20;
     const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * candidates.length);
-      setDisplayName(candidates[randomIndex]);
-      syncToOverlay({ displayName: candidates[randomIndex], isSelecting: true });
+      const randomIndex = Math.floor(Math.random() * filteredCandidates.length);
+      setDisplayName(filteredCandidates[randomIndex]);
+      syncToOverlay({ displayName: filteredCandidates[randomIndex], isSelecting: true });
       iterations++;
 
       if (iterations >= maxIterations) {
         clearInterval(interval);
-        const winnerIndex = Math.floor(Math.random() * candidates.length);
-        const winnerName = candidates[winnerIndex];
+        const winnerIndex = Math.floor(Math.random() * filteredCandidates.length);
+        const winnerName = filteredCandidates[winnerIndex];
         setWinner(winnerName);
         setDisplayName(winnerName);
         setIsSelecting(false);
         syncToOverlay({ winner: winnerName, displayName: winnerName, isSelecting: false });
-        saveToHistory(winnerName, candidates.length);
+        saveToHistory(winnerName, filteredCandidates.length);
       }
     }, 100);
   };
@@ -357,7 +421,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   const saveToHistory = (winnerName: string, participantCount: number) => {
     const finished: FinishedGiveaway = {
       id: generateId(),
-      name: raffleMode === 'keyword' ? `Sorteo: ${keyword}` : 'Sorteo de viewers',
+      name: raffleTitle.trim() || (raffleMode === 'keyword' ? `Sorteo: ${keyword}` : 'Sorteo de viewers'),
       keyword: raffleMode === 'keyword' ? keyword : '',
       mode: raffleMode,
       winner: winnerName,
@@ -376,11 +440,39 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     setWinner(null);
     setIsRunning(false);
     setTimeLeft(0);
-    setParticipants(new Set());
-    participantsRef.current = new Set();
+    // Clear only current mode's participants
+    if (raffleMode === 'viewers') {
+      setViewersParticipants(new Set());
+      viewersParticipantsRef.current = new Set();
+      viewersManualRef.current = new Set();
+    } else {
+      setKeywordParticipants(new Set());
+      keywordParticipantsRef.current = new Set();
+      keywordManualRef.current = new Set();
+    }
     setDisplayName('');
     setIsSelecting(false);
     syncToOverlay({ winner: null, isSelecting: false, displayName: '' });
+  };
+
+  // Soft reset - only clears winner/running state, keeps participants
+  const softResetRaffle = () => {
+    setWinner(null);
+    setIsRunning(false);
+    setTimeLeft(0);
+    setDisplayName('');
+    setIsSelecting(false);
+    syncToOverlay({ winner: null, isSelecting: false, displayName: '' });
+  };
+  
+  // Clear all participants in both modes
+  const clearAllParticipants = () => {
+    setViewersParticipants(new Set());
+    setKeywordParticipants(new Set());
+    viewersParticipantsRef.current = new Set();
+    keywordParticipantsRef.current = new Set();
+    viewersManualRef.current = new Set();
+    keywordManualRef.current = new Set();
   };
 
   const openOverlayWindow = () => {
@@ -462,6 +554,301 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
   const getUniqueParticipantCount = (thread: GiveawayThread) => {
     return new Set(thread.participants.map(p => p.oderId)).size;
+  };
+
+  // ============================================
+  // MANUAL PARTICIPANT FUNCTIONS
+  // ============================================
+  const addManualParticipant = () => {
+    const name = manualParticipant.trim().toLowerCase();
+    if (!name) return;
+    
+    // Check for duplicates in current participants
+    if (participantsRef.current.has(name)) {
+      setManualParticipantError('Este usuario ya está participando');
+      setTimeout(() => setManualParticipantError(null), 2000);
+      return;
+    }
+    
+    // In viewers mode without timer, also check against existing viewers
+    if (raffleMode === 'viewers' && !useTimer) {
+      const viewers = getViewers();
+      if (viewers.some(v => v.toLowerCase() === name)) {
+        setManualParticipantError('Este usuario ya está en el chat');
+        setTimeout(() => setManualParticipantError(null), 2000);
+        return;
+      }
+    }
+    
+    participantsRef.current.add(name);
+    manualParticipantsRef.current.add(name);
+    setParticipants(new Set(participantsRef.current));
+    setManualParticipant('');
+    setManualParticipantError(null);
+  };
+
+  const removeParticipant = (name: string) => {
+    participantsRef.current.delete(name);
+    manualParticipantsRef.current.delete(name);
+    setParticipants(new Set(participantsRef.current));
+  };
+
+  // Check if a participant was added manually
+  const isManualParticipant = (name: string): boolean => {
+    return manualParticipantsRef.current.has(name);
+  };
+
+  // Blacklist functions
+  const addToBlacklist = (name: string) => {
+    const nameLower = name.trim().toLowerCase();
+    if (nameLower) {
+      setBlacklist(prev => new Set([...prev, nameLower]));
+    }
+  };
+
+  const removeFromBlacklist = (name: string) => {
+    setBlacklist(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(name.toLowerCase());
+      return newSet;
+    });
+  };
+
+  const exportBlacklist = () => {
+    if (blacklist.size === 0) return;
+    const content = Array.from(blacklist).join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `blacklist_sorteos.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importBlacklist = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+      
+      const lines = content.split(/[\n\r]+/).map(l => l.trim().toLowerCase()).filter(l => l.length > 0);
+      setBlacklist(prev => new Set([...prev, ...lines]));
+      setManualParticipantError(`${lines.length} usuarios añadidos a la lista de prohibidos`);
+      setTimeout(() => setManualParticipantError(null), 3000);
+    };
+    reader.readAsText(file);
+    if (blacklistFileInputRef.current) {
+      blacklistFileInputRef.current.value = '';
+    }
+  };
+
+  // Filter out blacklisted users from a list
+  const filterBlacklisted = (users: string[]): string[] => {
+    return users.filter(u => !blacklist.has(u.toLowerCase()));
+  };
+
+  // Check if user is blacklisted
+  const isBlacklisted = (name: string): boolean => {
+    return blacklist.has(name.toLowerCase());
+  };
+
+  // Get all participants (viewers + manual) for display
+  const getAllParticipants = (): string[] => {
+    if (raffleMode === 'viewers' && !useTimer && !isRunning) {
+      // Combine viewers from chat with manually added participants
+      const viewers = getViewers();
+      const manual: string[] = Array.from(participantsRef.current);
+      const combined = new Set<string>([...viewers, ...manual]);
+      return Array.from(combined);
+    }
+    return Array.from(participantsRef.current) as string[];
+  };
+
+  // Export participants to file
+  const exportParticipants = () => {
+    const allParticipants = getAllParticipants();
+    if (allParticipants.length === 0) return;
+    
+    const content = allParticipants.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `participantes_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Import participants from file
+  const importParticipants = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+      
+      const lines = content.split(/[\n\r]+/).map(l => l.trim().toLowerCase()).filter(l => l.length > 0);
+      const existingViewers = new Set(getViewers().map(v => v.toLowerCase()));
+      const existingManual = new Set((Array.from(participantsRef.current) as string[]).map(p => p.toLowerCase()));
+      
+      let added = 0;
+      let duplicates = 0;
+      
+      lines.forEach(name => {
+        if (existingViewers.has(name) || existingManual.has(name) || participantsRef.current.has(name)) {
+          duplicates++;
+        } else {
+          participantsRef.current.add(name);
+          manualParticipantsRef.current.add(name);
+          added++;
+        }
+      });
+      
+      setParticipants(new Set(participantsRef.current));
+      
+      setManualParticipantError(`Añadidos: ${added}${duplicates > 0 ? `, Duplicados: ${duplicates}` : ''}`);
+      setTimeout(() => setManualParticipantError(null), 3000);
+    };
+    reader.readAsText(file);
+    
+    // Reset file input so same file can be selected again
+    if (participantsFileInputRef.current) {
+      participantsFileInputRef.current.value = '';
+    }
+  };
+
+  // Load chatters from Twitch API
+  const loadChatters = async () => {
+    if (!authToken || !isConnected) {
+      setApiError('Necesitas estar conectado con un token OAuth');
+      setTimeout(() => setApiError(null), 3000);
+      return;
+    }
+    
+    setIsLoadingChatters(true);
+    setApiError(null);
+    
+    try {
+      const channel = twitchService.getCurrentChannel();
+      const userId = await twitchService.getUserId(authToken, channel);
+      
+      if (!userId) {
+        setApiError('No se pudo obtener el ID del canal');
+        setIsLoadingChatters(false);
+        return;
+      }
+      
+      const chatters = await twitchService.getChatters(authToken, userId, userId);
+      
+      if (!chatters) {
+        setApiError('Token sin permiso. Genera uno nuevo con scope: moderator:read:chatters');
+        setIsLoadingChatters(false);
+        return;
+      }
+      
+      let added = 0;
+      let duplicates = 0;
+      chatters.forEach(name => {
+        const nameLower = name.toLowerCase();
+        if (participantsRef.current.has(nameLower)) {
+          duplicates++;
+        } else {
+          participantsRef.current.add(nameLower);
+          added++;
+        }
+      });
+      
+      setParticipants(new Set(participantsRef.current));
+      setManualParticipantError(`Chatters: ${added} añadidos${duplicates > 0 ? `, ${duplicates} ya estaban` : ''}`);
+      setTimeout(() => setManualParticipantError(null), 3000);
+    } catch (err) {
+      setApiError('Error al cargar chatters');
+    } finally {
+      setIsLoadingChatters(false);
+    }
+  };
+
+  // Load subscribers from Twitch API
+  const loadSubscribers = async () => {
+    if (!authToken || !isConnected) {
+      setApiError('Necesitas estar conectado con un token OAuth');
+      setTimeout(() => setApiError(null), 3000);
+      return;
+    }
+    
+    setIsLoadingSubs(true);
+    setApiError(null);
+    
+    try {
+      const channel = twitchService.getCurrentChannel();
+      const userId = await twitchService.getUserId(authToken, channel);
+      
+      if (!userId) {
+        setApiError('No se pudo obtener el ID del canal');
+        setIsLoadingSubs(false);
+        return;
+      }
+      
+      const subs = await twitchService.getSubscribers(authToken, userId);
+      
+      if (!subs) {
+        setApiError('Token sin permiso. Genera uno nuevo con scope: channel:read:subscriptions');
+        setIsLoadingSubs(false);
+        return;
+      }
+      
+      let added = 0;
+      let duplicates = 0;
+      subs.forEach(name => {
+        const nameLower = name.toLowerCase();
+        if (participantsRef.current.has(nameLower)) {
+          duplicates++;
+        } else {
+          participantsRef.current.add(nameLower);
+          added++;
+        }
+      });
+      
+      setParticipants(new Set(participantsRef.current));
+      setManualParticipantError(`Subs: ${added} añadidos${duplicates > 0 ? `, ${duplicates} ya estaban` : ''}`);
+      setTimeout(() => setManualParticipantError(null), 3000);
+    } catch (err) {
+      setApiError('Error al cargar suscriptores');
+    } finally {
+      setIsLoadingSubs(false);
+    }
+  };
+
+  const addManualParticipantToThread = (threadId: string) => {
+    const name = (threadManualParticipant[threadId] || '').trim().toLowerCase();
+    if (!name) return;
+    
+    const thread = threads.find(t => t.id === threadId);
+    if (!thread) return;
+    
+    // Check for duplicates
+    const existingParticipant = thread.participants.find(p => p.username.toLowerCase() === name);
+    if (existingParticipant) {
+      setThreadManualError(prev => ({ ...prev, [threadId]: 'Este usuario ya está participando' }));
+      setTimeout(() => setThreadManualError(prev => ({ ...prev, [threadId]: null })), 2000);
+      return;
+    }
+    
+    const participant: GiveawayParticipant = {
+      oderId: `manual_${name}_${Date.now()}`,
+      username: name,
+      timestamp: Date.now(),
+      messageId: `manual_${Date.now()}`,
+    };
+    
+    setThreads(prev => prev.map(t => 
+      t.id === threadId 
+        ? { ...t, participants: [...t.participants, participant] }
+        : t
+    ));
+    
+    setThreadManualParticipant(prev => ({ ...prev, [threadId]: '' }));
+    setThreadManualError(prev => ({ ...prev, [threadId]: null }));
   };
 
   const formatTime = (timestamp: number) => {
@@ -667,17 +1054,30 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             {/* Mode selector */}
             <div className="flex gap-2">
               <button 
-                onClick={() => { setRaffleMode('viewers'); resetRaffle(); }} 
+                onClick={() => { setRaffleMode('viewers'); softResetRaffle(); }} 
                 className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'viewers' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
               >
                 <Users size={18} /> {t.randomWinner.viewers}
               </button>
               <button 
-                onClick={() => { setRaffleMode('keyword'); resetRaffle(); }} 
+                onClick={() => { setRaffleMode('keyword'); softResetRaffle(); }} 
                 className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'keyword' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
               >
                 <MessageSquare size={18} /> {t.randomWinner.keyword}
               </button>
+            </div>
+
+            {/* Raffle title */}
+            <div className="space-y-2">
+              <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Título del sorteo (opcional)</label>
+              <input 
+                type="text" 
+                value={raffleTitle} 
+                onChange={(e) => setRaffleTitle(e.target.value)} 
+                placeholder="Ej: Sorteo de subs, Regalo navideño..." 
+                disabled={isRunning} 
+                className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 disabled:opacity-50" 
+              />
             </div>
 
             {/* Common options */}
@@ -748,28 +1148,169 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               </div>
             )}
 
-            {/* Participant count (viewers mode without timer) */}
-            {raffleMode === 'viewers' && !useTimer && !isRunning && (
-              <div className="text-center p-4 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm">{t.randomWinner.availableParticipants}</p>
-                <p className="text-3xl font-bold text-zinc-800 dark:text-white mt-1">{viewerCount}</p>
-                <p className="text-xs text-zinc-500 mt-1">{subsOnly ? t.randomWinner.subsInChat : t.randomWinner.usersInChat}</p>
-              </div>
-            )}
-
-            {/* Running stats */}
-            {(isRunning || participants.size > 0) && (
-              <div className={`grid gap-3 ${useTimer ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                {useTimer && (
-                  <div className="text-center p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
-                    <p className="text-zinc-500 dark:text-zinc-400 text-xs">{t.randomWinner.time}</p>
-                    <p className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-zinc-800 dark:text-white'}`}>{timeLeft}s</p>
-                  </div>
-                )}
-                <div className="text-center p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
-                  <p className="text-zinc-500 dark:text-zinc-400 text-xs">{t.randomWinner.participants}</p>
-                  <p className="text-2xl font-bold text-green-500">{participants.size}</p>
+            {/* Manual participant input */}
+            <div className="space-y-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600">
+              <div className="flex items-center justify-between">
+                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">
+                  <UserPlus size={14} />
+                  Añadir participantes
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={exportParticipants}
+                    disabled={getAllParticipants().length === 0}
+                    className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Exportar participantes"
+                  >
+                    <Download size={14} />
+                  </button>
+                  <label className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors cursor-pointer" title="Importar participantes">
+                    <Upload size={14} />
+                    <input
+                      ref={participantsFileInputRef}
+                      type="file"
+                      accept=".txt,.csv"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && importParticipants(e.target.files[0])}
+                    />
+                  </label>
                 </div>
+              </div>
+              
+              {/* Load from Twitch API button - dynamic based on subsOnly */}
+              {authToken && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={subsOnly ? loadSubscribers : loadChatters}
+                    disabled={(subsOnly ? isLoadingSubs : isLoadingChatters) || !isConnected}
+                    className={`flex-1 py-2 px-3 ${subsOnly ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-600 dark:text-yellow-400' : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-600 dark:text-cyan-400'} disabled:bg-zinc-200 dark:disabled:bg-zinc-700 disabled:text-zinc-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-xs`}
+                  >
+                    {(subsOnly ? isLoadingSubs : isLoadingChatters) ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : subsOnly ? (
+                      <Star size={14} />
+                    ) : (
+                      <Users size={14} />
+                    )}
+                    {subsOnly ? 'Cargar Subs' : 'Cargar Chatters'}
+                  </button>
+                  <button
+                    onClick={() => setShowBlacklistModal(true)}
+                    className="py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-xs"
+                    title="Lista de prohibidos"
+                  >
+                    <Ban size={14} />
+                    {blacklist.size > 0 && <span className="text-[10px]">({blacklist.size})</span>}
+                  </button>
+                </div>
+              )}
+              
+              {/* Blacklist button when no authToken */}
+              {!authToken && (
+                <button
+                  onClick={() => setShowBlacklistModal(true)}
+                  className="w-full py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-xs"
+                >
+                  <Ban size={14} />
+                  Lista de prohibidos {blacklist.size > 0 && `(${blacklist.size})`}
+                </button>
+              )}
+              
+              {apiError && (
+                <p className="text-red-500 text-xs bg-red-500/10 p-2 rounded-lg">{apiError}</p>
+              )}
+              
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={manualParticipant} 
+                  onChange={(e) => setManualParticipant(e.target.value.replace(/\s/g, ''))} 
+                  placeholder="Nombre de usuario" 
+                  onKeyDown={(e) => e.key === 'Enter' && addManualParticipant()}
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" 
+                />
+                <button 
+                  onClick={addManualParticipant}
+                  disabled={!manualParticipant.trim()}
+                  className="px-3 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+              {manualParticipantError && (
+                <p className={`text-xs ${manualParticipantError.includes('Añadidos') ? 'text-green-500' : 'text-red-500'}`}>{manualParticipantError}</p>
+              )}
+            </div>
+
+            {/* Participants list - always shown */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">
+                  <Users size={14} />
+                  Participantes ({raffleMode === 'viewers' && !useTimer ? getAllParticipants().length : participants.size})
+                </label>
+                {participants.size > 0 && !isRunning && (
+                  <button 
+                    onClick={resetRaffle}
+                    className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div className="max-h-40 overflow-y-auto bg-zinc-100 dark:bg-zinc-800 rounded-xl p-2">
+                {(() => {
+                  const displayParticipants = raffleMode === 'viewers' && !useTimer 
+                    ? getAllParticipants() 
+                    : (Array.from(participants) as string[]);
+                  
+                  if (displayParticipants.length === 0) {
+                    return (
+                      <p className="text-xs text-zinc-500 text-center py-4">
+                        No hay participantes aún
+                      </p>
+                    );
+                  }
+                  
+                  return (
+                    <div className="flex flex-wrap gap-1">
+                      {displayParticipants.map((name) => {
+                        const isManual = isManualParticipant(name);
+                        return (
+                          <span 
+                            key={name}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                              isManual 
+                                ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30' 
+                                : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                            }`}
+                          >
+                            {name}
+                            <button 
+                              onClick={() => removeParticipant(name)}
+                              className="hover:text-red-500 transition-colors ml-0.5"
+                              title="Eliminar"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+              <p className="text-zinc-500 text-[10px] text-center">
+                <span className="inline-block w-2 h-2 rounded bg-purple-500/30 mr-1"></span>Manuales
+                <span className="inline-block w-2 h-2 rounded bg-zinc-300 dark:bg-zinc-600 ml-2 mr-1"></span>Del chat
+              </p>
+            </div>
+
+            {/* Running stats - time only */}
+            {isRunning && useTimer && (
+              <div className="text-center p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
+                <p className="text-zinc-500 dark:text-zinc-400 text-xs">{t.randomWinner.time}</p>
+                <p className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-zinc-800 dark:text-white'}`}>{timeLeft}s</p>
               </div>
             )}
 
@@ -795,11 +1336,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               {!isRunning && !winner && (
                 <button 
                   onClick={startRaffle} 
-                  disabled={(raffleMode === 'keyword' && !keyword.trim()) || (raffleMode === 'viewers' && !useTimer && viewerCount === 0) || isSelecting} 
+                  disabled={(raffleMode === 'keyword' && !keyword.trim()) || (raffleMode === 'viewers' && !useTimer && getAllParticipants().length === 0) || isSelecting} 
                   className="w-full flex items-center justify-center gap-2 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
                 >
                   {useTimer ? <Play size={20} /> : <Sparkles size={20} />}
-                  {useTimer ? 'Iniciar Recolección' : t.randomWinner.selectWinner}
+                  {useTimer ? 'Iniciar Recolección' : `${t.randomWinner.selectWinner} (${getAllParticipants().length})`}
                 </button>
               )}
 
@@ -839,7 +1380,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             {/* Clear all button */}
             <button 
               onClick={() => { 
-                resetRaffle(); 
+                clearAllParticipants();
+                softResetRaffle();
+                setRaffleTitle('');
                 setKeyword(''); 
                 setTimeLimit(60); 
                 setSubsOnly(false);
@@ -949,6 +1492,34 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 {/* Expanded Content */}
                 {expandedThreadId === thread.id && (
                   <div className="px-3 pb-3 border-t border-zinc-200 dark:border-zinc-700 pt-3 space-y-3">
+                    {/* Manual participant input for thread */}
+                    <div className="space-y-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-600">
+                      <label className="text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase flex items-center gap-1">
+                        <UserPlus size={12} />
+                        Añadir manual
+                      </label>
+                      <div className="flex gap-1">
+                        <input 
+                          type="text" 
+                          value={threadManualParticipant[thread.id] || ''} 
+                          onChange={(e) => setThreadManualParticipant(prev => ({ ...prev, [thread.id]: e.target.value.replace(/\s/g, '') }))} 
+                          placeholder="Usuario" 
+                          onKeyDown={(e) => e.key === 'Enter' && addManualParticipantToThread(thread.id)}
+                          className="flex-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-800 dark:text-white rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-500" 
+                        />
+                        <button 
+                          onClick={() => addManualParticipantToThread(thread.id)}
+                          disabled={!(threadManualParticipant[thread.id] || '').trim()}
+                          className="px-2 py-1 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-600 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      {threadManualError[thread.id] && (
+                        <p className="text-red-500 text-[10px]">{threadManualError[thread.id]}</p>
+                      )}
+                    </div>
+
                     <div>
                       <p className="text-xs text-zinc-500 font-bold uppercase mb-2">
                         Participantes ({getUniqueParticipantCount(thread)})
@@ -1001,6 +1572,123 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           </div>
         )}
       </div>
+
+      {/* Blacklist Modal */}
+      {showBlacklistModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-500/20 rounded-lg">
+                  <Shield className="text-red-500" size={24} />
+                </div>
+                <h3 className="font-bold text-lg text-zinc-800 dark:text-white">Lista de Prohibidos</h3>
+              </div>
+              <button
+                onClick={() => setShowBlacklistModal(false)}
+                className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">
+              Los usuarios en esta lista nunca podrán ganar sorteos (bots, cuentas no deseadas, etc.)
+            </p>
+            
+            {/* Add user input */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={blacklistInput}
+                onChange={(e) => setBlacklistInput(e.target.value.replace(/\s/g, ''))}
+                placeholder="Nombre de usuario"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && blacklistInput.trim()) {
+                    addToBlacklist(blacklistInput);
+                    setBlacklistInput('');
+                  }
+                }}
+                className="flex-1 bg-zinc-100 dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
+              />
+              <button
+                onClick={() => {
+                  if (blacklistInput.trim()) {
+                    addToBlacklist(blacklistInput);
+                    setBlacklistInput('');
+                  }
+                }}
+                disabled={!blacklistInput.trim()}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+            
+            {/* Import/Export buttons */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={exportBlacklist}
+                disabled={blacklist.size === 0}
+                className="flex-1 py-2 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <Download size={16} />
+                Exportar
+              </button>
+              <label className="flex-1 py-2 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer">
+                <Upload size={16} />
+                Importar
+                <input
+                  ref={blacklistFileInputRef}
+                  type="file"
+                  accept=".txt"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && importBlacklist(e.target.files[0])}
+                />
+              </label>
+            </div>
+            
+            {/* Blacklist users */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2">
+                Usuarios bloqueados ({blacklist.size})
+              </p>
+              {blacklist.size === 0 ? (
+                <div className="text-center py-8 text-zinc-400">
+                  <Ban size={32} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No hay usuarios en la lista</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1 max-h-48 overflow-y-auto bg-zinc-50 dark:bg-zinc-900/50 rounded-lg p-2">
+                  {Array.from(blacklist as Set<string>).sort().map((name) => (
+                    <span
+                      key={name}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30"
+                    >
+                      {name}
+                      <button
+                        onClick={() => removeFromBlacklist(name)}
+                        className="hover:text-red-700 dark:hover:text-red-300 transition-colors ml-0.5"
+                        title="Quitar de la lista"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Close button */}
+            <button
+              onClick={() => setShowBlacklistModal(false)}
+              className="mt-4 w-full py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
