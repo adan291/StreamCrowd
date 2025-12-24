@@ -9,7 +9,7 @@ import { openTwitchOAuthPopup, TwitchOAuthError } from '../services/twitchOAuth'
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
-  onConnect: (channel: string, token?: string) => void;
+  onConnect: (channel: string, token?: string, userId?: string) => void;
   errorMessage?: string | null;
   savedCredentials?: { channel: string; token: string } | null;
   onClearSavedCredentials?: () => void;
@@ -41,10 +41,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
     
     try {
       const result = await openTwitchOAuthPopup();
-      // Auto-fill channel and token, then connect
+      // Auto-fill channel and token, then connect with userId
       setChannel(result.username);
       setToken(result.accessToken);
-      onConnect(result.username, result.accessToken);
+      onConnect(result.username, result.accessToken, result.userId);
     } catch (err) {
       const oauthError = err as TwitchOAuthError;
       if (oauthError.error === 'popup_closed') {

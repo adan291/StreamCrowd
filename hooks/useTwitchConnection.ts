@@ -16,6 +16,7 @@ import { twitchService } from '../services/twitchService';
 const STORAGE_KEY_CHANNEL = 'twitch_channel';
 const STORAGE_KEY_TOKEN = 'twitch_token';
 const STORAGE_KEY_TOKEN_EXPIRES = 'twitch_token_expires';
+const STORAGE_KEY_USER_ID = 'twitch_user_id';
 
 /**
  * Return type for the useTwitchConnection hook
@@ -31,8 +32,10 @@ export interface UseTwitchConnectionReturn {
   channelAvatar: string | null;
   /** OAuth token for authenticated connections */
   authToken: string;
+  /** User ID (broadcaster ID) for API calls */
+  userId: string;
   /** Connect to a Twitch channel */
-  connect: (channel: string, token?: string) => void;
+  connect: (channel: string, token?: string, userId?: string) => void;
   /** Disconnect from current channel */
   disconnect: () => void;
   /** Collaboration channels */
@@ -48,7 +51,7 @@ export interface UseTwitchConnectionReturn {
   /** Whether token is expiring soon (< 10 minutes) */
   tokenExpiringSoon: boolean;
   /** Saved credentials from localStorage */
-  savedCredentials: { channel: string; token: string } | null;
+  savedCredentials: { channel: string; token: string; userId?: string } | null;
   /** Clear saved credentials */
   clearSavedCredentials: () => void;
 }
@@ -118,6 +121,7 @@ export function useTwitchConnection(
   const [channelName, setChannelName] = useState<string>('');
   const [channelAvatar, setChannelAvatar] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
   
   // Token expiration state
   const [tokenExpiresIn, setTokenExpiresIn] = useState<number | null>(null);
@@ -138,11 +142,12 @@ export function useTwitchConnection(
   setErrorRef.current = setError;
 
   // Load saved credentials on mount
-  const [savedCredentials, setSavedCredentials] = useState<{ channel: string; token: string } | null>(() => {
+  const [savedCredentials, setSavedCredentials] = useState<{ channel: string; token: string; userId?: string } | null>(() => {
     try {
       const channel = localStorage.getItem(STORAGE_KEY_CHANNEL);
       const token = localStorage.getItem(STORAGE_KEY_TOKEN);
       const expires = localStorage.getItem(STORAGE_KEY_TOKEN_EXPIRES);
+      const savedUserId = localStorage.getItem(STORAGE_KEY_USER_ID);
       
       if (channel && token) {
         // Check if token might still be valid (stored expiration time)
@@ -153,10 +158,11 @@ export function useTwitchConnection(
             localStorage.removeItem(STORAGE_KEY_CHANNEL);
             localStorage.removeItem(STORAGE_KEY_TOKEN);
             localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+            localStorage.removeItem(STORAGE_KEY_USER_ID);
             return null;
           }
         }
-        return { channel, token };
+        return { channel, token, userId: savedUserId || undefined };
       }
       return null;
     } catch {
@@ -169,6 +175,7 @@ export function useTwitchConnection(
     localStorage.removeItem(STORAGE_KEY_CHANNEL);
     localStorage.removeItem(STORAGE_KEY_TOKEN);
     localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+    localStorage.removeItem(STORAGE_KEY_USER_ID);
     setSavedCredentials(null);
   }, []);
 
@@ -224,12 +231,16 @@ export function useTwitchConnection(
   /**
    * Connect to a Twitch channel
    */
-  const connect = useCallback(async (channel: string, token?: string) => {
+  const connect = useCallback(async (channel: string, token?: string, passedUserId?: string) => {
     if (!channel.trim()) return;
 
     setChannelName(channel);
     setStatus(ConnectionStatus.CONNECTING);
     setError(null);
+    
+    if (passedUserId) {
+      setUserId(passedUserId);
+    }
     
     if (token) {
       setAuthToken(token);
@@ -237,7 +248,13 @@ export function useTwitchConnection(
       // Validate token and get expiration (non-blocking)
       twitchService.validateToken(token).then(validation => {
         if (validation && validation.valid) {
-          // Token is valid
+          // If we got userId from validation and don't have one yet, use it
+          if (validation.userId && !passedUserId) {
+            setUserId(validation.userId);
+          }
+          
+          const finalUserId = passedUserId || validation.userId || '';
+          
           if (validation.expiresIn > 0) {
             // Token has expiration info - track it
             setTokenExpiresIn(validation.expiresIn);
@@ -252,6 +269,9 @@ export function useTwitchConnection(
           try {
             localStorage.setItem(STORAGE_KEY_CHANNEL, channel);
             localStorage.setItem(STORAGE_KEY_TOKEN, token);
+            if (finalUserId) {
+              localStorage.setItem(STORAGE_KEY_USER_ID, finalUserId);
+            }
             if (validation.expiresIn > 0) {
               const expiresAt = Date.now() + (validation.expiresIn * 1000);
               localStorage.setItem(STORAGE_KEY_TOKEN_EXPIRES, expiresAt.toString());
@@ -259,7 +279,7 @@ export function useTwitchConnection(
               // No expiration - remove any old expiration data
               localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
             }
-            setSavedCredentials({ channel, token });
+            setSavedCredentials({ channel, token, userId: finalUserId || undefined });
           } catch (e) {
             console.error('Error saving credentials to localStorage:', e);
           }
@@ -299,6 +319,7 @@ export function useTwitchConnection(
     setChannelName('');
     setChannelAvatar(null);
     setAuthToken('');
+    setUserId('');
     setError(null);
     setCollaborationChannels([]);
     setTokenExpiresIn(null);
@@ -345,6 +366,7 @@ export function useTwitchConnection(
     channelName,
     channelAvatar,
     authToken,
+    userId,
     connect,
     disconnect,
     collaborationChannels,

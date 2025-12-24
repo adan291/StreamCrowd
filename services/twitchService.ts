@@ -3,6 +3,12 @@ import tmi from 'tmi.js';
 import { ConnectionStatus, CollaborationChannel } from '../types';
 
 /**
+ * Twitch Client ID - uses environment variable if set, otherwise falls back to public ID
+ * IMPORTANT: When using OAuth tokens from your own app, the Client ID must match
+ */
+const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
+
+/**
  * Configuration for TwitchService reconnection behavior
  */
 export interface TwitchServiceConfig {
@@ -840,7 +846,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5', // Public Twitch client ID
+            'Client-Id': TWITCH_CLIENT_ID, // Public Twitch client ID
           }
         }
       );
@@ -880,7 +886,7 @@ class TwitchService {
         const response = await fetch(url.toString(), {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         });
         
@@ -916,7 +922,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -944,7 +950,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -983,7 +989,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -1082,7 +1088,7 @@ class TwitchService {
       const response = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
-          'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          'Client-Id': TWITCH_CLIENT_ID,
         }
       });
       
@@ -1122,7 +1128,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -1172,7 +1178,7 @@ class TwitchService {
       const response = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
-          'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+          'Client-Id': TWITCH_CLIENT_ID,
         }
       });
       
@@ -1213,7 +1219,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -1250,7 +1256,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -1292,7 +1298,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -1341,7 +1347,7 @@ class TwitchService {
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );

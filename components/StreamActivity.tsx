@@ -30,6 +30,9 @@ import { useI18n } from '../i18n';
 import { twitchService } from '../services/twitchService';
 import { storageHelpers, generateEventId, getTodayString } from '../hooks/useStreamEvents';
 
+// Twitch Client ID from environment
+const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
+
 // Tipos de eventos del stream
 export type StreamEventType = 'vote' | 'follow' | 'sub' | 'resub' | 'gift' | 'raid' | 'bits';
 
@@ -262,6 +265,7 @@ interface StreamActivityProps {
   pollOptions?: { [key: number]: { color: string; label: string; icon?: string; image?: string } };
   channelName?: string;
   authToken?: string;
+  userId?: string;
   onEventAdded?: (event: StreamEvent) => void;
 }
 
@@ -271,6 +275,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   pollOptions = {},
   channelName = 'unknown',
   authToken,
+  userId,
   onEventAdded
 }) => {
   const { t } = useI18n();
@@ -315,6 +320,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       });
     }
   }, [authToken]);
+
+  // Helper to get broadcaster ID - uses prop if available, otherwise fetches
+  const getBroadcasterId = async (): Promise<string | null> => {
+    if (userId) return userId;
+    if (!authToken || !channelName) return null;
+    return await twitchService.getUserId(authToken, channelName);
+  };
 
   const hasScope = (scope: string) => availableScopes.includes(scope);
 
@@ -443,8 +455,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
@@ -452,11 +464,11 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       // Usar la API de Helix para obtener followers
       const cleanToken = authToken.replace('oauth:', '');
       const response = await fetch(
-        `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${userId}&first=100`,
+        `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcasterId}&first=100`,
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -505,8 +517,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
@@ -514,11 +526,11 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       // Obtener detalles de subs
       const cleanToken = authToken.replace('oauth:', '');
       const response = await fetch(
-        `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${userId}&first=100`,
+        `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${broadcasterId}&first=100`,
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': 'gp762nuuoqcoxypju8c569th9wz7q5',
+            'Client-Id': TWITCH_CLIENT_ID,
           }
         }
       );
@@ -571,13 +583,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
-      const leaderboard = await twitchService.getBitsLeaderboard(authToken, userId, period);
+      const leaderboard = await twitchService.getBitsLeaderboard(authToken, broadcasterId, period);
       if (!leaderboard) {
         setFetchError(OAUTH_ERRORS['missing_scope_bits']);
         return;
@@ -618,13 +630,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
-      const clips = await twitchService.getClips(authToken, userId, 50);
+      const clips = await twitchService.getClips(authToken, broadcasterId, 50);
       if (!clips) {
         setFetchError(OAUTH_ERRORS['server_error']);
         return;
@@ -650,13 +662,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
-      const videos = await twitchService.getVideos(authToken, userId, 'all', 50);
+      const videos = await twitchService.getVideos(authToken, broadcasterId, 'all', 50);
       if (!videos) {
         setFetchError(OAUTH_ERRORS['server_error']);
         return;
@@ -682,13 +694,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
-      const mods = await twitchService.getModerators(authToken, userId);
+      const mods = await twitchService.getModerators(authToken, broadcasterId);
       if (!mods) {
         setFetchError(OAUTH_ERRORS['missing_scope_moderation']);
         return;
@@ -714,13 +726,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     setFetchError(null);
     
     try {
-      const userId = await twitchService.getUserId(authToken, channelName);
-      if (!userId) {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
         setFetchError(OAUTH_ERRORS['channel_not_found']);
         return;
       }
       
-      const vips = await twitchService.getVIPs(authToken, userId);
+      const vips = await twitchService.getVIPs(authToken, broadcasterId);
       if (!vips) {
         setFetchError(OAUTH_ERRORS['missing_scope_vips']);
         return;

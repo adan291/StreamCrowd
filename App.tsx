@@ -102,6 +102,7 @@ const App: React.FC = () => {
     tokenExpiringSoon,
     savedCredentials,
     clearSavedCredentials,
+    userId,
   } = useTwitchConnection({
     onStatusChange: (newStatus, err) => {
       if (err) {
@@ -1332,6 +1333,7 @@ const App: React.FC = () => {
                   collaborationChannels={collaborationChannels}
                   mainChannel={channelName}
                   authToken={authToken}
+                  userId={userId}
                 />
               </div>
             )}
@@ -1390,6 +1392,7 @@ const App: React.FC = () => {
                       pollOptions={poll.currentPoll ? poll.currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
                       channelName={channelName}
                       authToken={authToken}
+                      userId={userId}
                       onEventAdded={streamEventsHook.addEvent}
                     />
                   )}

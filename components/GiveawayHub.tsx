@@ -42,6 +42,7 @@ interface GiveawayHubProps {
   collaborationChannels?: CollaborationChannel[];
   mainChannel?: string;
   authToken?: string;
+  userId?: string;
 }
 
 type TabType = 'raffle' | 'active';
@@ -84,6 +85,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   isConnected,
   onClearChatMessages,
   authToken,
+  userId: propUserId,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabType>('raffle');
@@ -730,15 +732,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     
     try {
       const channel = twitchService.getCurrentChannel();
-      const userId = await twitchService.getUserId(authToken, channel);
+      // Use prop userId if available, otherwise fetch it
+      const odUserId = propUserId || await twitchService.getUserId(authToken, channel);
       
-      if (!userId) {
+      if (!odUserId) {
         setApiError('No se pudo obtener el ID del canal');
         setIsLoadingChatters(false);
         return;
       }
       
-      const chatters = await twitchService.getChatters(authToken, userId, userId);
+      const chatters = await twitchService.getChatters(authToken, odUserId, odUserId);
       
       if (!chatters) {
         setApiError('Token sin permiso. Genera uno nuevo con scope: moderator:read:chatters');
@@ -781,15 +784,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     
     try {
       const channel = twitchService.getCurrentChannel();
-      const userId = await twitchService.getUserId(authToken, channel);
+      // Use prop userId if available, otherwise fetch it
+      const odUserId = propUserId || await twitchService.getUserId(authToken, channel);
       
-      if (!userId) {
+      if (!odUserId) {
         setApiError('No se pudo obtener el ID del canal');
         setIsLoadingSubs(false);
         return;
       }
       
-      const subs = await twitchService.getSubscribers(authToken, userId);
+      const subs = await twitchService.getSubscribers(authToken, odUserId);
       
       if (!subs) {
         setApiError('Token sin permiso. Genera uno nuevo con scope: channel:read:subscriptions');
