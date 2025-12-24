@@ -1371,7 +1371,7 @@ const App: React.FC = () => {
                     onClick={() => setDataSubTab('analytics')}
                   >
                     <BarChart3 size={16} /> {t.nav.analytics}
-                    {aiAnalytics.config?.enabled && (
+                    {aiAnalytics.config && Object.values(aiAnalytics.config.providers).some(p => p.enabled) && (
                       <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded-full">IA</span>
                     )}
                   </button>
@@ -1406,7 +1406,7 @@ const App: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <Bot className="w-5 h-5 text-purple-400" />
                           <span className="text-white font-medium">{t.analytics.configureAI}</span>
-                          {aiAnalytics.config?.enabled && (
+                          {aiAnalytics.config && Object.values(aiAnalytics.config.providers).some(p => p.enabled) && (
                             <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">
                               {t.analytics.aiActive}
                             </span>
