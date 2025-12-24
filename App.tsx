@@ -138,6 +138,13 @@ const App: React.FC = () => {
 
   // Stream events hook - captures subs, resubs, gifts, etc.
   const streamEventsHook = useStreamEvents();
+  
+  // Sync channel name with stream events hook
+  useEffect(() => {
+    if (channelName) {
+      streamEventsHook.setChannelName(channelName);
+    }
+  }, [channelName]);
 
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);

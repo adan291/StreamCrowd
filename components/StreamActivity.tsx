@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { twitchService } from '../services/twitchService';
+import { storageHelpers, generateEventId, getTodayString } from '../hooks/useStreamEvents';
 
 // Tipos de eventos del stream
 export type StreamEventType = 'vote' | 'follow' | 'sub' | 'resub' | 'gift' | 'raid' | 'bits';
@@ -51,8 +52,8 @@ export interface StreamEvent {
   };
 }
 
-// Storage keys
-const EVENTS_BY_DATE_KEY = 'stream_activity_by_date';
+// Storage keys - now managed by useStreamEvents hook
+const EVENTS_BY_DATE_KEY = 'stream_activity_by_date_v2';
 
 // Scopes necesarios para cada funcionalidad
 const REQUIRED_SCOPES = {
@@ -210,71 +211,27 @@ const parseOAuthError = (status: number, errorBody?: string, dataType?: string):
   return OAUTH_ERRORS['unknown'];
 };
 
-// Funciones de persistencia
+// Funciones de persistencia - delegadas al hook useStreamEvents
 export const saveEvents = (events: StreamEvent[], channelName: string): void => {
-  const today = new Date().toISOString().split('T')[0];
-  const key = `${EVENTS_BY_DATE_KEY}_${channelName}_${today}`;
-  
-  const existing = loadEventsByDate(channelName, today);
-  const merged = [...existing];
-  
-  events.forEach(event => {
-    if (!merged.find(e => e.id === event.id)) {
-      merged.push(event);
-    }
-  });
-  
-  const trimmed = merged.slice(-1000);
-  localStorage.setItem(key, JSON.stringify(trimmed));
-  
-  const datesKey = `${EVENTS_BY_DATE_KEY}_${channelName}_dates`;
-  const dates: string[] = JSON.parse(localStorage.getItem(datesKey) || '[]');
-  if (!dates.includes(today)) {
-    dates.push(today);
-    const trimmedDates = dates.slice(-30);
-    localStorage.setItem(datesKey, JSON.stringify(trimmedDates));
-  }
+  const today = getTodayString();
+  storageHelpers.saveEventsForDate(channelName, today, events);
 };
 
 export const loadEventsByDate = (channelName: string, date: string): StreamEvent[] => {
-  const key = `${EVENTS_BY_DATE_KEY}_${channelName}_${date}`;
-  const stored = localStorage.getItem(key);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return [];
-    }
-  }
-  return [];
+  return storageHelpers.loadEventsForDate(channelName, date);
 };
 
 export const getAvailableDates = (channelName: string): string[] => {
-  const datesKey = `${EVENTS_BY_DATE_KEY}_${channelName}_dates`;
-  const stored = localStorage.getItem(datesKey);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return [];
-    }
-  }
-  return [];
+  return storageHelpers.getAvailableDates(channelName);
 };
 
 export const clearEventsByDate = (channelName: string, date: string): void => {
-  const key = `${EVENTS_BY_DATE_KEY}_${channelName}_${date}`;
-  localStorage.removeItem(key);
-  
-  const datesKey = `${EVENTS_BY_DATE_KEY}_${channelName}_dates`;
-  const dates: string[] = JSON.parse(localStorage.getItem(datesKey) || '[]');
-  const filtered = dates.filter(d => d !== date);
-  localStorage.setItem(datesKey, JSON.stringify(filtered));
+  storageHelpers.clearEventsForDate(channelName, date);
 };
 
 // Helper para convertir votos a eventos
 export const voteToEvent = (vote: VoteRecord): StreamEvent => ({
-  id: `vote_${vote.optionId}_${vote.timestamp}`,
+  id: generateEventId('vote', vote.username, vote.timestamp, `opt${vote.optionId}`),
   type: 'vote',
   username: vote.username,
   timestamp: vote.timestamp,
@@ -376,13 +333,45 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   }, [allEvents, historyEvents, activeFilters, viewMode]);
 
   // Estadísticas
+  // IMPORTANT: For gifts, we avoid double-counting by preferring individual gifts over bulk announcements
   const stats = useMemo(() => {
     const eventsToCount = viewMode === 'live' ? allEvents : historyEvents;
+    
+    // Handle gift counting to avoid duplicates
+    const giftEvents = eventsToCount.filter(e => e.type === 'gift');
+    const individualGifts = giftEvents.filter(e => e.data?.recipientUsername);
+    const bulkGifts = giftEvents.filter(e => e.data?.message?.startsWith('bulk_gift_'));
+    
+    // Use individual gifts for counting if available, otherwise use bulk
+    const giftsToCount = individualGifts.length > 0 ? individualGifts : bulkGifts;
+    
+    // Total gift count
+    let totalGifts: number;
+    if (individualGifts.length > 0) {
+      totalGifts = individualGifts.length;
+    } else {
+      totalGifts = bulkGifts.reduce((acc, e) => acc + (e.data?.giftCount || 1), 0);
+    }
+    
+    // Gift tier counts
+    const countGiftsByTier = (tier: string): number => {
+      if (individualGifts.length > 0) {
+        return individualGifts.filter(e => e.data?.tier === tier).length;
+      } else {
+        return bulkGifts
+          .filter(e => e.data?.tier === tier)
+          .reduce((acc, e) => acc + (e.data?.giftCount || 1), 0);
+      }
+    };
+    
     return {
       follows: eventsToCount.filter(e => e.type === 'follow').length,
       subs: eventsToCount.filter(e => e.type === 'sub').length,
       resubs: eventsToCount.filter(e => e.type === 'resub').length,
-      gifts: eventsToCount.filter(e => e.type === 'gift').reduce((acc, e) => acc + (e.data?.giftCount || 1), 0),
+      gifts: totalGifts,
+      giftsTier1: countGiftsByTier('1000'),
+      giftsTier2: countGiftsByTier('2000'),
+      giftsTier3: countGiftsByTier('3000'),
       raids: eventsToCount.filter(e => e.type === 'raid').length,
       bits: eventsToCount.filter(e => e.type === 'bits').reduce((acc, e) => acc + (e.data?.amount || 0), 0),
       votes: eventsToCount.filter(e => e.type === 'vote').length,
@@ -488,11 +477,12 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       
       // Convertir a eventos y añadir
       followers.forEach((f: { username: string; followedAt?: string }) => {
+        const timestamp = f.followedAt ? new Date(f.followedAt).getTime() : Date.now();
         const event: StreamEvent = {
-          id: `follow_api_${f.username}_${Date.now()}`,
+          id: generateEventId('follow_api', f.username, timestamp),
           type: 'follow',
           username: f.username,
-          timestamp: f.followedAt ? new Date(f.followedAt).getTime() : Date.now(),
+          timestamp,
         };
         onEventAdded?.(event);
       });
@@ -549,12 +539,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       setFetchedData(prev => ({ ...prev, subscribers }));
       
       // Convertir a eventos
-      subscribers.forEach((s: { username: string; tier: string; isGift: boolean }) => {
+      const now = Date.now();
+      subscribers.forEach((s: { username: string; tier: string; isGift: boolean }, index: number) => {
         const event: StreamEvent = {
-          id: `sub_api_${s.username}_${Date.now()}`,
+          id: generateEventId('sub_api', s.username, now, `idx${index}`),
           type: s.isGift ? 'gift' : 'sub',
           username: s.username,
-          timestamp: Date.now(),
+          timestamp: now,
           data: {
             tier: s.tier as SubTier,
           },
@@ -595,12 +586,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       setFetchedData(prev => ({ ...prev, bitsLeaderboard: leaderboard }));
       
       // Convertir a eventos de bits
+      const now = Date.now();
       leaderboard.forEach((entry) => {
         const event: StreamEvent = {
-          id: `bits_api_${entry.username}_${Date.now()}_${entry.rank}`,
+          id: generateEventId('bits_api', entry.username, now, `rank${entry.rank}`),
           type: 'bits',
           username: entry.username,
-          timestamp: Date.now(),
+          timestamp: now,
           data: {
             amount: entry.bits,
           },
@@ -848,15 +840,30 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
           </span>
         );
       case 'resub':
+        const resubTier = event.data?.tier || '1000';
         return (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400">
-            RESUB x{event.data?.months || 1}
+          <span 
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+            style={{ 
+              backgroundColor: `${getTierColor(resubTier)}20`,
+              color: getTierColor(resubTier)
+            }}
+          >
+            RESUB x{event.data?.months || 1} {getTierName(resubTier)}
           </span>
         );
       case 'gift':
+        const giftTier = event.data?.tier || '1000';
+        const isIndividualGift = !!event.data?.recipientUsername;
         return (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-500/20 text-pink-400">
-            🎁 x{event.data?.giftCount || 1}
+          <span 
+            className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+            style={{ 
+              backgroundColor: `${getTierColor(giftTier)}20`,
+              color: getTierColor(giftTier)
+            }}
+          >
+            🎁 {isIndividualGift ? `→ ${event.data?.recipientUsername}` : `x${event.data?.giftCount || 1}`} {getTierName(giftTier)}
           </span>
         );
       case 'raid':
