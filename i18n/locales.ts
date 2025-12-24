@@ -55,6 +55,11 @@ export interface Translations {
     errorChannelInvalid: string;
     errorTokenInvalid: string;
     urlDetected: string;
+    orLoginWith: string;
+    loginWithTwitch: string;
+    oauthLoading: string;
+    oauthError: string;
+    oauthPopupBlocked: string;
   };
   nav: {
     panel: string;
@@ -531,6 +536,11 @@ export const translations: Record<Locale, Translations> = {
       errorChannelInvalid: 'Nombre inválido (3-25 caracteres, letras, números y _).',
       errorTokenInvalid: 'Token inválido. Asegúrate de copiar el "ACCESS TOKEN".',
       urlDetected: 'URL detectada',
+      orLoginWith: 'o inicia sesión con',
+      loginWithTwitch: 'Iniciar sesión con Twitch',
+      oauthLoading: 'Conectando...',
+      oauthError: 'Error al iniciar sesión con Twitch',
+      oauthPopupBlocked: 'Popup bloqueado. Permite popups para este sitio.',
     },
     nav: {
       panel: 'Panel',
@@ -1020,6 +1030,11 @@ export const translations: Record<Locale, Translations> = {
       errorChannelInvalid: 'Invalid name (3-25 characters, letters, numbers and _).',
       errorTokenInvalid: 'Invalid token. Make sure to copy the "ACCESS TOKEN".',
       urlDetected: 'URL detected',
+      orLoginWith: 'or login with',
+      loginWithTwitch: 'Login with Twitch',
+      oauthLoading: 'Connecting...',
+      oauthError: 'Failed to login with Twitch',
+      oauthPopupBlocked: 'Popup blocked. Please allow popups for this site.',
     },
     nav: {
       panel: 'Panel',

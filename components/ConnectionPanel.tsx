@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { ConnectionStatus } from '../types';
 import { Button } from './Button';
-import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, ShieldAlert } from 'lucide-react';
+import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
+import { openTwitchOAuthPopup, TwitchOAuthError } from '../services/twitchOAuth';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -31,6 +32,32 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const [showToken, setShowToken] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isUrlDetected, setIsUrlDetected] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+
+  // Handle Twitch OAuth login
+  const handleTwitchLogin = async () => {
+    setIsOAuthLoading(true);
+    setLocalError(null);
+    
+    try {
+      const result = await openTwitchOAuthPopup();
+      // Auto-fill channel and token, then connect
+      setChannel(result.username);
+      setToken(result.accessToken);
+      onConnect(result.username, result.accessToken);
+    } catch (err) {
+      const oauthError = err as TwitchOAuthError;
+      if (oauthError.error === 'popup_closed') {
+        // User cancelled, don't show error
+      } else if (oauthError.error === 'popup_blocked') {
+        setLocalError(t.connection.oauthPopupBlocked || 'Popup blocked. Please allow popups for this site.');
+      } else {
+        setLocalError(oauthError.errorDescription || t.connection.oauthError || 'OAuth login failed');
+      }
+    } finally {
+      setIsOAuthLoading(false);
+    }
+  };
 
   // Format time remaining
   const formatTimeRemaining = (seconds: number): string => {
@@ -231,11 +258,46 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         <Button 
           fullWidth 
           type="submit" 
-          disabled={!channel.trim() || status === ConnectionStatus.CONNECTING}
+          disabled={!channel.trim() || status === ConnectionStatus.CONNECTING || isOAuthLoading}
           className="h-12 text-base shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40"
         >
           {status === ConnectionStatus.CONNECTING ? <><Loader2 className="animate-spin" size={20} /> {t.connection.connecting}</> : t.connection.connect}
         </Button>
+
+        {/* Divider */}
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-zinc-700"></div>
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="px-2 bg-gray-200 dark:bg-zinc-900 text-slate-500 dark:text-zinc-500">
+              {t.connection.orLoginWith || 'o inicia sesión con'}
+            </span>
+          </div>
+        </div>
+
+        {/* Twitch OAuth Login Button */}
+        <button
+          type="button"
+          onClick={handleTwitchLogin}
+          disabled={status === ConnectionStatus.CONNECTING || isOAuthLoading}
+          className="w-full h-12 flex items-center justify-center gap-2 bg-[#9146FF] hover:bg-[#7c3aed] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40"
+        >
+          {isOAuthLoading ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              {t.connection.oauthLoading || 'Conectando...'}
+            </>
+          ) : (
+            <>
+              <LogIn size={20} />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+              </svg>
+              {t.connection.loginWithTwitch || 'Iniciar sesión con Twitch'}
+            </>
+          )}
+        </button>
       </form>
       
       {displayError && (
