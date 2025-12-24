@@ -25,7 +25,20 @@ import {
   Video,
   Film,
   Shield,
-  Crown
+  Crown,
+  Ban,
+  Clock,
+  Search,
+  User,
+  X,
+  MessageSquare,
+  Gavel,
+  Eye,
+  Heart,
+  Play,
+  Square,
+  Settings,
+  Sliders
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { twitchService } from '../services/twitchService';
@@ -35,7 +48,7 @@ import { storageHelpers, generateEventId, getTodayString } from '../hooks/useStr
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
 // Tipos de eventos del stream
-export type StreamEventType = 'vote' | 'follow' | 'sub' | 'resub' | 'gift' | 'raid' | 'bits';
+export type StreamEventType = 'vote' | 'follow' | 'sub' | 'resub' | 'gift' | 'raid' | 'bits' | 'ban' | 'timeout';
 
 export type SubTier = '1000' | '2000' | '3000'; // Tier 1, 2, 3
 
@@ -53,6 +66,10 @@ export interface StreamEvent {
     recipientUsername?: string;
     viewerCount?: number;
     amount?: number; // For bits
+    // Ban/Timeout specific
+    duration?: number; // Timeout duration in seconds (null for permanent ban)
+    reason?: string; // Reason for ban/timeout
+    moderator?: string; // Who issued the ban/timeout
   };
 }
 
@@ -66,6 +83,8 @@ const REQUIRED_SCOPES = {
   bits: 'bits:read',
   moderation: 'moderation:read',
   vips: 'channel:read:vips',
+  chatters: 'moderator:read:chatters',
+  banUsers: 'moderator:manage:banned_users',
   clips: '', // Public - no scope needed
   videos: '', // Public - no scope needed
 };
@@ -284,10 +303,38 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   const prevEventsLength = useRef(events.length + votes.length);
   
   // Estados
-  const [activeFilters, setActiveFilters] = useState<Set<StreamEventType>>(new Set(['vote', 'follow', 'sub', 'resub', 'gift', 'raid', 'bits']));
-  const [viewMode, setViewMode] = useState<'live' | 'history' | 'fetch'>('live');
+  const [activeFilters, setActiveFilters] = useState<Set<StreamEventType>>(new Set(['vote', 'follow', 'sub', 'resub', 'gift', 'raid', 'bits', 'ban', 'timeout']));
+  const [viewMode, setViewMode] = useState<'live' | 'history' | 'fetch' | 'viewers'>('live');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [historyEvents, setHistoryEvents] = useState<StreamEvent[]>([]);
+  
+  // Estados para el panel de viewers
+  const [viewerSearch, setViewerSearch] = useState('');
+  const [selectedViewer, setSelectedViewer] = useState<string | null>(null);
+  const [viewerSortBy, setViewerSortBy] = useState<'activity' | 'bits' | 'subs' | 'bans'>('activity');
+  const [viewerTab, setViewerTab] = useState<'activity' | 'live'>('activity');
+  
+  // Estado para chatters en tiempo real
+  const [liveChatters, setLiveChatters] = useState<{ oderId: string; username: string; displayName: string }[]>([]);
+  const [loadingChatters, setLoadingChatters] = useState(false);
+  const [chattersError, setChattersError] = useState<string | null>(null);
+  const [lastChattersUpdate, setLastChattersUpdate] = useState<number | null>(null);
+  
+  // Estado para polling automático de chatters
+  const [chattersPollingActive, setChattersPollingActive] = useState(false);
+  const [chattersPollingInterval, setChattersPollingInterval] = useState(30); // segundos
+  const chattersPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Configuración de peso de votos por tier de suscripción
+  const [subWeightConfig, setSubWeightConfig] = useState({
+    enabled: true,
+    tier1Weight: 1,
+    tier2Weight: 2,
+    tier3Weight: 3,
+    followerWeight: 1,
+    regularWeight: 1,
+  });
+  const [showSubWeightConfig, setShowSubWeightConfig] = useState(false);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   
   // Estados para rango de fechas
@@ -315,6 +362,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   const [clipDateFrom, setClipDateFrom] = useState<string>('');
   const [clipDateTo, setClipDateTo] = useState<string>('');
   const [bitsPeriod, setBitsPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'all'>('all');
+  const [showModerationLog, setShowModerationLog] = useState(false);
 
   // Verificar scopes del token
   useEffect(() => {
@@ -349,6 +397,56 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     const eventsToFilter = viewMode === 'live' ? allEvents : historyEvents;
     return eventsToFilter.filter(e => activeFilters.has(e.type));
   }, [allEvents, historyEvents, activeFilters, viewMode]);
+
+  // Calcular registro de moderación (usuarios baneados/timeouteados)
+  const moderationLog = useMemo(() => {
+    const eventsToAnalyze = viewMode === 'live' ? allEvents : historyEvents;
+    const userMap = new Map<string, {
+      username: string;
+      bans: number;
+      timeouts: number;
+      totalTimeoutSeconds: number;
+      lastAction: { type: 'ban' | 'timeout'; timestamp: number; duration?: number; reason?: string };
+      history: { type: 'ban' | 'timeout'; timestamp: number; duration?: number; reason?: string }[];
+    }>();
+
+    eventsToAnalyze
+      .filter(e => e.type === 'ban' || e.type === 'timeout')
+      .forEach(e => {
+        const existing = userMap.get(e.username.toLowerCase()) || {
+          username: e.username,
+          bans: 0,
+          timeouts: 0,
+          totalTimeoutSeconds: 0,
+          lastAction: { type: e.type as 'ban' | 'timeout', timestamp: e.timestamp, duration: e.data?.duration, reason: e.data?.reason },
+          history: []
+        };
+
+        if (e.type === 'ban') {
+          existing.bans++;
+        } else {
+          existing.timeouts++;
+          existing.totalTimeoutSeconds += e.data?.duration || 0;
+        }
+
+        existing.history.push({
+          type: e.type as 'ban' | 'timeout',
+          timestamp: e.timestamp,
+          duration: e.data?.duration,
+          reason: e.data?.reason
+        });
+
+        if (e.timestamp > existing.lastAction.timestamp) {
+          existing.lastAction = { type: e.type as 'ban' | 'timeout', timestamp: e.timestamp, duration: e.data?.duration, reason: e.data?.reason };
+        }
+
+        userMap.set(e.username.toLowerCase(), existing);
+      });
+
+    return Array.from(userMap.values()).sort((a, b) => 
+      (b.bans + b.timeouts) - (a.bans + a.timeouts)
+    );
+  }, [allEvents, historyEvents, viewMode]);
 
   // Estadísticas
   // IMPORTANT: For gifts, we avoid double-counting by preferring individual gifts over bulk announcements
@@ -393,8 +491,169 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       raids: eventsToCount.filter(e => e.type === 'raid').length,
       bits: eventsToCount.filter(e => e.type === 'bits').reduce((acc, e) => acc + (e.data?.amount || 0), 0),
       votes: eventsToCount.filter(e => e.type === 'vote').length,
+      bans: eventsToCount.filter(e => e.type === 'ban').length,
+      timeouts: eventsToCount.filter(e => e.type === 'timeout').length,
     };
   }, [allEvents, historyEvents, viewMode]);
+
+  // Datos de todos los viewers con su historial completo
+  interface ViewerData {
+    username: string;
+    totalActivity: number;
+    follows: number;
+    firstSeen: number;
+    lastSeen: number;
+    // Suscripciones
+    subs: number;
+    resubs: number;
+    totalSubMonths: number;
+    currentTier?: SubTier;
+    // Regalos dados
+    giftsGiven: number;
+    giftsReceived: number;
+    // Bits
+    totalBits: number;
+    // Moderación
+    bans: number;
+    timeouts: number;
+    totalTimeoutSeconds: number;
+    // Votos
+    votes: number;
+    // Historial de eventos
+    events: StreamEvent[];
+  }
+
+  const viewersData = useMemo(() => {
+    const eventsToAnalyze = viewMode === 'live' ? allEvents : historyEvents;
+    const userMap = new Map<string, ViewerData>();
+
+    eventsToAnalyze.forEach(e => {
+      const key = e.username.toLowerCase();
+      const existing = userMap.get(key) || {
+        username: e.username,
+        totalActivity: 0,
+        follows: 0,
+        firstSeen: e.timestamp,
+        lastSeen: e.timestamp,
+        subs: 0,
+        resubs: 0,
+        totalSubMonths: 0,
+        currentTier: undefined as SubTier | undefined,
+        giftsGiven: 0,
+        giftsReceived: 0,
+        totalBits: 0,
+        bans: 0,
+        timeouts: 0,
+        totalTimeoutSeconds: 0,
+        votes: 0,
+        events: [] as StreamEvent[]
+      };
+
+      existing.totalActivity++;
+      existing.events.push(e);
+      
+      if (e.timestamp < existing.firstSeen) existing.firstSeen = e.timestamp;
+      if (e.timestamp > existing.lastSeen) existing.lastSeen = e.timestamp;
+
+      switch (e.type) {
+        case 'follow':
+          existing.follows++;
+          break;
+        case 'sub':
+          existing.subs++;
+          existing.currentTier = e.data?.tier;
+          break;
+        case 'resub':
+          existing.resubs++;
+          existing.totalSubMonths = Math.max(existing.totalSubMonths, e.data?.months || 0);
+          existing.currentTier = e.data?.tier;
+          break;
+        case 'gift':
+          if (e.data?.recipientUsername) {
+            // Es un regalo dado
+            existing.giftsGiven += 1;
+            // También registrar al receptor
+            const recipientKey = e.data.recipientUsername.toLowerCase();
+            const recipient = userMap.get(recipientKey) || {
+              username: e.data.recipientUsername,
+              totalActivity: 0,
+              follows: 0,
+              firstSeen: e.timestamp,
+              lastSeen: e.timestamp,
+              subs: 0,
+              resubs: 0,
+              totalSubMonths: 0,
+              currentTier: undefined as SubTier | undefined,
+              giftsGiven: 0,
+              giftsReceived: 0,
+              totalBits: 0,
+              bans: 0,
+              timeouts: 0,
+              totalTimeoutSeconds: 0,
+              votes: 0,
+              events: [] as StreamEvent[]
+            };
+            recipient.giftsReceived++;
+            recipient.totalActivity++;
+            if (e.timestamp < recipient.firstSeen) recipient.firstSeen = e.timestamp;
+            if (e.timestamp > recipient.lastSeen) recipient.lastSeen = e.timestamp;
+            userMap.set(recipientKey, recipient);
+          } else if (e.data?.giftCount) {
+            existing.giftsGiven += e.data.giftCount;
+          }
+          break;
+        case 'bits':
+          existing.totalBits += e.data?.amount || 0;
+          break;
+        case 'ban':
+          existing.bans++;
+          break;
+        case 'timeout':
+          existing.timeouts++;
+          existing.totalTimeoutSeconds += e.data?.duration || 0;
+          break;
+        case 'vote':
+          existing.votes++;
+          break;
+      }
+
+      userMap.set(key, existing);
+    });
+
+    // Convertir a array y ordenar
+    let viewers = Array.from(userMap.values());
+    
+    // Aplicar filtro de búsqueda
+    if (viewerSearch) {
+      const search = viewerSearch.toLowerCase();
+      viewers = viewers.filter(v => v.username.toLowerCase().includes(search));
+    }
+
+    // Ordenar según criterio seleccionado
+    switch (viewerSortBy) {
+      case 'bits':
+        viewers.sort((a, b) => b.totalBits - a.totalBits);
+        break;
+      case 'subs':
+        viewers.sort((a, b) => (b.totalSubMonths + b.subs + b.resubs) - (a.totalSubMonths + a.subs + a.resubs));
+        break;
+      case 'bans':
+        viewers.sort((a, b) => (b.bans + b.timeouts) - (a.bans + a.timeouts));
+        break;
+      case 'activity':
+      default:
+        viewers.sort((a, b) => b.totalActivity - a.totalActivity);
+        break;
+    }
+
+    return viewers;
+  }, [allEvents, historyEvents, viewMode, viewerSearch, viewerSortBy]);
+
+  // Obtener datos del viewer seleccionado
+  const selectedViewerData = useMemo(() => {
+    if (!selectedViewer) return null;
+    return viewersData.find(v => v.username.toLowerCase() === selectedViewer.toLowerCase()) || null;
+  }, [selectedViewer, viewersData]);
 
   // Cargar fechas disponibles
   useEffect(() => {
@@ -759,6 +1018,234 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     }
   };
 
+  // ============================================
+  // FUNCIONES DE MODERACIÓN
+  // ============================================
+  
+  const [moderationAction, setModerationAction] = useState<{
+    type: 'ban' | 'timeout' | 'unban' | null;
+    username: string;
+    duration?: number;
+    reason?: string;
+  }>({ type: null, username: '' });
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [moderationResult, setModerationResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Banear usuario
+  const banUser = async (username: string, reason?: string) => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      // Obtener el ID del usuario a banear
+      const targetUserId = await twitchService.getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      
+      const success = await twitchService.banUser(authToken, broadcasterId, targetUserId, reason);
+      
+      if (success) {
+        setModerationResult({ success: true, message: `${username} ha sido baneado permanentemente` });
+        // Agregar evento local
+        const event: StreamEvent = {
+          id: generateEventId('ban', username, Date.now()),
+          type: 'ban',
+          username,
+          timestamp: Date.now(),
+          data: { reason }
+        };
+        onEventAdded?.(event);
+      } else {
+        setModerationResult({ success: false, message: 'Error al banear usuario. Verifica los permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al banear usuario' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Timeout usuario
+  const timeoutUser = async (username: string, duration: number, reason?: string) => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const targetUserId = await twitchService.getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      
+      const success = await twitchService.timeoutUser(authToken, broadcasterId, targetUserId, duration, reason);
+      
+      if (success) {
+        const formatDuration = (s: number) => {
+          if (s < 60) return `${s}s`;
+          if (s < 3600) return `${Math.floor(s / 60)}m`;
+          return `${Math.floor(s / 3600)}h`;
+        };
+        setModerationResult({ success: true, message: `${username} ha sido silenciado por ${formatDuration(duration)}` });
+        // Agregar evento local
+        const event: StreamEvent = {
+          id: generateEventId('timeout', username, Date.now()),
+          type: 'timeout',
+          username,
+          timestamp: Date.now(),
+          data: { duration, reason }
+        };
+        onEventAdded?.(event);
+      } else {
+        setModerationResult({ success: false, message: 'Error al silenciar usuario. Verifica los permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al silenciar usuario' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Desbanear usuario
+  const unbanUser = async (username: string) => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const targetUserId = await twitchService.getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      
+      const success = await twitchService.unbanUser(authToken, broadcasterId, targetUserId);
+      
+      if (success) {
+        setModerationResult({ success: true, message: `${username} ha sido desbaneado` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al desbanear usuario. Verifica los permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al desbanear usuario' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Cargar chatters en tiempo real
+  const fetchLiveChatters = async () => {
+    if (!authToken || !channelName) {
+      setChattersError('Se requiere conexión con token OAuth');
+      return;
+    }
+    
+    setLoadingChatters(true);
+    setChattersError(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setChattersError('No se pudo obtener el ID del canal');
+        return;
+      }
+      
+      const chatters = await twitchService.getChattersDetailed(authToken, broadcasterId, broadcasterId);
+      
+      if (chatters) {
+        setLiveChatters(chatters);
+        setLastChattersUpdate(Date.now());
+        setChattersError(null);
+      } else {
+        setChattersError('Error al obtener chatters. Verifica el scope moderator:read:chatters');
+      }
+    } catch (err) {
+      setChattersError('Error al cargar chatters');
+      console.error(err);
+    } finally {
+      setLoadingChatters(false);
+    }
+  };
+
+  // Iniciar polling automático de chatters
+  const startChattersPolling = () => {
+    if (chattersPollingRef.current) {
+      clearInterval(chattersPollingRef.current);
+    }
+    
+    setChattersPollingActive(true);
+    fetchLiveChatters(); // Cargar inmediatamente
+    
+    chattersPollingRef.current = setInterval(() => {
+      fetchLiveChatters();
+    }, chattersPollingInterval * 1000);
+  };
+
+  // Detener polling automático de chatters
+  const stopChattersPolling = () => {
+    if (chattersPollingRef.current) {
+      clearInterval(chattersPollingRef.current);
+      chattersPollingRef.current = null;
+    }
+    setChattersPollingActive(false);
+  };
+
+  // Limpiar polling al desmontar
+  useEffect(() => {
+    return () => {
+      if (chattersPollingRef.current) {
+        clearInterval(chattersPollingRef.current);
+      }
+    };
+  }, []);
+
+  // Actualizar intervalo de polling si cambia mientras está activo
+  useEffect(() => {
+    if (chattersPollingActive && chattersPollingRef.current) {
+      clearInterval(chattersPollingRef.current);
+      chattersPollingRef.current = setInterval(() => {
+        fetchLiveChatters();
+      }, chattersPollingInterval * 1000);
+    }
+  }, [chattersPollingInterval]);
+
+  // Filtrar chatters por búsqueda
+  const filteredChatters = useMemo(() => {
+    if (!viewerSearch) return liveChatters;
+    const search = viewerSearch.toLowerCase();
+    return liveChatters.filter(c => 
+      c.username.toLowerCase().includes(search) || 
+      c.displayName.toLowerCase().includes(search)
+    );
+  }, [liveChatters, viewerSearch]);
+
   const toggleFilter = (type: StreamEventType) => {
     const newFilters = new Set(activeFilters);
     if (newFilters.has(type)) {
@@ -779,6 +1266,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         if (e.type === 'sub') details = `${getTierName(e.data?.tier || '1000')}`;
         if (e.type === 'resub') details = `${e.data?.months} months - ${getTierName(e.data?.tier || '1000')}`;
         if (e.type === 'gift') details = `${e.data?.giftCount || 1} gifts`;
+        if (e.type === 'ban') details = `Permanent ban${e.data?.reason ? ` - ${e.data.reason}` : ''}`;
+        if (e.type === 'timeout') details = `${e.data?.duration || 0}s timeout${e.data?.reason ? ` - ${e.data.reason}` : ''}`;
         return [
           new Date(e.timestamp).toISOString(),
           e.type,
@@ -806,6 +1295,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       case 'raid': return <Users className="w-3.5 h-3.5 text-red-400" />;
       case 'bits': return <Coins className="w-3.5 h-3.5 text-amber-400" />;
       case 'vote': return <Vote className="w-3.5 h-3.5 text-orange-400" />;
+      case 'ban': return <Ban className="w-3.5 h-3.5 text-red-500" />;
+      case 'timeout': return <Clock className="w-3.5 h-3.5 text-yellow-500" />;
       default: return <Activity className="w-3.5 h-3.5 text-gray-400" />;
     }
   };
@@ -910,6 +1401,24 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
             {option?.icon} +{event.data?.optionId}
           </span>
         );
+      case 'ban':
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-600/20 text-red-500">
+            🚫 BAN {event.data?.reason ? `- ${event.data.reason}` : ''}
+          </span>
+        );
+      case 'timeout':
+        const formatDuration = (seconds: number) => {
+          if (seconds < 60) return `${seconds}s`;
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+          if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+          return `${Math.floor(seconds / 86400)}d`;
+        };
+        return (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-500/20 text-yellow-500">
+            ⏱️ TIMEOUT {event.data?.duration ? formatDuration(event.data.duration) : ''}
+          </span>
+        );
       default:
         return null;
     }
@@ -1010,6 +1519,29 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       displayName: v.displayName
     }));
     exportToCSV(data, 'vips', ['username', 'displayName']);
+  };
+
+  // Exportar registro de moderación
+  const exportModerationLog = () => {
+    if (moderationLog.length === 0) return;
+    
+    const formatDuration = (seconds: number) => {
+      if (seconds < 60) return `${seconds}s`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+      return `${Math.floor(seconds / 86400)}d`;
+    };
+    
+    const data = moderationLog.map(u => ({
+      username: u.username,
+      bans: u.bans,
+      timeouts: u.timeouts,
+      totalTimeoutTime: formatDuration(u.totalTimeoutSeconds),
+      lastAction: u.lastAction.type === 'ban' ? 'BAN' : `TIMEOUT ${formatDuration(u.lastAction.duration || 0)}`,
+      lastActionDate: new Date(u.lastAction.timestamp).toLocaleString('es-ES'),
+      lastReason: u.lastAction.reason || 'N/A'
+    }));
+    exportToCSV(data, 'moderation_log', ['username', 'bans', 'timeouts', 'totalTimeoutTime', 'lastAction', 'lastActionDate', 'lastReason']);
   };
 
   // Exportar TODO en un archivo Excel con múltiples hojas
@@ -1171,6 +1703,621 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   const hasAnyFetchedData = fetchedData.followers || fetchedData.subscribers || 
     fetchedData.bitsLeaderboard || fetchedData.clips || fetchedData.videos || 
     fetchedData.moderators || fetchedData.vips;
+
+  // Helper para formatear duración
+  const formatDurationHelper = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+
+  // Panel de Viewers/Comunidad
+  const renderViewersPanel = () => (
+    <div className="flex flex-col h-full">
+      {/* Tabs: Actividad vs En Vivo */}
+      <div className="p-2 border-b border-zinc-700">
+        <div className="flex gap-1">
+          <button
+            onClick={() => setViewerTab('activity')}
+            className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+              viewerTab === 'activity'
+                ? 'bg-cyan-500 text-white'
+                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+            }`}
+          >
+            <Activity className="w-3 h-3" />
+            Historial ({viewersData.length})
+          </button>
+          <button
+            onClick={() => {
+              setViewerTab('live');
+              if (liveChatters.length === 0 && !loadingChatters) {
+                fetchLiveChatters();
+              }
+            }}
+            className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+              viewerTab === 'live'
+                ? 'bg-green-500 text-white'
+                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+            }`}
+          >
+            <Eye className="w-3 h-3" />
+            En Vivo ({liveChatters.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Header con búsqueda */}
+      <div className="p-3 border-b border-zinc-700 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+            <input
+              type="text"
+              value={viewerSearch}
+              onChange={(e) => setViewerSearch(e.target.value)}
+              placeholder="Buscar usuario..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+            />
+            {viewerSearch && (
+              <button
+                onClick={() => setViewerSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          {viewerTab === 'live' && (
+            <>
+              {/* Botón de polling automático */}
+              <button
+                onClick={chattersPollingActive ? stopChattersPolling : startChattersPolling}
+                className={`p-1.5 rounded transition-all ${
+                  chattersPollingActive 
+                    ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
+                    : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                }`}
+                title={chattersPollingActive ? 'Detener actualización automática' : 'Iniciar actualización automática'}
+              >
+                {chattersPollingActive ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              </button>
+              {/* Botón de actualizar manual */}
+              <button
+                onClick={fetchLiveChatters}
+                disabled={loadingChatters}
+                className="p-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 disabled:opacity-50"
+                title="Actualizar ahora"
+              >
+                <RefreshCw className={`w-4 h-4 ${loadingChatters ? 'animate-spin' : ''}`} />
+              </button>
+            </>
+          )}
+          {/* Botón de configuración */}
+          <button
+            onClick={() => setShowSubWeightConfig(!showSubWeightConfig)}
+            className={`p-1.5 rounded transition-all ${
+              showSubWeightConfig 
+                ? 'bg-purple-500/30 text-purple-400' 
+                : 'bg-zinc-700 hover:bg-zinc-600 text-zinc-400'
+            }`}
+            title="Configuración de pesos"
+          >
+            <Sliders className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Panel de configuración de pesos de suscriptores */}
+        {showSubWeightConfig && (
+          <div className="p-3 rounded-lg bg-zinc-800/80 border border-zinc-700 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-zinc-300 flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 text-purple-400" />
+                Peso de votos por tipo de usuario
+              </p>
+              <label className="flex items-center gap-2 text-[10px] text-zinc-400">
+                <input
+                  type="checkbox"
+                  checked={subWeightConfig.enabled}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="w-3 h-3 rounded"
+                />
+                Activar
+              </label>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500">Regular</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={subWeightConfig.regularWeight}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, regularWeight: parseFloat(e.target.value) || 1 }))}
+                  className="w-full px-2 py-1 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-zinc-500">Follower</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={subWeightConfig.followerWeight}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, followerWeight: parseFloat(e.target.value) || 1 }))}
+                  className="w-full px-2 py-1 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-purple-400">Sub Tier 1</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={subWeightConfig.tier1Weight}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, tier1Weight: parseFloat(e.target.value) || 1 }))}
+                  className="w-full px-2 py-1 text-xs bg-zinc-900 border border-purple-500/30 rounded text-zinc-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] text-cyan-400">Sub Tier 2</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={subWeightConfig.tier2Weight}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, tier2Weight: parseFloat(e.target.value) || 1 }))}
+                  className="w-full px-2 py-1 text-xs bg-zinc-900 border border-cyan-500/30 rounded text-zinc-200"
+                />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-[10px] text-amber-400">Sub Tier 3</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={subWeightConfig.tier3Weight}
+                  onChange={(e) => setSubWeightConfig(prev => ({ ...prev, tier3Weight: parseFloat(e.target.value) || 1 }))}
+                  className="w-full px-2 py-1 text-xs bg-zinc-900 border border-amber-500/30 rounded text-zinc-200"
+                />
+              </div>
+            </div>
+            
+            <p className="text-[9px] text-zinc-500">
+              Ejemplo: Si Tier 3 = 3, un voto de sub Tier 3 cuenta como 3 votos
+            </p>
+          </div>
+        )}
+        
+        {/* Controles de polling (solo en tab live) */}
+        {viewerTab === 'live' && (
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] ${
+              chattersPollingActive 
+                ? 'bg-green-500/20 text-green-400' 
+                : 'bg-zinc-800 text-zinc-500'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${chattersPollingActive ? 'bg-green-400 animate-pulse' : 'bg-zinc-600'}`} />
+              {chattersPollingActive ? 'Auto-actualización activa' : 'Auto-actualización pausada'}
+            </div>
+            
+            {chattersPollingActive && (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-zinc-500">cada</span>
+                <select
+                  value={chattersPollingInterval}
+                  onChange={(e) => setChattersPollingInterval(parseInt(e.target.value))}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-300"
+                >
+                  <option value="10">10s</option>
+                  <option value="30">30s</option>
+                  <option value="60">1m</option>
+                  <option value="120">2m</option>
+                  <option value="300">5m</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Ordenar por (solo en tab de actividad) */}
+        {viewerTab === 'activity' && (
+          <div className="flex gap-1">
+            {[
+              { key: 'activity', label: 'Actividad', icon: Activity },
+              { key: 'bits', label: 'Bits', icon: Coins },
+              { key: 'subs', label: 'Subs', icon: Star },
+              { key: 'bans', label: 'Sanciones', icon: Ban },
+            ].map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setViewerSortBy(key as any)}
+                className={`flex-1 py-1 px-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                  viewerSortBy === key
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        
+        {/* Info de última actualización (solo en tab live) */}
+        {viewerTab === 'live' && (
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-zinc-500">
+              {filteredChatters.length} usuarios en el chat
+            </p>
+            {lastChattersUpdate && (
+              <p className="text-[10px] text-zinc-600">
+                Actualizado: {new Date(lastChattersUpdate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+            )}
+          </div>
+        )}
+        
+        {viewerTab === 'activity' && (
+          <p className="text-[10px] text-zinc-500">
+            {viewersData.length} usuarios con actividad
+          </p>
+        )}
+      </div>
+
+      {/* Lista de viewers o detalle de viewer seleccionado */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {selectedViewer && selectedViewerData ? (
+          // Detalle del viewer seleccionado
+          <div className="p-3 space-y-3">
+            {/* Header con botón de volver */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedViewer(null)}
+                className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+              >
+                <ChevronUp className="w-4 h-4 rotate-[-90deg]" />
+              </button>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-zinc-200">{selectedViewerData.username}</h3>
+                <p className="text-[10px] text-zinc-500">
+                  Visto por primera vez: {new Date(selectedViewerData.firstSeen).toLocaleDateString('es-ES')}
+                </p>
+              </div>
+              <a
+                href={`https://twitch.tv/${selectedViewerData.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+
+            {/* Stats del usuario */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2 rounded bg-green-500/10 text-center">
+                <div className="text-lg font-bold text-green-400">{selectedViewerData.follows}</div>
+                <div className="text-[9px] text-zinc-500">Follows</div>
+              </div>
+              <div className="p-2 rounded bg-purple-500/10 text-center">
+                <div className="text-lg font-bold text-purple-400">{selectedViewerData.subs + selectedViewerData.resubs}</div>
+                <div className="text-[9px] text-zinc-500">Subs</div>
+              </div>
+              <div className="p-2 rounded bg-amber-500/10 text-center">
+                <div className="text-lg font-bold text-amber-400">{selectedViewerData.totalBits.toLocaleString()}</div>
+                <div className="text-[9px] text-zinc-500">Bits</div>
+              </div>
+              <div className="p-2 rounded bg-pink-500/10 text-center">
+                <div className="text-lg font-bold text-pink-400">{selectedViewerData.giftsGiven}</div>
+                <div className="text-[9px] text-zinc-500">Gifts dados</div>
+              </div>
+              <div className="p-2 rounded bg-red-600/10 text-center">
+                <div className="text-lg font-bold text-red-500">{selectedViewerData.bans}</div>
+                <div className="text-[9px] text-zinc-500">Bans</div>
+              </div>
+              <div className="p-2 rounded bg-yellow-500/10 text-center">
+                <div className="text-lg font-bold text-yellow-500">{selectedViewerData.timeouts}</div>
+                <div className="text-[9px] text-zinc-500">Timeouts</div>
+              </div>
+            </div>
+
+            {/* Info adicional */}
+            {selectedViewerData.totalSubMonths > 0 && (
+              <div className="p-2 rounded bg-purple-500/10 border border-purple-500/30">
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-purple-400" />
+                  <div>
+                    <p className="text-xs font-bold text-purple-400">
+                      {selectedViewerData.totalSubMonths} meses de suscripción
+                    </p>
+                    {selectedViewerData.currentTier && (
+                      <p className="text-[10px] text-purple-300/70">
+                        Tier actual: {selectedViewerData.currentTier === '1000' ? '1' : selectedViewerData.currentTier === '2000' ? '2' : '3'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedViewerData.totalTimeoutSeconds > 0 && (
+              <div className="p-2 rounded bg-yellow-500/10 border border-yellow-500/30">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-yellow-500" />
+                  <p className="text-xs text-yellow-400">
+                    Tiempo total en timeout: {formatDurationHelper(selectedViewerData.totalTimeoutSeconds)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Acciones de moderación */}
+            {authToken && (
+              <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700 space-y-2">
+                <p className="text-xs font-bold text-zinc-400 flex items-center gap-1">
+                  <Gavel className="w-3.5 h-3.5" /> Acciones de moderación
+                </p>
+                
+                {moderationResult && (
+                  <div className={`p-2 rounded text-xs ${moderationResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {moderationResult.message}
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => timeoutUser(selectedViewerData.username, 60)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Clock className="w-3 h-3" /> 1m
+                  </button>
+                  <button
+                    onClick={() => timeoutUser(selectedViewerData.username, 600)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Clock className="w-3 h-3" /> 10m
+                  </button>
+                  <button
+                    onClick={() => timeoutUser(selectedViewerData.username, 3600)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Clock className="w-3 h-3" /> 1h
+                  </button>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => banUser(selectedViewerData.username)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-red-600/20 hover:bg-red-600/30 text-red-500 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Ban className="w-3 h-3" /> Ban permanente
+                  </button>
+                  <button
+                    onClick={() => unbanUser(selectedViewerData.username)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-green-500/20 hover:bg-green-500/30 text-green-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Heart className="w-3 h-3" /> Desbanear
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Historial de eventos */}
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-zinc-400">Historial de actividad</p>
+              <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1">
+                {selectedViewerData.events.slice().reverse().slice(0, 50).map((event, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-1.5 rounded bg-zinc-900/50 text-[10px]">
+                    {renderEventIcon(event.type)}
+                    <span className="text-zinc-400">
+                      {event.type === 'sub' && 'Suscripción'}
+                      {event.type === 'resub' && `Resub (${event.data?.months}m)`}
+                      {event.type === 'gift' && `Gift x${event.data?.giftCount || 1}`}
+                      {event.type === 'bits' && `${event.data?.amount} bits`}
+                      {event.type === 'follow' && 'Follow'}
+                      {event.type === 'vote' && 'Voto'}
+                      {event.type === 'ban' && 'BAN'}
+                      {event.type === 'timeout' && `Timeout ${formatDurationHelper(event.data?.duration || 0)}`}
+                      {event.type === 'raid' && `Raid (${event.data?.viewerCount})`}
+                    </span>
+                    <span className="ml-auto text-zinc-600">
+                      {new Date(event.timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : viewerTab === 'live' ? (
+          // Lista de chatters en vivo
+          <div className="p-2 space-y-1">
+            {chattersError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <div>
+                    <p className="text-xs text-red-400">{chattersError}</p>
+                    <p className="text-[10px] text-red-300/70 mt-1">
+                      Necesitas el scope: moderator:read:chatters
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {loadingChatters ? (
+              <div className="text-center py-8 text-zinc-500">
+                <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin opacity-50" />
+                <p className="text-xs">Cargando chatters...</p>
+              </div>
+            ) : filteredChatters.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500">
+                <Eye className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">No hay chatters</p>
+                <p className="text-[10px] mt-1">Pulsa el botón de actualizar para cargar</p>
+                <button
+                  onClick={fetchLiveChatters}
+                  className="mt-3 px-4 py-2 rounded bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs font-bold flex items-center gap-2 mx-auto"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Cargar chatters
+                </button>
+              </div>
+            ) : (
+              filteredChatters.map((chatter, idx) => {
+                // Buscar si tenemos datos de actividad de este usuario
+                const activityData = viewersData.find(v => v.username.toLowerCase() === chatter.username.toLowerCase());
+                
+                return (
+                  <div
+                    key={idx}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-transparent hover:border-zinc-700 transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <User className="w-4 h-4 text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold text-xs text-zinc-200 truncate">{chatter.displayName}</span>
+                        {activityData?.totalSubMonths && activityData.totalSubMonths > 0 && (
+                          <Star className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                        )}
+                        {activityData?.bans && activityData.bans > 0 && (
+                          <Ban className="w-3 h-3 text-red-500 flex-shrink-0" />
+                        )}
+                        <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" title="En el chat" />
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                        <span>@{chatter.username}</span>
+                        {activityData && (
+                          <>
+                            {activityData.totalBits > 0 && (
+                              <span className="text-amber-400">{activityData.totalBits.toLocaleString()} bits</span>
+                            )}
+                            {activityData.giftsGiven > 0 && (
+                              <span className="text-pink-400">{activityData.giftsGiven} gifts</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {/* Acciones rápidas de moderación */}
+                    {authToken && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            timeoutUser(chatter.username, 60);
+                          }}
+                          disabled={moderationLoading}
+                          className="p-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 disabled:opacity-50"
+                          title="Timeout 1m"
+                        >
+                          <Clock className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            banUser(chatter.username);
+                          }}
+                          disabled={moderationLoading}
+                          className="p-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 disabled:opacity-50"
+                          title="Ban"
+                        >
+                          <Ban className="w-3 h-3" />
+                        </button>
+                        {activityData && (
+                          <button
+                            onClick={() => setSelectedViewer(chatter.username)}
+                            className="p-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400"
+                            title="Ver perfil"
+                          >
+                            <User className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            {filteredChatters.length > 0 && (
+              <p className="text-center text-[10px] text-zinc-500 py-2">
+                {filteredChatters.length} usuarios en el chat
+              </p>
+            )}
+          </div>
+        ) : (
+          // Lista de viewers (historial de actividad)
+          <div className="p-2 space-y-1">
+            {viewersData.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500">
+                <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">No hay datos de usuarios</p>
+                <p className="text-[10px] mt-1">Los usuarios aparecerán cuando haya actividad</p>
+              </div>
+            ) : (
+              viewersData.slice(0, 100).map((viewer, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedViewer(viewer.username)}
+                  className="w-full flex items-center gap-2 p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 border border-transparent hover:border-zinc-700 transition-all text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
+                    <User className="w-4 h-4 text-zinc-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-xs text-zinc-200 truncate">{viewer.username}</span>
+                      {viewer.totalSubMonths > 0 && (
+                        <Star className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                      )}
+                      {viewer.bans > 0 && (
+                        <Ban className="w-3 h-3 text-red-500 flex-shrink-0" />
+                      )}
+                      {/* Indicador si está en el chat ahora */}
+                      {liveChatters.some(c => c.username.toLowerCase() === viewer.username.toLowerCase()) && (
+                        <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" title="En el chat" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                      <span>{viewer.totalActivity} eventos</span>
+                      {viewer.totalBits > 0 && (
+                        <span className="text-amber-400">{viewer.totalBits.toLocaleString()} bits</span>
+                      )}
+                      {viewer.giftsGiven > 0 && (
+                        <span className="text-pink-400">{viewer.giftsGiven} gifts</span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronUp className="w-4 h-4 text-zinc-600 rotate-90" />
+                </button>
+              ))
+            )}
+            {viewersData.length > 100 && (
+              <p className="text-center text-[10px] text-zinc-500 py-2">
+                Mostrando 100 de {viewersData.length} usuarios
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const renderFetchPanel = () => (
     <div className="p-3 space-y-3">
@@ -1677,6 +2824,88 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
           )}
         </div>
       )}
+
+      {/* Panel de Registro de Moderación */}
+      {(stats.bans > 0 || stats.timeouts > 0) && (
+        <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-red-400" />
+              <p className="text-xs font-bold text-zinc-300">Registro de Moderación</p>
+              <span className="px-1.5 py-0.5 text-[9px] bg-red-500/20 text-red-400 rounded">
+                {moderationLog.length} usuarios
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportModerationLog}
+                className="px-2 py-1 text-[9px] bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+              <button
+                onClick={() => setShowModerationLog(!showModerationLog)}
+                className="text-[10px] text-zinc-400 hover:text-zinc-300"
+              >
+                {showModerationLog ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          
+          {/* Resumen rápido */}
+          <div className="flex gap-2">
+            <div className="flex-1 p-2 rounded bg-red-600/10 text-center">
+              <div className="text-lg font-bold text-red-500">{stats.bans}</div>
+              <div className="text-[9px] text-zinc-500">Bans</div>
+            </div>
+            <div className="flex-1 p-2 rounded bg-yellow-500/10 text-center">
+              <div className="text-lg font-bold text-yellow-500">{stats.timeouts}</div>
+              <div className="text-[9px] text-zinc-500">Timeouts</div>
+            </div>
+          </div>
+          
+          {showModerationLog && moderationLog.length > 0 && (
+            <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+              {moderationLog.map((user, idx) => {
+                const formatDuration = (seconds: number) => {
+                  if (seconds < 60) return `${seconds}s`;
+                  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+                  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+                  return `${Math.floor(seconds / 86400)}d`;
+                };
+                
+                return (
+                  <div key={idx} className="p-2 rounded bg-zinc-900/50 border border-zinc-700/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-zinc-200">{user.username}</span>
+                        {user.bans > 0 && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-red-600/20 text-red-500 rounded font-bold">
+                            🚫 {user.bans} ban{user.bans > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {user.timeouts > 0 && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-yellow-500/20 text-yellow-500 rounded font-bold">
+                            ⏱️ {user.timeouts} timeout{user.timeouts > 1 ? 's' : ''} ({formatDuration(user.totalTimeoutSeconds)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[10px] text-zinc-500">
+                      Última acción: {user.lastAction.type === 'ban' ? '🚫 BAN' : `⏱️ TIMEOUT ${formatDuration(user.lastAction.duration || 0)}`}
+                      {' · '}
+                      {new Date(user.lastAction.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      {user.lastAction.reason && (
+                        <span className="text-zinc-400"> · "{user.lastAction.reason}"</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -1686,7 +2915,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       <div className="h-full flex flex-col">
         {/* Stats bar */}
         <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div className="grid grid-cols-9 gap-1 text-center">
             <div className="p-1.5 rounded bg-green-500/10">
               <div className="text-sm font-bold text-green-400">{stats.follows}</div>
               <div className="text-[8px] text-zinc-500">Follows</div>
@@ -1715,6 +2944,14 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
               <div className="text-sm font-bold text-orange-400">{stats.votes}</div>
               <div className="text-[8px] text-zinc-500">Votos</div>
             </div>
+            <div className="p-1.5 rounded bg-red-600/10">
+              <div className="text-sm font-bold text-red-500">{stats.bans}</div>
+              <div className="text-[8px] text-zinc-500">Bans</div>
+            </div>
+            <div className="p-1.5 rounded bg-yellow-500/10">
+              <div className="text-sm font-bold text-yellow-500">{stats.timeouts}</div>
+              <div className="text-[8px] text-zinc-500">Timeouts</div>
+            </div>
           </div>
         </div>
         
@@ -1727,7 +2964,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
             >
               <span className="flex items-center justify-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${viewMode === 'live' ? 'bg-white animate-pulse' : 'bg-zinc-400'}`} />
-                EN VIVO
+                LIVE
               </span>
             </button>
             <button
@@ -1735,19 +2972,26 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
               className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold ${viewMode === 'history' ? 'bg-purple-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
             >
               <Calendar className="w-3 h-3 inline mr-1" />
-              HISTORIAL
+              HIST
+            </button>
+            <button
+              onClick={() => setViewMode('viewers')}
+              className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold ${viewMode === 'viewers' ? 'bg-cyan-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
+            >
+              <Users className="w-3 h-3 inline mr-1" />
+              USERS
             </button>
             <button
               onClick={() => setViewMode('fetch')}
               className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold ${viewMode === 'fetch' ? 'bg-amber-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
             >
               <CloudDownload className="w-3 h-3 inline mr-1" />
-              RECUPERAR
+              API
             </button>
           </div>
         </div>
         
-        {viewMode === 'fetch' ? renderFetchPanel() : (
+        {viewMode === 'fetch' ? renderFetchPanel() : viewMode === 'viewers' ? renderViewersPanel() : (
           <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600">
             <Activity size={48} className="opacity-20 mb-2" />
             <p className="text-xs">Esperando actividad...</p>
@@ -1763,7 +3007,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       {/* Header con stats */}
       <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
         {/* Stats row */}
-        <div className="grid grid-cols-7 gap-1 text-center mb-2">
+        <div className="grid grid-cols-9 gap-1 text-center mb-2">
           <div 
             className={`p-1.5 rounded cursor-pointer transition-all ${activeFilters.has('follow') ? 'bg-green-500/20 ring-1 ring-green-500/50' : 'bg-green-500/10 opacity-50'}`}
             onClick={() => toggleFilter('follow')}
@@ -1813,6 +3057,20 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
             <div className="text-sm font-bold text-orange-400">{stats.votes}</div>
             <div className="text-[8px] text-zinc-500">Votos</div>
           </div>
+          <div 
+            className={`p-1.5 rounded cursor-pointer transition-all ${activeFilters.has('ban') ? 'bg-red-600/20 ring-1 ring-red-600/50' : 'bg-red-600/10 opacity-50'}`}
+            onClick={() => toggleFilter('ban')}
+          >
+            <div className="text-sm font-bold text-red-500">{stats.bans}</div>
+            <div className="text-[8px] text-zinc-500">Bans</div>
+          </div>
+          <div 
+            className={`p-1.5 rounded cursor-pointer transition-all ${activeFilters.has('timeout') ? 'bg-yellow-500/20 ring-1 ring-yellow-500/50' : 'bg-yellow-500/10 opacity-50'}`}
+            onClick={() => toggleFilter('timeout')}
+          >
+            <div className="text-sm font-bold text-yellow-500">{stats.timeouts}</div>
+            <div className="text-[8px] text-zinc-500">Timeouts</div>
+          </div>
         </div>
         
         {/* Mode toggle */}
@@ -1824,7 +3082,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
             >
               <span className="flex items-center justify-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${viewMode === 'live' ? 'bg-white animate-pulse' : 'bg-zinc-400'}`} />
-                EN VIVO
+                LIVE
               </span>
             </button>
             <button
@@ -1837,14 +3095,21 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
               className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold transition-all ${viewMode === 'history' ? 'bg-purple-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
             >
               <Calendar className="w-3 h-3 inline mr-1" />
-              HISTORIAL
+              HIST
+            </button>
+            <button
+              onClick={() => setViewMode('viewers')}
+              className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold transition-all ${viewMode === 'viewers' ? 'bg-cyan-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
+            >
+              <Users className="w-3 h-3 inline mr-1" />
+              USERS
             </button>
             <button
               onClick={() => setViewMode('fetch')}
               className={`flex-1 py-1.5 px-2 rounded text-[10px] font-bold transition-all ${viewMode === 'fetch' ? 'bg-amber-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'}`}
             >
               <CloudDownload className="w-3 h-3 inline mr-1" />
-              RECUPERAR
+              API
             </button>
           </div>
           
@@ -1967,6 +3232,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       {/* Contenido según modo */}
       {viewMode === 'fetch' ? (
         renderFetchPanel()
+      ) : viewMode === 'viewers' ? (
+        renderViewersPanel()
       ) : (
         <div 
           ref={containerRef} 

@@ -74,6 +74,9 @@ export interface UseStreamEventsReturn {
     giftsTier1: number;
     giftsTier2: number;
     giftsTier3: number;
+    // Moderation
+    bans: number;
+    timeouts: number;
   };
   /** Channel name for storage */
   channelName: string;
@@ -92,6 +95,8 @@ export interface UseStreamEventsReturn {
  * For stats, we count:
  * - Total gifts given = sum of giftbulk.giftCount (or count of gift events if no bulk)
  * - Individual recipients = count of gift events
+ * 
+ * Ban and Timeout events are tracked separately for moderation history.
  */
 const convertToStreamEvent = (data: StreamEventData): StreamEvent => {
   const timestamp = data.timestamp || Date.now();
@@ -132,6 +137,12 @@ const convertToStreamEvent = (data: StreamEventData): StreamEvent => {
       break;
     case 'anongiftpaidupgrade':
       eventId = generateEventId('anongiftupgrade', data.username, timestamp);
+      break;
+    case 'ban':
+      eventId = generateEventId('ban', data.username, timestamp);
+      break;
+    case 'timeout':
+      eventId = generateEventId('timeout', data.username, timestamp, `${data.duration}s`);
       break;
     default:
       eventId = generateEventId(data.type, data.username, timestamp);
@@ -247,6 +258,25 @@ const convertToStreamEvent = (data: StreamEventData): StreamEvent => {
         data: {
           viewerCount: data.viewerCount,
           message: 'host', // Mark as host to differentiate from raid
+        },
+      };
+    
+    case 'ban':
+      return {
+        ...baseEvent,
+        type: 'ban' as StreamEventType,
+        data: {
+          reason: data.reason,
+        },
+      };
+    
+    case 'timeout':
+      return {
+        ...baseEvent,
+        type: 'timeout' as StreamEventType,
+        data: {
+          duration: data.duration,
+          reason: data.reason,
         },
       };
     
@@ -680,6 +710,9 @@ export function useStreamEvents(): UseStreamEventsReturn {
       giftsTier1: countGiftsByTier('1000'),
       giftsTier2: countGiftsByTier('2000'),
       giftsTier3: countGiftsByTier('3000'),
+      // Moderation
+      bans: events.filter((e: StreamEvent) => e.type === 'ban').length,
+      timeouts: events.filter((e: StreamEvent) => e.type === 'timeout').length,
     };
   }, [events]);
 

@@ -29,10 +29,15 @@ import {
   Loader2,
   Ban,
   Shield,
+  Heart,
+  Settings,
+  Coins,
+  DollarSign,
+  Zap,
 } from 'lucide-react';
-import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel } from '../types';
+import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel, SubsGiveawayConfig, SubsGiveawayEntry, DEFAULT_SUBS_CONFIG } from '../types';
 import { useI18n } from '../i18n';
-import { twitchService } from '../services/twitchService';
+import { twitchService, StreamEventData } from '../services/twitchService';
 
 interface GiveawayHubProps {
   chatMessages: TwitchMessage[];
@@ -46,7 +51,7 @@ interface GiveawayHubProps {
 }
 
 type TabType = 'raffle' | 'active';
-type RaffleMode = 'viewers' | 'keyword';
+type RaffleMode = 'viewers' | 'keyword' | 'subs';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const THREAD_COLORS = ['#a970ff', '#00f0f0', '#ff6b6b', '#4ade80', '#fbbf24', '#f472b6'];
@@ -64,7 +69,7 @@ export interface FinishedGiveaway {
   id: string;
   name: string;
   keyword: string;
-  mode: 'viewers' | 'keyword';
+  mode: 'viewers' | 'keyword' | 'subs';
   winner: string;
   participantCount: number;
   subscribersOnly: boolean;
@@ -79,6 +84,297 @@ interface GiveawayExport {
   threads: GiveawayThread[];
   history: FinishedGiveaway[];
 }
+
+// Componente para configurar valores de subs
+const SubsConfigPanel: React.FC<{
+  config: SubsGiveawayConfig;
+  onChange: (config: SubsGiveawayConfig) => void;
+  onClose: () => void;
+}> = ({ config, onChange, onClose }) => {
+  const [localConfig, setLocalConfig] = useState(config);
+  
+  const updateConfig = (key: keyof SubsGiveawayConfig, value: number | boolean | string) => {
+    setLocalConfig(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const handleSave = () => {
+    onChange(localConfig);
+    onClose();
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-pink-500/20 rounded-lg">
+              <Settings className="text-pink-500" size={24} />
+            </div>
+            <h3 className="font-bold text-lg text-zinc-800 dark:text-white">Configurar Valores</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {/* Subs por Tier */}
+          <div className="p-3 bg-purple-500/10 rounded-xl space-y-3">
+            <h4 className="font-bold text-purple-600 dark:text-purple-400 text-sm flex items-center gap-2">
+              <Star size={16} /> Suscripciones
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 1</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.tier1Value}
+                  onChange={(e) => updateConfig('tier1Value', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 2</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.tier2Value}
+                  onChange={(e) => updateConfig('tier2Value', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 3</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.tier3Value}
+                  onChange={(e) => updateConfig('tier3Value', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Prime</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.primeValue}
+                  onChange={(e) => updateConfig('primeValue', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Resubs */}
+          <div className="p-3 bg-cyan-500/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-cyan-600 dark:text-cyan-400 text-sm flex items-center gap-2">
+                <RefreshCw size={16} /> Resubs
+              </h4>
+              <button
+                onClick={() => updateConfig('resubEnabled', !localConfig.resubEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${localConfig.resubEnabled ? 'bg-cyan-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${localConfig.resubEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {localConfig.resubEnabled && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por resub</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={localConfig.resubValue}
+                    onChange={(e) => updateConfig('resubValue', Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Bonus por mes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={localConfig.resubBonusPerMonth}
+                    onChange={(e) => updateConfig('resubBonusPerMonth', Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Gift Subs */}
+          <div className="p-3 bg-pink-500/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-pink-600 dark:text-pink-400 text-sm flex items-center gap-2">
+                <Gift size={16} /> Gift Subs
+              </h4>
+              <button
+                onClick={() => updateConfig('giftSubEnabled', !localConfig.giftSubEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${localConfig.giftSubEnabled ? 'bg-pink-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${localConfig.giftSubEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {localConfig.giftSubEnabled && (
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por sub regalada</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.giftSubValue}
+                  onChange={(e) => updateConfig('giftSubValue', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Bits */}
+          <div className="p-3 bg-yellow-500/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-yellow-600 dark:text-yellow-400 text-sm flex items-center gap-2">
+                <Coins size={16} /> Bits
+              </h4>
+              <button
+                onClick={() => updateConfig('bitsEnabled', !localConfig.bitsEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${localConfig.bitsEnabled ? 'bg-yellow-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${localConfig.bitsEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {localConfig.bitsEnabled && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Bits por entrada</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={localConfig.bitsPerEntry}
+                    onChange={(e) => updateConfig('bitsPerEntry', Math.max(1, parseInt(e.target.value) || 100))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo bits</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={localConfig.bitsMinimum}
+                    onChange={(e) => updateConfig('bitsMinimum', Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Donaciones */}
+          <div className="p-3 bg-green-500/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-green-600 dark:text-green-400 text-sm flex items-center gap-2">
+                <DollarSign size={16} /> Donaciones
+              </h4>
+              <button
+                onClick={() => updateConfig('donationsEnabled', !localConfig.donationsEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${localConfig.donationsEnabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${localConfig.donationsEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {localConfig.donationsEnabled && (
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">€ por entrada</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={localConfig.donationPerEntry}
+                    onChange={(e) => updateConfig('donationPerEntry', Math.max(0.01, parseFloat(e.target.value) || 1))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={localConfig.donationMinimum}
+                    onChange={(e) => updateConfig('donationMinimum', Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Moneda</label>
+                  <select
+                    value={localConfig.donationCurrency}
+                    onChange={(e) => updateConfig('donationCurrency', e.target.value)}
+                    className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Regalos de canal */}
+          <div className="p-3 bg-orange-500/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-orange-600 dark:text-orange-400 text-sm flex items-center gap-2">
+                <Zap size={16} /> Regalos de Canal
+              </h4>
+              <button
+                onClick={() => updateConfig('channelGiftsEnabled', !localConfig.channelGiftsEnabled)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${localConfig.channelGiftsEnabled ? 'bg-orange-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${localConfig.channelGiftsEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {localConfig.channelGiftsEnabled && (
+              <div>
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por regalo</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={localConfig.channelGiftValue}
+                  onChange={(e) => updateConfig('channelGiftValue', Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+          <button
+            onClick={() => setLocalConfig(DEFAULT_SUBS_CONFIG)}
+            className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors text-sm"
+          >
+            Restaurar
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 py-2 bg-pink-500 hover:bg-pink-600 text-white font-medium rounded-lg transition-colors text-sm"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   chatMessages,
@@ -113,6 +409,25 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   const viewersManualRef = useRef<Set<string>>(new Set());
   const keywordManualRef = useRef<Set<string>>(new Set());
   
+  // Subs mode - array to allow multiple entries per user (1 sub = 1 entry)
+  const [subsParticipants, setSubsParticipants] = useState<string[]>([]);
+  const subsParticipantsRef = useRef<string[]>([]);
+  
+  // Subs mode detailed entries (for weighted selection)
+  const [subsEntries, setSubsEntries] = useState<SubsGiveawayEntry[]>([]);
+  const subsEntriesRef = useRef<SubsGiveawayEntry[]>([]);
+  
+  // Subs configuration
+  const [subsConfig, setSubsConfig] = useState<SubsGiveawayConfig>(() => {
+    const saved = localStorage.getItem('giveaway_subs_config');
+    if (saved) {
+      try { return { ...DEFAULT_SUBS_CONFIG, ...JSON.parse(saved) }; }
+      catch { return DEFAULT_SUBS_CONFIG; }
+    }
+    return DEFAULT_SUBS_CONFIG;
+  });
+  const [showSubsConfig, setShowSubsConfig] = useState(false);
+  
   // Legacy refs for compatibility - point to current mode
   const participantsRef = raffleMode === 'viewers' ? viewersParticipantsRef : keywordParticipantsRef;
   const participants = raffleMode === 'viewers' ? viewersParticipants : keywordParticipants;
@@ -133,7 +448,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     if (saved) {
       try { 
         const all = JSON.parse(saved);
-        return all.filter((t: GiveawayThread) => !t.winner);
+        // Migrate old threads without mode field
+        return all.filter((t: GiveawayThread) => !t.winner).map((t: GiveawayThread) => ({
+          ...t,
+          mode: t.mode || 'keyword', // Default to keyword for old threads
+        }));
       } catch { return []; }
     }
     return [];
@@ -172,6 +491,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   useEffect(() => {
     localStorage.setItem('giveaway_blacklist', JSON.stringify(Array.from(blacklist)));
   }, [blacklist]);
+
+  // Save subs config to localStorage
+  useEffect(() => {
+    localStorage.setItem('giveaway_subs_config', JSON.stringify(subsConfig));
+  }, [subsConfig]);
 
   const activeThreadCount = threads.filter(t => t.isActive).length;
 
@@ -310,6 +634,112 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     return () => clearInterval(interval);
   }, [isRunning, useTimer, timeLeft]);
 
+  // Ref to track if subs raffle is running (for the stream event listener)
+  const subsRaffleActiveRef = useRef(false);
+  const subsStartTimeRef = useRef(0);
+  
+  // Update refs when raffle state changes
+  useEffect(() => {
+    subsRaffleActiveRef.current = isRunning && raffleMode === 'subs';
+    if (isRunning && raffleMode === 'subs') {
+      subsStartTimeRef.current = startTimeRef.current;
+    }
+  }, [isRunning, raffleMode]);
+
+  // Set up stream event listener for subs mode
+  useEffect(() => {
+    const handleSubEvent = (data: StreamEventData) => {
+      // Only process if subs raffle is active
+      if (!subsRaffleActiveRef.current) return;
+      
+      // Only process events that happened after raffle started
+      const eventTime = data.timestamp || Date.now();
+      if (eventTime < subsStartTimeRef.current) return;
+      
+      const username = (data.displayName || data.username).toLowerCase();
+      const config = subsConfig;
+      
+      // Calculate entries based on event type and config
+      let entries = 0;
+      let entryType: SubsGiveawayEntry['type'] = 'sub';
+      let tier: SubsGiveawayEntry['tier'] | undefined;
+      let months: number | undefined;
+      let amount: number | undefined;
+      
+      if (data.type === 'sub') {
+        entryType = 'sub';
+        // Determine tier from tier field
+        if (data.tier === '1000' || data.tier === 'Prime') {
+          tier = data.tier === 'Prime' ? 'prime' : 1;
+          entries = data.tier === 'Prime' ? config.primeValue : config.tier1Value;
+        } else if (data.tier === '2000') {
+          tier = 2;
+          entries = config.tier2Value;
+        } else if (data.tier === '3000') {
+          tier = 3;
+          entries = config.tier3Value;
+        } else {
+          tier = 1;
+          entries = config.tier1Value;
+        }
+      } else if (data.type === 'resub' && config.resubEnabled) {
+        entryType = 'resub';
+        months = data.months || 1;
+        // Base resub value + bonus per month
+        entries = config.resubValue + Math.floor((months - 1) * config.resubBonusPerMonth);
+        // Determine tier
+        if (data.tier === '1000' || data.tier === 'Prime') {
+          tier = data.tier === 'Prime' ? 'prime' : 1;
+        } else if (data.tier === '2000') {
+          tier = 2;
+        } else if (data.tier === '3000') {
+          tier = 3;
+        } else {
+          tier = 1;
+        }
+      } else if ((data.type === 'subgift' || data.type === 'submysterygift') && config.giftSubEnabled) {
+        entryType = 'giftsub';
+        const giftCount = data.giftCount || 1;
+        entries = giftCount * config.giftSubValue;
+        amount = giftCount;
+      } else if (data.type === 'cheer' && config.bitsEnabled) {
+        const bits = data.bits || 0;
+        if (bits >= config.bitsMinimum) {
+          entryType = 'bits' as SubsGiveawayEntry['type'];
+          entries = Math.floor(bits / config.bitsPerEntry);
+          amount = bits;
+        }
+      }
+      
+      if (entries > 0) {
+        // Add detailed entry
+        const entry: SubsGiveawayEntry = {
+          oderId: data.userId || username,
+          username,
+          entries,
+          type: entryType,
+          tier,
+          months,
+          amount,
+          timestamp: eventTime,
+        };
+        subsEntriesRef.current = [...subsEntriesRef.current, entry];
+        setSubsEntries([...subsEntriesRef.current]);
+        
+        // Add to simple participants array (for weighted selection)
+        const newEntries = Array(entries).fill(username);
+        subsParticipantsRef.current = [...subsParticipantsRef.current, ...newEntries];
+        setSubsParticipants([...subsParticipantsRef.current]);
+      }
+    };
+    
+    twitchService.onStreamEvent(handleSubEvent);
+    
+    return () => {
+      twitchService.offStreamEvent(handleSubEvent);
+    };
+  }, [subsConfig]);
+
   // Save threads to localStorage
   useEffect(() => {
     localStorage.setItem('giveaway_threads', JSON.stringify(threads));
@@ -319,7 +749,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   useEffect(() => {
     if (!isConnected) return;
     
-    const activeThreads = threads.filter(t => t.isActive);
+    const activeThreads = threads.filter(t => t.isActive && t.mode === 'keyword');
     if (activeThreads.length === 0) return;
 
     chatMessages.forEach(msg => {
@@ -357,6 +787,70 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     });
   }, [chatMessages, threads, isConnected]);
 
+  // Process stream events for active subs threads
+  useEffect(() => {
+    const handleSubEventForThreads = (data: StreamEventData) => {
+      const activeSubsThreads = threads.filter(t => t.isActive && t.mode === 'subs');
+      if (activeSubsThreads.length === 0) return;
+      
+      const eventTime = data.timestamp || Date.now();
+      const username = (data.displayName || data.username).toLowerCase();
+      
+      activeSubsThreads.forEach(thread => {
+        // Only process events after thread was created
+        if (eventTime < thread.createdAt) return;
+        
+        const config = thread.subsConfig || DEFAULT_SUBS_CONFIG;
+        let entries = 0;
+        
+        if (data.type === 'sub') {
+          if (data.tier === '1000' || data.tier === 'Prime') {
+            entries = data.tier === 'Prime' ? config.primeValue : config.tier1Value;
+          } else if (data.tier === '2000') {
+            entries = config.tier2Value;
+          } else if (data.tier === '3000') {
+            entries = config.tier3Value;
+          } else {
+            entries = config.tier1Value;
+          }
+        } else if (data.type === 'resub' && config.resubEnabled) {
+          const months = data.months || 1;
+          entries = config.resubValue + Math.floor((months - 1) * config.resubBonusPerMonth);
+        } else if ((data.type === 'subgift' || data.type === 'submysterygift') && config.giftSubEnabled) {
+          const giftCount = data.giftCount || 1;
+          entries = giftCount * config.giftSubValue;
+        } else if (data.type === 'cheer' && config.bitsEnabled) {
+          const bits = data.bits || 0;
+          if (bits >= config.bitsMinimum) {
+            entries = Math.floor(bits / config.bitsPerEntry);
+          }
+        }
+        
+        if (entries > 0) {
+          // Add participant entries
+          const newParticipants: GiveawayParticipant[] = Array(entries).fill(null).map((_, i) => ({
+            oderId: data.userId || username,
+            username,
+            timestamp: eventTime,
+            messageId: `${data.type}_${eventTime}_${i}`,
+          }));
+          
+          setThreads(prev => prev.map(t => 
+            t.id === thread.id 
+              ? { ...t, participants: [...t.participants, ...newParticipants] }
+              : t
+          ));
+        }
+      });
+    };
+    
+    twitchService.onStreamEvent(handleSubEventForThreads);
+    
+    return () => {
+      twitchService.offStreamEvent(handleSubEventForThreads);
+    };
+  }, [threads]);
+
 
   // ============================================
   // RAFFLE ACTIONS
@@ -371,6 +865,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       const allParticipants = getAllParticipants();
       if (allParticipants.length === 0) return;
       animateSelection(allParticipants);
+    } else if (raffleMode === 'subs') {
+      // Subs mode always uses timer to collect sub events
+      startTimeRef.current = Date.now();
+      if (useTimer) setTimeLeft(timeLimit);
+      setIsRunning(true);
     } else {
       // Keep existing manual participants, only reset the timestamp for new chat participants
       startTimeRef.current = Date.now();
@@ -381,10 +880,18 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
   const finishAndSelectWinner = () => {
     setIsRunning(false);
-    // Use all participants (manual + from chat)
-    const participantList: string[] = Array.from(participantsRef.current) as string[];
-    if (participantList.length === 0) return;
-    animateSelection(participantList);
+    
+    if (raffleMode === 'subs') {
+      // Use subs participants array (allows duplicates for weighted selection)
+      const participantList = subsParticipantsRef.current;
+      if (participantList.length === 0) return;
+      animateSelection(participantList);
+    } else {
+      // Use all participants (manual + from chat)
+      const participantList: string[] = Array.from(participantsRef.current) as string[];
+      if (participantList.length === 0) return;
+      animateSelection(participantList);
+    }
   };
 
   const animateSelection = (candidates: string[]) => {
@@ -421,14 +928,21 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   };
 
   const saveToHistory = (winnerName: string, participantCount: number) => {
+    const getName = () => {
+      if (raffleTitle.trim()) return raffleTitle.trim();
+      if (raffleMode === 'keyword') return `Sorteo: ${keyword}`;
+      if (raffleMode === 'subs') return 'Sorteo de Subs';
+      return 'Sorteo de viewers';
+    };
+    
     const finished: FinishedGiveaway = {
       id: generateId(),
-      name: raffleTitle.trim() || (raffleMode === 'keyword' ? `Sorteo: ${keyword}` : 'Sorteo de viewers'),
+      name: getName(),
       keyword: raffleMode === 'keyword' ? keyword : '',
       mode: raffleMode,
       winner: winnerName,
       participantCount,
-      subscribersOnly: subsOnly,
+      subscribersOnly: raffleMode === 'subs' ? true : subsOnly,
       createdAt: startTimeRef.current || Date.now(),
       finishedAt: Date.now(),
     };
@@ -447,10 +961,15 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       setViewersParticipants(new Set());
       viewersParticipantsRef.current = new Set();
       viewersManualRef.current = new Set();
-    } else {
+    } else if (raffleMode === 'keyword') {
       setKeywordParticipants(new Set());
       keywordParticipantsRef.current = new Set();
       keywordManualRef.current = new Set();
+    } else if (raffleMode === 'subs') {
+      setSubsParticipants([]);
+      subsParticipantsRef.current = [];
+      setSubsEntries([]);
+      subsEntriesRef.current = [];
     }
     setDisplayName('');
     setIsSelecting(false);
@@ -467,12 +986,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     syncToOverlay({ winner: null, isSelecting: false, displayName: '' });
   };
   
-  // Clear all participants in both modes
+  // Clear all participants in all modes
   const clearAllParticipants = () => {
     setViewersParticipants(new Set());
     setKeywordParticipants(new Set());
+    setSubsParticipants([]);
+    setSubsEntries([]);
     viewersParticipantsRef.current = new Set();
     keywordParticipantsRef.current = new Set();
+    subsParticipantsRef.current = [];
+    subsEntriesRef.current = [];
     viewersManualRef.current = new Set();
     keywordManualRef.current = new Set();
   };
@@ -501,10 +1024,36 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       createdAt: Date.now(),
       subscribersOnly: subsOnly,
       allowMultipleEntries: false,
+      mode: 'keyword',
     };
 
     setThreads(prev => [...prev, newThread]);
     setActiveTab('active');
+  };
+
+  // Create a subs thread (runs in background collecting sub events)
+  const createSubsThread = () => {
+    const name = raffleTitle.trim() || 'Sorteo de Subs';
+    
+    const newThread: GiveawayThread = {
+      id: generateId(),
+      name,
+      keyword: '', // No keyword for subs mode
+      isActive: true,
+      participants: [],
+      createdAt: Date.now(),
+      subscribersOnly: true,
+      allowMultipleEntries: true, // Multiple entries allowed based on config
+      mode: 'subs',
+      subsConfig: { ...subsConfig },
+    };
+
+    setThreads(prev => [...prev, newThread]);
+    setActiveTab('active');
+    
+    // Reset the quick raffle state
+    softResetRaffle();
+    setRaffleTitle('');
   };
 
   const toggleThread = (id: string) => {
@@ -521,21 +1070,40 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     const thread = threads.find(t => t.id === id);
     if (!thread || thread.participants.length === 0) return;
 
-    const participantMap = new Map<string, GiveawayParticipant>();
-    thread.participants.forEach(p => participantMap.set(p.oderId, p));
-    const uniqueParticipants = Array.from(participantMap.values());
+    let candidates: string[];
+    let uniqueCount: number;
+    
+    if (thread.mode === 'subs') {
+      // For subs mode, use all participants (weighted by entries)
+      // Filter out blacklisted users
+      candidates = filterBlacklisted(thread.participants.map(p => p.username));
+      uniqueCount = new Set(candidates).size;
+    } else {
+      // For keyword mode, use unique participants
+      const participantMap = new Map<string, GiveawayParticipant>();
+      thread.participants.forEach(p => participantMap.set(p.oderId, p));
+      const uniqueParticipants = Array.from(participantMap.values());
+      candidates = filterBlacklisted(uniqueParticipants.map(p => p.username));
+      uniqueCount = candidates.length;
+    }
+    
+    if (candidates.length === 0) {
+      setManualParticipantError('No hay participantes válidos (todos están en la lista de prohibidos)');
+      setTimeout(() => setManualParticipantError(null), 3000);
+      return;
+    }
 
-    const winnerIndex = Math.floor(Math.random() * uniqueParticipants.length);
-    const threadWinner = uniqueParticipants[winnerIndex];
+    const winnerIndex = Math.floor(Math.random() * candidates.length);
+    const winnerName = candidates[winnerIndex];
 
     // Guardar en historial
     const finished: FinishedGiveaway = {
       id: thread.id,
       name: thread.name,
       keyword: thread.keyword,
-      mode: 'keyword',
-      winner: threadWinner.username,
-      participantCount: uniqueParticipants.length,
+      mode: thread.mode || 'keyword',
+      winner: winnerName,
+      participantCount: uniqueCount,
       subscribersOnly: thread.subscribersOnly,
       createdAt: thread.createdAt,
       finishedAt: Date.now(),
@@ -549,13 +1117,17 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     setThreads(prev => prev.filter(t => t.id !== id));
     
     // Mostrar ganador
-    setWinner(threadWinner.username);
-    setDisplayName(threadWinner.username);
-    syncToOverlay({ winner: threadWinner.username, displayName: threadWinner.username, isSelecting: false });
+    setWinner(winnerName);
+    setDisplayName(winnerName);
+    syncToOverlay({ winner: winnerName, displayName: winnerName, isSelecting: false });
   };
 
   const getUniqueParticipantCount = (thread: GiveawayThread) => {
     return new Set(thread.participants.map(p => p.oderId)).size;
+  };
+
+  const getTotalEntries = (thread: GiveawayThread) => {
+    return thread.participants.length;
   };
 
   // ============================================
@@ -1069,6 +1641,12 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               >
                 <MessageSquare size={18} /> {t.randomWinner.keyword}
               </button>
+              <button 
+                onClick={() => { setRaffleMode('subs'); softResetRaffle(); }} 
+                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'subs' ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+              >
+                <Heart size={18} /> Subs
+              </button>
             </div>
 
             {/* Raffle title */}
@@ -1086,20 +1664,22 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
             {/* Common options */}
             <div className="space-y-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
-              {/* Subs only toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Star className="text-yellow-400" size={16} />
-                  <span className="text-zinc-700 dark:text-zinc-300 text-sm">{t.randomWinner.subsOnly}</span>
+              {/* Subs only toggle - not shown in subs mode */}
+              {raffleMode !== 'subs' && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="text-yellow-400" size={16} />
+                    <span className="text-zinc-700 dark:text-zinc-300 text-sm">{t.randomWinner.subsOnly}</span>
+                  </div>
+                  <button 
+                    onClick={() => setSubsOnly(!subsOnly)} 
+                    disabled={isRunning}
+                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${subsOnly ? 'bg-yellow-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${subsOnly ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setSubsOnly(!subsOnly)} 
-                  disabled={isRunning}
-                  className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${subsOnly ? 'bg-yellow-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${subsOnly ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
+              )}
 
               {/* Timer toggle */}
               <div className="flex items-center justify-between">
@@ -1134,6 +1714,41 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               )}
             </div>
 
+            {/* Subs mode info */}
+            {raffleMode === 'subs' && (
+              <div className="space-y-3">
+                <div className="p-3 bg-pink-500/10 border border-pink-500/20 rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-pink-600 dark:text-pink-400 text-sm font-medium flex items-center gap-2">
+                      <Heart size={14} />
+                      Sorteo de Subs
+                    </p>
+                    <button
+                      onClick={() => setShowSubsConfig(true)}
+                      className="p-1.5 text-pink-500 hover:bg-pink-500/20 rounded-lg transition-colors"
+                      title="Configurar valores"
+                    >
+                      <Settings size={16} />
+                    </button>
+                  </div>
+                  <p className="text-pink-600/70 dark:text-pink-400/70 text-xs">
+                    T1: {subsConfig.tier1Value} | T2: {subsConfig.tier2Value} | T3: {subsConfig.tier3Value} | Prime: {subsConfig.primeValue}
+                    {subsConfig.giftSubEnabled && ` | Gift: ${subsConfig.giftSubValue}`}
+                    {subsConfig.bitsEnabled && ` | ${subsConfig.bitsPerEntry} bits = 1`}
+                  </p>
+                </div>
+                
+                {/* Blacklist button for subs mode */}
+                <button
+                  onClick={() => setShowBlacklistModal(true)}
+                  className="w-full py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 text-xs"
+                >
+                  <Ban size={14} />
+                  Lista de prohibidos {blacklist.size > 0 && `(${blacklist.size})`}
+                </button>
+              </div>
+            )}
+
             {/* Keyword input (only in keyword mode) */}
             {raffleMode === 'keyword' && (
               <div className="space-y-2">
@@ -1152,7 +1767,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               </div>
             )}
 
-            {/* Manual participant input */}
+            {/* Manual participant input - not shown in subs mode */}
+            {raffleMode !== 'subs' && (
             <div className="space-y-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600">
               <div className="flex items-center justify-between">
                 <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">
@@ -1245,8 +1861,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 <p className={`text-xs ${manualParticipantError.includes('Añadidos') ? 'text-green-500' : 'text-red-500'}`}>{manualParticipantError}</p>
               )}
             </div>
+            )}
 
-            {/* Participants list - always shown */}
+            {/* Participants list - shown for viewers and keyword modes */}
+            {raffleMode !== 'subs' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">
@@ -1309,6 +1927,89 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 <span className="inline-block w-2 h-2 rounded bg-zinc-300 dark:bg-zinc-600 ml-2 mr-1"></span>Del chat
               </p>
             </div>
+            )}
+
+            {/* Subs participants list */}
+            {raffleMode === 'subs' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-2">
+                  <Heart size={14} className="text-pink-500" />
+                  Participaciones ({subsParticipants.length})
+                </label>
+                {subsParticipants.length > 0 && !isRunning && (
+                  <button 
+                    onClick={resetRaffle}
+                    className="text-xs text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+              <div className="max-h-40 overflow-y-auto bg-zinc-100 dark:bg-zinc-800 rounded-xl p-2">
+                {subsParticipants.length === 0 ? (
+                  <p className="text-xs text-zinc-500 text-center py-4">
+                    {isRunning ? 'Esperando subs, bits, donaciones...' : 'Inicia el sorteo para capturar eventos'}
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {(() => {
+                      // Group entries by user and show details
+                      const userEntries: Record<string, { total: number; details: SubsGiveawayEntry[] }> = subsEntries.reduce((acc, entry) => {
+                        if (!acc[entry.username]) {
+                          acc[entry.username] = { total: 0, details: [] };
+                        }
+                        acc[entry.username].total += entry.entries;
+                        acc[entry.username].details.push(entry);
+                        return acc;
+                      }, {} as Record<string, { total: number; details: SubsGiveawayEntry[] }>);
+                      
+                      // Sort by total entries descending
+                      const sorted = Object.entries(userEntries).sort((a, b) => b[1].total - a[1].total);
+                      
+                      return sorted.map(([name, data]) => {
+                        // Check if blacklisted
+                        const blocked = isBlacklisted(name);
+                        return (
+                          <div 
+                            key={name}
+                            className={`flex items-center justify-between px-2 py-1.5 rounded ${
+                              blocked 
+                                ? 'bg-red-500/10 text-red-400 line-through opacity-50' 
+                                : 'bg-pink-500/10 text-pink-600 dark:text-pink-400'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium">{name}</span>
+                              {blocked && <Ban size={10} />}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {data.details.some(d => d.type === 'sub' || d.type === 'resub') && (
+                                <Star size={10} className="text-purple-400" />
+                              )}
+                              {data.details.some(d => d.type === 'giftsub') && (
+                                <Gift size={10} className="text-pink-400" />
+                              )}
+                              {data.details.some(d => d.type === 'bits') && (
+                                <Coins size={10} className="text-yellow-400" />
+                              )}
+                              <span className="text-xs bg-pink-500/20 px-2 py-0.5 rounded-full ml-1">
+                                x{data.total}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                )}
+              </div>
+              <p className="text-zinc-500 text-[10px] text-center">
+                Usuarios únicos: {new Set(subsParticipants).size} | Total entradas: {subsParticipants.length}
+                {blacklist.size > 0 && ` | Bloqueados: ${blacklist.size}`}
+              </p>
+            </div>
+            )}
 
             {/* Running stats - time only */}
             {isRunning && useTimer && (
@@ -1336,15 +2037,41 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
             {/* Action buttons */}
             <div className="space-y-2">
-              {/* Main action button */}
-              {!isRunning && !winner && (
+              {/* Main action button - hidden for subs/keyword without timer (use create thread instead) */}
+              {!isRunning && !winner && !(raffleMode === 'subs' && !useTimer) && !(raffleMode === 'keyword' && !useTimer) && (
                 <button 
                   onClick={startRaffle} 
                   disabled={(raffleMode === 'keyword' && !keyword.trim()) || (raffleMode === 'viewers' && !useTimer && getAllParticipants().length === 0) || isSelecting} 
+                  className={`w-full flex items-center justify-center gap-2 py-3 ${raffleMode === 'subs' ? 'bg-pink-500 hover:bg-pink-600' : 'bg-purple-500 hover:bg-purple-600'} disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all`}
+                >
+                  {raffleMode === 'subs' ? (
+                    <>
+                      <Heart size={20} />
+                      Iniciar Sorteo de Subs
+                    </>
+                  ) : useTimer ? (
+                    <>
+                      <Play size={20} />
+                      Iniciar Recolección
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} />
+                      {t.randomWinner.selectWinner} ({getAllParticipants().length})
+                    </>
+                  )}
+                </button>
+              )}
+              
+              {/* Viewers mode without timer - direct select */}
+              {!isRunning && !winner && raffleMode === 'viewers' && !useTimer && (
+                <button 
+                  onClick={startRaffle} 
+                  disabled={getAllParticipants().length === 0 || isSelecting} 
                   className="w-full flex items-center justify-center gap-2 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
                 >
-                  {useTimer ? <Play size={20} /> : <Sparkles size={20} />}
-                  {useTimer ? 'Iniciar Recolección' : `${t.randomWinner.selectWinner} (${getAllParticipants().length})`}
+                  <Sparkles size={20} />
+                  {t.randomWinner.selectWinner} ({getAllParticipants().length})
                 </button>
               )}
 
@@ -1352,10 +2079,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               {isRunning && (
                 <button 
                   onClick={finishAndSelectWinner} 
-                  disabled={participants.size === 0}
+                  disabled={raffleMode === 'subs' ? subsParticipants.length === 0 : participants.size === 0}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-bold rounded-xl transition-all animate-pulse"
                 >
-                  <Trophy size={20} /> {t.randomWinner.finishAndChoose} ({participants.size})
+                  <Trophy size={20} /> {t.randomWinner.finishAndChoose} ({raffleMode === 'subs' ? subsParticipants.length : participants.size})
                 </button>
               )}
 
@@ -1369,12 +2096,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 </button>
               )}
 
-              {/* Create thread button (only keyword mode without timer) */}
-              {raffleMode === 'keyword' && !useTimer && !isRunning && !winner && (
+              {/* Create thread button (keyword or subs mode without timer) */}
+              {(raffleMode === 'keyword' || raffleMode === 'subs') && !useTimer && !isRunning && !winner && (
                 <button 
-                  onClick={createThreadFromRaffle} 
-                  disabled={!keyword.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 disabled:from-zinc-400 disabled:to-zinc-500 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                  onClick={raffleMode === 'subs' ? createSubsThread : createThreadFromRaffle} 
+                  disabled={raffleMode === 'keyword' && !keyword.trim()}
+                  className={`w-full flex items-center justify-center gap-2 py-3 ${
+                    raffleMode === 'subs' 
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400'
+                  } disabled:from-zinc-400 disabled:to-zinc-500 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all`}
                 >
                   <Plus size={20} /> Crear Hilo (sin límite de tiempo)
                 </button>
@@ -1401,6 +2132,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             <p className="text-center text-zinc-500 text-xs">
               {raffleMode === 'viewers' 
                 ? (useTimer ? 'Los viewers que escriban durante el tiempo participarán' : t.randomWinner.viewersHint)
+                : raffleMode === 'subs'
+                ? 'Cada sub/resub/gift sub durante el sorteo = 1 participación'
                 : t.randomWinner.keywordHint
               }
             </p>
@@ -1423,7 +2156,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 key={thread.id}
                 className={`rounded-xl border overflow-hidden transition-all ${
                   thread.isActive 
-                    ? 'border-green-500/30 bg-green-500/5' 
+                    ? thread.mode === 'subs' 
+                      ? 'border-pink-500/30 bg-pink-500/5'
+                      : 'border-green-500/30 bg-green-500/5' 
                     : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50'
                 }`}
               >
@@ -1435,10 +2170,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                   <div className="flex items-center gap-3">
                     <div 
                       className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold shrink-0"
-                      style={{ backgroundColor: THREAD_COLORS[index % THREAD_COLORS.length] }}
+                      style={{ backgroundColor: thread.mode === 'subs' ? '#ec4899' : THREAD_COLORS[index % THREAD_COLORS.length] }}
                     >
                       <span className="relative">
-                        <Gift size={18} />
+                        {thread.mode === 'subs' ? <Heart size={18} /> : <Gift size={18} />}
                         {thread.isActive && (
                           <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                         )}
@@ -1448,19 +2183,26 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-zinc-800 dark:text-white truncate">{thread.name}</span>
-                        {thread.subscribersOnly && (
+                        {thread.mode === 'subs' ? (
+                          <span className="px-1.5 py-0.5 bg-pink-500/20 text-pink-600 dark:text-pink-400 text-[10px] font-bold rounded">SUBS</span>
+                        ) : thread.subscribersOnly && (
                           <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-600 dark:text-purple-400 text-[10px] font-bold rounded">SUB</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <span className="flex items-center gap-1">
-                          <Hash size={10} />
-                          {thread.keyword}
-                        </span>
-                        <span>•</span>
+                        {thread.mode === 'keyword' && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Hash size={10} />
+                              {thread.keyword}
+                            </span>
+                            <span>•</span>
+                          </>
+                        )}
                         <span className="flex items-center gap-1">
                           <Users size={10} />
                           {getUniqueParticipantCount(thread)}
+                          {thread.mode === 'subs' && ` (${getTotalEntries(thread)} entradas)`}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
@@ -1496,7 +2238,20 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 {/* Expanded Content */}
                 {expandedThreadId === thread.id && (
                   <div className="px-3 pb-3 border-t border-zinc-200 dark:border-zinc-700 pt-3 space-y-3">
-                    {/* Manual participant input for thread */}
+                    {/* Subs config summary for subs threads */}
+                    {thread.mode === 'subs' && thread.subsConfig && (
+                      <div className="p-2 bg-pink-500/10 rounded-lg text-xs text-pink-600 dark:text-pink-400">
+                        <p className="font-medium mb-1">Configuración:</p>
+                        <p>
+                          T1: {thread.subsConfig.tier1Value} | T2: {thread.subsConfig.tier2Value} | T3: {thread.subsConfig.tier3Value} | Prime: {thread.subsConfig.primeValue}
+                          {thread.subsConfig.giftSubEnabled && ` | Gift: ${thread.subsConfig.giftSubValue}`}
+                          {thread.subsConfig.bitsEnabled && ` | ${thread.subsConfig.bitsPerEntry} bits = 1`}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Manual participant input for thread - only for keyword mode */}
+                    {thread.mode === 'keyword' && (
                     <div className="space-y-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-600">
                       <label className="text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase flex items-center gap-1">
                         <UserPlus size={12} />
@@ -1523,29 +2278,76 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                         <p className="text-red-500 text-[10px]">{threadManualError[thread.id]}</p>
                       )}
                     </div>
+                    )}
 
                     <div>
                       <p className="text-xs text-zinc-500 font-bold uppercase mb-2">
-                        Participantes ({getUniqueParticipantCount(thread)})
+                        {thread.mode === 'subs' 
+                          ? `Participantes (${getUniqueParticipantCount(thread)} usuarios, ${getTotalEntries(thread)} entradas)`
+                          : `Participantes (${getUniqueParticipantCount(thread)})`
+                        }
                       </p>
                       <div className="max-h-32 overflow-y-auto bg-zinc-100 dark:bg-zinc-800 rounded-lg p-2">
                         {thread.participants.length === 0 ? (
                           <p className="text-xs text-zinc-500 text-center py-2">
-                            Esperando participantes...
+                            {thread.mode === 'subs' ? 'Esperando subs, bits, donaciones...' : 'Esperando participantes...'}
                           </p>
+                        ) : thread.mode === 'subs' ? (
+                          // Subs mode - show weighted entries
+                          <div className="space-y-1">
+                            {(() => {
+                              const counts: Record<string, number> = thread.participants.reduce((acc, p) => {
+                                acc[p.username] = (acc[p.username] || 0) + 1;
+                                return acc;
+                              }, {} as Record<string, number>);
+                              
+                              const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                              
+                              return sorted.slice(0, 50).map(([name, count]) => {
+                                const blocked = isBlacklisted(name);
+                                return (
+                                  <div 
+                                    key={name}
+                                    className={`flex items-center justify-between px-2 py-1 rounded ${
+                                      blocked 
+                                        ? 'bg-red-500/10 text-red-400 line-through opacity-50' 
+                                        : 'bg-pink-500/10 text-pink-600 dark:text-pink-400'
+                                    }`}
+                                  >
+                                    <span className="text-xs font-medium flex items-center gap-1">
+                                      {name}
+                                      {blocked && <Ban size={10} />}
+                                    </span>
+                                    <span className="text-xs bg-pink-500/20 px-2 py-0.5 rounded-full">
+                                      x{count}
+                                    </span>
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
                         ) : (
+                          // Keyword mode - show unique participants
                           <div className="flex flex-wrap gap-1">
                             {(() => {
                               const participantMap = new Map<string, GiveawayParticipant>();
                               thread.participants.forEach(p => participantMap.set(p.oderId, p));
-                              return Array.from(participantMap.values()).slice(-50).map((p, i) => (
-                                <span 
-                                  key={`${p.oderId}-${i}`}
-                                  className="px-2 py-0.5 rounded text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                                >
-                                  {p.username}
-                                </span>
-                              ));
+                              return Array.from(participantMap.values()).slice(-50).map((p, i) => {
+                                const blocked = isBlacklisted(p.username);
+                                return (
+                                  <span 
+                                    key={`${p.oderId}-${i}`}
+                                    className={`px-2 py-0.5 rounded text-xs ${
+                                      blocked 
+                                        ? 'bg-red-500/10 text-red-400 line-through opacity-50' 
+                                        : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                                    }`}
+                                  >
+                                    {p.username}
+                                    {blocked && <Ban size={8} className="inline ml-1" />}
+                                  </span>
+                                );
+                              });
                             })()}
                           </div>
                         )}
@@ -1556,7 +2358,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                       <button
                         onClick={() => pickThreadWinner(thread.id)}
                         disabled={thread.participants.length === 0}
-                        className="flex-1 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 disabled:from-zinc-400 disabled:to-zinc-500 disabled:cursor-not-allowed text-white font-bold rounded-lg flex items-center justify-center gap-2 text-sm transition-all"
+                        className={`flex-1 py-2 ${
+                          thread.mode === 'subs'
+                            ? 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400'
+                            : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400'
+                        } disabled:from-zinc-400 disabled:to-zinc-500 disabled:cursor-not-allowed text-white font-bold rounded-lg flex items-center justify-center gap-2 text-sm transition-all`}
                       >
                         <Sparkles size={16} />
                         Sortear Ganador
@@ -1692,6 +2498,15 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Subs Config Modal */}
+      {showSubsConfig && (
+        <SubsConfigPanel
+          config={subsConfig}
+          onChange={setSubsConfig}
+          onClose={() => setShowSubsConfig(false)}
+        />
       )}
     </div>
   );

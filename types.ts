@@ -107,7 +107,84 @@ export interface GiveawayThread {
   // Opciones
   subscribersOnly: boolean;
   allowMultipleEntries: boolean; // Si el mismo user puede entrar varias veces
+  // Modo del hilo
+  mode: 'keyword' | 'subs';
+  // Configuración de valores para modo subs
+  subsConfig?: SubsGiveawayConfig;
 }
+
+/**
+ * Configuración de valores para sorteos de subs
+ */
+export interface SubsGiveawayConfig {
+  // Valor base por tipo de sub
+  tier1Value: number; // Entradas por sub tier 1 (default: 1)
+  tier2Value: number; // Entradas por sub tier 2 (default: 2)
+  tier3Value: number; // Entradas por sub tier 3 (default: 5)
+  primeValue: number; // Entradas por sub Prime (default: 1)
+  
+  // Resubs
+  resubEnabled: boolean; // Contar resubs
+  resubValue: number; // Entradas por resub (default: 1)
+  resubBonusPerMonth: number; // Bonus por cada mes de sub (0 = sin bonus)
+  
+  // Gift subs
+  giftSubEnabled: boolean; // Contar gift subs
+  giftSubValue: number; // Entradas por cada sub regalada (default: 1)
+  
+  // Bits
+  bitsEnabled: boolean;
+  bitsPerEntry: number; // Cuántos bits = 1 entrada (ej: 100 bits = 1 entrada)
+  bitsMinimum: number; // Mínimo de bits para participar
+  
+  // Donaciones (requiere integración externa)
+  donationsEnabled: boolean;
+  donationPerEntry: number; // Cuánto dinero = 1 entrada (ej: 1€ = 1 entrada)
+  donationMinimum: number; // Mínimo para participar
+  donationCurrency: string; // EUR, USD, etc.
+  
+  // Regalos de canal (Hype Train contributions, etc.)
+  channelGiftsEnabled: boolean;
+  channelGiftValue: number; // Entradas por regalo de canal
+}
+
+/**
+ * Participación en sorteo de subs con detalles
+ */
+export interface SubsGiveawayEntry {
+  oderId: string;
+  username: string;
+  entries: number; // Número de entradas
+  type: 'sub' | 'resub' | 'giftsub' | 'bits' | 'donation' | 'channelgift';
+  tier?: 1 | 2 | 3 | 'prime';
+  months?: number; // Meses de sub (para resubs)
+  amount?: number; // Cantidad (bits, donación, gifts)
+  timestamp: number;
+}
+
+/**
+ * Configuración por defecto para sorteos de subs
+ */
+export const DEFAULT_SUBS_CONFIG: SubsGiveawayConfig = {
+  tier1Value: 1,
+  tier2Value: 2,
+  tier3Value: 5,
+  primeValue: 1,
+  resubEnabled: true,
+  resubValue: 1,
+  resubBonusPerMonth: 0,
+  giftSubEnabled: true,
+  giftSubValue: 1,
+  bitsEnabled: false,
+  bitsPerEntry: 100,
+  bitsMinimum: 100,
+  donationsEnabled: false,
+  donationPerEntry: 1,
+  donationMinimum: 1,
+  donationCurrency: 'EUR',
+  channelGiftsEnabled: false,
+  channelGiftValue: 1,
+};
 
 export interface CollaborationState {
   isActive: boolean;

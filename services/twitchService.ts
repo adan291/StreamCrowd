@@ -57,10 +57,10 @@ export type ReconnectAttemptCallback = (attempt: number, maxAttempts: number) =>
 export type SubTier = 'Prime' | '1000' | '2000' | '3000';
 
 /**
- * Stream event data for subscriptions, follows, raids, cheers, etc.
+ * Stream event data for subscriptions, follows, raids, cheers, bans, timeouts, etc.
  */
 export interface StreamEventData {
-  type: 'sub' | 'resub' | 'subgift' | 'submysterygift' | 'primepaidupgrade' | 'giftpaidupgrade' | 'anongiftpaidupgrade' | 'raid' | 'cheer' | 'hosted';
+  type: 'sub' | 'resub' | 'subgift' | 'submysterygift' | 'primepaidupgrade' | 'giftpaidupgrade' | 'anongiftpaidupgrade' | 'raid' | 'cheer' | 'hosted' | 'ban' | 'timeout';
   username: string;
   displayName: string;
   userId?: string;
@@ -83,6 +83,9 @@ export interface StreamEventData {
   viewerCount?: number;
   // Cheer/Bits specific
   bits?: number;
+  // Ban/Timeout specific
+  duration?: number; // Timeout duration in seconds (null/undefined for permanent ban)
+  reason?: string; // Reason for ban/timeout
 }
 
 /**
@@ -118,7 +121,7 @@ class TwitchService {
   private messageCallback: MessageCallback | null = null;
   private statusChangeCallback: StatusCallback | null = null;
   private reconnectAttemptCallback: ReconnectAttemptCallback | null = null;
-  private streamEventCallback: StreamEventCallback | null = null;
+  private streamEventCallbacks: Set<StreamEventCallback> = new Set();
   private currentChannel: string = '';
   private isAnonymous: boolean = false;
   private config: TwitchServiceConfig;
@@ -372,142 +375,126 @@ class TwitchService {
 
         // Subscription event
         this.client.on('subscription', (channel, username, method, message, userstate) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'sub',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              tier: this.parseTier(method?.plan),
-              message: message || undefined,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'sub',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            tier: this.parseTier(method?.plan),
+            message: message || undefined,
+          });
         });
 
         // Resub event
         this.client.on('resub', (channel, username, months, message, userstate, methods) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'resub',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              tier: this.parseTier(methods?.plan),
-              months: months,
-              cumulativeMonths: parseInt(userstate['msg-param-cumulative-months'] || '0', 10) || months,
-              streakMonths: parseInt(userstate['msg-param-streak-months'] || '0', 10) || undefined,
-              message: message || undefined,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'resub',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            tier: this.parseTier(methods?.plan),
+            months: months,
+            cumulativeMonths: parseInt(userstate['msg-param-cumulative-months'] || '0', 10) || months,
+            streakMonths: parseInt(userstate['msg-param-streak-months'] || '0', 10) || undefined,
+            message: message || undefined,
+          });
         });
 
         // Gift sub event (single gift)
         this.client.on('subgift', (channel, username, streakMonths, recipient, methods, userstate) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'subgift',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              tier: this.parseTier(methods?.plan),
-              recipientUsername: recipient,
-              recipientDisplayName: userstate['msg-param-recipient-display-name'] || recipient,
-              giftCount: 1,
-              gifterUsername: username,
-              gifterDisplayName: userstate['display-name'] || username,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'subgift',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            tier: this.parseTier(methods?.plan),
+            recipientUsername: recipient,
+            recipientDisplayName: userstate['msg-param-recipient-display-name'] || recipient,
+            giftCount: 1,
+            gifterUsername: username,
+            gifterDisplayName: userstate['display-name'] || username,
+          });
         });
 
         // Mystery gift (mass gift subs)
         this.client.on('submysterygift', (channel, username, numbOfSubs, methods, userstate) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'submysterygift',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              tier: this.parseTier(methods?.plan),
-              giftCount: numbOfSubs,
-              senderCount: parseInt(userstate['msg-param-sender-count'] || '0', 10) || undefined,
-              gifterUsername: username,
-              gifterDisplayName: userstate['display-name'] || username,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'submysterygift',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            tier: this.parseTier(methods?.plan),
+            giftCount: numbOfSubs,
+            senderCount: parseInt(userstate['msg-param-sender-count'] || '0', 10) || undefined,
+            gifterUsername: username,
+            gifterDisplayName: userstate['display-name'] || username,
+          });
         });
 
         // Prime paid upgrade
         this.client.on('primepaidupgrade', (channel, username, methods, userstate) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'primepaidupgrade',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              tier: this.parseTier(methods?.plan),
-            });
-          }
+          this.emitStreamEvent({
+            type: 'primepaidupgrade',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            tier: this.parseTier(methods?.plan),
+          });
         });
 
         // Gift paid upgrade
         this.client.on('giftpaidupgrade', (channel, username, sender, userstate) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'giftpaidupgrade',
-              username: username,
-              displayName: userstate['display-name'] || username,
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              gifterUsername: sender,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'giftpaidupgrade',
+            username: username,
+            displayName: userstate['display-name'] || username,
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            gifterUsername: sender,
+          });
         });
 
         // Raid event
         this.client.on('raided', (channel, username, viewers) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'raid',
-              username: username,
-              displayName: username,
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              viewerCount: viewers,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'raid',
+            username: username,
+            displayName: username,
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            viewerCount: viewers,
+          });
         });
 
         // Cheer/Bits event
         this.client.on('cheer', (channel, userstate, message) => {
-          if (this.streamEventCallback) {
-            this.streamEventCallback({
-              type: 'cheer',
-              username: userstate.username || userstate['display-name'] || 'anonymous',
-              displayName: userstate['display-name'] || userstate.username || 'Anonymous',
-              userId: userstate['user-id'],
-              channel: channel.replace('#', ''),
-              timestamp: Date.now(),
-              bits: parseInt(userstate.bits || '0', 10),
-              message: message,
-            });
-          }
+          this.emitStreamEvent({
+            type: 'cheer',
+            username: userstate.username || userstate['display-name'] || 'anonymous',
+            displayName: userstate['display-name'] || userstate.username || 'Anonymous',
+            userId: userstate['user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            bits: parseInt(userstate.bits || '0', 10),
+            message: message,
+          });
         });
 
         // Hosted event (when someone hosts you)
         this.client.on('hosted', (channel, username, viewers, autohost) => {
-          if (this.streamEventCallback && !autohost) {
-            this.streamEventCallback({
+          if (!autohost) {
+            this.emitStreamEvent({
               type: 'hosted',
               username: username,
               displayName: username,
@@ -516,6 +503,33 @@ class TwitchService {
               viewerCount: viewers,
             });
           }
+        });
+
+        // Ban event (permanent ban)
+        this.client.on('ban', (channel, username, reason, userstate) => {
+          this.emitStreamEvent({
+            type: 'ban',
+            username: username,
+            displayName: username,
+            userId: userstate?.['target-user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            reason: reason || undefined,
+          });
+        });
+
+        // Timeout event (temporary ban)
+        this.client.on('timeout', (channel, username, reason, duration, userstate) => {
+          this.emitStreamEvent({
+            type: 'timeout',
+            username: username,
+            displayName: username,
+            userId: userstate?.['target-user-id'],
+            channel: channel.replace('#', ''),
+            timestamp: Date.now(),
+            duration: duration,
+            reason: reason || undefined,
+          });
         });
 
         this.client.on('connected', () => {
@@ -738,11 +752,34 @@ class TwitchService {
   }
 
   /**
-   * Set the stream event callback (subs, resubs, gifts, etc.)
+   * Add a stream event callback (subs, resubs, gifts, etc.)
+   * Multiple callbacks can be registered
    * @param callback Function to call when a stream event occurs
    */
   public onStreamEvent(callback: StreamEventCallback): void {
-    this.streamEventCallback = callback;
+    this.streamEventCallbacks.add(callback);
+  }
+
+  /**
+   * Remove a stream event callback
+   * @param callback The callback to remove
+   */
+  public offStreamEvent(callback: StreamEventCallback): void {
+    this.streamEventCallbacks.delete(callback);
+  }
+
+  /**
+   * Emit a stream event to all registered callbacks
+   * @param event The event data to emit
+   */
+  private emitStreamEvent(event: StreamEventData): void {
+    this.streamEventCallbacks.forEach(callback => {
+      try {
+        callback(event);
+      } catch (e) {
+        console.error('Error in stream event callback:', e);
+      }
+    });
   }
 
   /**
@@ -858,6 +895,66 @@ class TwitchService {
       
       const data = await response.json();
       return data.data?.map((user: { user_login: string }) => user.user_login) || [];
+    } catch (err) {
+      console.error('Error getting chatters:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Get chatters with detailed info (username, display name, user ID)
+   * Requires OAuth token with moderator:read:chatters scope
+   * @param token OAuth token with required scope
+   * @param broadcasterId Broadcaster user ID
+   * @param moderatorId Moderator user ID (usually same as broadcaster)
+   * @returns Promise with array of chatter info or null if failed
+   */
+  public async getChattersDetailed(token: string, broadcasterId: string, moderatorId: string): Promise<{
+    oderId: string;
+    username: string;
+    displayName: string;
+  }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const allChatters: { oderId: string; username: string; displayName: string }[] = [];
+      let cursor: string | undefined;
+      
+      // Paginate through all chatters
+      do {
+        const url = new URL('https://api.twitch.tv/helix/chat/chatters');
+        url.searchParams.set('broadcaster_id', broadcasterId);
+        url.searchParams.set('moderator_id', moderatorId);
+        url.searchParams.set('first', '1000');
+        if (cursor) url.searchParams.set('after', cursor);
+        
+        const response = await fetch(url.toString(), {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to get chatters:', response.status);
+          return allChatters.length > 0 ? allChatters : null;
+        }
+        
+        const data = await response.json();
+        const chatters = data.data?.map((user: any) => ({
+          oderId: user.user_id,
+          username: user.user_login,
+          displayName: user.user_name,
+        })) || [];
+        
+        allChatters.push(...chatters);
+        cursor = data.pagination?.cursor;
+        
+        // Safety limit - max 10000 chatters
+        if (allChatters.length >= 10000) break;
+        
+      } while (cursor);
+      
+      return allChatters;
     } catch (err) {
       console.error('Error getting chatters:', err);
       return null;
@@ -1384,6 +1481,169 @@ class TwitchService {
       };
     } catch (err) {
       console.error('Error getting stream info:', err);
+      return null;
+    }
+  }
+
+  // ============================================
+  // MODERATION FUNCTIONS
+  // ============================================
+
+  /**
+   * Ban a user from the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @param userId User ID to ban
+   * @param reason Optional reason for the ban
+   * @returns Promise with success boolean
+   */
+  public async banUser(token: string, broadcasterId: string, userId: string, reason?: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: {
+              user_id: userId,
+              reason: reason || undefined,
+            }
+          })
+        }
+      );
+      
+      return response.ok;
+    } catch (err) {
+      console.error('Error banning user:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Timeout a user in the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @param userId User ID to timeout
+   * @param duration Duration in seconds (1-1209600, max 2 weeks)
+   * @param reason Optional reason for the timeout
+   * @returns Promise with success boolean
+   */
+  public async timeoutUser(token: string, broadcasterId: string, userId: string, duration: number, reason?: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      // Clamp duration between 1 second and 2 weeks
+      const clampedDuration = Math.max(1, Math.min(duration, 1209600));
+      
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: {
+              user_id: userId,
+              duration: clampedDuration,
+              reason: reason || undefined,
+            }
+          })
+        }
+      );
+      
+      return response.ok;
+    } catch (err) {
+      console.error('Error timing out user:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Unban a user from the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @param userId User ID to unban
+   * @returns Promise with success boolean
+   */
+  public async unbanUser(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch (err) {
+      console.error('Error unbanning user:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Get list of banned users
+   * Requires OAuth token with moderation:read scope
+   * @param token OAuth token
+   * @param broadcasterId Broadcaster user ID
+   * @returns Promise with array of banned users or null if failed
+   */
+  public async getBannedUsers(token: string, broadcasterId: string): Promise<{
+    oderId: string;
+    username: string;
+    displayName: string;
+    reason?: string;
+    moderatorId?: string;
+    moderatorName?: string;
+    createdAt: string;
+    expiresAt?: string; // null for permanent bans
+  }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/banned?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('Failed to get banned users:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((u: any) => ({
+        oderId: u.user_id,
+        username: u.user_login,
+        displayName: u.user_name,
+        reason: u.reason || undefined,
+        moderatorId: u.moderator_id,
+        moderatorName: u.moderator_name,
+        createdAt: u.created_at,
+        expiresAt: u.expires_at || undefined,
+      })) || [];
+    } catch (err) {
+      console.error('Error getting banned users:', err);
       return null;
     }
   }

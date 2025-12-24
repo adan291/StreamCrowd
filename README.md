@@ -18,9 +18,9 @@
 
 ## 🎯 ¿Qué es TwitchVote?
 
-TwitchVote es una aplicación todo-en-uno para streamers que quieren aumentar la interacción con su audiencia. Incluye encuestas en tiempo real, +15 juegos interactivos controlados por chat, sorteos, panel de jueces, y herramientas de moderación avanzadas.
+TwitchVote es una aplicación todo-en-uno para streamers que quieren aumentar la interacción con su audiencia. Incluye encuestas en tiempo real, **+13 juegos interactivos** controlados por chat, sorteos, panel de jueces, analytics avanzados, y herramientas de moderación.
 
-Disponible como **aplicación web** y **aplicación de escritorio** (Electron).
+Disponible como **aplicación web** (PWA) y **aplicación de escritorio** (Electron).
 
 ---
 
@@ -29,60 +29,87 @@ Disponible como **aplicación web** y **aplicación de escritorio** (Electron).
 ### 📊 Encuestas en Vivo
 - Creación de encuestas con opciones personalizables
 - Votación por chat con prefijos configurables (`+1`, `#opcion`, etc.)
+- Modo de coincidencia exacta o parcial para votos
 - Límite de votos y duración opcional
-- Historial de encuestas con exportación
-- Modo overlay para OBS/Streamlabs
+- Historial de encuestas con exportación a Excel
+- Modo overlay transparente para OBS/Streamlabs
+- Ruleta/Spinner para selección aleatoria de opciones
 
-### 🎮 Juegos Interactivos
-+15 minijuegos controlados por el chat de Twitch:
+### 🎮 Juegos Interactivos (+13 minijuegos)
 
-| Juego | Descripción |
-|-------|-------------|
-| 🎰 **Casino Roulette** | Ruleta de casino con apuestas del chat |
-| 🎣 **Chat Fishing** | Pesca competitiva entre viewers |
-| 🔫 **Pium Game** | Duelos rápidos estilo western |
-| 🦆 **Duck Hunt** | Caza de patos clásica |
-| 🚢 **Battleship** | Hundir la flota colaborativo |
-| 🥔 **Hot Potato** | Patata caliente entre usuarios |
-| ❓ **Trivia Battle** | Preguntas y respuestas |
-| 👁️ **Veo Veo** | Adivina el objeto |
-| ✂️ **Piedra Papel Tijera** | Torneos de PPT |
-| 📝 **Ahorcado** | El clásico juego de palabras |
-| 🏎️ **Carrera de Emotes** | Carreras con emotes del canal |
-| 🧠 **Memoria IRL** | Memory con imágenes personalizadas |
-| 🎉 **Party & Co** | Minijuegos variados estilo party |
+| Juego | Descripción | Comando Chat |
+|-------|-------------|--------------|
+| � ***Casino Roulette** | Ruleta de casino con apuestas del chat | `!bet`, `!spin` |
+| 🎣 **Chat Fishing** | Pesca competitiva con ranking | `!fish`, `!cast` |
+| 🔫 **Pium Game** | Duelos rápidos estilo western | `!pium @user` |
+| 🦆 **Duck Hunt** | Caza de patos clásica | `!shoot` |
+| 🚢 **Battleship** | Hundir la flota colaborativo | `!fire A1` |
+| 🥔 **Hot Potato** | Patata caliente entre usuarios | `!pass @user` |
+| ❓ **Trivia Battle** | Preguntas y respuestas con puntos | respuesta directa |
+| 👁️ **Veo Veo** | Adivina el objeto oculto | respuesta directa |
+| ✂️ **Piedra Papel Tijera** | Torneos de PPT | `!piedra`, `!papel`, `!tijera` |
+| 📝 **Ahorcado** | El clásico juego de palabras | letra directa |
+| 🏎️ **Carrera de Emotes** | Carreras con emotes del canal | emote para votar |
+| 🧠 **Memoria IRL** | Memory con imágenes personalizadas | `!flip 1`, `!flip 2` |
+| 🎉 **Party & Co** | Minijuegos variados estilo party | varios comandos |
 
 ### 🎁 Sorteos y Giveaways
 - Sorteos por palabra clave
-- Filtros: solo subs, followers, etc.
+- Filtros: solo subs, followers, antigüedad de cuenta
 - Ruleta visual con animación
-- Historial de ganadores
+- Selección de ganador aleatorio con overlay
+- Historial de ganadores exportable
 
 ### ⚖️ Panel de Jueces
-- Sistema de puntuación multi-criterio
+- Sistema de puntuación multi-criterio personalizable
 - Múltiples jueces (streamers colaboradores)
-- Votación pública combinada
+- Votación pública del chat combinada
 - Revelación dramática de resultados
+- Overlay dedicado para OBS
+
+### 📈 Analytics Avanzados
+- Análisis de sentimiento del chat en tiempo real
+- Métricas: msgs/min, engagement, retención de usuarios
+- Gráficos de actividad y tendencia emocional
+- Top usuarios, palabras frecuentes y emotes populares
+- Mapa de calor de actividad
+- Índice de salud del chat
+- Detección de idioma dominante
+- Exportación de datos a CSV
+- Historial de sesiones guardadas
+
+### 🎬 Stream Events
+- Captura de subs, resubs, gifts, bits, raids
+- Notificaciones visuales personalizables
+- Historial de eventos del stream
 
 ### 🛡️ Moderación Avanzada
 - Filtros de antigüedad de cuenta
 - Cooldown entre votos
 - Peso de votos (subs valen más)
+- Detección de spam
 - Logs exportables
 - Presets de configuración
 
+### 🤖 Mascota AI Interactiva
+- Asistente visual con expresiones dinámicas
+- Detecta dificultades del usuario y ofrece ayuda
+- Arrastrable por la pantalla
+- Integración opcional con Gemini API
+- Animaciones y estados emocionales
+
 ### 🎨 Personalización
 - Temas claro/oscuro
-- Colores personalizables
+- Colores personalizables para encuestas
 - Overlays transparentes para OBS
-- Mascota AI interactiva
 - Soporte multi-idioma (ES/EN)
+- Atajos de teclado configurables
+- SoundBoard integrado
 
-### 📈 Analytics
-- Estadísticas de stream en tiempo real
-- Historial de sesiones
-- Análisis de participación
-- Exportación de datos
+### 🔗 Colaboración Multi-Canal
+- Conecta múltiples canales de Twitch
+- Votos combinados de diferentes chats
+- Ideal para colaboraciones entre streamers
 
 ---
 
@@ -158,7 +185,7 @@ GEMINI_API_KEY=tu_api_key
 3. (Opcional) Conecta con OAuth para funciones avanzadas:
    - Enviar mensajes al chat
    - Acceder a lista de subs
-   - Emotes personalizados
+   - Emotes personalizados del canal
 
 ---
 
@@ -173,20 +200,47 @@ GEMINI_API_KEY=tu_api_key
 5. Ancho: 400px, Alto: 600px
 6. Marcar "Fondo transparente"
 
-### Overlays de Juegos
+### Overlays Disponibles
 
-Cada juego tiene su propio overlay:
+Cada componente tiene su propio overlay para OBS:
 
 ```
-# Ejemplos de URLs de overlay
-?overlayPium=true        # Pium Game
-?overlayRoulette=true    # Casino Roulette
-?overlayFishing=true     # Chat Fishing
-?overlayTrivia=true      # Trivia Battle
-?overlayDuckHunt=true    # Duck Hunt
-?overlayAhorcado=true    # Ahorcado
-?overlayCarrera=true     # Carrera de Emotes
+# Encuestas y Herramientas
+?overlay=true              # Encuesta principal
+?overlayCountdown=true     # Cuenta regresiva
+?overlaySpinner=true       # Ruleta/Spinner
+?overlayRandomWinner=true  # Ganador aleatorio
+?overlayJudgePanel=true    # Panel de jueces
+
+# Juegos
+?overlayPium=true          # Pium Game
+?overlayRoulette=true      # Casino Roulette
+?overlayFishing=true       # Chat Fishing
+?overlayPotato=true        # Hot Potato
+?overlayTrivia=true        # Trivia Battle
+?overlayBattleship=true    # Battleship
+?overlayDuckHunt=true      # Duck Hunt
+?overlayVeoVeo=true        # Veo Veo
+?overlayPPT=true           # Piedra Papel Tijera
+?overlayAhorcado=true      # Ahorcado
+?overlayCarrera=true       # Carrera de Emotes
+?overlayMemoria=true       # Memoria IRL
+?overlayPartyCo=true       # Party & Co
 ```
+
+Añade `&channel=TU_CANAL` a cualquier URL para conectar automáticamente.
+
+---
+
+## ⌨️ Atajos de Teclado
+
+| Atajo | Acción |
+|-------|--------|
+| `Ctrl + ,` | Abrir herramientas |
+| `Ctrl + H` | Ver historial |
+| `Ctrl + B` | Ocultar/mostrar sidebar |
+| `Ctrl + D` | Cambiar tema claro/oscuro |
+| `Escape` | Cerrar modal activo |
 
 ---
 
@@ -211,17 +265,17 @@ npm run test:all
 ## 📁 Estructura del Proyecto
 
 ```
-├── components/          # Componentes React
-│   ├── games/          # Juegos interactivos
-│   └── mascot/         # Mascota AI
-├── hooks/              # Custom hooks
-├── services/           # Servicios (Twitch, AI, etc.)
-├── context/            # React Context providers
-├── i18n/               # Traducciones
-├── constants/          # Constantes
-├── electron/           # Código Electron
-├── tests/              # Tests
-└── public/             # Assets estáticos
+├── components/           # Componentes React
+│   ├── games/           # 13+ juegos interactivos
+│   └── mascot/          # Mascota AI
+├── hooks/               # Custom hooks (polls, moderation, analytics...)
+├── services/            # Servicios (Twitch, AI, chat analysis...)
+├── context/             # React Context providers
+├── i18n/                # Traducciones ES/EN
+├── constants/           # Constantes y storage keys
+├── electron/            # Código Electron para desktop
+├── tests/               # Tests unitarios y E2E
+└── public/              # Assets estáticos
 ```
 
 ---
