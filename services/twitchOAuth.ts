@@ -4,8 +4,8 @@
  */
 
 // You need to register your app at https://dev.twitch.tv/console/apps
-// and replace this with your own Client ID
-const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
+// Set VITE_TWITCH_CLIENT_ID in .env.local or Vercel environment variables
+const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || '3tz1yl90wzjq2syvrsf6zrefvzb3y4';
 
 // Scopes needed for chat functionality
 const OAUTH_SCOPES = [
@@ -14,7 +14,7 @@ const OAUTH_SCOPES = [
   'channel:read:subscriptions',
   'moderator:read:chatters',
   'bits:read',
-].join('+');
+].join(' ');
 
 // Callback path - must match what's registered in Twitch Dev Console
 const CALLBACK_PATH = '/auth/twitch/callback';
@@ -92,6 +92,15 @@ async function validateToken(accessToken: string): Promise<{ username: string; u
  */
 export function openTwitchOAuthPopup(): Promise<TwitchOAuthResult> {
   return new Promise((resolve, reject) => {
+    // Validate Client ID is configured
+    if (!TWITCH_CLIENT_ID) {
+      reject({ 
+        error: 'missing_client_id', 
+        errorDescription: 'Twitch Client ID not configured. Set VITE_TWITCH_CLIENT_ID in environment variables.' 
+      });
+      return;
+    }
+
     const state = generateState();
     const authUrl = buildAuthUrl(state);
     
