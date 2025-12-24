@@ -5,7 +5,7 @@
 
 // You need to register your app at https://dev.twitch.tv/console/apps
 // Set VITE_TWITCH_CLIENT_ID in .env.local or Vercel environment variables
-const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || '3tz1yl90wzjq2syvrsf6zrefvzb3y4';
+const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
 // Scopes needed for chat functionality
 const OAUTH_SCOPES = [
@@ -16,8 +16,8 @@ const OAUTH_SCOPES = [
   'bits:read',
 ].join(' ');
 
-// Callback path - must match what's registered in Twitch Dev Console
-const CALLBACK_PATH = '/auth/twitch/callback';
+// Callback path - can be root or specific path, must match Twitch Dev Console
+const CALLBACK_PATH = '/';
 
 export interface TwitchOAuthResult {
   accessToken: string;
@@ -35,8 +35,8 @@ export interface TwitchOAuthError {
  * Get the redirect URI based on current location
  */
 function getRedirectUri(): string {
-  const origin = window.location.origin;
-  return `${origin}${CALLBACK_PATH}`;
+  // Just use origin without trailing slash - must match exactly what's in Twitch Dev Console
+  return window.location.origin;
 }
 
 /**
