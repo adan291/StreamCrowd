@@ -129,6 +129,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   const [challenges, setChallenges] = useState<Challenge[]>([...DEFAULT_CHALLENGES]);
   const [customChallenges, setCustomChallenges] = useState<Challenge[]>([]);
   const [pointsToWin, setPointsToWin] = useState(50);
+  const [timeMultiplier, setTimeMultiplier] = useState(1); // 0.5x, 1x, 1.5x, 2x
   const [enabledTypes, setEnabledTypes] = useState<Set<ChallengeType>>(
     new Set(['trivia', 'mimica', 'dibujo', 'palabras', 'cultura', 'rapidez'])
   );
@@ -328,7 +329,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
 
   const startChallenge = (challenge: Challenge) => {
     setCurrentChallenge(challenge);
-    setTimeLeft(challenge.timeLimit);
+    setTimeLeft(Math.round(challenge.timeLimit * timeMultiplier));
     setWinner(null);
     setRoundNumber(prev => prev + 1);
     setUsedChallenges(prev => new Set([...prev, challenge.id]));
@@ -503,7 +504,20 @@ Responde SOLO con JSON:
             </button>
             
             <div className="flex items-center gap-2 ml-auto">
-              <span className="text-zinc-400 text-sm">Meta:</span>
+              <span className="text-zinc-400 text-sm">Tiempo:</span>
+              <select
+                value={timeMultiplier}
+                onChange={(e) => setTimeMultiplier(parseFloat(e.target.value))}
+                className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={0.75}>0.75x</option>
+                <option value={1}>1x</option>
+                <option value={1.5}>1.5x</option>
+                <option value={2}>2x</option>
+              </select>
+              
+              <span className="text-zinc-400 text-sm ml-2">Meta:</span>
               <input
                 type="number"
                 min="20"

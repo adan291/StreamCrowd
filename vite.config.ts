@@ -82,7 +82,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -92,9 +92,25 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            charts: ['recharts'],
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react-dom') || id.includes('react')) {
+                return 'vendor-react';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('lucide')) {
+                return 'vendor-icons';
+              }
+              return 'vendor';
+            }
+            if (id.includes('/components/games/')) {
+              return 'games';
+            }
+            if (id.includes('/components/mascot/')) {
+              return 'mascot';
+            }
           }
         }
       }
