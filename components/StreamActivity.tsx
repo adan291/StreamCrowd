@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { VoteRecord } from '../types';
 import { 
   Activity, 
@@ -304,11 +305,16 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     followers?: { username: string; followedAt?: string }[];
     subscribers?: { username: string; tier: string; isGift: boolean }[];
     bitsLeaderboard?: { rank: number; username: string; bits: number }[];
-    clips?: { id: string; title: string; url: string; viewCount: number; creatorName: string }[];
-    videos?: { id: string; title: string; url: string; viewCount: number; type: string }[];
+    clips?: { id: string; title: string; url: string; viewCount: number; creatorName: string; createdAt?: string }[];
+    videos?: { id: string; title: string; url: string; viewCount: number; type: string; createdAt?: string }[];
     moderators?: { username: string; displayName: string }[];
     vips?: { username: string; displayName: string }[];
   }>({});
+  
+  // Estados para filtros de fetch
+  const [clipDateFrom, setClipDateFrom] = useState<string>('');
+  const [clipDateTo, setClipDateTo] = useState<string>('');
+  const [bitsPeriod, setBitsPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'all'>('all');
 
   // Verificar scopes del token
   useEffect(() => {
@@ -636,7 +642,11 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const clips = await twitchService.getClips(authToken, broadcasterId, 50);
+      // Convert dates to ISO format if provided
+      const startedAt = clipDateFrom ? new Date(clipDateFrom).toISOString() : undefined;
+      const endedAt = clipDateTo ? new Date(clipDateTo + 'T23:59:59').toISOString() : undefined;
+      
+      const clips = await twitchService.getClips(authToken, broadcasterId, 100, startedAt, endedAt);
       if (!clips) {
         setFetchError(OAUTH_ERRORS['server_error']);
         return;
@@ -906,6 +916,262 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   };
 
   // Panel de recuperación de datos
+  
+  // Helper para exportar datos a CSV
+  const exportToCSV = (data: any[], filename: string, headers: string[]) => {
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const value = row[h.toLowerCase().replace(/ /g, '')] ?? row[h] ?? '';
+        // Escape commas and quotes
+        const strValue = String(value);
+        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
+        }
+        return strValue;
+      }).join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportFollowers = () => {
+    if (!fetchedData.followers) return;
+    const data = fetchedData.followers.map(f => ({
+      username: f.username,
+      followedAt: f.followedAt || 'N/A'
+    }));
+    exportToCSV(data, 'followers', ['username', 'followedAt']);
+  };
+
+  const exportSubscribers = () => {
+    if (!fetchedData.subscribers) return;
+    const data = fetchedData.subscribers.map(s => ({
+      username: s.username,
+      tier: s.tier === '1000' ? 'Tier 1' : s.tier === '2000' ? 'Tier 2' : s.tier === '3000' ? 'Tier 3' : s.tier,
+      isGift: s.isGift ? 'Sí' : 'No'
+    }));
+    exportToCSV(data, 'subscribers', ['username', 'tier', 'isGift']);
+  };
+
+  const exportBitsLeaderboard = () => {
+    if (!fetchedData.bitsLeaderboard) return;
+    const data = fetchedData.bitsLeaderboard.map(b => ({
+      rank: b.rank,
+      username: b.username,
+      bits: b.bits
+    }));
+    exportToCSV(data, 'bits_leaderboard', ['rank', 'username', 'bits']);
+  };
+
+  const exportClips = () => {
+    if (!fetchedData.clips) return;
+    const data = fetchedData.clips.map(c => ({
+      title: c.title,
+      creator: c.creatorName,
+      views: c.viewCount,
+      url: c.url,
+      createdAt: c.createdAt || 'N/A'
+    }));
+    exportToCSV(data, 'clips', ['title', 'creator', 'views', 'url', 'createdAt']);
+  };
+
+  const exportVideos = () => {
+    if (!fetchedData.videos) return;
+    const data = fetchedData.videos.map(v => ({
+      title: v.title,
+      type: v.type,
+      views: v.viewCount,
+      url: v.url,
+      createdAt: v.createdAt || 'N/A'
+    }));
+    exportToCSV(data, 'videos', ['title', 'type', 'views', 'url', 'createdAt']);
+  };
+
+  const exportModerators = () => {
+    if (!fetchedData.moderators) return;
+    const data = fetchedData.moderators.map(m => ({
+      username: m.username,
+      displayName: m.displayName
+    }));
+    exportToCSV(data, 'moderators', ['username', 'displayName']);
+  };
+
+  const exportVIPs = () => {
+    if (!fetchedData.vips) return;
+    const data = fetchedData.vips.map(v => ({
+      username: v.username,
+      displayName: v.displayName
+    }));
+    exportToCSV(data, 'vips', ['username', 'displayName']);
+  };
+
+  // Exportar TODO en un archivo Excel con múltiples hojas
+  const exportAllData = () => {
+    const workbook = XLSX.utils.book_new();
+    const date = new Date().toISOString().split('T')[0];
+    
+    // Hoja de Resumen
+    const summaryData: any[][] = [
+      ['REPORTE DE DATOS - ' + channelName.toUpperCase()],
+      ['Fecha de exportación:', new Date().toLocaleString('es-ES')],
+      [''],
+      ['RESUMEN'],
+      ['Tipo', 'Cantidad', 'Detalles'],
+    ];
+    
+    if (fetchedData.followers) {
+      summaryData.push(['Followers', fetchedData.followers.length, '']);
+    }
+    if (fetchedData.subscribers) {
+      const own = fetchedData.subscribers.filter(s => !s.isGift).length;
+      const gifted = fetchedData.subscribers.filter(s => s.isGift).length;
+      summaryData.push(['Suscriptores', fetchedData.subscribers.length, `${own} propios, ${gifted} regalados`]);
+    }
+    if (fetchedData.bitsLeaderboard) {
+      const totalBits = fetchedData.bitsLeaderboard.reduce((acc, e) => acc + e.bits, 0);
+      summaryData.push(['Cheerers', fetchedData.bitsLeaderboard.length, `${totalBits.toLocaleString()} bits total`]);
+    }
+    if (fetchedData.clips) {
+      const totalViews = fetchedData.clips.reduce((acc, c) => acc + c.viewCount, 0);
+      summaryData.push(['Clips', fetchedData.clips.length, `${totalViews.toLocaleString()} views total`]);
+    }
+    if (fetchedData.videos) {
+      summaryData.push(['Videos/VODs', fetchedData.videos.length, '']);
+    }
+    if (fetchedData.moderators) {
+      summaryData.push(['Moderadores', fetchedData.moderators.length, '']);
+    }
+    if (fetchedData.vips) {
+      summaryData.push(['VIPs', fetchedData.vips.length, '']);
+    }
+    
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    summarySheet['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
+    
+    // Hoja de Followers
+    if (fetchedData.followers && fetchedData.followers.length > 0) {
+      const followersData = [
+        ['Username', 'Fecha de Follow'],
+        ...fetchedData.followers.map(f => [
+          f.username,
+          f.followedAt ? new Date(f.followedAt).toLocaleString('es-ES') : 'N/A'
+        ])
+      ];
+      const followersSheet = XLSX.utils.aoa_to_sheet(followersData);
+      followersSheet['!cols'] = [{ wch: 25 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(workbook, followersSheet, 'Followers');
+    }
+    
+    // Hoja de Suscriptores
+    if (fetchedData.subscribers && fetchedData.subscribers.length > 0) {
+      const subsData = [
+        ['Username', 'Tier', 'Tipo', 'Es Regalada'],
+        ...fetchedData.subscribers.map(s => [
+          s.username,
+          s.tier === '1000' ? 'Tier 1' : s.tier === '2000' ? 'Tier 2' : s.tier === '3000' ? 'Tier 3' : s.tier,
+          s.isGift ? 'Regalada' : 'Propia',
+          s.isGift ? 'Sí' : 'No'
+        ])
+      ];
+      const subsSheet = XLSX.utils.aoa_to_sheet(subsData);
+      subsSheet['!cols'] = [{ wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(workbook, subsSheet, 'Suscriptores');
+    }
+    
+    // Hoja de Bits Leaderboard
+    if (fetchedData.bitsLeaderboard && fetchedData.bitsLeaderboard.length > 0) {
+      const bitsData = [
+        ['Rank', 'Username', 'Bits'],
+        ...fetchedData.bitsLeaderboard.map(b => [
+          b.rank,
+          b.username,
+          b.bits
+        ])
+      ];
+      const bitsSheet = XLSX.utils.aoa_to_sheet(bitsData);
+      bitsSheet['!cols'] = [{ wch: 8 }, { wch: 25 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(workbook, bitsSheet, 'Bits');
+    }
+    
+    // Hoja de Clips
+    if (fetchedData.clips && fetchedData.clips.length > 0) {
+      const clipsData = [
+        ['Título', 'Creador', 'Views', 'Fecha', 'URL'],
+        ...fetchedData.clips.map(c => [
+          c.title,
+          c.creatorName,
+          c.viewCount,
+          c.createdAt ? new Date(c.createdAt).toLocaleDateString('es-ES') : 'N/A',
+          c.url
+        ])
+      ];
+      const clipsSheet = XLSX.utils.aoa_to_sheet(clipsData);
+      clipsSheet['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 50 }];
+      XLSX.utils.book_append_sheet(workbook, clipsSheet, 'Clips');
+    }
+    
+    // Hoja de Videos
+    if (fetchedData.videos && fetchedData.videos.length > 0) {
+      const videosData = [
+        ['Título', 'Tipo', 'Views', 'Fecha', 'URL'],
+        ...fetchedData.videos.map(v => [
+          v.title,
+          v.type,
+          v.viewCount,
+          v.createdAt ? new Date(v.createdAt).toLocaleDateString('es-ES') : 'N/A',
+          v.url
+        ])
+      ];
+      const videosSheet = XLSX.utils.aoa_to_sheet(videosData);
+      videosSheet['!cols'] = [{ wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 50 }];
+      XLSX.utils.book_append_sheet(workbook, videosSheet, 'Videos');
+    }
+    
+    // Hoja de Moderadores
+    if (fetchedData.moderators && fetchedData.moderators.length > 0) {
+      const modsData = [
+        ['Username', 'Display Name'],
+        ...fetchedData.moderators.map(m => [
+          m.username,
+          m.displayName
+        ])
+      ];
+      const modsSheet = XLSX.utils.aoa_to_sheet(modsData);
+      modsSheet['!cols'] = [{ wch: 25 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(workbook, modsSheet, 'Moderadores');
+    }
+    
+    // Hoja de VIPs
+    if (fetchedData.vips && fetchedData.vips.length > 0) {
+      const vipsData = [
+        ['Username', 'Display Name'],
+        ...fetchedData.vips.map(v => [
+          v.username,
+          v.displayName
+        ])
+      ];
+      const vipsSheet = XLSX.utils.aoa_to_sheet(vipsData);
+      vipsSheet['!cols'] = [{ wch: 25 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(workbook, vipsSheet, 'VIPs');
+    }
+    
+    // Descargar el archivo
+    XLSX.writeFile(workbook, `${channelName}_reporte_${date}.xlsx`);
+  };
+
+  // Verificar si hay datos para exportar
+  const hasAnyFetchedData = fetchedData.followers || fetchedData.subscribers || 
+    fetchedData.bitsLeaderboard || fetchedData.clips || fetchedData.videos || 
+    fetchedData.moderators || fetchedData.vips;
+
   const renderFetchPanel = () => (
     <div className="p-3 space-y-3">
       {/* Aviso de OAuth */}
@@ -1059,48 +1325,101 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         </button>
 
         {/* Bits Leaderboard */}
-        <button
-          onClick={() => fetchBitsLeaderboard('all')}
-          disabled={isLoading || !authToken || !hasScope(REQUIRED_SCOPES.bits)}
-          className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
-            hasScope(REQUIRED_SCOPES.bits)
-              ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
-              : 'bg-zinc-800/50 border-zinc-700 opacity-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Coins className="w-4 h-4 text-amber-400" />
-            <div className="text-left">
-              <p className="text-xs font-bold text-zinc-200">Bits Leaderboard</p>
-              <p className="text-[10px] text-zinc-500">Top 100 cheerers (histórico)</p>
+        <div className={`rounded-lg border transition-all ${
+          hasScope(REQUIRED_SCOPES.bits)
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-zinc-800/50 border-zinc-700 opacity-50'
+        }`}>
+          <button
+            onClick={() => fetchBitsLeaderboard(bitsPeriod)}
+            disabled={isLoading || !authToken || !hasScope(REQUIRED_SCOPES.bits)}
+            className="w-full flex items-center justify-between p-3 hover:bg-amber-500/10 transition-all rounded-t-lg"
+          >
+            <div className="flex items-center gap-2">
+              <Coins className="w-4 h-4 text-amber-400" />
+              <div className="text-left">
+                <p className="text-xs font-bold text-zinc-200">Bits Leaderboard</p>
+                <p className="text-[10px] text-zinc-500">Top 100 cheerers</p>
+              </div>
             </div>
+            {isLoading && loadingType === 'bits' ? (
+              <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+            ) : (
+              <CloudDownload className="w-4 h-4 text-amber-400" />
+            )}
+          </button>
+          {/* Period selector */}
+          <div className="px-3 pb-2 flex gap-1 flex-wrap">
+            {(['day', 'week', 'month', 'year', 'all'] as const).map(period => (
+              <button
+                key={period}
+                onClick={() => setBitsPeriod(period)}
+                className={`px-2 py-0.5 text-[10px] rounded transition-all ${
+                  bitsPeriod === period
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'
+                }`}
+              >
+                {period === 'day' ? 'Hoy' : period === 'week' ? 'Semana' : period === 'month' ? 'Mes' : period === 'year' ? 'Año' : 'Todo'}
+              </button>
+            ))}
           </div>
-          {isLoading && loadingType === 'bits' ? (
-            <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-          ) : (
-            <CloudDownload className="w-4 h-4 text-amber-400" />
-          )}
-        </button>
+        </div>
 
         {/* Clips */}
-        <button
-          onClick={fetchClips}
-          disabled={isLoading || !authToken}
-          className="w-full flex items-center justify-between p-3 rounded-lg border transition-all bg-cyan-500/10 border-cyan-500/30 hover:bg-cyan-500/20"
-        >
-          <div className="flex items-center gap-2">
-            <Film className="w-4 h-4 text-cyan-400" />
-            <div className="text-left">
-              <p className="text-xs font-bold text-zinc-200">Clips del canal</p>
-              <p className="text-[10px] text-zinc-500">Últimos 50 clips (público)</p>
+        <div className="rounded-lg border transition-all bg-cyan-500/10 border-cyan-500/30">
+          <button
+            onClick={fetchClips}
+            disabled={isLoading || !authToken}
+            className="w-full flex items-center justify-between p-3 hover:bg-cyan-500/10 transition-all rounded-t-lg"
+          >
+            <div className="flex items-center gap-2">
+              <Film className="w-4 h-4 text-cyan-400" />
+              <div className="text-left">
+                <p className="text-xs font-bold text-zinc-200">Clips del canal</p>
+                <p className="text-[10px] text-zinc-500">
+                  {clipDateFrom || clipDateTo ? 'Filtrado por fecha' : 'Últimos 100 clips'}
+                </p>
+              </div>
+            </div>
+            {isLoading && loadingType === 'clips' ? (
+              <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+            ) : (
+              <CloudDownload className="w-4 h-4 text-cyan-400" />
+            )}
+          </button>
+          {/* Date range selector */}
+          <div className="px-3 pb-2 space-y-1">
+            <div className="flex gap-2 items-center">
+              <div className="flex-1">
+                <label className="text-[9px] text-zinc-500 block mb-0.5">Desde</label>
+                <input
+                  type="date"
+                  value={clipDateFrom}
+                  onChange={(e) => setClipDateFrom(e.target.value)}
+                  className="w-full px-2 py-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-300"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[9px] text-zinc-500 block mb-0.5">Hasta</label>
+                <input
+                  type="date"
+                  value={clipDateTo}
+                  onChange={(e) => setClipDateTo(e.target.value)}
+                  className="w-full px-2 py-1 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-300"
+                />
+              </div>
+              {(clipDateFrom || clipDateTo) && (
+                <button
+                  onClick={() => { setClipDateFrom(''); setClipDateTo(''); }}
+                  className="mt-3 px-2 py-1 text-[10px] bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-400"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
-          {isLoading && loadingType === 'clips' ? (
-            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
-          ) : (
-            <CloudDownload className="w-4 h-4 text-cyan-400" />
-          )}
-        </button>
+        </div>
 
         {/* VODs */}
         <button
@@ -1215,43 +1534,146 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       )}
 
       {/* Datos recuperados */}
-      {(fetchedData.followers || fetchedData.subscribers || fetchedData.bitsLeaderboard || fetchedData.clips || fetchedData.videos || fetchedData.moderators || fetchedData.vips) && (
-        <div className="p-2 rounded-lg bg-zinc-800/50 border border-zinc-700">
-          <p className="text-xs font-bold text-zinc-400 mb-2">Datos recuperados</p>
+      {hasAnyFetchedData && (
+        <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-zinc-400">Datos recuperados</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportAllData}
+                className="px-2 py-1 text-[9px] bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded flex items-center gap-1 font-bold"
+                title="Descargar todo en Excel"
+              >
+                <Download className="w-3 h-3" /> EXCEL
+              </button>
+              <button
+                onClick={() => setFetchedData({})}
+                className="text-[10px] text-zinc-500 hover:text-zinc-300"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
+          
           {fetchedData.followers && (
-            <p className="text-[10px] text-green-400">
-              ✓ {fetchedData.followers.length} followers cargados
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-green-500/10">
+              <div>
+                <p className="text-[10px] text-green-400 font-bold">
+                  ✓ {fetchedData.followers.length} followers
+                </p>
+              </div>
+              <button
+                onClick={exportFollowers}
+                className="px-2 py-1 text-[9px] bg-green-500/20 hover:bg-green-500/30 text-green-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.subscribers && (
-            <p className="text-[10px] text-purple-400">
-              ✓ {fetchedData.subscribers.length} suscriptores cargados
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-purple-500/10">
+              <div>
+                <p className="text-[10px] text-purple-400 font-bold">
+                  ✓ {fetchedData.subscribers.length} suscriptores
+                </p>
+                <p className="text-[9px] text-purple-300/70">
+                  {fetchedData.subscribers.filter(s => !s.isGift).length} propios · {fetchedData.subscribers.filter(s => s.isGift).length} regalados
+                </p>
+              </div>
+              <button
+                onClick={exportSubscribers}
+                className="px-2 py-1 text-[9px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.bitsLeaderboard && (
-            <p className="text-[10px] text-amber-400">
-              ✓ {fetchedData.bitsLeaderboard.length} cheerers en leaderboard ({fetchedData.bitsLeaderboard.reduce((acc, e) => acc + e.bits, 0).toLocaleString()} bits total)
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-amber-500/10">
+              <div>
+                <p className="text-[10px] text-amber-400 font-bold">
+                  ✓ {fetchedData.bitsLeaderboard.length} cheerers
+                </p>
+                <p className="text-[9px] text-amber-300/70">
+                  {fetchedData.bitsLeaderboard.reduce((acc, e) => acc + e.bits, 0).toLocaleString()} bits total
+                </p>
+              </div>
+              <button
+                onClick={exportBitsLeaderboard}
+                className="px-2 py-1 text-[9px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.clips && (
-            <p className="text-[10px] text-cyan-400">
-              ✓ {fetchedData.clips.length} clips cargados
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-cyan-500/10">
+              <div>
+                <p className="text-[10px] text-cyan-400 font-bold">
+                  ✓ {fetchedData.clips.length} clips
+                </p>
+                <p className="text-[9px] text-cyan-300/70">
+                  {fetchedData.clips.reduce((acc, c) => acc + c.viewCount, 0).toLocaleString()} views total
+                </p>
+              </div>
+              <button
+                onClick={exportClips}
+                className="px-2 py-1 text-[9px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.videos && (
-            <p className="text-[10px] text-indigo-400">
-              ✓ {fetchedData.videos.length} videos/VODs cargados
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-indigo-500/10">
+              <div>
+                <p className="text-[10px] text-indigo-400 font-bold">
+                  ✓ {fetchedData.videos.length} videos/VODs
+                </p>
+              </div>
+              <button
+                onClick={exportVideos}
+                className="px-2 py-1 text-[9px] bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.moderators && (
-            <p className="text-[10px] text-red-400">
-              ✓ {fetchedData.moderators.length} moderadores
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-red-500/10">
+              <div>
+                <p className="text-[10px] text-red-400 font-bold">
+                  ✓ {fetchedData.moderators.length} moderadores
+                </p>
+              </div>
+              <button
+                onClick={exportModerators}
+                className="px-2 py-1 text-[9px] bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
+          
           {fetchedData.vips && (
-            <p className="text-[10px] text-pink-400">
-              ✓ {fetchedData.vips.length} VIPs
-            </p>
+            <div className="flex items-center justify-between p-2 rounded bg-pink-500/10">
+              <div>
+                <p className="text-[10px] text-pink-400 font-bold">
+                  ✓ {fetchedData.vips.length} VIPs
+                </p>
+              </div>
+              <button
+                onClick={exportVIPs}
+                className="px-2 py-1 text-[9px] bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 rounded flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" /> CSV
+              </button>
+            </div>
           )}
         </div>
       )}

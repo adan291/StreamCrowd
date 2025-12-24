@@ -13,7 +13,6 @@ import { twitchService, StreamEventData } from '../services/twitchService';
 import { StreamEvent, StreamEventType, SubTier } from '../components/StreamActivity';
 
 // Storage keys
-const EVENTS_STORAGE_KEY = 'stream_events_v2';
 const EVENTS_BY_DATE_KEY = 'stream_activity_by_date_v2';
 const MAX_EVENTS_IN_MEMORY = 1000;
 const MAX_EVENTS_PER_DAY = 2000;
@@ -28,7 +27,7 @@ const generateEventId = (type: string, username: string, timestamp: number, extr
     return `${base}_${extra}`;
   }
   // Add random suffix to prevent collisions for same-second events
-  return `${base}_${Math.random().toString(36).substr(2, 6)}`;
+  return `${base}_${Math.random().toString(36).slice(2, 8)}`;
 };
 
 /**
@@ -391,20 +390,22 @@ export function useStreamEvents(): UseStreamEventsReturn {
   const listenerSetupRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>('');
+  // Track session start time - only show events from current session in "Live" mode
+  const sessionStartRef = useRef<number>(Date.now());
 
-  // Load events from today on mount or channel change
+  // Reset session start when channel changes (new connection)
   useEffect(() => {
-    if (!channelName) return;
-    
-    const today = getTodayString();
-    const todayEvents = storageHelpers.loadEventsForDate(channelName, today);
-    
-    if (todayEvents.length > 0) {
-      setEvents(prev => storageHelpers.mergeEvents(prev, todayEvents));
+    if (channelName) {
+      sessionStartRef.current = Date.now();
+      // Clear in-memory events for fresh session
+      setEvents([]);
     }
   }, [channelName]);
 
-  // Debounced save to localStorage
+  // DON'T load events from storage on mount - Live mode should only show current session
+  // Historical events are accessed via loadEventsFromDate/loadEventsFromRange
+
+  // Debounced save to localStorage - merges with existing events for the day
   const saveToStorage = useCallback((eventsToSave: StreamEvent[]) => {
     if (!channelName) return;
     
@@ -416,15 +417,21 @@ export function useStreamEvents(): UseStreamEventsReturn {
     // Debounce save by 2 seconds
     saveTimeoutRef.current = setTimeout(() => {
       const today = getTodayString();
-      const todayEvents = eventsToSave.filter(e => {
+      const sessionEvents = eventsToSave.filter(e => {
         const eventDate = new Date(e.timestamp).toISOString().split('T')[0];
         return eventDate === today;
       });
       
+      if (sessionEvents.length === 0) return;
+      
+      // Load existing events for today and merge with session events
+      const existingEvents = storageHelpers.loadEventsForDate(channelName, today);
+      const mergedEvents = storageHelpers.mergeEvents(existingEvents, sessionEvents);
+      
       // Only save if there are changes
-      const eventsJson = JSON.stringify(todayEvents);
+      const eventsJson = JSON.stringify(mergedEvents);
       if (eventsJson !== lastSavedRef.current) {
-        storageHelpers.saveEventsForDate(channelName, today, todayEvents);
+        storageHelpers.saveEventsForDate(channelName, today, mergedEvents);
         lastSavedRef.current = eventsJson;
       }
     }, 2000);
@@ -437,20 +444,88 @@ export function useStreamEvents(): UseStreamEventsReturn {
     }
   }, [events, saveToStorage]);
 
-  // Save on unmount
+  // Save on page unload (closing tab/browser)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Force immediate save when page is closing - MERGE with existing events
+      if (channelName && events.length > 0) {
+        const today = getTodayString();
+        const sessionTodayEvents = events.filter(e => {
+          const eventDate = new Date(e.timestamp).toISOString().split('T')[0];
+          return eventDate === today;
+        });
+        
+        if (sessionTodayEvents.length === 0) return;
+        
+        // Use synchronous localStorage write with MERGE
+        try {
+          const key = `${EVENTS_BY_DATE_KEY}_${channelName.toLowerCase()}_${today}`;
+          
+          // Load existing events for today
+          const existingJson = localStorage.getItem(key);
+          const existingEvents: StreamEvent[] = existingJson ? JSON.parse(existingJson) : [];
+          
+          // Merge: add session events that don't already exist
+          const existingIds = new Set(existingEvents.map(e => e.id));
+          const newEvents = sessionTodayEvents.filter(e => !existingIds.has(e.id));
+          const mergedEvents = [...existingEvents, ...newEvents];
+          
+          // Sort by timestamp and trim
+          mergedEvents.sort((a, b) => a.timestamp - b.timestamp);
+          const trimmedEvents = mergedEvents.slice(-MAX_EVENTS_PER_DAY);
+          
+          localStorage.setItem(key, JSON.stringify(trimmedEvents));
+          
+          // Update dates index
+          const datesKey = `${EVENTS_BY_DATE_KEY}_${channelName.toLowerCase()}_dates`;
+          const dates: string[] = JSON.parse(localStorage.getItem(datesKey) || '[]');
+          if (!dates.includes(today)) {
+            dates.push(today);
+            dates.sort();
+            localStorage.setItem(datesKey, JSON.stringify(dates.slice(-MAX_DAYS_STORED)));
+          }
+        } catch (e) {
+          console.warn('Failed to save events on unload:', e);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Also save on visibility change (when tab becomes hidden)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleBeforeUnload();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [channelName, events]);
+
+  // Save on unmount - also merge with existing events
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      // Force immediate save on unmount
+      // Force immediate save on unmount with MERGE
       if (channelName && events.length > 0) {
         const today = getTodayString();
-        const todayEvents = events.filter(e => {
+        const sessionTodayEvents = events.filter(e => {
           const eventDate = new Date(e.timestamp).toISOString().split('T')[0];
           return eventDate === today;
         });
-        storageHelpers.saveEventsForDate(channelName, today, todayEvents);
+        
+        if (sessionTodayEvents.length > 0) {
+          // Load existing and merge
+          const existingEvents = storageHelpers.loadEventsForDate(channelName, today);
+          const mergedEvents = storageHelpers.mergeEvents(existingEvents, sessionTodayEvents);
+          storageHelpers.saveEventsForDate(channelName, today, mergedEvents);
+        }
       }
     };
   }, [channelName, events]);
@@ -564,46 +639,43 @@ export function useStreamEvents(): UseStreamEventsReturn {
   // We count gifts by looking at individual gift events (subgift) only,
   // NOT the bulk announcements, to get accurate recipient count.
   const stats = useMemo(() => {
-    const giftEvents = events.filter(e => e.type === 'gift');
+    const giftEvents = events.filter((e: StreamEvent) => e.type === 'gift');
     
     // Count individual gifts (those with recipientUsername) vs bulk announcements
-    const individualGifts = giftEvents.filter(e => e.data?.recipientUsername);
-    const bulkGifts = giftEvents.filter(e => e.data?.message?.startsWith('bulk_gift_'));
+    const individualGifts = giftEvents.filter((e: StreamEvent) => e.data?.recipientUsername);
+    const bulkGifts = giftEvents.filter((e: StreamEvent) => e.data?.message?.startsWith('bulk_gift_'));
     
-    // Use individual gifts for counting if available, otherwise use bulk
-    const giftsToCount = individualGifts.length > 0 ? individualGifts : bulkGifts;
-    
-    // Total gift count
+    // Total gift count - prefer individual gifts for counting if available
     let totalGifts: number;
     if (individualGifts.length > 0) {
       totalGifts = individualGifts.length;
     } else {
-      totalGifts = bulkGifts.reduce((acc, e) => acc + (e.data?.giftCount || 1), 0);
+      totalGifts = bulkGifts.reduce((acc: number, e: StreamEvent) => acc + (e.data?.giftCount || 1), 0);
     }
     
     // Gift tier counts (using the same logic - prefer individual, fall back to bulk)
     const countGiftsByTier = (tier: string): number => {
       if (individualGifts.length > 0) {
-        return individualGifts.filter(e => e.data?.tier === tier).length;
+        return individualGifts.filter((e: StreamEvent) => e.data?.tier === tier).length;
       } else {
         return bulkGifts
-          .filter(e => e.data?.tier === tier)
-          .reduce((acc, e) => acc + (e.data?.giftCount || 1), 0);
+          .filter((e: StreamEvent) => e.data?.tier === tier)
+          .reduce((acc: number, e: StreamEvent) => acc + (e.data?.giftCount || 1), 0);
       }
     };
     
     return {
-      follows: events.filter(e => e.type === 'follow').length,
-      subs: events.filter(e => e.type === 'sub').length,
-      resubs: events.filter(e => e.type === 'resub').length,
+      follows: events.filter((e: StreamEvent) => e.type === 'follow').length,
+      subs: events.filter((e: StreamEvent) => e.type === 'sub').length,
+      resubs: events.filter((e: StreamEvent) => e.type === 'resub').length,
       gifts: totalGifts,
-      raids: events.filter(e => e.type === 'raid').length,
-      bits: events.filter(e => e.type === 'bits').reduce((acc, e) => acc + (e.data?.amount || 0), 0),
+      raids: events.filter((e: StreamEvent) => e.type === 'raid').length,
+      bits: events.filter((e: StreamEvent) => e.type === 'bits').reduce((acc: number, e: StreamEvent) => acc + (e.data?.amount || 0), 0),
       // Sub/resub tiers
-      tier1: events.filter(e => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '1000').length,
-      tier2: events.filter(e => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '2000').length,
-      tier3: events.filter(e => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '3000').length,
-      prime: events.filter(e => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '1000').length,
+      tier1: events.filter((e: StreamEvent) => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '1000').length,
+      tier2: events.filter((e: StreamEvent) => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '2000').length,
+      tier3: events.filter((e: StreamEvent) => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '3000').length,
+      prime: events.filter((e: StreamEvent) => (e.type === 'sub' || e.type === 'resub') && e.data?.tier === '1000').length,
       // Gift tiers
       giftsTier1: countGiftsByTier('1000'),
       giftsTier2: countGiftsByTier('2000'),

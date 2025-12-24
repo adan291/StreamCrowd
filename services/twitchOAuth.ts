@@ -7,12 +7,15 @@
 // Set VITE_TWITCH_CLIENT_ID in .env.local or Vercel environment variables
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
-// Scopes needed for chat functionality
+// Scopes needed for full functionality
 const OAUTH_SCOPES = [
   'chat:read',
   'chat:edit',
   'channel:read:subscriptions',
   'moderator:read:chatters',
+  'moderator:read:followers',
+  'channel:read:vips',
+  'moderation:read',
   'bits:read',
 ].join(' ');
 

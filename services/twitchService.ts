@@ -1114,24 +1114,36 @@ class TwitchService {
    * @param token OAuth token
    * @param broadcasterId Broadcaster user ID
    * @param first Number of clips to fetch (max 100)
+   * @param startedAt Optional start date (ISO 8601 format)
+   * @param endedAt Optional end date (ISO 8601 format)
    * @returns Promise with clips data or null if failed
    */
   public async getClips(
     token: string, 
     broadcasterId: string, 
-    first: number = 20
+    first: number = 20,
+    startedAt?: string,
+    endedAt?: string
   ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; creatorName: string; thumbnailUrl: string }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
-        `https://api.twitch.tv/helix/clips?broadcaster_id=${broadcasterId}&first=${first}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${cleanToken}`,
-            'Client-Id': TWITCH_CLIENT_ID,
-          }
+      const url = new URL('https://api.twitch.tv/helix/clips');
+      url.searchParams.set('broadcaster_id', broadcasterId);
+      url.searchParams.set('first', first.toString());
+      
+      if (startedAt) {
+        url.searchParams.set('started_at', startedAt);
+      }
+      if (endedAt) {
+        url.searchParams.set('ended_at', endedAt);
+      }
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
         }
-      );
+      });
       
       if (!response.ok) {
         console.error('Failed to get clips:', response.status);
