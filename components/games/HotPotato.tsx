@@ -272,8 +272,6 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
         </button>
       </div>
       
-      <OBSOverlayUrl overlayParam="overlayPotato" title="la patata caliente" />
-
       {/* Game Status */}
       {gameState === 'waiting' && (
         <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
@@ -386,6 +384,8 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayPotato" title="la patata caliente" />
     </div>
   );
 };

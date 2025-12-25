@@ -213,7 +213,6 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
-        <OBSOverlayUrl overlayParam="overlayAhorcado" title="el ahorcado" />
       </div>
 
       {gameState === 'setup' && (
@@ -344,6 +343,8 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayAhorcado" title="el ahorcado" />
     </div>
   );
 };

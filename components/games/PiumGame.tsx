@@ -679,8 +679,6 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         >
           <ExternalLink size={16} /> Overlay
         </button>
-        
-        <OBSOverlayUrl overlayParam="overlayPium" title="el billar" />
       </div>
 
       {/* Shot controls */}
@@ -782,6 +780,8 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
           </div>
         )}
       </div>
+
+      <OBSOverlayUrl overlayParam="overlayPium" title="el billar" />
     </div>
   );
 };

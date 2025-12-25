@@ -354,8 +354,6 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
         </button>
       </div>
       
-      <OBSOverlayUrl overlayParam="overlayBattleship" title="hundir la flota" />
-
       {/* Setup info */}
       {gameState === 'setup' && placingShipIndex < SHIPS_CONFIG.length && (
         <div className="bg-zinc-800/50 rounded-xl p-3 text-center">
@@ -490,6 +488,8 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayBattleship" title="hundir la flota" />
     </div>
   );
 };

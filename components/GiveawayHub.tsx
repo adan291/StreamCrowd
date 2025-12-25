@@ -1623,9 +1623,6 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           // RAFFLE TAB
           // ============================================
           <div className="p-4 space-y-4">
-            {/* Overlay panel */}
-            <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
-
             {/* Mode selector */}
             <div className="flex gap-2">
               <button 
@@ -2507,6 +2504,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           onClose={() => setShowSubsConfig(false)}
         />
       )}
+
+      {/* OBS Overlay URL - at the bottom */}
+      <div className="fixed bottom-4 left-4 right-4 md:static md:p-4 z-40">
+        <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
+      </div>
     </div>
   );
 };

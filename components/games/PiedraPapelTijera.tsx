@@ -238,7 +238,6 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
-        <OBSOverlayUrl overlayParam="overlayPPT" title="piedra papel tijera" />
       </div>
 
       {gameState === 'waiting' && (
@@ -359,6 +358,8 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayPPT" title="piedra papel tijera" />
     </div>
   );
 };

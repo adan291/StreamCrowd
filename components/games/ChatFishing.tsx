@@ -455,8 +455,6 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
         </button>
       </div>
       
-      <OBSOverlayUrl overlayParam="overlayFishing" title="la pesca" />
-
       <div className="flex items-center justify-between bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl p-3 mt-3">
         <div className="flex items-center gap-2">
           <Trophy size={20} className="text-yellow-400" />
@@ -506,6 +504,8 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayFishing" title="la pesca" />
     </div>
   );
 };

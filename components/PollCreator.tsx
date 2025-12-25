@@ -933,8 +933,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                  <span className="ml-2 text-[10px] opacity-60 hidden sm:inline bg-white/20 px-1.5 py-0.5 rounded">Ctrl+↵</span>
                </Button>
              </Tooltip>
-             
-             <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
           </div>
         </form>
       </div>
@@ -1092,6 +1090,11 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           isConnected={isConnected}
         />
       )}
+
+      {/* OBS Overlay URL - at the bottom */}
+      <div className="fixed bottom-4 left-4 right-4 md:static md:mt-4 z-40">
+        <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
+      </div>
 
     </>
   );

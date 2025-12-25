@@ -155,7 +155,6 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
-        <OBSOverlayUrl overlayParam="overlayVeoVeo" title="el Veo Veo" />
       </div>
 
       {gameState === 'setup' && (
@@ -287,6 +286,8 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayVeoVeo" title="el Veo Veo" />
     </div>
   );
 };

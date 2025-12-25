@@ -278,7 +278,6 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           Overlay OBS
         </button>
         
-        <OBSOverlayUrl overlayParam="overlayRoulette" title="la ruleta" />
       </div>
 
       {/* Settings */}
@@ -417,6 +416,8 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           </div>
         )}
       </div>
+
+      <OBSOverlayUrl overlayParam="overlayRoulette" title="la ruleta" />
     </div>
   );
 };

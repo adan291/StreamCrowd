@@ -575,8 +575,6 @@ Responde SOLO con JSON:
           Overlay OBS
         </button>
       </div>
-      <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
-
       {/* Estado: Lobby */}
       {gameState === 'lobby' && (
         <>
@@ -864,6 +862,8 @@ Responde SOLO con JSON:
           </div>
         )}
       </div>
+
+      <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
     </div>
   );
 };

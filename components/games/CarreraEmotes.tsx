@@ -577,8 +577,6 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
           </button>
         </div>
       </div>
-      <OBSOverlayUrl overlayParam="overlayCarrera" title="la carrera de emotes" />
-
       {gameState === 'setup' && (
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
           {/* Botones de carga rápida */}
@@ -852,6 +850,8 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
           </button>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayCarrera" title="la carrera de emotes" />
     </div>
   );
 };

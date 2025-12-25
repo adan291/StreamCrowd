@@ -922,7 +922,6 @@ IMPORTANTE:
                     <ExternalLink size={14} />
                   </button>
                 </div>
-      <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
               </div>
               
               <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -1080,6 +1079,8 @@ IMPORTANTE:
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
     </div>
   );
 };

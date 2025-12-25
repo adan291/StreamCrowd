@@ -411,8 +411,6 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
         </button>
       </div>
       
-      <OBSOverlayUrl overlayParam="overlayDuckHunt" title="el Duck Hunt" />
-
       <div className="bg-zinc-800/50 rounded-xl p-3 mt-3">
         <p className="text-zinc-400 text-sm text-center">
           Viewers escriben <span className="text-yellow-400 font-bold">!pato</span> para aparecer instantáneamente
@@ -462,6 +460,8 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
           </div>
         </div>
       )}
+
+      <OBSOverlayUrl overlayParam="overlayDuckHunt" title="el Duck Hunt" />
     </div>
   );
 };

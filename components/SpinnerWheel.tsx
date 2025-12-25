@@ -593,9 +593,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 
         <h2 className="text-2xl font-bold text-white text-center mb-4">🎰 Ruleta de la Suerte</h2>
 
-        <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
-
-        <div className="flex justify-center gap-2 mb-4 mt-4">
+        <div className="flex justify-center gap-2 mb-4">
           <button onClick={() => setMode('classic')} disabled={isSpinning || isVotingActive} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${mode === 'classic' ? 'bg-twitch-brand text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} disabled:opacity-50`}>
             <Equal size={18} /> Clásica
           </button>
@@ -775,6 +773,8 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         </div>
 
         {currentOptions.length === 0 && <p className="text-center text-zinc-400 mt-4">Crea una encuesta primero para usar la ruleta</p>}
+
+        <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
       </div>
     </ToolWithChat>
   );
