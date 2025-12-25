@@ -32,6 +32,45 @@
     <link rel="preconnect" href="https://embed.twitch.tv" />
     <link rel="preconnect" href="https://static-cdn.jtvnw.net" />
     
+    <!-- Early overlay detection - prevents flash in OBS Browser Source -->
+    <script>
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        var isOverlay = params.get('overlay') === 'true' ||
+          params.get('overlayPoll') === 'true' ||
+          params.get('overlayCountdown') === 'true' ||
+          params.get('overlaySpinner') === 'true' ||
+          params.get('overlayRandomWinner') === 'true' ||
+          params.get('overlayJudgePanel') === 'true' ||
+          params.get('overlayPium') === 'true' ||
+          params.get('overlayRoulette') === 'true' ||
+          params.get('overlayFishing') === 'true' ||
+          params.get('overlayPotato') === 'true' ||
+          params.get('overlayTrivia') === 'true' ||
+          params.get('overlayBattleship') === 'true' ||
+          params.get('overlayDuckHunt') === 'true' ||
+          params.get('overlayVeoVeo') === 'true' ||
+          params.get('overlayPPT') === 'true' ||
+          params.get('overlayAhorcado') === 'true' ||
+          params.get('overlayCarrera') === 'true' ||
+          params.get('overlayMemoria') === 'true' ||
+          params.get('overlayPartyCo') === 'true';
+        
+        if (isOverlay) {
+          document.documentElement.style.background = 'transparent';
+          document.documentElement.classList.add('overlay-mode');
+        }
+      })();
+    </script>
+    <style>
+      /* Overlay mode - transparent background before React loads */
+      html.overlay-mode,
+      html.overlay-mode body {
+        background: transparent !important;
+        background-image: none !important;
+      }
+    </style>
+    
     <!-- Twitch Embed -->
     <script src="https://embed.twitch.tv/embed/v1.js"></script>
     
