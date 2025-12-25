@@ -92,23 +92,10 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              // Agrupar React, ReactDOM y lucide-react juntos para evitar problemas de orden de carga
-              if (id.includes('react-dom') || id.includes('react') || id.includes('lucide')) {
-                return 'vendor-react';
-              }
-              if (id.includes('recharts') || id.includes('d3')) {
-                return 'vendor-charts';
-              }
-              return 'vendor';
-            }
-            if (id.includes('/components/games/')) {
-              return 'games';
-            }
-            if (id.includes('/components/mascot/')) {
-              return 'mascot';
-            }
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-icons': ['lucide-react'],
+            'vendor-charts': ['recharts']
           }
         }
       }
