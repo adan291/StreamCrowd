@@ -94,14 +94,12 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react-dom') || id.includes('react')) {
+              // Agrupar React, ReactDOM y lucide-react juntos para evitar problemas de orden de carga
+              if (id.includes('react-dom') || id.includes('react') || id.includes('lucide')) {
                 return 'vendor-react';
               }
               if (id.includes('recharts') || id.includes('d3')) {
                 return 'vendor-charts';
-              }
-              if (id.includes('lucide')) {
-                return 'vendor-icons';
               }
               return 'vendor';
             }
