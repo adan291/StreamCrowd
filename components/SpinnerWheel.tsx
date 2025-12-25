@@ -82,14 +82,9 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   const [rotation, setRotation] = useState(0);
   const [winner, setWinner] = useState<PollOption | null>(null);
   const [showWinner, setShowWinner] = useState(false);
-  // En overlay mode, usar opciones por defecto para evitar parpadeo en OBS
-  const defaultOverlayOptions: PollOption[] = [
-    { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
-    { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
-    { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
-  ];
-  const [currentOptions, setCurrentOptions] = useState<PollOption[]>(isOverlayMode ? defaultOverlayOptions : options);
-  const [isOverlayReady, setIsOverlayReady] = useState(true); // Always ready to prevent loading screen flicker
+  // En overlay mode, empezar vacío y esperar sync de Firebase
+  const [currentOptions, setCurrentOptions] = useState<PollOption[]>(isOverlayMode ? [] : options);
+  const [isOverlayReady, setIsOverlayReady] = useState(!isOverlayMode);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   
@@ -144,19 +139,24 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       setShowWinner(state.showWinner);
       if (state.options && state.options.length > 0) {
         setCurrentOptions(state.options);
+        setIsOverlayReady(true);
       }
     };
     
     if (isOverlayMode) {
+      console.log('[SpinnerOverlay] Initializing overlay mode...');
+      
       // Overlay listens for state updates via BroadcastChannel
       channelRef.current.onmessage = (event) => {
         if (event.data?.type === 'request_sync') return;
         const state: SpinnerState = event.data;
+        console.log('[SpinnerOverlay] BroadcastChannel update:', state);
         throttledSetState(state);
       };
       
       // Subscribe to Firebase for real-time sync (works across browsers/OBS)
       const unsubscribeFirebase = gameSync.subscribe((data) => {
+        console.log('[SpinnerOverlay] Firebase update:', data);
         if (data && data.type === 'spinner' && data.state) {
           const state = data.state as SpinnerState;
           throttledSetState(state);
@@ -168,6 +168,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         const stored = localStorage.getItem(STORAGE_KEY_SPINNER);
         if (stored) {
           const state: SpinnerState = JSON.parse(stored);
+          console.log('[SpinnerOverlay] localStorage state:', state);
           throttledSetState(state);
         }
       } catch { /* ignore */ }
@@ -215,9 +216,10 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         isSpinning,
         winner,
         showWinner,
-        options: currentOptions,
+        options: state.options || currentOptions,
         ...state
       };
+      console.log('[SpinnerMain] Syncing to overlay:', fullState);
       // Sync via BroadcastChannel (same browser)
       channelRef.current?.postMessage(fullState);
       // Also save to localStorage for OBS Browser Source
@@ -229,11 +231,26 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     }
   }, [isOverlayMode, rotation, isSpinning, winner, showWinner, currentOptions]);
 
-  // Update options when prop changes
+  // Update options when prop changes and sync to overlay
   useEffect(() => {
-    setCurrentOptions(options);
-    syncToOverlay({ options });
-  }, [options]);
+    if (!isOverlayMode && options.length > 0) {
+      setCurrentOptions(options);
+      // Sync with the new options directly
+      const fullState = {
+        rotation,
+        isSpinning,
+        winner,
+        showWinner,
+        options: options, // Use the new options directly
+      };
+      console.log('[SpinnerMain] Options changed, syncing:', fullState);
+      channelRef.current?.postMessage(fullState);
+      try {
+        localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
+      } catch { /* ignore */ }
+      gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
+    }
+  }, [options, isOverlayMode]);
 
 
   // Calculate total votes helper
@@ -550,8 +567,21 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       </div>
     );
 
-    // Siempre mostrar la ruleta (con opciones por defecto si no hay datos)
-    // Esto evita el parpadeo en OBS causado por la pantalla de "Conectando..."
+    // Mostrar pantalla de espera si no hay opciones (sin animación para evitar parpadeo en OBS)
+    if (!isOverlayReady || currentOptions.length === 0) {
+      return (
+        <div className="min-h-screen w-full flex flex-col items-center justify-center p-4" style={{ backgroundColor: overlayBgColor }}>
+          <button onClick={() => setShowOverlaySettings(!showOverlaySettings)} className="fixed top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg z-50">
+            <Settings size={18} />
+          </button>
+          {showOverlaySettings && <OverlaySettingsPanel />}
+          <div className="text-center">
+            <p className="text-white/70 text-lg">🎰 Esperando ruleta...</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center p-4" style={{ backgroundColor: overlayBgColor }}>
         <button onClick={() => setShowOverlaySettings(!showOverlaySettings)} className="fixed top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg z-50">

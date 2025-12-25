@@ -89,6 +89,8 @@ export function subscribeToState<T>(
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     callback(data as T | null);
+  }, (error) => {
+    console.error(`Firebase subscription error for ${path}:`, error);
   });
 
   // Retorna función para cancelar suscripción

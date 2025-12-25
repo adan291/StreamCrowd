@@ -59,6 +59,12 @@
         if (isOverlay) {
           document.documentElement.style.background = 'transparent';
           document.documentElement.classList.add('overlay-mode');
+          // Add no-cache meta for OBS
+          var meta = document.createElement('meta');
+          meta.httpEquiv = 'Cache-Control';
+          meta.content = 'no-cache, no-store, must-revalidate';
+          document.head.appendChild(meta);
+          console.log('[Overlay] Mode detected:', window.location.search);
         }
       })();
     </script>
