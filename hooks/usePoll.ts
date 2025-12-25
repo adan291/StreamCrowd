@@ -5,6 +5,7 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 import { pollSync } from '../services/firebaseSync';
 
 const POLL_OVERLAY_CHANNEL = 'poll_overlay_sync';
+const FIREBASE_SYNC_THROTTLE_MS = 500; // Throttle Firebase updates to max 2 per second
 
 /**
  * Configuration for creating a new poll
@@ -138,32 +139,56 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
     return map;
   }, [voteHistory]);
 
+  // Ref for throttling Firebase sync
+  const lastFirebaseSyncRef = useRef<number>(0);
+  const pendingFirebaseSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Sync to localStorage for overlay mode (Controller Mode)
-  // Also sync to Firebase for cross-browser/OBS support
+  // Also sync to Firebase for cross-browser/OBS support (throttled)
   useEffect(() => {
     if (syncToStorage && !isOverlayMode) {
       try {
         if (currentPoll) {
           localStorage.setItem(STORAGE_KEYS.POLL_SYNC, JSON.stringify(currentPoll));
           
-          // Sync to Firebase for OBS Browser Source
-          const firebaseData = {
-            question: currentPoll.question,
-            options: currentPoll.options.map(o => ({
-              text: o.label,
-              votes: o.votes,
-              color: o.color
-            })),
-            isActive: currentPoll.isActive,
-            showResults: !currentPoll.isActive,
-            totalVotes: currentPoll.totalVotes,
-            updatedAt: Date.now()
+          // Throttled Firebase sync to avoid overwhelming OBS Browser Source
+          const now = Date.now();
+          const timeSinceLastSync = now - lastFirebaseSyncRef.current;
+          
+          const doFirebaseSync = () => {
+            const firebaseData = {
+              question: currentPoll.question,
+              options: currentPoll.options.map(o => ({
+                text: o.label,
+                votes: o.votes,
+                color: o.color
+              })),
+              isActive: currentPoll.isActive,
+              showResults: !currentPoll.isActive,
+              totalVotes: currentPoll.totalVotes,
+              updatedAt: Date.now()
+            };
+            lastFirebaseSyncRef.current = Date.now();
+            pollSync.update(firebaseData).catch(err => console.error('Firebase sync error:', err));
           };
-          console.log('[usePoll] Syncing to Firebase:', firebaseData);
-          pollSync.update(firebaseData).catch(err => console.error('Firebase sync error:', err));
+          
+          // Clear any pending sync
+          if (pendingFirebaseSyncRef.current) {
+            clearTimeout(pendingFirebaseSyncRef.current);
+          }
+          
+          if (timeSinceLastSync >= FIREBASE_SYNC_THROTTLE_MS) {
+            // Enough time has passed, sync immediately
+            doFirebaseSync();
+          } else {
+            // Schedule sync for later
+            pendingFirebaseSyncRef.current = setTimeout(doFirebaseSync, FIREBASE_SYNC_THROTTLE_MS - timeSinceLastSync);
+          }
         } else {
           // Clear Firebase state when poll is reset
-          console.log('[usePoll] Clearing Firebase state');
+          if (pendingFirebaseSyncRef.current) {
+            clearTimeout(pendingFirebaseSyncRef.current);
+          }
           pollSync.update(null as any).catch(() => {});
         }
         localStorage.setItem(STORAGE_KEYS.VOTE_HISTORY_SYNC, JSON.stringify(voteHistory));
@@ -171,6 +196,12 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
         console.error('Storage Sync Error (Quota Exceeded?):', e);
       }
     }
+    
+    return () => {
+      if (pendingFirebaseSyncRef.current) {
+        clearTimeout(pendingFirebaseSyncRef.current);
+      }
+    };
   }, [currentPoll, voteHistory, syncToStorage, isOverlayMode]);
 
   // Broadcast poll state to overlay via BroadcastChannel

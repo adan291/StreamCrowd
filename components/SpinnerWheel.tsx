@@ -602,7 +602,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           </button>
         </div>
 
-        {/* Manual participants section */}
+        {/* Manual participants section - HIDDEN: feature disabled for now
         <div className="bg-zinc-800/50 rounded-xl p-4 mb-4 space-y-3 border border-dashed border-zinc-600">
           <div className="flex items-center justify-between">
             <span className="text-sm text-zinc-300 font-medium flex items-center gap-2">
@@ -696,6 +696,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             Añade participantes manualmente para sortear entre ellos
           </p>
         </div>
+        */}
 
         {mode === 'voting' && (
           <div className="bg-zinc-800/50 rounded-xl p-4 mb-4 space-y-3">

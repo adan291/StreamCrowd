@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings, Trophy, Users } from 'lucide-react';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { pollSync } from '../services/firebaseSync';
@@ -49,6 +49,19 @@ const getBgFromUrl = (): string => {
   return 'transparent';
 };
 
+// Compare two poll states to avoid unnecessary re-renders
+const arePollStatesEqual = (a: PollState, b: PollState): boolean => {
+  if (a.question !== b.question) return false;
+  if (a.totalVotes !== b.totalVotes) return false;
+  if (a.isActive !== b.isActive) return false;
+  if (a.options.length !== b.options.length) return false;
+  for (let i = 0; i < a.options.length; i++) {
+    if (a.options[i].votes !== b.options[i].votes) return false;
+    if (a.options[i].label !== b.options[i].label) return false;
+  }
+  return true;
+};
+
 export const PollOverlay: React.FC = () => {
   const { bgColor: defaultBg, setBgColor: setDefaultBg } = useOverlayMode(true);
   const [bgColor, setBgColor] = useState(getBgFromUrl() || defaultBg);
@@ -60,32 +73,34 @@ export const PollOverlay: React.FC = () => {
     isActive: false,
     winner: null,
   });
+  
+  // Ref to track last state and avoid unnecessary updates
+  const lastStateRef = useRef<PollState>(state);
 
-  // Helper to update state from poll data
-  const updateStateFromPoll = (poll: Poll | null) => {
-    if (!poll) {
-      setState({
-        question: '',
-        options: [],
-        totalVotes: 0,
-        isActive: false,
-        winner: null,
-      });
-      return;
-    }
-    
-    const winner = !poll.isActive && poll.totalVotes > 0
-      ? poll.options.reduce((prev, curr) => prev.votes > curr.votes ? prev : curr)
-      : null;
-    
-    setState({
+  // Helper to update state from poll data - with deduplication
+  const updateStateFromPoll = useCallback((poll: Poll | null) => {
+    const newState: PollState = poll ? {
       question: poll.question,
       options: poll.options,
       totalVotes: poll.totalVotes,
       isActive: poll.isActive,
-      winner,
-    });
-  };
+      winner: !poll.isActive && poll.totalVotes > 0
+        ? poll.options.reduce((prev, curr) => prev.votes > curr.votes ? prev : curr)
+        : null,
+    } : {
+      question: '',
+      options: [],
+      totalVotes: 0,
+      isActive: false,
+      winner: null,
+    };
+    
+    // Only update if state actually changed
+    if (!arePollStatesEqual(lastStateRef.current, newState)) {
+      lastStateRef.current = newState;
+      setState(newState);
+    }
+  }, []);
 
   useEffect(() => {
     // Subscribe to Firebase for real-time sync (works across browsers/OBS)
@@ -112,30 +127,29 @@ export const PollOverlay: React.FC = () => {
     const channel = new BroadcastChannel(POLL_CHANNEL);
     channel.onmessage = (e) => {
       if (e.data.type === 'poll_state') {
-        setState(e.data.state);
+        // Only update if different from current state
+        if (!arePollStatesEqual(lastStateRef.current, e.data.state)) {
+          lastStateRef.current = e.data.state;
+          setState(e.data.state);
+        }
       }
     };
     channel.postMessage({ type: 'request_state' });
 
-    // Fallback: poll localStorage for legacy support
-    const loadFromStorage = () => {
-      try {
-        const storedPoll = localStorage.getItem(STORAGE_KEYS.POLL_SYNC);
-        if (storedPoll) {
-          const poll = JSON.parse(storedPoll) as Poll;
-          updateStateFromPoll(poll);
-        }
-      } catch { /* ignore */ }
-    };
-
-    // Initial load from localStorage
-    loadFromStorage();
+    // Fallback: load from localStorage once on mount (not polling)
+    try {
+      const storedPoll = localStorage.getItem(STORAGE_KEYS.POLL_SYNC);
+      if (storedPoll) {
+        const poll = JSON.parse(storedPoll) as Poll;
+        updateStateFromPoll(poll);
+      }
+    } catch { /* ignore */ }
 
     return () => {
       unsubscribe();
       channel.close();
     };
-  }, []);
+  }, [updateStateFromPoll]);
 
   const { question, options, totalVotes, isActive, winner } = state;
 
