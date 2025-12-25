@@ -207,15 +207,6 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
   const activePlayers = players.filter((p: Player) => !p.isOut);
   const sortedLeaderboard = Array.from(leaderboard.entries()).sort((a, b) => b[1] - a[1]);
 
-  const openOverlay = () => {
-    const width = 600;
-    const height = 500;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayPotato=true`, 'PotatoOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   return (
     <div className="p-4 space-y-4">
       {/* Controls */}
@@ -243,7 +234,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
         )}
         
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-zinc-400 text-sm">Tiempo bomba:</span>
+          <span className="text-zinc-400 text-sm">Tiempo:</span>
           <input
             type="number"
             min="15"
@@ -251,24 +242,19 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
             value={bombTime}
             onChange={(e) => setBombTime(Math.max(15, parseInt(e.target.value) || 30))}
             disabled={gameState === 'playing'}
-            className="w-16 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+            className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
           />
-          <span className="text-zinc-500 text-xs">seg</span>
+          <span className="text-zinc-500 text-xs">s</span>
         </div>
+        
+        <OBSOverlayUrl overlayParam="overlayPotato" title="la patata caliente" />
         
         <button
           onClick={resetGame}
           className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+          title="Reiniciar"
         >
           <RotateCcw size={18} />
-        </button>
-        
-        <button
-          onClick={openOverlay}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg transition-all ml-auto"
-        >
-          <ExternalLink size={16} />
-          Overlay OBS
         </button>
       </div>
       
@@ -384,8 +370,6 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
           </div>
         </div>
       )}
-
-      <OBSOverlayUrl overlayParam="overlayPotato" title="la patata caliente" />
     </div>
   );
 };

@@ -595,6 +595,11 @@ export const LivePoll: React.FC<LivePollProps> = ({
         {/* Actions - Only visible in Default mode */}
         {isDefault && (
           <div className="flex gap-2 shrink-0 flex-col items-end sm:flex-row relative z-20">
+             {/* OBS Overlay - inline with actions */}
+             {poll.isActive && overlayWindowRef && !isSimulationMode && (
+                <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
+             )}
+             
              {!isSimulationMode && (
                 <Button variant="ghost" onClick={sharePoll} size="sm" className={copied ? "text-green-600 dark:text-green-400" : ""}>
                    {copied ? <CheckCircle2 size={18} /> : <Share2 size={18} />}
@@ -961,12 +966,6 @@ export const LivePoll: React.FC<LivePollProps> = ({
         </div>
       )}
 
-      {/* OBS Overlay Section */}
-      {isDefault && poll.isActive && overlayWindowRef && !isSimulationMode && (
-        <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-fade-in" data-tour="overlay">
-          <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
-        </div>
-      )}
     </div>
   );
 };

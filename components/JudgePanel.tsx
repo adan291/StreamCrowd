@@ -1093,10 +1093,13 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
         </button>
       )}
 
-      <h2 className={`text-2xl font-bold ${isEmbedded ? 'text-zinc-900 dark:text-white' : 'text-white'} text-center mb-2 flex items-center justify-center gap-2`}>
-        <Trophy className="text-yellow-400" /> Panel de Jueces
-      </h2>
-      <p className="text-zinc-400 text-center text-sm mb-4">Sistema de puntuación con jueces y votación pública</p>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className={`text-xl font-bold ${isEmbedded ? 'text-zinc-900 dark:text-white' : 'text-white'} flex items-center gap-2`}>
+          <Trophy className="text-yellow-400" /> Panel de Jueces
+        </h2>
+        <OBSOverlayUrl overlayParam="overlayJudgePanel" title="el panel de jueces" />
+      </div>
+      <p className="text-zinc-400 text-sm mb-4">Sistema de puntuación con jueces y votación pública</p>
 
       {/* Config Toggle */}
       <button 
@@ -1757,8 +1760,6 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
             • Público: <code className={`${isEmbedded ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-zinc-700'} px-1 rounded`}>{state.config.publicVotePrefix}1</code>, <code className={`${isEmbedded ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-zinc-700'} px-1 rounded`}>{state.config.publicVotePrefix}2</code>, etc. o <code className={`${isEmbedded ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-zinc-700'} px-1 rounded`}>!voto @nombre</code>
           </p>
         </div>
-
-        <OBSOverlayUrl overlayParam="overlayJudgePanel" title="el panel de jueces" />
       </div>
   );
 

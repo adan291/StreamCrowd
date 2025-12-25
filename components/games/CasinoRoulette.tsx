@@ -226,15 +226,6 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
     syncToOverlay({ type: 'reset' });
   };
 
-  const openOverlay = () => {
-    const width = 600;
-    const height = 700;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayRoulette=true`, 'RouletteOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   const winners = result !== null ? bets.filter(b => b.number === result) : [];
   const betsByNumber = bets.reduce((acc, bet) => {
     acc[bet.number] = (acc[bet.number] || 0) + 1;
@@ -251,7 +242,7 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg transition-all"
         >
           <Play size={16} />
-          {isSpinning ? 'Girando...' : 'Girar Ruleta'}
+          {isSpinning ? 'Girando...' : 'Girar'}
         </button>
         
         <button
@@ -260,7 +251,6 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-lg transition-all"
         >
           <RotateCcw size={16} />
-          Reset
         </button>
         
         <button
@@ -270,14 +260,9 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           <Settings size={18} />
         </button>
         
-        <button
-          onClick={openOverlay}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg transition-all ml-auto"
-        >
-          <ExternalLink size={16} />
-          Overlay OBS
-        </button>
-        
+        <div className="flex items-center gap-2 ml-auto">
+          <OBSOverlayUrl overlayParam="overlayRoulette" title="la ruleta" />
+        </div>
       </div>
 
       {/* Settings */}
@@ -416,8 +401,6 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           </div>
         )}
       </div>
-
-      <OBSOverlayUrl overlayParam="overlayRoulette" title="la ruleta" />
     </div>
   );
 };

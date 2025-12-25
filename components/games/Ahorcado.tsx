@@ -167,14 +167,6 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
     setContributors([]);
   };
 
-  const openOverlay = () => {
-    const width = 650, height = 450;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayAhorcado=true`, 'AhorcadoOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   // Dibujar ahorcado
   const renderHangman = () => {
     const parts = [
@@ -205,12 +197,10 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
           <Skull className="text-red-400" size={24} />
           <h3 className="text-lg font-bold text-white">Ahorcado</h3>
         </div>
-        <div className="flex gap-2">
-          <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg">
+        <div className="flex items-center gap-2">
+          <OBSOverlayUrl overlayParam="overlayAhorcado" title="el ahorcado" />
+          <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg" title="Reiniciar">
             <RotateCcw size={18} />
-          </button>
-          <button onClick={openOverlay} className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg">
-            <ExternalLink size={16} /> Overlay
           </button>
         </div>
       </div>
@@ -343,8 +333,6 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
           </div>
         </div>
       )}
-
-      <OBSOverlayUrl overlayParam="overlayAhorcado" title="el ahorcado" />
     </div>
   );
 };

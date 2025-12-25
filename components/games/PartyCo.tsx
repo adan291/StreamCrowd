@@ -488,14 +488,6 @@ Responde SOLO con JSON:
     setIsGenerating(false);
   };
 
-  const openOverlay = () => {
-    const width = 700, height = 500;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayPartyCo=true`, 'PartyCoOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   return (
     <div className="p-4 space-y-4">
       {/* Header con controles */}
@@ -508,24 +500,22 @@ Responde SOLO con JSON:
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg transition-all"
             >
               <Dice6 size={18} />
-              ¡Lanzar Dado! ({players.size} jugadores)
+              ¡Lanzar! ({players.size})
             </button>
             
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-zinc-400 text-sm">Tiempo:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400 text-xs">Tiempo:</span>
               <select
                 value={timeMultiplier}
                 onChange={(e) => setTimeMultiplier(parseFloat(e.target.value))}
-                className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
+                className="px-2 py-1 bg-zinc-700 rounded text-white text-xs"
               >
                 <option value={0.5}>0.5x</option>
-                <option value={0.75}>0.75x</option>
                 <option value={1}>1x</option>
-                <option value={1.5}>1.5x</option>
                 <option value={2}>2x</option>
               </select>
               
-              <span className="text-zinc-400 text-sm ml-2">Meta:</span>
+              <span className="text-zinc-400 text-xs">Meta:</span>
               <input
                 type="number"
                 min="20"
@@ -533,9 +523,8 @@ Responde SOLO con JSON:
                 step="10"
                 value={pointsToWin}
                 onChange={(e) => setPointsToWin(Math.max(20, parseInt(e.target.value) || 50))}
-                className="w-16 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-xs"
               />
-              <span className="text-zinc-500 text-xs">pts</span>
             </div>
           </>
         )}
@@ -546,7 +535,7 @@ Responde SOLO con JSON:
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white font-bold rounded-lg transition-all"
           >
             <Dice6 size={18} />
-            Siguiente Ronda
+            Siguiente
           </button>
         )}
         
@@ -560,20 +549,16 @@ Responde SOLO con JSON:
           </button>
         )}
         
-        <button
-          onClick={resetGame}
-          className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all ml-auto"
-        >
-          <RotateCcw size={18} />
-        </button>
-        
-        <button
-          onClick={openOverlay}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg transition-all"
-        >
-          <ExternalLink size={16} />
-          Overlay OBS
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
+          <button
+            onClick={resetGame}
+            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+            title="Reiniciar"
+          >
+            <RotateCcw size={18} />
+          </button>
+        </div>
       </div>
       {/* Estado: Lobby */}
       {gameState === 'lobby' && (
@@ -863,7 +848,6 @@ Responde SOLO con JSON:
         )}
       </div>
 
-      <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
     </div>
   );
 };

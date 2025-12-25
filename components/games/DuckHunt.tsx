@@ -366,14 +366,6 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     processedIdsRef.current.clear();
   };
 
-  const openOverlay = () => {
-    const width = 700, height = 500;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayDuckHunt=true`, 'DuckHuntOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   const accuracy = shotsFired > 0 ? Math.round((kills.length / shotsFired) * 100) : 0;
 
   return (
@@ -399,16 +391,12 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
           <span className="text-zinc-400 text-sm">🎯 {accuracy}%</span>
         </div>
         
-        <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg ml-auto">
-          <RotateCcw size={18} />
-        </button>
-        
-        <button
-          onClick={openOverlay}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg"
-        >
-          <ExternalLink size={16} /> Overlay
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <OBSOverlayUrl overlayParam="overlayDuckHunt" title="el Duck Hunt" />
+          <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg" title="Reiniciar">
+            <RotateCcw size={18} />
+          </button>
+        </div>
       </div>
       
       <div className="bg-zinc-800/50 rounded-xl p-3 mt-3">
@@ -460,8 +448,6 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
           </div>
         </div>
       )}
-
-      <OBSOverlayUrl overlayParam="overlayDuckHunt" title="el Duck Hunt" />
     </div>
   );
 };

@@ -1557,6 +1557,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             Sorteos
           </h2>
           <div className="flex items-center gap-2">
+            <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
             {activeThreadCount > 0 && (
               <span className="px-2 py-0.5 bg-green-500/20 text-green-600 dark:text-green-400 text-xs font-bold rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -2504,11 +2505,6 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           onClose={() => setShowSubsConfig(false)}
         />
       )}
-
-      {/* OBS Overlay URL - at the bottom */}
-      <div className="fixed bottom-4 left-4 right-4 md:static md:p-4 z-40">
-        <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
-      </div>
     </div>
   );
 };

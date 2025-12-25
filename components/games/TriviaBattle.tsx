@@ -571,19 +571,20 @@ IMPORTANTE:
     setSelectedCustomCategories(prev => prev.filter(c => c !== catId));
   };
 
-  const openOverlay = () => {
-    const width = 700, height = 500;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayTrivia=true`, 'TriviaOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   return (
     <div className="p-4 space-y-4">
       {/* Setup Mode */}
       {gameState === 'setup' && (
         <>
+          {/* Header with OBS */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-lg font-bold text-white flex items-center gap-2">
+              <HelpCircle className="text-purple-400" size={20} />
+              Trivia Battle
+            </span>
+            <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
+          </div>
+          
           {/* Mode Selector */}
           <div className="flex gap-2 bg-zinc-800 rounded-xl p-2">
             <button
@@ -915,12 +916,6 @@ IMPORTANTE:
                   >
                     <Play size={16} /> ¡Empezar!
                   </button>
-                  <button
-                    onClick={openOverlay}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg"
-                  >
-                    <ExternalLink size={14} />
-                  </button>
                 </div>
               </div>
               
@@ -1079,8 +1074,6 @@ IMPORTANTE:
           </div>
         </div>
       )}
-
-      <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
     </div>
   );
 };

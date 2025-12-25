@@ -411,14 +411,6 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
     }));
   };
 
-  const openOverlay = () => {
-    const width = 700, height = 450;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayFishing=true`, 'FishingOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-  };
-
   return (
     <div className="p-4 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -446,13 +438,12 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
           <button onClick={() => moveHook('right')} disabled={isFishing} className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-white rounded-lg">→</button>
         </div>
         
-        <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg ml-auto">
-          <RotateCcw size={18} />
-        </button>
-        
-        <button onClick={openOverlay} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-medium rounded-lg">
-          <ExternalLink size={16} /> Overlay
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <OBSOverlayUrl overlayParam="overlayFishing" title="la pesca" />
+          <button onClick={resetGame} className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg" title="Reiniciar">
+            <RotateCcw size={18} />
+          </button>
+        </div>
       </div>
       
       <div className="flex items-center justify-between bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl p-3 mt-3">
@@ -504,8 +495,6 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
           </div>
         </div>
       )}
-
-      <OBSOverlayUrl overlayParam="overlayFishing" title="la pesca" />
     </div>
   );
 };

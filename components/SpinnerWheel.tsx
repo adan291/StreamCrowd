@@ -763,7 +763,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           </div>
         )}
 
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-4 mb-4">
           <button onClick={spin} disabled={isSpinning || currentOptions.length === 0 || (mode === 'voting' && isVotingActive)} className="flex items-center gap-2 px-6 py-3 bg-twitch-brand hover:bg-twitch-brand/80 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all transform hover:scale-105 active:scale-95">
             <Play size={20} /> {isSpinning ? 'Girando...' : 'Girar'}
           </button>
@@ -772,9 +772,11 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           </button>
         </div>
 
-        {currentOptions.length === 0 && <p className="text-center text-zinc-400 mt-4">Crea una encuesta primero para usar la ruleta</p>}
+        {currentOptions.length === 0 && <p className="text-center text-zinc-400 mb-4">Crea una encuesta primero para usar la ruleta</p>}
 
-        <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
+        <div className="flex justify-center">
+          <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
+        </div>
       </div>
     </ToolWithChat>
   );

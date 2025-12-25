@@ -925,6 +925,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 <button type="button" onClick={() => setShowPreview(true)} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 font-bold text-sm h-[42px] flex items-center gap-1.5" title={t.poll.preview}><Eye size={16} /> <span className="hidden xs:inline">{t.poll.preview}</span></button>
                 <button type="button" onClick={saveTemplate} disabled={!question.trim()} className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 font-bold text-sm h-[42px] flex items-center gap-1.5" title={t.poll.saveTemplate}><Save size={16} /> <span className="hidden xs:inline">{t.poll.save}</span></button>
                 <div className="flex-1"></div>
+                <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
              </div>
 
              <Tooltip text="Atajo: Ctrl+Enter">
@@ -1090,11 +1091,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           isConnected={isConnected}
         />
       )}
-
-      {/* OBS Overlay URL - at the bottom */}
-      <div className="fixed bottom-4 left-4 right-4 md:static md:mt-4 z-40">
-        <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
-      </div>
 
     </>
   );
