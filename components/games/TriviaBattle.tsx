@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, ExternalLink, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Question {
   id: string;
@@ -34,6 +36,7 @@ interface TriviaBattleProps {
 }
 
 const GAME_CHANNEL = 'trivia_battle_sync';
+const STORAGE_KEY_TRIVIA = 'trivia_battle_state';
 const CUSTOM_QUESTIONS_KEY = 'trivia_custom_questions';
 
 // Funciones para persistencia de preguntas personalizadas
@@ -247,7 +250,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'trivia_state',
       gameState,
       currentQuestion: currentQuestion || null,
@@ -257,7 +260,12 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       showCorrect,
       answerCounts,
       topPlayers: sortedPlayers.slice(0, 10)
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_TRIVIA, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('trivia', state).catch(() => {});
   }, [gameState, currentQuestion, currentQuestionIndex, questions.length, timeLeft, showCorrect, answerCounts, sortedPlayers]);
 
   useEffect(() => {
@@ -914,6 +922,7 @@ IMPORTANTE:
                     <ExternalLink size={14} />
                   </button>
                 </div>
+      <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
               </div>
               
               <div className="space-y-2 max-h-40 overflow-y-auto">

@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Timer, Swords } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 const GAME_CHANNEL = 'ppt_sync';
+const STORAGE_KEY_PPT = 'ppt_state';
 const EMOJIS = { piedra: '🪨', papel: '📄', tijera: '✂️' };
 
 export const PPTOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<any>({
     gameState: 'waiting',
     players: [],
@@ -16,17 +20,43 @@ export const PPTOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'ppt_state') setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'ppt_state') setState(data);
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'ppt' && data.state) {
+        handleState({ ...data.state, type: 'ppt_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_PPT);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const counts = { piedra: 0, papel: 0, tijera: 0 };
   state.players?.forEach((p: any) => { if (p.choice) counts[p.choice as keyof typeof counts]++; });
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {state.gameState === 'waiting' && (
         <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
           <Swords size={48} className="text-orange-400 mx-auto mb-2" />

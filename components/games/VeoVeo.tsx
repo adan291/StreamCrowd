@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Eye, Play, Trophy, RotateCcw, ExternalLink, Check, X, HelpCircle } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Player {
   oderId: string;
@@ -16,6 +18,7 @@ interface VeoVeoProps {
 }
 
 const GAME_CHANNEL = 'veoveo_sync';
+const STORAGE_KEY_VEOVEO = 'veoveo_state';
 
 export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true }) => {
   const [gameState, setGameState] = useState<'setup' | 'playing' | 'revealed'>('setup');
@@ -35,7 +38,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
   }, []);
 
   const syncToOverlay = () => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'veoveo_state',
       gameState,
       hint,
@@ -43,7 +46,12 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
       winner,
       hintsGiven,
       revealedWord: gameState === 'revealed' ? secretWord : null
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_VEOVEO, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('veoveo', state).catch(() => {});
   };
 
   useEffect(() => { syncToOverlay(); }, [gameState, hint, guesses, winner, hintsGiven]);
@@ -147,6 +155,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
+        <OBSOverlayUrl overlayParam="overlayVeoVeo" title="el Veo Veo" />
       </div>
 
       {gameState === 'setup' && (

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Ship, Target, Trophy, ExternalLink, Crosshair } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Ship {
   id: string;
@@ -32,6 +34,7 @@ interface BattleshipGameProps {
 }
 
 const GAME_CHANNEL = 'battleship_sync';
+const STORAGE_KEY_BATTLESHIP = 'battleship_state';
 const GRID_SIZE = 10;
 const SHIPS_CONFIG = [
   { name: 'Portaaviones', size: 5 },
@@ -73,7 +76,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'battleship_state',
       gameState,
       grid: gameState === 'playing' || gameState === 'finished' ? grid : null,
@@ -82,7 +85,13 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
       lastShot,
       shipsRemaining,
       leaderboard: Array.from(leaderboard.entries())
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_BATTLESHIP, JSON.stringify(state));
+    } catch { /* ignore */ }
+    // Sync to Firebase for OBS Browser Source
+    gameSync.update('battleship', state).catch(() => {});
   }, [gameState, grid, ships, shots, lastShot, shipsRemaining, leaderboard]);
 
   useEffect(() => {
@@ -344,6 +353,8 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
           <ExternalLink size={16} /> Overlay
         </button>
       </div>
+      
+      <OBSOverlayUrl overlayParam="overlayBattleship" title="hundir la flota" />
 
       {/* Setup info */}
       {gameState === 'setup' && placingShipIndex < SHIPS_CONFIG.length && (

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Trophy, Check } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Question {
   question: string;
@@ -26,8 +28,10 @@ interface TriviaState {
 }
 
 const GAME_CHANNEL = 'trivia_battle_sync';
+const STORAGE_KEY_TRIVIA = 'trivia_battle_state';
 
 export const TriviaOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<TriviaState>({
     gameState: 'setup',
     currentQuestion: null,
@@ -41,18 +45,44 @@ export const TriviaOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'trivia_state') {
-        setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'trivia_state') {
+        setState(data);
       }
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'trivia' && data.state) {
+        handleState({ ...data.state, type: 'trivia_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_TRIVIA);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const totalAnswers = state.answerCounts.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {/* Setup/Waiting */}
       {state.gameState === 'setup' && (
         <div className="text-center">

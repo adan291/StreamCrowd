@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
+import { countdownSync } from '../services/firebaseSync';
 
 interface CountdownConfig {
   initialDays: number;
@@ -228,7 +229,21 @@ export const Countdown: React.FC<CountdownProps> = ({
         if (state.config) setConfig(state.config);
         if (state.overlayStyle) setOverlayStyle(state.overlayStyle);
       };
+      
+      // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+      const unsubscribeFirebase = countdownSync.subscribe((data) => {
+        if (data) {
+          setTimeLeft(Math.floor((data.endTime - Date.now()) / 1000));
+          setIsRunning(data.isActive);
+        }
+      });
+      
       setTimeout(() => channelRef.current?.postMessage({ type: 'request_sync' }), 100);
+      
+      return () => { 
+        channelRef.current?.close(); 
+        unsubscribeFirebase();
+      };
     } else {
       channelRef.current.onmessage = (event) => {
         if (event.data?.type === 'request_sync') {
@@ -236,14 +251,20 @@ export const Countdown: React.FC<CountdownProps> = ({
           channelRef.current?.postMessage({ timeLeft: s.timeLeft, isRunning: s.isRunning, totalAdded: s.totalAdded, recentEvents: s.recentEvents, config: s.config, overlayStyle: s.overlayStyle });
         }
       };
+      
+      return () => { channelRef.current?.close(); };
     }
-    
-    return () => { channelRef.current?.close(); };
   }, [isOverlayMode]);
 
   const syncToOverlay = useCallback(() => {
     if (!isOverlayMode && channelRef.current) {
       channelRef.current.postMessage({ timeLeft, isRunning, totalAdded, recentEvents, config, overlayStyle });
+      // Also sync to Firebase for OBS Browser Source
+      countdownSync.update({
+        endTime: Date.now() + (timeLeft * 1000),
+        label: 'Countdown',
+        isActive: isRunning
+      }).catch(err => console.error('Firebase countdown sync error:', err));
     }
   }, [isOverlayMode, timeLeft, isRunning, totalAdded, recentEvents, config, overlayStyle]);
 

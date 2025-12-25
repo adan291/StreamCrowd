@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Camera, Eye, EyeOff, Plus, Trash2, Check, Sparkles, Loader2 } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface MemoryObject {
   id: string;
@@ -16,6 +18,7 @@ interface MemoriaIRLProps {
 }
 
 const GAME_CHANNEL = 'memoria_irl_sync';
+const STORAGE_KEY_MEMORIA = 'memoria_irl_state';
 
 export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnected = true }) => {
   const [gameState, setGameState] = useState<'setup' | 'viewing' | 'guessing' | 'results'>('setup');
@@ -51,7 +54,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
   }, [gameState]);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'memoria_state',
       gameState,
       imageUrl: gameState === 'viewing' ? imageUrl : null,
@@ -59,7 +62,12 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
       timeLeft,
       totalObjects: objects.length,
       foundCount: objects.filter(o => o.found).length
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_MEMORIA, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('memoria', state).catch(() => {});
   }, [gameState, imageUrl, objects, timeLeft]);
 
   useEffect(() => { syncToOverlay(); }, [syncToOverlay]);
@@ -89,7 +97,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
           
           setScores(prev => {
             const newScores = new Map(prev);
-            const existing = newScores.get(oderId);
+            const existing = prev.get(oderId);
             newScores.set(oderId, {
               username: msg.username,
               color: msg.color || '#a970ff',
@@ -352,6 +360,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
           </button>
         </div>
       </div>
+      <OBSOverlayUrl overlayParam="overlayMemoria" title="el juego de memoria" />
 
       {gameState === 'setup' && (
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">

@@ -16,7 +16,6 @@ import {
   RotateCcw,
   MessageSquare,
   Star,
-  ExternalLink,
   List,
   Timer,
   TimerOff,
@@ -38,6 +37,8 @@ import {
 import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel, SubsGiveawayConfig, SubsGiveawayEntry, DEFAULT_SUBS_CONFIG } from '../types';
 import { useI18n } from '../i18n';
 import { twitchService, StreamEventData } from '../services/twitchService';
+import { giveawaySync } from '../services/firebaseSync';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
 
 interface GiveawayHubProps {
   chatMessages: TwitchMessage[];
@@ -561,15 +562,27 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   }, []);
 
   const syncToOverlay = (state: Partial<WinnerState>) => {
+    const fullState = {
+      winner,
+      isSelecting,
+      displayName,
+      participantCount: raffleMode === 'viewers' ? getViewers().length : participants.size,
+      ...state
+    };
+    
+    // Sync via BroadcastChannel (same browser)
     if (channelRef.current) {
-      channelRef.current.postMessage({
-        winner,
-        isSelecting,
-        displayName,
-        participantCount: raffleMode === 'viewers' ? getViewers().length : participants.size,
-        ...state
-      });
+      channelRef.current.postMessage(fullState);
     }
+    
+    // Sync via Firebase (OBS Browser Source)
+    giveawaySync.update({
+      winner: fullState.winner,
+      isSpinning: fullState.isSelecting,
+      displayName: fullState.displayName || '',
+      participants: [],
+      updatedAt: Date.now()
+    }).catch(err => console.error('Firebase giveaway sync error:', err));
   };
 
   // ============================================
@@ -998,15 +1011,6 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     subsEntriesRef.current = [];
     viewersManualRef.current = new Set();
     keywordManualRef.current = new Set();
-  };
-
-  const openOverlayWindow = () => {
-    const width = 450;
-    const height = 350;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayRandomWinner=true`, 'RandomWinnerOverlay', `width=${width},height=${height},left=${left},top=${top}`);
   };
 
   // ============================================
@@ -1619,13 +1623,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           // RAFFLE TAB
           // ============================================
           <div className="p-4 space-y-4">
-            {/* Overlay button */}
-            <button 
-              onClick={openOverlayWindow} 
-              className="w-full py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-500/80 hover:to-orange-500/80 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm"
-            >
-              <ExternalLink size={16} /> {t.randomWinner.openOverlay}
-            </button>
+            {/* Overlay panel */}
+            <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
 
             {/* Mode selector */}
             <div className="flex gap-2">

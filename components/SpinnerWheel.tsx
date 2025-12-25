@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PollOption, TwitchMessage, CollaborationChannel } from '../types';
-import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, ExternalLink, Settings, UserPlus, Trash2, Download, Upload } from 'lucide-react';
+import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, Settings, UserPlus, Trash2, Download, Upload } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
+import { gameSync } from '../services/firebaseSync';
+import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
 
 type WheelMode = 'classic' | 'voting';
+
+const STORAGE_KEY_SPINNER = 'spinner_overlay_state';
+const SPINNER_CHANNEL = 'spinner_sync';
+const OVERLAY_TEXT_COLORS = ['#FFFFFF', '#000000', '#FFD700', '#00FFFF', '#FF6B6B', '#4ADE80'];
 
 interface SpinnerWheelProps {
   options: PollOption[];
@@ -19,10 +26,6 @@ interface SpinnerWheelProps {
   onRemoveCollaborator?: (channel: string) => void;
   isConnected?: boolean;
 }
-
-const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', '#1a1a2e', 'transparent'];
-const OVERLAY_TEXT_COLORS = ['#FFFFFF', '#000000', '#FFD700', '#00FFFF', '#FF6B6B', '#4ADE80'];
-const SPINNER_CHANNEL = 'spinner_sync';
 
 interface SpinnerState {
   rotation: number;
@@ -53,7 +56,8 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   isConnected = true,
 }) => {
   const { t } = useI18n();
-  const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
+  useOverlayMode(isOverlayMode); // Clean up body background for OBS
+  const [overlayBgColor, setOverlayBgColor] = useState('transparent');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlayWheelSize, setOverlayWheelSize] = useState<'normal' | 'large'>('large');
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
@@ -99,9 +103,9 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     channelRef.current = new BroadcastChannel(SPINNER_CHANNEL);
     
     if (isOverlayMode) {
-      // Overlay listens for state updates
+      // Overlay listens for state updates via BroadcastChannel
       channelRef.current.onmessage = (event) => {
-        if (event.data?.type === 'request_sync') return; // Ignorar requests
+        if (event.data?.type === 'request_sync') return;
         const state: SpinnerState = event.data;
         setRotation(state.rotation);
         setIsSpinning(state.isSpinning);
@@ -112,42 +116,95 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           setIsOverlayReady(true);
         }
       };
-      // Request initial state
+      
+      // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+      const unsubscribeFirebase = gameSync.subscribe((data) => {
+        if (data && data.type === 'spinner' && data.state) {
+          const state = data.state as SpinnerState;
+          setRotation(state.rotation);
+          setIsSpinning(state.isSpinning);
+          setWinner(state.winner);
+          setShowWinner(state.showWinner);
+          if (state.options && state.options.length > 0) {
+            setCurrentOptions(state.options);
+            setIsOverlayReady(true);
+          }
+        }
+      });
+      
+      // Also poll localStorage for legacy support
+      const loadFromStorage = () => {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY_SPINNER);
+          if (stored) {
+            const state: SpinnerState = JSON.parse(stored);
+            setRotation(state.rotation);
+            setIsSpinning(state.isSpinning);
+            setWinner(state.winner);
+            setShowWinner(state.showWinner);
+            if (state.options && state.options.length > 0) {
+              setCurrentOptions(state.options);
+              setIsOverlayReady(true);
+            }
+          }
+        } catch { /* ignore */ }
+      };
+      loadFromStorage();
+      
+      // Request initial state via BroadcastChannel
       setTimeout(() => {
         channelRef.current?.postMessage({ type: 'request_sync' });
       }, 100);
+      
+      return () => {
+        channelRef.current?.close();
+        unsubscribeFirebase();
+      };
     } else {
       // Main window listens for sync requests and sends current state
       channelRef.current.onmessage = (event) => {
         if (event.data?.type === 'request_sync') {
           const current = stateRef.current;
-          channelRef.current?.postMessage({
+          const stateToSend = {
             rotation: current.rotation,
             isSpinning: current.isSpinning,
             winner: current.winner,
             showWinner: current.showWinner,
             options: current.options.length > 0 ? current.options : options
-          });
+          };
+          channelRef.current?.postMessage(stateToSend);
+          // Also save to localStorage for OBS
+          try {
+            localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(stateToSend));
+          } catch { /* ignore */ }
         }
       };
+      
+      return () => {
+        channelRef.current?.close();
+      };
     }
-    
-    return () => {
-      channelRef.current?.close();
-    };
   }, [isOverlayMode, options]);
 
   // Sync state to overlay (only from main window)
   const syncToOverlay = useCallback((state: Partial<SpinnerState>) => {
-    if (!isOverlayMode && channelRef.current) {
-      channelRef.current.postMessage({
+    if (!isOverlayMode) {
+      const fullState = {
         rotation,
         isSpinning,
         winner,
         showWinner,
         options: currentOptions,
         ...state
-      });
+      };
+      // Sync via BroadcastChannel (same browser)
+      channelRef.current?.postMessage(fullState);
+      // Also save to localStorage for OBS Browser Source
+      try {
+        localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
+      } catch { /* ignore */ }
+      // Sync to Firebase for cross-browser/OBS support
+      gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
     }
   }, [isOverlayMode, rotation, isSpinning, winner, showWinner, currentOptions]);
 
@@ -426,19 +483,6 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     }, 100);
   };
 
-  const openOverlayWindow = () => {
-    const width = 450;
-    const height = 500;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlaySpinner=true`, 'SpinnerOverlay', `width=${width},height=${height},left=${left},top=${top}`);
-    // Enviar estado inicial después de un pequeño delay para que el overlay esté listo
-    setTimeout(() => {
-      syncToOverlay({ options: currentOptions.length > 0 ? currentOptions : options });
-    }, 500);
-  };
-
   const totalVotes = getTotalVotes();
 
 
@@ -547,14 +591,11 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           <X size={24} />
         </button>
 
-        <h2 className="text-2xl font-bold text-white text-center mb-2">🎰 Ruleta de la Suerte</h2>
+        <h2 className="text-2xl font-bold text-white text-center mb-4">🎰 Ruleta de la Suerte</h2>
 
-        <button onClick={openOverlayWindow} className="w-full mb-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-500/80 hover:to-purple-600/80 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm">
-          <ExternalLink size={16} />
-          Abrir Overlay para OBS
-        </button>
+        <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
 
-        <div className="flex justify-center gap-2 mb-4">
+        <div className="flex justify-center gap-2 mb-4 mt-4">
           <button onClick={() => setMode('classic')} disabled={isSpinning || isVotingActive} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${mode === 'classic' ? 'bg-twitch-brand text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} disabled:opacity-50`}>
             <Equal size={18} /> Clásica
           </button>
@@ -738,3 +779,4 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     </ToolWithChat>
   );
 };
+

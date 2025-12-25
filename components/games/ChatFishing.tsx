@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, ExternalLink, Fish, Anchor, Trophy, RotateCcw } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface CaughtFish {
   id: string;
@@ -31,6 +33,7 @@ interface ChatFishingProps {
 }
 
 const GAME_CHANNEL = 'chat_fishing_sync';
+const STORAGE_KEY_FISHING = 'chat_fishing_state';
 const RARITY_COLORS = {
   common: '#9CA3AF',
   rare: '#3B82F6',
@@ -68,14 +71,19 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'fishing_state',
       fish: fishRef.current,
       hook: { ...hookPosition, depth: hookDepth },
       isFishing,
       lastCatch,
       totalPoints
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_FISHING, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('fishing', state).catch(() => {});
   }, [hookPosition, hookDepth, isFishing, lastCatch, totalPoints]);
 
   useEffect(() => {
@@ -446,8 +454,10 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
           <ExternalLink size={16} /> Overlay
         </button>
       </div>
+      
+      <OBSOverlayUrl overlayParam="overlayFishing" title="la pesca" />
 
-      <div className="flex items-center justify-between bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl p-3">
+      <div className="flex items-center justify-between bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-xl p-3 mt-3">
         <div className="flex items-center gap-2">
           <Trophy size={20} className="text-yellow-400" />
           <span className="text-white font-bold text-lg">{totalPoints} pts</span>

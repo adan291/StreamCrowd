@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Duck {
   id: string;
@@ -20,11 +22,13 @@ interface DuckHuntState {
 }
 
 const GAME_CHANNEL = 'duckhunt_sync';
+const STORAGE_KEY_DUCKHUNT = 'duckhunt_state';
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
 const DUCK_SIZE = 50;
 
 export const DuckHuntOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<DuckHuntState>({
     ducks: [],
     score: 0,
@@ -39,18 +43,41 @@ export const DuckHuntOverlay: React.FC = () => {
   useEffect(() => {
     channelRef.current = new BroadcastChannel(GAME_CHANNEL);
     
-    channelRef.current.onmessage = (event) => {
-      if (event.data.type === 'duckhunt_state') {
-        ducksRef.current = event.data.ducks || [];
+    const handleState = (data: any) => {
+      if (data.type === 'duckhunt_state') {
+        ducksRef.current = data.ducks || [];
         setState({
-          ducks: event.data.ducks || [],
-          score: event.data.score || 0,
-          kills: event.data.kills || []
+          ducks: data.ducks || [],
+          score: data.score || 0,
+          kills: data.kills || []
         });
       }
     };
     
-    return () => channelRef.current?.close();
+    channelRef.current.onmessage = (event) => handleState(event.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'duckhunt' && data.state) {
+        handleState({ ...data.state, type: 'duckhunt_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_DUCKHUNT);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channelRef.current?.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Animation loop
@@ -163,7 +190,8 @@ export const DuckHuntOverlay: React.FC = () => {
   const aliveDucks = ducks.filter((d: Duck) => d.isAlive).length;
 
   return (
-    <div className="h-screen w-screen bg-[#87CEEB] overflow-hidden relative">
+    <div className="h-screen w-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {/* Canvas */}
       <canvas
         ref={canvasRef}

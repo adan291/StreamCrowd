@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Trophy, Crown, Users, Dice6, Brain, Eye, Pencil, MessageCircle, HelpCircle, Zap } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 type ChallengeType = 'trivia' | 'mimica' | 'dibujo' | 'palabras' | 'cultura' | 'rapidez';
 
@@ -34,6 +36,7 @@ interface PartyCoState {
 }
 
 const GAME_CHANNEL = 'party_co_sync';
+const STORAGE_KEY_PARTYCO = 'party_co_state';
 
 const CHALLENGE_ICONS: Record<ChallengeType, React.ReactNode> = {
   trivia: <Brain size={24} />,
@@ -63,6 +66,7 @@ const CHALLENGE_NAMES: Record<ChallengeType, string> = {
 };
 
 export const PartyCoOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<PartyCoState>({
     gameState: 'lobby',
     currentChallenge: null,
@@ -78,29 +82,53 @@ export const PartyCoOverlay: React.FC = () => {
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
     
-    channel.onmessage = (event) => {
-      if (event.data.type === 'party_co_state') {
+    const handleState = (data: any) => {
+      if (data.type === 'party_co_state') {
         setState({
-          gameState: event.data.gameState,
-          currentChallenge: event.data.currentChallenge,
-          timeLeft: event.data.timeLeft,
-          diceValue: event.data.diceValue,
-          isRolling: event.data.isRolling,
-          winner: event.data.winner,
-          roundNumber: event.data.roundNumber,
-          topPlayers: event.data.topPlayers || [],
-          pointsToWin: event.data.pointsToWin || 50
+          gameState: data.gameState,
+          currentChallenge: data.currentChallenge,
+          timeLeft: data.timeLeft,
+          diceValue: data.diceValue,
+          isRolling: data.isRolling,
+          winner: data.winner,
+          roundNumber: data.roundNumber,
+          topPlayers: data.topPlayers || [],
+          pointsToWin: data.pointsToWin || 50
         });
       }
     };
+    
+    channel.onmessage = (event) => handleState(event.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'partyco' && data.state) {
+        handleState({ ...data.state, type: 'party_co_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_PARTYCO);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
 
-    return () => channel.close();
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const { gameState, currentChallenge, timeLeft, diceValue, isRolling, winner, roundNumber, topPlayers, pointsToWin } = state;
 
   return (
-    <div className="min-h-screen bg-transparent p-4 flex flex-col items-center justify-center">
+    <div className="min-h-screen p-4 flex flex-col items-center justify-center" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {/* Lobby */}
       {gameState === 'lobby' && (
         <div className="text-center animate-pulse">

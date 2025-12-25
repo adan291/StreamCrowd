@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Crown, Trophy, Settings } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
+import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
+import { giveawaySync } from '../services/firebaseSync';
 
 interface RandomWinnerOverlayProps {
   chatMessages: TwitchMessage[];
   onClose: () => void;
 }
 
-const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', '#1a1a2e', 'transparent'];
 const OVERLAY_TEXT_COLORS = ['#FFFFFF', '#000000', '#FFD700', '#00FFFF', '#FF6B6B', '#4ADE80'];
 const RANDOM_WINNER_CHANNEL = 'random_winner_sync';
 
@@ -23,7 +24,8 @@ export const RandomWinnerOverlay: React.FC<RandomWinnerOverlayProps> = ({
   chatMessages, 
   onClose,
 }) => {
-  const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
+  useOverlayMode(true); // Enable transparent background for OBS
+  const [overlayBgColor, setOverlayBgColor] = useState('transparent');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlaySize, setOverlaySize] = useState<'normal' | 'large'>('large');
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
@@ -45,10 +47,22 @@ export const RandomWinnerOverlay: React.FC<RandomWinnerOverlayProps> = ({
       setDisplayName(state.displayName || '');
     };
     
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = giveawaySync.subscribe((data) => {
+      if (data) {
+        setWinner(data.winner);
+        setIsSelecting(data.isSpinning);
+        setDisplayName(data.displayName || data.winner || '');
+      }
+    });
+    
     // Request sync on mount
     setTimeout(() => channelRef.current?.postMessage({ type: 'request_sync' }), 100);
     
-    return () => { channelRef.current?.close(); };
+    return () => { 
+      channelRef.current?.close(); 
+      unsubscribeFirebase();
+    };
   }, []);
 
   const getOverlayTextSize = () => overlaySize === 'large' ? 'text-6xl' : 'text-4xl';

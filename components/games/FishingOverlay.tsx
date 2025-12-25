@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Fish, Trophy } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface SwimmingFish {
   id: string;
@@ -22,6 +24,7 @@ interface FishingState {
 }
 
 const GAME_CHANNEL = 'chat_fishing_sync';
+const STORAGE_KEY_FISHING = 'chat_fishing_state';
 const RARITY_COLORS = {
   common: '#9CA3AF',
   rare: '#3B82F6',
@@ -30,6 +33,7 @@ const RARITY_COLORS = {
 };
 
 export const FishingOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<FishingState>({
     fish: [],
     hook: { x: 300, y: 50, depth: 0 },
@@ -44,13 +48,38 @@ export const FishingOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'fishing_state') {
-        setState(e.data);
-        fishRef.current = e.data.fish || [];
+    
+    const handleState = (data: any) => {
+      if (data.type === 'fishing_state') {
+        setState(data);
+        fishRef.current = data.fish || [];
       }
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'fishing' && data.state) {
+        handleState({ ...data.state, type: 'fishing_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_FISHING);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -168,7 +197,8 @@ export const FishingOverlay: React.FC = () => {
   }, [state.hook]);
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden relative">
+    <div className="w-screen h-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       <canvas
         ref={canvasRef}
         width={700}

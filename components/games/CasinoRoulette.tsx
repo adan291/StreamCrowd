@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Settings, ExternalLink, Timer, Users, Trash2 } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Bet {
 visitorId: string;
@@ -16,6 +18,7 @@ interface CasinoRouletteProps {
 }
 
 const ROULETTE_CHANNEL = 'casino_roulette_sync';
+const STORAGE_KEY_ROULETTE = 'casino_roulette_state';
 const ROULETTE_NUMBERS = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10,
   5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
@@ -51,7 +54,13 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
   }, []);
 
   const syncToOverlay = useCallback((data: any) => {
+    // Sync via BroadcastChannel (same browser)
     channelRef.current?.postMessage(data);
+    // Also save to localStorage for cross-browser (OBS)
+    try {
+      localStorage.setItem(STORAGE_KEY_ROULETTE, JSON.stringify(data));
+    } catch { /* ignore */ }
+    gameSync.update('roulette', data).catch(() => {});
   }, []);
 
   // Process chat messages for bets
@@ -268,6 +277,8 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
           <ExternalLink size={16} />
           Overlay OBS
         </button>
+        
+        <OBSOverlayUrl overlayParam="overlayRoulette" title="la ruleta" />
       </div>
 
       {/* Settings */}

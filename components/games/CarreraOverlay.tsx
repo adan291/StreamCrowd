@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Flag, Timer } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 const GAME_CHANNEL = 'carrera_emotes_sync';
+const STORAGE_KEY_CARRERA = 'carrera_emotes_state';
 
 export const CarreraOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<any>({
     gameState: 'setup',
     racers: [],
@@ -13,14 +17,40 @@ export const CarreraOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'carrera_state') setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'carrera_state') setState(data);
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'carrera' && data.state) {
+        handleState({ ...data.state, type: 'carrera_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_CARRERA);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {state.gameState === 'setup' && (
         <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
           <Flag size={48} className="text-green-400 mx-auto mb-2" />

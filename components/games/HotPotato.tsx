@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Bomb, Timer, Trophy, RotateCcw, Users, ExternalLink } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Player {
   oderId: string; // visitorId typo kept for compatibility
@@ -17,6 +19,7 @@ interface HotPotatoProps {
 }
 
 const GAME_CHANNEL = 'hot_potato_sync';
+const STORAGE_KEY_POTATO = 'hot_potato_state';
 
 export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected = true }) => {
   const [gameState, setGameState] = useState<'waiting' | 'playing' | 'exploded'>('waiting');
@@ -39,7 +42,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'potato_state',
       gameState,
       players,
@@ -47,7 +50,12 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
       timeLeft,
       loser,
       round
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_POTATO, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('potato', state).catch(() => {});
   }, [gameState, players, currentHolder, timeLeft, loser, round]);
 
   // Sync state changes to overlay
@@ -263,6 +271,8 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
           Overlay OBS
         </button>
       </div>
+      
+      <OBSOverlayUrl overlayParam="overlayPotato" title="la patata caliente" />
 
       {/* Game Status */}
       {gameState === 'waiting' && (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Bet {
   visitorId: string;
@@ -10,19 +11,18 @@ interface Bet {
 }
 
 const ROULETTE_CHANNEL = 'casino_roulette_sync';
+const STORAGE_KEY_ROULETTE = 'casino_roulette_state';
 const ROULETTE_NUMBERS = [
   0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10,
   5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26
 ];
 const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', 'transparent'];
 
 export const RouletteOverlay: React.FC = () => {
+  const { bgColor, setBgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [result, setResult] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [bets, setBets] = useState<Bet[]>([]);
-  const [bgColor, setBgColor] = useState('#00FF00');
-  const [showSettings, setShowSettings] = useState(false);
   const [wheelSize, setWheelSize] = useState<'normal' | 'large'>('large');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,53 +96,79 @@ export const RouletteOverlay: React.FC = () => {
   }, [wheelSize]);
 
   // Setup BroadcastChannel
+  // Handle incoming state data
+  const handleStateData = useCallback((data: any) => {
+    if (data.type === 'spin') {
+      isSpinningRef.current = true;
+      setShowResult(false);
+      setResult(null);
+      
+      const startRotation = rotationRef.current;
+      const targetRotation = data.rotation;
+      const duration = 5000;
+      const startTime = Date.now();
+      
+      const animateSpin = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        
+        rotationRef.current = startRotation + (targetRotation - startRotation) * eased;
+        drawWheel();
+        
+        if (progress < 1) {
+          animationRef.current = requestAnimationFrame(animateSpin);
+        } else {
+          rotationRef.current = targetRotation;
+          isSpinningRef.current = false;
+        }
+      };
+      
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      animateSpin();
+    } else if (data.type === 'result') {
+      setResult(data.result);
+      setShowResult(true);
+      setBets(data.bets || []);
+    } else if (data.type === 'reset') {
+      setResult(null);
+      setShowResult(false);
+      setBets([]);
+    }
+  }, [drawWheel]);
+
   useEffect(() => {
+    // BroadcastChannel for same-browser sync
     channelRef.current = new BroadcastChannel(ROULETTE_CHANNEL);
-    channelRef.current.onmessage = (event) => {
-      const data = event.data;
-      if (data.type === 'spin') {
-        isSpinningRef.current = true;
-        setShowResult(false);
-        setResult(null);
-        
-        const startRotation = rotationRef.current;
-        const targetRotation = data.rotation;
-        const duration = 5000;
-        const startTime = Date.now();
-        
-        const animateSpin = () => {
-          const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / duration, 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          
-          rotationRef.current = startRotation + (targetRotation - startRotation) * eased;
-          drawWheel();
-          
-          if (progress < 1) {
-            animationRef.current = requestAnimationFrame(animateSpin);
-          } else {
-            rotationRef.current = targetRotation;
-            isSpinningRef.current = false;
-          }
-        };
-        
-        if (animationRef.current) cancelAnimationFrame(animationRef.current);
-        animateSpin();
-      } else if (data.type === 'result') {
-        setResult(data.result);
-        setShowResult(true);
-        setBets(data.bets || []);
-      } else if (data.type === 'reset') {
-        setResult(null);
-        setShowResult(false);
-        setBets([]);
+    channelRef.current.onmessage = (event) => handleStateData(event.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'roulette' && data.state) {
+        handleStateData(data.state);
       }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_ROULETTE);
+        if (stored) {
+          handleStateData(JSON.parse(stored));
+        }
+      } catch { /* ignore */ }
     };
+    
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
     return () => {
       channelRef.current?.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [drawWheel]);
+  }, [handleStateData]);
 
   // Initial draw
   useEffect(() => {
@@ -157,40 +183,7 @@ export const RouletteOverlay: React.FC = () => {
       className="min-h-screen w-full flex flex-col items-center justify-center p-4" 
       style={{ backgroundColor: bgColor }}
     >
-      <button
-        onClick={() => setShowSettings(!showSettings)}
-        className="fixed top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg z-50"
-      >
-        <Settings size={18} />
-      </button>
-      
-      {showSettings && (
-        <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-56">
-          <p className="text-xs text-zinc-400 mb-2 font-bold">Chroma Key</p>
-          <div className="flex gap-1 mb-3">
-            {OVERLAY_BG_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setBgColor(color)}
-                className={`w-8 h-8 rounded border-2 ${bgColor === color ? 'border-white scale-110' : 'border-transparent'} ${color === 'transparent' ? 'bg-[conic-gradient(#666_25%,#888_25%_50%,#666_50%_75%,#888_75%)] bg-[length:8px_8px]' : ''}`}
-                style={{ backgroundColor: color === 'transparent' ? undefined : color }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-zinc-400 mb-2 font-bold">Tamaño</p>
-          <div className="flex gap-1">
-            {(['normal', 'large'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setWheelSize(s)}
-                className={`flex-1 py-1.5 rounded text-xs font-medium ${wheelSize === s ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300'}`}
-              >
-                {s === 'normal' ? 'Normal' : 'Grande'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <OverlayChromaKey {...chromaKeyProps} />
 
       {/* Roulette Wheel */}
       <div className="relative">

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Skull, Heart } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 const GAME_CHANNEL = 'ahorcado_sync';
+const STORAGE_KEY_AHORCADO = 'ahorcado_state';
 
 export const AhorcadoOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<any>({
     gameState: 'setup',
     displayWord: '',
@@ -17,10 +21,35 @@ export const AhorcadoOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'ahorcado_state') setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'ahorcado_state') setState(data);
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'ahorcado' && data.state) {
+        handleState({ ...data.state, type: 'ahorcado_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_AHORCADO);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const renderHangman = () => {
@@ -45,7 +74,8 @@ export const AhorcadoOverlay: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {state.gameState === 'setup' && (
         <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
           <Skull size={48} className="text-red-400 mx-auto mb-2" />

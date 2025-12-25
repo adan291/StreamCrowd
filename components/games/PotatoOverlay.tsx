@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bomb, Timer } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Player {
   oderId: string;
@@ -19,8 +21,10 @@ interface PotatoState {
 }
 
 const GAME_CHANNEL = 'hot_potato_sync';
+const STORAGE_KEY_POTATO = 'hot_potato_state';
 
 export const PotatoOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<PotatoState>({
     gameState: 'waiting',
     players: [],
@@ -32,18 +36,44 @@ export const PotatoOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'potato_state') {
-        setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'potato_state') {
+        setState(data);
       }
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'potato' && data.state) {
+        handleState({ ...data.state, type: 'potato_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_POTATO);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const activePlayers = state.players.filter(p => !p.isOut);
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {/* Waiting */}
       {state.gameState === 'waiting' && (
         <div className="text-center">

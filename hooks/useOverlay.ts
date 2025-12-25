@@ -31,7 +31,7 @@ export interface UseOverlayReturn {
  * Default overlay settings
  */
 export const DEFAULT_OVERLAY_SETTINGS: OverlaySettings = {
-  bgColor: '#00FF00',
+  bgColor: 'transparent',
   textColor: '#FFFFFF',
   borderColor: '#FFFFFF',
   showBorders: true,
@@ -42,12 +42,26 @@ export const DEFAULT_OVERLAY_SETTINGS: OverlaySettings = {
 
 /**
  * Detects if overlay mode is enabled via URL parameters
- * @returns true if overlay=true is present in URL params
+ * @returns true if any overlay parameter is present in URL params
  */
 export function detectOverlayMode(): boolean {
   if (typeof window === 'undefined') return false;
   const params = new URLSearchParams(window.location.search);
-  return params.get('overlay') === 'true';
+  // Check for any overlay mode parameter
+  return params.get('overlay') === 'true' || 
+         params.get('overlayPoll') === 'true' ||
+         params.get('overlayCountdown') === 'true' ||
+         params.get('overlaySpinner') === 'true' ||
+         params.get('overlayGiveaway') === 'true' ||
+         params.get('overlayRandomWinner') === 'true' ||
+         params.get('overlayJudge') === 'true' ||
+         params.get('overlayJudgePanel') === 'true' ||
+         params.get('overlayTrivia') === 'true' ||
+         params.get('overlayPPT') === 'true' ||
+         params.get('overlayAhorcado') === 'true' ||
+         params.get('overlayCarrera') === 'true' ||
+         params.get('overlayMemoria') === 'true' ||
+         params.get('overlayPartyCo') === 'true';
 }
 
 /**

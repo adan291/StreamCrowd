@@ -2,6 +2,9 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Poll, VoteRecord } from '../types';
 import { useLocalStorage } from './useLocalStorage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { pollSync } from '../services/firebaseSync';
+
+const POLL_OVERLAY_CHANNEL = 'poll_overlay_sync';
 
 /**
  * Configuration for creating a new poll
@@ -136,11 +139,32 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
   }, [voteHistory]);
 
   // Sync to localStorage for overlay mode (Controller Mode)
+  // Also sync to Firebase for cross-browser/OBS support
   useEffect(() => {
     if (syncToStorage && !isOverlayMode) {
       try {
         if (currentPoll) {
           localStorage.setItem(STORAGE_KEYS.POLL_SYNC, JSON.stringify(currentPoll));
+          
+          // Sync to Firebase for OBS Browser Source
+          const firebaseData = {
+            question: currentPoll.question,
+            options: currentPoll.options.map(o => ({
+              text: o.label,
+              votes: o.votes,
+              color: o.color
+            })),
+            isActive: currentPoll.isActive,
+            showResults: !currentPoll.isActive,
+            totalVotes: currentPoll.totalVotes,
+            updatedAt: Date.now()
+          };
+          console.log('[usePoll] Syncing to Firebase:', firebaseData);
+          pollSync.update(firebaseData).catch(err => console.error('Firebase sync error:', err));
+        } else {
+          // Clear Firebase state when poll is reset
+          console.log('[usePoll] Clearing Firebase state');
+          pollSync.update(null as any).catch(() => {});
         }
         localStorage.setItem(STORAGE_KEYS.VOTE_HISTORY_SYNC, JSON.stringify(voteHistory));
       } catch (e) {
@@ -149,9 +173,84 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
     }
   }, [currentPoll, voteHistory, syncToStorage, isOverlayMode]);
 
-  // Listen for storage changes in overlay mode
+  // Broadcast poll state to overlay via BroadcastChannel
+  useEffect(() => {
+    if (isOverlayMode) return;
+    
+    const channel = new BroadcastChannel(POLL_OVERLAY_CHANNEL);
+    
+    // Find winner if poll is not active
+    const winner = currentPoll && !currentPoll.isActive && currentPoll.totalVotes > 0
+      ? currentPoll.options.reduce((prev, curr) => prev.votes > curr.votes ? prev : curr)
+      : null;
+    
+    // Send current state
+    channel.postMessage({
+      type: 'poll_state',
+      state: {
+        question: currentPoll?.question || '',
+        options: currentPoll?.options || [],
+        totalVotes: currentPoll?.totalVotes || 0,
+        isActive: currentPoll?.isActive || false,
+        winner,
+      }
+    });
+    
+    // Listen for state requests from overlay
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data.type === 'request_state') {
+        channel.postMessage({
+          type: 'poll_state',
+          state: {
+            question: currentPoll?.question || '',
+            options: currentPoll?.options || [],
+            totalVotes: currentPoll?.totalVotes || 0,
+            isActive: currentPoll?.isActive || false,
+            winner,
+          }
+        });
+      }
+    };
+    
+    channel.addEventListener('message', handleMessage);
+    
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+    };
+  }, [currentPoll, isOverlayMode]);
+
+  // Listen for storage changes and Firebase in overlay mode
   useEffect(() => {
     if (!isOverlayMode) return;
+
+    console.log('[usePoll] Overlay mode detected, subscribing to Firebase...');
+
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = pollSync.subscribe((data) => {
+      console.log('[usePoll] Firebase data received:', data);
+      if (data && data.options && Array.isArray(data.options)) {
+        // Convert Firebase data to Poll format
+        const pollFromFirebase: Poll = {
+          id: 'firebase-sync',
+          title: data.question || '',
+          question: data.question || '',
+          options: data.options.map((opt, i) => ({
+            id: i + 1,
+            label: opt.text || '',
+            votes: opt.votes || 0,
+            color: opt.color || '#a970ff',
+          })),
+          isActive: data.isActive ?? false,
+          totalVotes: data.totalVotes || 0,
+          startTime: data.updatedAt || Date.now(),
+        };
+        setCurrentPoll(pollFromFirebase);
+      } else {
+        // No data in Firebase or invalid data - poll was reset/cleared
+        setCurrentPoll(null);
+      }
+    });
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEYS.POLL_SYNC && e.newValue) {
@@ -168,7 +267,7 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
 
     window.addEventListener('storage', handleStorage);
 
-    // Initial load from storage
+    // Initial load from storage (fallback)
     const loadFromStorage = () => {
       const storedPoll = localStorage.getItem(STORAGE_KEYS.POLL_SYNC);
       if (storedPoll) {
@@ -190,6 +289,7 @@ export function usePoll(options: UsePollOptions = {}): UsePollReturn {
     const pollInterval = setInterval(loadFromStorage, 500);
 
     return () => {
+      unsubscribeFirebase();
       window.removeEventListener('storage', handleStorage);
       clearInterval(pollInterval);
     };

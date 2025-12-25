@@ -68,6 +68,7 @@ import { CarreraOverlay } from './components/games/CarreraOverlay';
 import { MemoriaOverlay } from './components/games/MemoriaOverlay';
 import { PotatoOverlay } from './components/games/PotatoOverlay';
 import { TriviaOverlay } from './components/games/TriviaOverlay';
+import { PollOverlay } from './components/PollOverlay';
 import { PartyCoOverlay } from './components/games/PartyCoOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
@@ -678,6 +679,7 @@ const App: React.FC = () => {
   const isCarreraOverlay = urlParams?.get('overlayCarrera') === 'true';
   const isMemoriaOverlay = urlParams?.get('overlayMemoria') === 'true';
   const isPartyCoOverlay = urlParams?.get('overlayPartyCo') === 'true';
+  const isPollOverlay = urlParams?.get('overlayPoll') === 'true';
   
   // Countdown Overlay Mode Render
   if (isCountdownOverlay) {
@@ -769,32 +771,38 @@ const App: React.FC = () => {
     return <PartyCoOverlay />;
   }
 
-  // Overlay Mode Render
-  if (isOverlayMode) {
-    const presetColors = ['#00FF00', '#FF00FF', '#0000FF', '#000000', '#FFFFFF', '#1a1a2e', '#16213e'];
+  // Generic Overlay Mode - backwards compatibility, redirect to overlayPoll
+  if (isOverlayMode && !isPollOverlay) {
+    // Redirect old ?overlay=true to ?overlayPoll=true
+    if (typeof window !== 'undefined') {
+      const newUrl = window.location.href.replace('overlay=true', 'overlayPoll=true');
+      window.location.replace(newUrl);
+    }
+    return null;
+  }
+
+  // Poll Overlay Mode Render - Full featured overlay with settings
+  if (isPollOverlay) {
+    const presetColors = ['transparent', '#00FF00', '#FF00FF', '#0000FF', '#000000', '#FFFFFF', '#1a1a2e'];
     const textColors = ['#FFFFFF', '#000000', '#FFD700', '#00FFFF', '#FF6B6B', '#4ADE80'];
+    
+    // Clean body background for true transparency in OBS
+    useEffect(() => {
+      document.body.style.background = 'transparent';
+      document.body.classList.remove('bg-dot-pattern-light', 'bg-dot-pattern', 'dark:bg-dot-pattern');
+      document.documentElement.style.background = 'transparent';
+      return () => {
+        document.body.style.background = '';
+        document.documentElement.style.background = '';
+      };
+    }, []);
     
     return (
       <div className="h-screen w-screen overflow-hidden relative" style={{ background: overlaySettings.bgColor }}>
-        {/* Overlay Mode Indicator */}
-        <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-center py-1 bg-gradient-to-r from-purple-600/80 via-twitch-brand/80 to-purple-600/80 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-white text-xs font-bold uppercase tracking-wider">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            <span>🎬 {t.overlay.mode} - {t.overlay.forOBS}</span>
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-          </div>
-        </div>
-        
         {/* Settings Toggle Button */}
         <button 
           onClick={toggleOverlaySettings}
-          className="absolute top-8 right-2 z-50 p-2 rounded-lg bg-black/50 hover:bg-black/70 text-white transition-all"
+          className="absolute top-2 right-2 z-50 p-2 rounded-lg bg-black/50 hover:bg-black/70 text-white transition-all"
           title="Configuración"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -802,7 +810,7 @@ const App: React.FC = () => {
         
         {/* Settings Panel */}
         {showOverlaySettings && (
-          <div className="absolute top-16 right-2 z-50 bg-zinc-900 rounded-xl p-4 shadow-2xl border border-zinc-700 w-64">
+          <div className="absolute top-12 right-2 z-50 bg-zinc-900 rounded-xl p-4 shadow-2xl border border-zinc-700 w-64">
             <h3 className="text-white font-bold mb-3 text-sm">{t.overlay.title}</h3>
             
             {/* Background Color */}
@@ -813,9 +821,9 @@ const App: React.FC = () => {
                   <button
                     key={color}
                     onClick={() => setOverlaySettings({ bgColor: color })}
-                    className={`w-6 h-6 rounded border-2 ${overlaySettings.bgColor === color ? 'border-white' : 'border-transparent'}`}
-                    style={{ background: color }}
-                    title={color}
+                    className={`w-6 h-6 rounded border-2 ${overlaySettings.bgColor === color ? 'border-white' : 'border-transparent'} ${color === 'transparent' ? 'bg-[conic-gradient(#666_25%,#888_25%_50%,#666_50%_75%,#888_75%)] bg-[length:8px_8px]' : ''}`}
+                    style={{ background: color === 'transparent' ? undefined : color }}
+                    title={color === 'transparent' ? 'Transparente' : color}
                   />
                 ))}
               </div>
@@ -837,33 +845,6 @@ const App: React.FC = () => {
               </div>
             </div>
             
-            {/* Border Color */}
-            <div className="mb-3">
-              <label className="text-zinc-400 text-xs block mb-1">{t.overlay.borderColor}</label>
-              <div className="flex gap-1 flex-wrap">
-                {textColors.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setOverlaySettings({ borderColor: color })}
-                    className={`w-6 h-6 rounded border-2 ${overlaySettings.borderColor === color ? 'border-white' : 'border-transparent'}`}
-                    style={{ background: color }}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            {/* Show Borders Toggle */}
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-zinc-400 text-xs">{t.overlay.showBorders}</label>
-              <button
-                onClick={() => setOverlaySettings({ showBorders: !overlaySettings.showBorders })}
-                className={`w-10 h-5 rounded-full transition-colors ${overlaySettings.showBorders ? 'bg-green-500' : 'bg-zinc-600'}`}
-              >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${overlaySettings.showBorders ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-            
             {/* Font Size */}
             <div className="mb-3">
               <label className="text-zinc-400 text-xs block mb-1">{t.overlay.fontSize}</label>
@@ -877,54 +858,6 @@ const App: React.FC = () => {
                     {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
                   </button>
                 ))}
-              </div>
-            </div>
-            
-            {/* Font Style */}
-            <div className="mb-3">
-              <label className="text-zinc-400 text-xs block mb-1">{t.overlay.fontStyle}</label>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setOverlaySettings({ fontStyle: 'normal' })}
-                  className={`flex-1 py-1 px-2 rounded text-xs transition-colors ${overlaySettings.fontStyle === 'normal' ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                >
-                  Normal
-                </button>
-                <button
-                  onClick={() => setOverlaySettings({ fontStyle: 'bold' })}
-                  className={`flex-1 py-1 px-2 rounded text-xs font-bold transition-colors ${overlaySettings.fontStyle === 'bold' ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                >
-                  Bold
-                </button>
-                <button
-                  onClick={() => setOverlaySettings({ fontStyle: 'italic' })}
-                  className={`flex-1 py-1 px-2 rounded text-xs italic transition-colors ${overlaySettings.fontStyle === 'italic' ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                >
-                  Italic
-                </button>
-              </div>
-            </div>
-            
-            {/* Theme Toggle */}
-            <div className="pt-2 border-t border-zinc-700">
-              <label className="text-zinc-400 text-xs block mb-2">{t.overlay.theme}</label>
-              <div className="flex items-center bg-zinc-800 rounded-lg p-1">
-                <button
-                  onClick={() => setOverlaySettings({ theme: 'light' })}
-                  className={`flex-1 p-2 rounded-md transition-all flex items-center justify-center gap-1 ${overlaySettings.theme === 'light' ? 'bg-white text-yellow-500 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
-                  title={t.overlay.light}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-                  <span className="text-xs">{t.overlay.light}</span>
-                </button>
-                <button
-                  onClick={() => setOverlaySettings({ theme: 'dark' })}
-                  className={`flex-1 p-2 rounded-md transition-all flex items-center justify-center gap-1 ${overlaySettings.theme === 'dark' ? 'bg-zinc-900 text-blue-400 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
-                  title={t.overlay.dark}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
-                  <span className="text-xs">{t.overlay.dark}</span>
-                </button>
               </div>
             </div>
           </div>
@@ -949,7 +882,8 @@ const App: React.FC = () => {
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center" style={{ color: overlaySettings.textColor }}>
-            <div className="text-center p-8 bg-black/70 rounded-xl shadow-xl max-w-md" style={{ borderColor: overlaySettings.borderColor, borderWidth: overlaySettings.showBorders ? 2 : 0 }}>
+            <div className="text-center p-8 bg-black/70 rounded-xl shadow-xl max-w-md">
+              <div className="text-5xl mb-4">📊</div>
               <p className="font-bold mb-2 text-xl">{t.poll.waitingPoll}</p>
               <p className="text-sm opacity-70">{t.poll.createPollHint}</p>
             </div>

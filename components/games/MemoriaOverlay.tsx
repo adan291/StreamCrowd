@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Eye, EyeOff, Camera, Check } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 const GAME_CHANNEL = 'memoria_irl_sync';
+const STORAGE_KEY_MEMORIA = 'memoria_irl_state';
 
 export const MemoriaOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<any>({
     gameState: 'setup',
     imageUrl: null,
@@ -15,14 +19,40 @@ export const MemoriaOverlay: React.FC = () => {
 
   useEffect(() => {
     const channel = new BroadcastChannel(GAME_CHANNEL);
-    channel.onmessage = (e) => {
-      if (e.data.type === 'memoria_state') setState(e.data);
+    
+    const handleState = (data: any) => {
+      if (data.type === 'memoria_state') setState(data);
     };
-    return () => channel.close();
+    
+    channel.onmessage = (e) => handleState(e.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'memoria' && data.state) {
+        handleState({ ...data.state, type: 'memoria_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_MEMORIA);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channel.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   return (
-    <div className="w-screen h-screen bg-transparent overflow-hidden flex flex-col items-center justify-center p-8">
+    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {state.gameState === 'setup' && (
         <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
           <Camera size={48} className="text-cyan-400 mx-auto mb-2" />

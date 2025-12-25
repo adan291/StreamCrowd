@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings } from 'lucide-react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Ball {
   id: string;
@@ -20,6 +21,7 @@ interface Pocket {
 }
 
 const GAME_CHANNEL = 'pium_game_sync';
+const STORAGE_KEY_PIUM = 'pium_game_state';
 const FRICTION = 0.985;
 const POCKET_RADIUS = 24;
 const TABLE_COLOR = '#0a6b35';
@@ -27,15 +29,13 @@ const TABLE_FELT = '#0d7a3e';
 const BORDER_COLOR = '#4a2c1a';
 const WOOD_LIGHT = '#6b4423';
 const WOOD_DARK = '#3d2415';
-const OVERLAY_BG_COLORS = ['#00FF00', '#FF00FF', '#0000FF', '#000000', 'transparent'];
 
 // Source canvas dimensions (must match PiumGame)
 const SOURCE_WIDTH = 700;
 const SOURCE_HEIGHT = 380;
 
 export const PiumOverlay: React.FC = () => {
-  const [bgColor, setBgColor] = useState('#00FF00');
-  const [showSettings, setShowSettings] = useState(false);
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [scores, setScores] = useState<[string, number][]>([]);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +45,7 @@ export const PiumOverlay: React.FC = () => {
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
+    // BroadcastChannel for same-browser sync
     channelRef.current = new BroadcastChannel(GAME_CHANNEL);
     channelRef.current.onmessage = (event) => {
       if (event.data?.type === 'game_state') {
@@ -53,7 +54,40 @@ export const PiumOverlay: React.FC = () => {
         setScores(event.data.scores || []);
       }
     };
-    return () => channelRef.current?.close();
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'pium' && data.state) {
+        const state = data.state;
+        if (state.balls) ballsRef.current = state.balls;
+        if (state.cueBall) cueBallRef.current = state.cueBall;
+        if (state.scores) setScores(state.scores);
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_PIUM);
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data?.type === 'game_state') {
+            ballsRef.current = data.balls || [];
+            cueBallRef.current = data.cueBall || null;
+            setScores(data.scores || []);
+          }
+        }
+      } catch { /* ignore */ }
+    };
+    
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channelRef.current?.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Helper function to darken colors
@@ -373,28 +407,7 @@ export const PiumOverlay: React.FC = () => {
 
   return (
     <div className="w-screen h-screen overflow-hidden" style={{ backgroundColor: bgColor }}>
-      <button
-        onClick={() => setShowSettings(!showSettings)}
-        className="fixed top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg z-50"
-      >
-        <Settings size={18} />
-      </button>
-      
-      {showSettings && (
-        <div className="fixed top-12 right-2 bg-zinc-900 rounded-xl p-4 shadow-xl border border-zinc-700 z-50 w-48">
-          <p className="text-xs text-zinc-400 mb-2 font-bold">Chroma Key</p>
-          <div className="flex gap-1 flex-wrap">
-            {OVERLAY_BG_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setBgColor(color)}
-                className={`w-8 h-8 rounded border-2 ${bgColor === color ? 'border-white scale-110' : 'border-transparent'} ${color === 'transparent' ? 'bg-[conic-gradient(#666_25%,#888_25%_50%,#666_50%_75%,#888_75%)] bg-[length:8px_8px]' : ''}`}
-                style={{ backgroundColor: color === 'transparent' ? undefined : color }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      <OverlayChromaKey {...chromaKeyProps} />
       
       <canvas ref={canvasRef} className="w-full h-full" />
       

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, ExternalLink, Trash2, Volume2, VolumeX, Trophy, RotateCcw } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
+
+const STORAGE_KEY_PIUM = 'pium_game_state';
 
 interface Ball {
   id: string;
@@ -106,13 +110,22 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({ 
+    const state = { 
       type: 'game_state', 
       balls: ballsRef.current.filter(b => !b.pocketed),
       cueBall: cueBallRef.current,
       scores: Array.from(scores.entries()),
       pockets: getPockets()
-    });
+    };
+    
+    // Sync via BroadcastChannel (same browser)
+    channelRef.current?.postMessage(state);
+    
+    // Also save to localStorage for cross-browser (OBS)
+    try {
+      localStorage.setItem(STORAGE_KEY_PIUM, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('pium', state).catch(() => {});
   }, [scores, getPockets]);
 
   // Get spawn position for new balls (random but on right side of cue ball)
@@ -666,6 +679,8 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
         >
           <ExternalLink size={16} /> Overlay
         </button>
+        
+        <OBSOverlayUrl overlayParam="overlayPium" title="el billar" />
       </div>
 
       {/* Shot controls */}

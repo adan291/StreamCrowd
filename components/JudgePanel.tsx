@@ -15,7 +15,6 @@ import {
   Crown,
   Medal,
   Upload,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
   Check,
@@ -41,6 +40,8 @@ import {
 } from '../types';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
+import { judgePanelSync } from '../services/firebaseSync';
 
 // Constants
 const JUDGE_PANEL_CHANNEL = 'judge_panel_sync';
@@ -117,9 +118,11 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
   const [newJudgeName, setNewJudgeName] = useState('');
   const [editingCriterionId, setEditingCriterionId] = useState<string | null>(null);
   const [editingJudgeId, setEditingJudgeId] = useState<string | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
+  const [winnerId, setWinnerId] = useState<string | null>(null);
   
   // Overlay settings
-  const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
+  const [overlayBgColor, setOverlayBgColor] = useState('transparent');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlaySize, setOverlaySize] = useState<'normal' | 'large'>('large');
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
@@ -178,9 +181,68 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
     };
   }, []);
 
+  // Refs for isFinished and winnerId to use in syncState
+  const isFinishedRef = useRef(false);
+  const winnerIdRef = useRef<string | null>(null);
+  
+  // Keep refs in sync
+  useEffect(() => {
+    isFinishedRef.current = isFinished;
+    winnerIdRef.current = winnerId;
+  }, [isFinished, winnerId]);
+
   // Sync state to other instances
   const syncState = useCallback(() => {
-    channelRef.current?.postMessage({ type: 'state_sync', state: stateRef.current });
+    const currentState = stateRef.current;
+    
+    // Sync via BroadcastChannel (same browser)
+    channelRef.current?.postMessage({ type: 'state_sync', state: currentState, isFinished: isFinishedRef.current, winnerId: winnerIdRef.current });
+    
+    // Sync via Firebase (OBS Browser Source)
+    // Note: Firebase doesn't accept undefined values, so we convert them to null
+    judgePanelSync.update({
+      title: currentState.config.title,
+      contestants: currentState.config.contestants.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        image: c.image || null,
+        voteKey: c.voteKey || null
+      })),
+      judges: currentState.config.judges.map(j => ({
+        id: j.id,
+        username: j.username,
+        color: j.color
+      })),
+      criteria: currentState.config.criteria.map(cr => ({
+        id: cr.id,
+        name: cr.name,
+        minScore: cr.minScore,
+        maxScore: cr.maxScore,
+        weight: cr.weight
+      })),
+      scores: currentState.scores.map(s => ({
+        judgeId: s.judgeId,
+        contestantId: s.contestantId,
+        criterionId: s.criterionId,
+        score: s.score
+      })),
+      publicVotes: currentState.publicVotes.map(v => ({
+        oderId: v.oderId,
+        contestantId: v.contestantId
+      })),
+      publicVotingActive: currentState.publicVotingActive,
+      publicVotingTimeLeft: currentState.publicVotingTimeLeft ?? null,
+      publicVotingEnabled: currentState.config.publicVotingEnabled,
+      publicVoteWeight: currentState.config.publicVoteWeight,
+      revealScoresLive: currentState.config.revealScoresLive,
+      showJudgeNames: currentState.config.showJudgeNames,
+      revealedContestants: currentState.revealedContestants,
+      isActive: currentState.config.isActive,
+      isFinished: isFinishedRef.current,
+      winnerId: winnerIdRef.current,
+      updatedAt: Date.now()
+    }).catch(err => console.error('Firebase judgePanel sync error:', err));
   }, []);
 
   // Auto-add main channel streamer as default judge
@@ -560,6 +622,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
   };
 
   const startTournament = () => {
+    // Reset finished state first
+    setIsFinished(false);
+    setWinnerId(null);
+    
     setState(prev => {
       // Apply defaults: prefix "+" if empty, voteKey "1", "2", "3"... if empty
       const finalPrefix = prev.config.publicVotePrefix || '+';
@@ -584,22 +650,53 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
     });
     processedVotesRef.current.clear();
     setShowConfig(false);
-    syncState();
+    // Sync after state updates with delay to ensure refs are updated
+    setTimeout(() => syncState(), 100);
   };
 
-  const stopTournament = () => {
+  const finishTournament = () => {
+    // Calculate winner based on results
+    if (results.length > 0) {
+      const winner = results[0]; // Already sorted by finalScore
+      setWinnerId(winner.contestant.id);
+    }
+    setIsFinished(true);
     setState(prev => ({
       ...prev,
       config: { ...prev.config, isActive: false, endTime: Date.now() }
     }));
-    syncState();
+    // Need to sync after state updates
+    setTimeout(() => syncState(), 50);
   };
 
   const resetTournament = () => {
     setState(createDefaultState());
     processedVotesRef.current.clear();
     setShowConfig(true);
-    syncState();
+    setIsFinished(false);
+    setWinnerId(null);
+    // Sync reset state to Firebase immediately
+    setTimeout(() => {
+      judgePanelSync.update({
+        title: 'Panel de Jueces',
+        contestants: [],
+        judges: [],
+        criteria: [],
+        scores: [],
+        publicVotes: [],
+        publicVotingActive: false,
+        publicVotingTimeLeft: null,
+        publicVotingEnabled: false,
+        publicVoteWeight: 0.3,
+        revealScoresLive: true,
+        showJudgeNames: true,
+        revealedContestants: [],
+        isActive: false,
+        isFinished: false,
+        winnerId: null,
+        updatedAt: Date.now()
+      }).catch(err => console.error('Firebase reset sync error:', err));
+    }, 50);
   };
 
   const startPublicVoting = () => {
@@ -631,15 +728,6 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
       revealedContestants: prev.config.contestants.map(c => c.id)
     }));
     syncState();
-  };
-
-  const openOverlayWindow = () => {
-    const width = 800;
-    const height = 600;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    window.open(`${baseUrl}?overlayJudgePanel=true`, 'JudgePanelOverlay', `width=${width},height=${height},left=${left},top=${top}`);
   };
 
   // Get score for display (respects reveal mode only in overlay)
@@ -705,6 +793,49 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
 
   // Overlay Mode - Solo visualización
   if (isOverlayMode) {
+    // Clean body background for true transparency in OBS
+    useEffect(() => {
+      document.body.style.background = 'transparent';
+      document.body.classList.remove('bg-dot-pattern-light', 'bg-dot-pattern', 'dark:bg-dot-pattern');
+      document.documentElement.style.background = 'transparent';
+      return () => {
+        document.body.style.background = '';
+        document.documentElement.style.background = '';
+      };
+    }, []);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    useEffect(() => {
+      const unsubscribeFirebase = judgePanelSync.subscribe((data) => {
+        if (data) {
+          setState(prev => ({
+            ...prev,
+            config: {
+              ...prev.config,
+              title: data.title || prev.config.title,
+              contestants: data.contestants || [],
+              judges: data.judges || [],
+              criteria: data.criteria || [],
+              publicVotingEnabled: data.publicVotingEnabled ?? false,
+              publicVoteWeight: data.publicVoteWeight ?? 0.3,
+              revealScoresLive: data.revealScoresLive ?? true,
+              showJudgeNames: data.showJudgeNames ?? true,
+              isActive: data.isActive ?? false,
+            },
+            scores: data.scores || [],
+            publicVotes: (data.publicVotes || []).map(v => ({ ...v, odername: '', timestamp: Date.now() })),
+            publicVotingActive: data.publicVotingActive ?? false,
+            publicVotingTimeLeft: data.publicVotingTimeLeft ?? undefined,
+            revealedContestants: data.revealedContestants || [],
+          }));
+          setIsFinished(data.isFinished ?? false);
+          setWinnerId(data.winnerId ?? null);
+        }
+      });
+      
+      return () => unsubscribeFirebase();
+    }, []);
+    
     const getOverlayTextSize = () => overlaySize === 'normal' ? 'text-base' : 'text-lg';
     const getOverlayTitleSize = () => overlaySize === 'normal' ? 'text-2xl' : 'text-4xl';
     const getOverlayScoreSize = () => overlaySize === 'normal' ? 'text-lg' : 'text-2xl';
@@ -759,91 +890,196 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
           </div>
         )}
 
+        {/* Winner Screen - Shows when tournament is finished */}
+        {isFinished && winnerId && (
+          <div className="fixed inset-0 flex items-center justify-center z-40" style={{ backgroundColor: overlayBgColor }}>
+            <div className="text-center animate-fade-in">
+              {/* Confetti effect */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {[...Array(30)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="absolute w-3 h-3 animate-confetti"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      top: '-20px',
+                      backgroundColor: ['#fbbf24', '#a855f7', '#3b82f6', '#22c55e', '#ef4444', '#f97316'][i % 6],
+                      animationDelay: `${Math.random() * 2}s`,
+                      animationDuration: `${2 + Math.random() * 2}s`,
+                      borderRadius: Math.random() > 0.5 ? '50%' : '0',
+                    }}
+                  />
+                ))}
+              </div>
+              
+              <Trophy className="text-yellow-400 mx-auto mb-4 animate-bounce" size={overlaySize === 'large' ? 100 : 70} />
+              <h2 className={`${overlaySize === 'large' ? 'text-5xl' : 'text-3xl'} font-black text-yellow-400 mb-6`}>
+                ¡GANADOR!
+              </h2>
+              
+              {(() => {
+                const winnerResult = results.find(r => r.contestant.id === winnerId);
+                if (!winnerResult) return null;
+                return (
+                  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-3xl p-8 border-2 border-yellow-400">
+                    <div className="flex items-center justify-center gap-6 mb-4">
+                      {winnerResult.contestant.image ? (
+                        <img src={winnerResult.contestant.image} alt="" className={`${overlaySize === 'large' ? 'w-32 h-32' : 'w-20 h-20'} rounded-2xl object-cover border-4 border-yellow-400`} />
+                      ) : (
+                        <div className={`${overlaySize === 'large' ? 'w-32 h-32 text-5xl' : 'w-20 h-20 text-3xl'} rounded-2xl flex items-center justify-center font-bold border-4 border-yellow-400`} style={{ backgroundColor: winnerResult.contestant.color, color: '#fff' }}>
+                          {winnerResult.contestant.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <h3 className={`${overlaySize === 'large' ? 'text-6xl' : 'text-4xl'} font-black mb-4`} style={{ color: overlayTextColor }}>
+                      {winnerResult.contestant.name}
+                    </h3>
+                    <div className={`${overlaySize === 'large' ? 'text-3xl' : 'text-xl'} font-bold text-yellow-400`}>
+                      {winnerResult.finalScore.toFixed(1)} puntos
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Normal content - hidden when showing winner */}
+        {!isFinished && (
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             <h1 className={`${getOverlayTitleSize()} font-black mb-2 flex items-center justify-center gap-3`} style={{ color: overlayTextColor }}>
               <Trophy className="text-yellow-400" size={overlaySize === 'normal' ? 30 : 40} />
-              {state.config.title}
+              {state.config.title || 'Panel de Jueces'}
             </h1>
             {state.publicVotingActive && (
               <div className="inline-flex items-center gap-2 bg-green-500/20 text-green-400 px-4 py-2 rounded-full">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                 Votación pública activa
-                {state.publicVotingTimeLeft !== undefined && (
+                {state.publicVotingTimeLeft !== undefined && state.publicVotingTimeLeft !== null && (
                   <span className="font-mono font-bold">{state.publicVotingTimeLeft}s</span>
                 )}
               </div>
             )}
+            {/* Show if scores are hidden */}
+            {!state.config.revealScoresLive && (
+              <div className="inline-flex items-center gap-2 bg-zinc-700/50 text-zinc-400 px-4 py-2 rounded-full mt-2">
+                <EyeOff size={16} />
+                Puntuaciones ocultas
+              </div>
+            )}
           </div>
 
-          {/* Results Table */}
+          {/* Waiting message if no contestants */}
+          {state.config.contestants.length === 0 ? (
+            <div className="text-center bg-black/50 rounded-2xl px-10 py-8">
+              <Gavel className="text-yellow-400 mx-auto mb-3" size={overlaySize === 'large' ? 64 : 48} />
+              <p className={`${overlaySize === 'large' ? 'text-2xl' : 'text-xl'}`} style={{ color: overlayTextColor, opacity: 0.7 }}>Esperando concursantes...</p>
+              <p className="text-zinc-500 text-sm mt-2">Configura el panel en la aplicación principal</p>
+            </div>
+          ) : (
+          /* Results Table with Criteria columns */
           <div className="bg-zinc-800/80 backdrop-blur rounded-2xl overflow-hidden border border-zinc-700">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-zinc-900/50">
-                  <th className={`p-4 text-left font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>#</th>
-                  <th className={`p-4 text-left font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>Concursante</th>
-                  {state.config.judges.map(judge => (
-                    <th key={judge.id} className={`p-4 text-center font-bold ${getOverlayTextSize()}`} style={{ color: judge.color }}>
-                      {state.config.showJudgeNames ? judge.username : <Gavel size={16} className="mx-auto" />}
-                    </th>
-                  ))}
-                  {state.config.publicVotingEnabled && (
-                    <th className={`p-4 text-center font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>
-                      <Users size={16} className="mx-auto" />
-                    </th>
-                  )}
-                  <th className={`p-4 text-center font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((result, index) => (
-                  <tr 
-                    key={result.contestant.id} 
-                    className={`border-t border-zinc-700/50 ${index === 0 ? 'bg-yellow-500/10' : ''}`}
-                  >
-                    <td className="p-4">{renderRankBadge(result.rank)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        {result.contestant.image ? (
-                          <img src={result.contestant.image} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold" style={{ backgroundColor: result.contestant.color }}>
-                            {result.contestant.name.charAt(0)}
-                          </div>
-                        )}
-                        <span className={`font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>{result.contestant.name}</span>
-                      </div>
-                    </td>
-                    {result.judgeScores.map(js => (
-                      <td key={js.judge.id} className="p-4 text-center">
-                        {isScoreRevealed(result.contestant.id, true) ? (
-                          <span className={`font-mono font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>{js.total > 0 ? js.total : '-'}</span>
-                        ) : (
-                          <span className="text-zinc-600">?</span>
-                        )}
-                      </td>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-900/50">
+                    <th className={`p-3 text-left font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>#</th>
+                    <th className={`p-3 text-left font-bold ${getOverlayTextSize()}`} style={{ color: overlayTextColor }}>Concursante</th>
+                    {/* Criteria columns */}
+                    {state.config.criteria.map(criterion => (
+                      <th key={criterion.id} className={`p-3 text-center font-bold text-sm`} style={{ color: overlayTextColor, opacity: 0.8 }}>
+                        <div className="flex flex-col items-center">
+                          <span className="truncate max-w-[80px]" title={criterion.name}>{criterion.name}</span>
+                          {criterion.weight !== 1 && <span className="text-xs text-zinc-500">x{criterion.weight}</span>}
+                        </div>
+                      </th>
                     ))}
                     {state.config.publicVotingEnabled && (
-                      <td className="p-4 text-center">
-                        <span className="text-cyan-400 font-bold">{result.publicVotes}</span>
-                        <span className="text-zinc-500 text-xs ml-1">({result.publicPercentage.toFixed(0)}%)</span>
-                      </td>
+                      <th className={`p-3 text-center text-cyan-400 font-bold ${getOverlayTextSize()}`}>
+                        <Users size={16} className="mx-auto mb-1" />
+                        <span className="text-xs">Público</span>
+                      </th>
                     )}
-                    <td className="p-4 text-center">
-                      {isScoreRevealed(result.contestant.id, true) ? (
-                        <span className={`${getOverlayScoreSize()} font-black text-twitch-light`}>{result.finalScore.toFixed(1)}</span>
-                      ) : (
-                        <span className={`text-zinc-600 ${getOverlayScoreSize()}`}>?</span>
-                      )}
-                    </td>
+                    <th className={`p-3 text-center text-twitch-light font-bold ${getOverlayTextSize()}`}>Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {results.map((result, index) => {
+                    // Check if scores should be shown (revealScoresLive OR contestant is revealed)
+                    const showScores = state.config.revealScoresLive || state.revealedContestants.includes(result.contestant.id);
+                    
+                    return (
+                    <tr 
+                      key={result.contestant.id} 
+                      className={`border-t border-zinc-700/50 ${index === 0 && showScores ? 'bg-yellow-500/10' : ''}`}
+                    >
+                      <td className="p-3">{renderRankBadge(result.rank)}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {result.contestant.image ? (
+                            <img src={result.contestant.image} alt="" className={`${overlaySize === 'large' ? 'w-10 h-10' : 'w-8 h-8'} rounded-lg object-cover`} />
+                          ) : (
+                            <div 
+                              className={`${overlaySize === 'large' ? 'w-10 h-10 text-lg' : 'w-8 h-8 text-sm'} rounded-lg flex items-center justify-center text-white font-bold`} 
+                              style={{ backgroundColor: result.contestant.color }}
+                            >
+                              {result.contestant.name.charAt(0)}
+                            </div>
+                          )}
+                          <span className={`font-bold ${overlaySize === 'large' ? 'text-lg' : 'text-base'}`} style={{ color: overlayTextColor }}>
+                            {result.contestant.name}
+                          </span>
+                        </div>
+                      </td>
+                      {/* Criterion scores - average across all judges */}
+                      {state.config.criteria.map(criterion => {
+                        // Get all scores for this criterion from all judges
+                        const allScores = result.judgeScores.flatMap(js => 
+                          js.scores.filter(s => s.criterion.id === criterion.id).map(s => s.score)
+                        ).filter(s => s !== null) as number[];
+                        
+                        const avgScore = allScores.length > 0 
+                          ? allScores.reduce((a, b) => a + b, 0) / allScores.length 
+                          : null;
+                        
+                        return (
+                          <td key={criterion.id} className="p-3 text-center">
+                            {showScores ? (
+                              <span className={`font-bold ${overlaySize === 'large' ? 'text-xl' : 'text-lg'}`} style={{ color: overlayTextColor }}>
+                                {avgScore !== null ? avgScore.toFixed(1) : '-'}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-600 text-xl">?</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      {state.config.publicVotingEnabled && (
+                        <td className="p-3 text-center">
+                          <span className={`text-cyan-400 font-bold ${overlaySize === 'large' ? 'text-lg' : 'text-base'}`}>{result.publicVotes}</span>
+                          <span className="text-zinc-500 text-xs ml-1">({result.publicPercentage.toFixed(0)}%)</span>
+                        </td>
+                      )}
+                      <td className="p-3 text-center">
+                        {showScores ? (
+                          <span className={`${overlaySize === 'large' ? 'text-2xl' : 'text-xl'} font-black text-twitch-light`}>
+                            {result.finalScore.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className={`text-zinc-600 ${overlaySize === 'large' ? 'text-2xl' : 'text-xl'}`}>?</span>
+                        )}
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </div>
           </div>
+          )}
         </div>
+        )}
       </div>
     );
   }
@@ -862,9 +1098,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
       </h2>
       <p className="text-zinc-400 text-center text-sm mb-4">Sistema de puntuación con jueces y votación pública</p>
 
-      <button onClick={openOverlayWindow} className="w-full mb-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-500/80 hover:to-orange-500/80 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 text-sm">
-        <ExternalLink size={16} /> Abrir Overlay para OBS
-      </button>
+      <OBSOverlayUrl overlayParam="overlayJudgePanel" title="el panel de jueces" />
 
       {/* Config Toggle */}
       <button 
@@ -1310,10 +1544,13 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-sm text-white flex items-center gap-2">
                 {state.config.revealScoresLive ? <Eye size={14} /> : <EyeOff size={14} />}
-                Mostrar puntuaciones en tiempo real
+                Mostrar puntuaciones en overlay
               </label>
               <button
-                onClick={() => setState(prev => ({ ...prev, config: { ...prev.config, revealScoresLive: !prev.config.revealScoresLive } }))}
+                onClick={() => {
+                  setState(prev => ({ ...prev, config: { ...prev.config, revealScoresLive: !prev.config.revealScoresLive } }));
+                  setTimeout(() => syncState(), 50);
+                }}
                 className={`w-10 h-5 rounded-full transition-colors ${state.config.revealScoresLive ? 'bg-green-500' : 'bg-zinc-600'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state.config.revealScoresLive ? 'translate-x-5' : 'translate-x-0.5'}`} />
@@ -1343,8 +1580,8 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
             </div>
           ) : (
             <>
-              <button onClick={stopTournament} className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all">
-                <Pause size={20} /> Detener
+              <button onClick={finishTournament} className="flex-1 flex items-center justify-center gap-2 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-xl transition-all">
+                <Trophy size={20} /> Finalizar
               </button>
               {state.config.publicVotingEnabled && (
                 state.publicVotingActive ? (
@@ -1387,18 +1624,19 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                   <tr className="bg-zinc-900/50">
                     <th className="p-3 text-left text-zinc-400 font-bold">#</th>
                     <th className="p-3 text-left text-zinc-400 font-bold">Concursante</th>
-                    {state.config.judges.map(judge => (
-                      <th key={judge.id} className="p-3 text-center font-bold" style={{ color: judge.color }}>
-                        {judge.username}
+                    {/* Criteria columns */}
+                    {state.config.criteria.map(criterion => (
+                      <th key={criterion.id} className="p-3 text-center text-zinc-400 font-bold text-xs">
+                        <div className="flex flex-col items-center">
+                          <span className="truncate max-w-[60px]" title={criterion.name}>{criterion.name}</span>
+                          {criterion.weight !== 1 && <span className="text-zinc-500 text-[10px]">x{criterion.weight}</span>}
+                        </div>
                       </th>
                     ))}
                     {state.config.publicVotingEnabled && (
                       <th className="p-3 text-center text-cyan-400 font-bold">Público</th>
                     )}
                     <th className="p-3 text-center text-twitch-light font-bold">Total</th>
-                    {!state.config.revealScoresLive && (
-                      <th className="p-3 text-center text-zinc-400 font-bold">Revelar</th>
-                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -1417,24 +1655,24 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                           <span className="text-white font-medium">{result.contestant.name}</span>
                         </div>
                       </td>
-                      {result.judgeScores.map(js => (
-                        <td key={js.judge.id} className="p-3 text-center">
-                          {isScoreRevealed(result.contestant.id) ? (
-                            <div className="flex flex-col items-center">
-                              <span className="text-white font-bold">{js.total > 0 ? js.total : '-'}</span>
-                              <div className="flex gap-1 mt-1">
-                                {js.scores.map(s => (
-                                  <span key={s.criterion.id} className="text-[10px] text-zinc-500" title={s.criterion.name}>
-                                    {s.score ?? '-'}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-zinc-600">?</span>
-                          )}
-                        </td>
-                      ))}
+                      {/* Criterion scores - average across all judges */}
+                      {state.config.criteria.map(criterion => {
+                        const allScores = result.judgeScores.flatMap(js => 
+                          js.scores.filter(s => s.criterion.id === criterion.id).map(s => s.score)
+                        ).filter(s => s !== null) as number[];
+                        
+                        const avgScore = allScores.length > 0 
+                          ? allScores.reduce((a, b) => a + b, 0) / allScores.length 
+                          : null;
+                        
+                        return (
+                          <td key={criterion.id} className="p-3 text-center">
+                            <span className="text-white font-bold">
+                              {avgScore !== null ? avgScore.toFixed(1) : '-'}
+                            </span>
+                          </td>
+                        );
+                      })}
                       {state.config.publicVotingEnabled && (
                         <td className="p-3 text-center">
                           <span className="text-cyan-400 font-bold">{result.publicVotes}</span>
@@ -1442,36 +1680,13 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                         </td>
                       )}
                       <td className="p-3 text-center">
-                        {isScoreRevealed(result.contestant.id) ? (
-                          <span className="text-xl font-black text-twitch-light">{result.finalScore.toFixed(1)}</span>
-                        ) : (
-                          <span className="text-zinc-600 text-xl">?</span>
-                        )}
+                        <span className="text-xl font-black text-twitch-light">{result.finalScore.toFixed(1)}</span>
                       </td>
-                      {!state.config.revealScoresLive && (
-                        <td className="p-3 text-center">
-                          {!state.revealedContestants.includes(result.contestant.id) ? (
-                            <button onClick={() => revealContestant(result.contestant.id)} className="p-2 bg-twitch-brand/20 hover:bg-twitch-brand/40 text-twitch-light rounded-lg">
-                              <Eye size={16} />
-                            </button>
-                          ) : (
-                            <Check size={16} className="text-green-400 mx-auto" />
-                          )}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            
-            {!state.config.revealScoresLive && state.config.contestants.length > 0 && (
-              <div className="p-3 border-t border-zinc-700/50 flex justify-end">
-                <button onClick={revealAll} className="px-4 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg flex items-center gap-2 text-sm font-bold">
-                  <Sparkles size={16} /> Revelar Todos
-                </button>
-              </div>
-            )}
           </div>
         )}
 

@@ -1,0 +1,129 @@
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, onValue, off, DatabaseReference } from 'firebase/database';
+
+const firebaseConfig = {
+  apiKey: "REDACTED_FIREBASE_API_KEY",
+  authDomain: "twtich-vote-live.firebaseapp.com",
+  databaseURL: "https://twtich-vote-live-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "twtich-vote-live",
+  storageBucket: "twtich-vote-live.firebasestorage.app",
+  messagingSenderId: "779005710594",
+  appId: "1:779005710594:web:8df44b0c02a57fc262b21b",
+  measurementId: "G-TJZ968LQPC"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
+
+// Tipos para el estado sincronizado
+export interface SyncedOverlayState {
+  poll?: {
+    question: string;
+    options: Array<{ text: string; votes: number; color: string }>;
+    isActive: boolean;
+    showResults: boolean;
+    totalVotes: number;
+    updatedAt: number;
+  };
+  countdown?: {
+    endTime: number;
+    label: string;
+    isActive: boolean;
+    updatedAt: number;
+  };
+  giveaway?: {
+    winner: string | null;
+    isSpinning: boolean;
+    displayName: string;
+    participants: string[];
+    updatedAt: number;
+  };
+  judgePanel?: {
+    title: string;
+    contestants: Array<{ id: string; name: string; color: string; image?: string | null; voteKey?: string | null }>;
+    judges: Array<{ id: string; username: string; color: string }>;
+    criteria: Array<{ id: string; name: string; minScore: number; maxScore: number; weight: number }>;
+    scores: Array<{ judgeId: string; contestantId: string; criterionId: string; score: number }>;
+    publicVotes: Array<{ oderId: string; contestantId: string }>;
+    publicVotingActive: boolean;
+    publicVotingTimeLeft?: number | null;
+    publicVotingEnabled: boolean;
+    publicVoteWeight: number;
+    revealScoresLive: boolean;
+    showJudgeNames: boolean;
+    revealedContestants: string[];
+    isActive: boolean;
+    isFinished: boolean;
+    winnerId: string | null;
+    updatedAt: number;
+  };
+  game?: {
+    type: string;
+    state: any;
+    updatedAt: number;
+  };
+}
+
+// Escribir estado a Firebase
+export async function syncState(path: string, data: any): Promise<void> {
+  try {
+    const dbRef = ref(database, `overlays/${path}`);
+    await set(dbRef, {
+      ...data,
+      updatedAt: Date.now()
+    });
+  } catch (error) {
+    console.error('Error syncing to Firebase:', error);
+    throw error;
+  }
+}
+
+// Escuchar cambios en tiempo real
+export function subscribeToState<T>(
+  path: string, 
+  callback: (data: T | null) => void
+): () => void {
+  const dbRef = ref(database, `overlays/${path}`);
+  
+  onValue(dbRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(data as T | null);
+  });
+
+  // Retorna función para cancelar suscripción
+  return () => off(dbRef);
+}
+
+// Helpers específicos para cada tipo de overlay
+export const pollSync = {
+  update: (data: SyncedOverlayState['poll']) => syncState('poll', data),
+  subscribe: (callback: (data: SyncedOverlayState['poll'] | null) => void) => 
+    subscribeToState<SyncedOverlayState['poll']>('poll', callback)
+};
+
+export const countdownSync = {
+  update: (data: Omit<NonNullable<SyncedOverlayState['countdown']>, 'updatedAt'>) => syncState('countdown', data),
+  subscribe: (callback: (data: SyncedOverlayState['countdown'] | null) => void) => 
+    subscribeToState<SyncedOverlayState['countdown']>('countdown', callback)
+};
+
+export const giveawaySync = {
+  update: (data: SyncedOverlayState['giveaway']) => syncState('giveaway', data),
+  subscribe: (callback: (data: SyncedOverlayState['giveaway'] | null) => void) => 
+    subscribeToState<SyncedOverlayState['giveaway']>('giveaway', callback)
+};
+
+export const judgePanelSync = {
+  update: (data: SyncedOverlayState['judgePanel']) => syncState('judgePanel', data),
+  subscribe: (callback: (data: SyncedOverlayState['judgePanel'] | null) => void) => 
+    subscribeToState<SyncedOverlayState['judgePanel']>('judgePanel', callback)
+};
+
+export const gameSync = {
+  update: (type: string, state: any) => syncState('game', { type, state }),
+  subscribe: (callback: (data: SyncedOverlayState['game'] | null) => void) => 
+    subscribeToState<SyncedOverlayState['game']>('game', callback)
+};
+
+export { database };

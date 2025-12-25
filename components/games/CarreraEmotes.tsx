@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Upload, Loader2, Sparkles } from 'lucide-react';
 import { twitchService } from '../../services/twitchService';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Racer {
   id: string;
@@ -20,6 +22,7 @@ interface CarreraEmotesProps {
 }
 
 const GAME_CHANNEL = 'carrera_emotes_sync';
+const STORAGE_KEY_CARRERA = 'carrera_emotes_state';
 const DEFAULT_EMOTES = ['🐎', '🦄', '🐢', '🐇', '🦊', '🐼'];
 const SAVED_EMOTES_KEY = 'carrera_saved_emotes';
 
@@ -240,13 +243,18 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
   }, [propChannelName]);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'carrera_state',
       gameState,
       racers,
       winner,
       timeLeft
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_CARRERA, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('carrera', state).catch(() => {});
   }, [gameState, racers, winner, timeLeft]);
 
   useEffect(() => { syncToOverlay(); }, [syncToOverlay]);
@@ -569,6 +577,7 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
           </button>
         </div>
       </div>
+      <OBSOverlayUrl overlayParam="overlayCarrera" title="la carrera de emotes" />
 
       {gameState === 'setup' && (
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">

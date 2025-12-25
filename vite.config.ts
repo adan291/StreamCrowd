@@ -18,6 +18,43 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['ai-vision-icon.svg', 'ai-vision-icon.png', 'ai-vision-icon.ico'],
+        devOptions: {
+          enabled: false
+        },
+        workbox: {
+          // Limpiar caches viejos automáticamente
+          cleanupOutdatedCaches: true,
+          // No pre-cachear archivos JS para evitar problemas de versiones
+          globPatterns: ['**/*.{css,html,ico,png,svg,woff2}'],
+          // Saltar waiting y activar inmediatamente
+          skipWaiting: true,
+          clientsClaim: true,
+          runtimeCaching: [
+            {
+              // JS files - Network first para siempre tener la última versión
+              urlPattern: /\.js$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'js-cache',
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 // 1 día
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/static-cdn\.jtvnw\.net\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'twitch-images',
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+                }
+              }
+            }
+          ]
+        },
         manifest: {
           name: 'TwitchVote Live',
           short_name: 'TwitchVote',
@@ -51,22 +88,6 @@ export default defineConfig(({ mode }) => {
               description: 'Crear una nueva encuesta',
               url: '/',
               icons: [{ src: 'ai-vision-icon.png', sizes: '192x192' }]
-            }
-          ]
-        },
-        workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/static-cdn\.jtvnw\.net\/.*/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'twitch-images',
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-                }
-              }
             }
           ]
         }

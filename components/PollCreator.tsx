@@ -11,6 +11,7 @@ import { LivePoll } from './LivePoll';
 import { ModerationConfigForm } from './ModerationConfigForm';
 import { useI18n } from '../i18n';
 import { TwitchMessage } from '../types';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
@@ -932,6 +933,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                  <span className="ml-2 text-[10px] opacity-60 hidden sm:inline bg-white/20 px-1.5 py-0.5 rounded">Ctrl+↵</span>
                </Button>
              </Tooltip>
+             
+             <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
           </div>
         </form>
       </div>

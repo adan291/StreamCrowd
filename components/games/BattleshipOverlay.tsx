@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Ship {
   id: string;
@@ -35,6 +37,7 @@ interface BattleshipState {
 }
 
 const GAME_CHANNEL = 'battleship_sync';
+const STORAGE_KEY_BATTLESHIP = 'battleship_state';
 const GRID_SIZE = 10;
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 const SHIPS_CONFIG = [
@@ -46,6 +49,7 @@ const SHIPS_CONFIG = [
 ];
 
 export const BattleshipOverlay: React.FC = () => {
+  const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<BattleshipState>({
     gameState: 'setup',
     grid: null,
@@ -61,21 +65,44 @@ export const BattleshipOverlay: React.FC = () => {
   useEffect(() => {
     channelRef.current = new BroadcastChannel(GAME_CHANNEL);
     
-    channelRef.current.onmessage = (event) => {
-      if (event.data.type === 'battleship_state') {
+    const handleState = (data: any) => {
+      if (data.type === 'battleship_state') {
         setState({
-          gameState: event.data.gameState,
-          grid: event.data.grid,
-          ships: event.data.ships || [],
-          shots: event.data.shots || [],
-          lastShot: event.data.lastShot,
-          shipsRemaining: event.data.shipsRemaining,
-          leaderboard: event.data.leaderboard || []
+          gameState: data.gameState,
+          grid: data.grid,
+          ships: data.ships || [],
+          shots: data.shots || [],
+          lastShot: data.lastShot,
+          shipsRemaining: data.shipsRemaining,
+          leaderboard: data.leaderboard || []
         });
       }
     };
     
-    return () => channelRef.current?.close();
+    channelRef.current.onmessage = (event) => handleState(event.data);
+    
+    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
+    const unsubscribeFirebase = gameSync.subscribe((data) => {
+      if (data && data.type === 'battleship' && data.state) {
+        handleState({ ...data.state, type: 'battleship_state' });
+      }
+    });
+    
+    // Also poll localStorage for legacy support
+    const loadFromStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_BATTLESHIP);
+        if (stored) handleState(JSON.parse(stored));
+      } catch { /* ignore */ }
+    };
+    loadFromStorage();
+    const pollInterval = setInterval(loadFromStorage, 300);
+    
+    return () => {
+      channelRef.current?.close();
+      unsubscribeFirebase();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const { gameState, grid, ships, lastShot, shipsRemaining, leaderboard } = state;
@@ -83,8 +110,9 @@ export const BattleshipOverlay: React.FC = () => {
   // Waiting state
   if (gameState === 'setup' || !grid) {
     return (
-      <div className="h-screen w-screen bg-gradient-to-b from-blue-900 to-blue-950 flex items-center justify-center">
-        <div className="text-center">
+      <div className="h-screen w-screen flex items-center justify-center" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+        <OverlayChromaKey {...chromaKeyProps} />
+        <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-6">
           <div className="text-6xl mb-4">🚢</div>
           <p className="text-white text-2xl font-bold">Hundir la Flota</p>
           <p className="text-blue-300 text-lg mt-2">Preparando batalla...</p>
@@ -94,7 +122,8 @@ export const BattleshipOverlay: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen bg-gradient-to-b from-blue-900 to-blue-950 p-4 overflow-hidden">
+    <div className="h-screen w-screen p-4 overflow-hidden" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+      <OverlayChromaKey {...chromaKeyProps} />
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

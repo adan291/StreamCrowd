@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Skull, Heart, Sparkles } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface AhorcadoProps {
   chatMessages: TwitchMessage[];
@@ -8,6 +10,7 @@ interface AhorcadoProps {
 }
 
 const GAME_CHANNEL = 'ahorcado_sync';
+const STORAGE_KEY_AHORCADO = 'ahorcado_state';
 const MAX_ERRORS = 6;
 
 export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = true }) => {
@@ -47,7 +50,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
   };
 
   const syncToOverlay = () => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'ahorcado_state',
       gameState,
       displayWord: getDisplayWord(),
@@ -57,7 +60,12 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
       maxErrors: MAX_ERRORS,
       contributors: contributors.slice(-10),
       secretWord: gameState === 'won' || gameState === 'lost' ? secretWord : null
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_AHORCADO, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('ahorcado', state).catch(() => {});
   };
 
   useEffect(() => { syncToOverlay(); }, [gameState, guessedLetters, errors, contributors]);
@@ -205,6 +213,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
+        <OBSOverlayUrl overlayParam="overlayAhorcado" title="el ahorcado" />
       </div>
 
       {gameState === 'setup' && (

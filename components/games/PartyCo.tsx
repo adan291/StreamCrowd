@@ -6,6 +6,8 @@ import {
   Music, Brain, Zap, HelpCircle, Crown, Plus, Trash2
 } from 'lucide-react';
 import { loadAIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 // Tipos de pruebas del Party & Co
 type ChallengeType = 'trivia' | 'mimica' | 'dibujo' | 'palabras' | 'cultura' | 'rapidez';
@@ -36,6 +38,7 @@ interface PartyCoProps {
 }
 
 const GAME_CHANNEL = 'party_co_sync';
+const STORAGE_KEY_PARTYCO = 'party_co_state';
 const CUSTOM_CHALLENGES_KEY = 'party_co_custom_challenges';
 
 // Iconos por tipo de prueba
@@ -168,7 +171,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'party_co_state',
       gameState,
       currentChallenge,
@@ -179,7 +182,12 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
       roundNumber,
       topPlayers: sortedPlayers.slice(0, 10),
       pointsToWin
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_PARTYCO, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('partyco', state).catch(() => {});
   }, [gameState, currentChallenge, timeLeft, diceValue, isRolling, winner, roundNumber, sortedPlayers, pointsToWin]);
 
   useEffect(() => {
@@ -567,6 +575,7 @@ Responde SOLO con JSON:
           Overlay OBS
         </button>
       </div>
+      <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
 
       {/* Estado: Lobby */}
       {gameState === 'lobby' && (

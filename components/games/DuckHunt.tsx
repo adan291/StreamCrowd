@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, RotateCcw, Trophy, ExternalLink, Crosshair } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Duck {
   id: string;
@@ -22,6 +24,7 @@ interface DuckHuntProps {
 }
 
 const GAME_CHANNEL = 'duckhunt_sync';
+const STORAGE_KEY_DUCKHUNT = 'duckhunt_state';
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 400;
 const DUCK_SIZE = 40;
@@ -47,12 +50,17 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
   }, []);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'duckhunt_state',
       ducks: ducksRef.current,
       score,
       kills: kills.slice(-5)
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_DUCKHUNT, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('duckhunt', state).catch(() => {});
   }, [score, kills]);
 
   useEffect(() => {
@@ -402,8 +410,10 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
           <ExternalLink size={16} /> Overlay
         </button>
       </div>
+      
+      <OBSOverlayUrl overlayParam="overlayDuckHunt" title="el Duck Hunt" />
 
-      <div className="bg-zinc-800/50 rounded-xl p-3">
+      <div className="bg-zinc-800/50 rounded-xl p-3 mt-3">
         <p className="text-zinc-400 text-sm text-center">
           Viewers escriben <span className="text-yellow-400 font-bold">!pato</span> para aparecer instantáneamente
         </p>

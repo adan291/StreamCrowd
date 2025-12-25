@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Cell, Tooltip } from 'recharts';
 import { Poll, VoteRecord, PollOption, ModerationStats, ModerationLogEntry, calculateWeightedTotal } from '../types';
 import { Button } from './Button';
-import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale, ExternalLink } from 'lucide-react';
+import { StopCircle, RefreshCcw, Users, Target, CheckCircle2, Download, AlertTriangle, Trophy, Share2, Copy, Eye, Edit2, Save, X, Clock, Dices, FlaskConical, Shield, Scale } from 'lucide-react';
 import { ModerationStatsDisplay } from './ModerationStatsDisplay';
 import { ModerationLogViewer } from './ModerationLogViewer';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useI18n } from '../i18n';
 
 interface OverlayStyles {
@@ -963,41 +964,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
       {/* OBS Overlay Section */}
       {isDefault && poll.isActive && overlayWindowRef && !isSimulationMode && (
         <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 animate-fade-in" data-tour="overlay">
-          <div className="bg-gradient-to-r from-twitch-brand/10 to-purple-500/10 dark:from-twitch-brand/20 dark:to-purple-500/20 rounded-xl p-4 border border-twitch-brand/20">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-twitch-brand/20 rounded-lg text-twitch-brand dark:text-twitch-light shrink-0">
-                    <ExternalLink size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">{t.poll.obsOverlay}</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      {t.poll.obsHint}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleOpenOverlay}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-twitch-brand hover:bg-twitch-light text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors shadow-lg shadow-twitch-brand/20"
-                >
-                  <ExternalLink size={16} />
-                  Abrir Overlay
-                </button>
-              </div>
-              
-              {/* Mini Tutorial */}
-              <div className="bg-zinc-100 dark:bg-zinc-900/50 rounded-lg p-3 text-xs text-zinc-600 dark:text-zinc-400">
-                <p className="font-bold text-zinc-700 dark:text-zinc-300 mb-2">📋 Pasos rápidos:</p>
-                <ol className="list-decimal list-inside space-y-1 leading-relaxed">
-                  <li>Haz clic en <span className="font-semibold text-twitch-brand">"Abrir Overlay"</span></li>
-                  <li>En OBS: <span className="font-mono bg-zinc-200 dark:bg-zinc-800 px-1 rounded">+ → Window Capture</span> → selecciona la ventana del overlay</li>
-                  <li>Aplica filtro <span className="font-mono bg-green-200 dark:bg-green-900/50 text-green-700 dark:text-green-400 px-1 rounded">Chroma Key</span>: clic derecho en la fuente → Filtros → + → Chroma Key</li>
-                  <li>Selecciona el color verde del fondo y ajusta la similitud</li>
-                </ol>
-              </div>
-            </div>
-          </div>
+          <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
         </div>
       )}
     </div>

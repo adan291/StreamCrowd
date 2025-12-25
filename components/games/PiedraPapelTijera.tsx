@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Swords, Timer } from 'lucide-react';
+import { OBSOverlayUrl } from '../OBSOverlayUrl';
+import { gameSync } from '../../services/firebaseSync';
 
 interface Player {
   oderId: string;
@@ -17,6 +19,7 @@ interface PiedraPapelTijeraProps {
 }
 
 const GAME_CHANNEL = 'ppt_sync';
+const STORAGE_KEY_PPT = 'ppt_state';
 const CHOICES = ['piedra', 'papel', 'tijera'] as const;
 const EMOJIS = { piedra: '🪨', papel: '📄', tijera: '✂️' };
 
@@ -43,7 +46,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
   }, [players]);
 
   const syncToOverlay = useCallback(() => {
-    channelRef.current?.postMessage({
+    const state = {
       type: 'ppt_state',
       gameState,
       players: getActivePlayers(),
@@ -51,7 +54,12 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
       timeLeft,
       results: results.slice(-5),
       champion
-    });
+    };
+    channelRef.current?.postMessage(state);
+    try {
+      localStorage.setItem(STORAGE_KEY_PPT, JSON.stringify(state));
+    } catch { /* ignore */ }
+    gameSync.update('ppt', state).catch(() => {});
   }, [gameState, getActivePlayers, round, timeLeft, results, champion]);
 
   useEffect(() => { syncToOverlay(); }, [syncToOverlay]);
@@ -230,6 +238,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
             <ExternalLink size={16} /> Overlay
           </button>
         </div>
+        <OBSOverlayUrl overlayParam="overlayPPT" title="piedra papel tijera" />
       </div>
 
       {gameState === 'waiting' && (
