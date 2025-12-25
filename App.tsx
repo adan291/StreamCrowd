@@ -74,7 +74,97 @@ import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
+// Early overlay detection - runs before any hooks to prevent flash
+const getOverlayType = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  
+  if (params.get('overlayCountdown') === 'true') return 'countdown';
+  if (params.get('overlaySpinner') === 'true') return 'spinner';
+  if (params.get('overlayRandomWinner') === 'true') return 'randomWinner';
+  if (params.get('overlayJudgePanel') === 'true') return 'judgePanel';
+  if (params.get('overlayPium') === 'true') return 'pium';
+  if (params.get('overlayRoulette') === 'true') return 'roulette';
+  if (params.get('overlayFishing') === 'true') return 'fishing';
+  if (params.get('overlayPotato') === 'true') return 'potato';
+  if (params.get('overlayTrivia') === 'true') return 'trivia';
+  if (params.get('overlayBattleship') === 'true') return 'battleship';
+  if (params.get('overlayDuckHunt') === 'true') return 'duckHunt';
+  if (params.get('overlayVeoVeo') === 'true') return 'veoVeo';
+  if (params.get('overlayPPT') === 'true') return 'ppt';
+  if (params.get('overlayAhorcado') === 'true') return 'ahorcado';
+  if (params.get('overlayCarrera') === 'true') return 'carrera';
+  if (params.get('overlayMemoria') === 'true') return 'memoria';
+  if (params.get('overlayPartyCo') === 'true') return 'partyCo';
+  if (params.get('overlayPoll') === 'true') return 'poll';
+  if (params.get('overlay') === 'true') return 'legacyPoll';
+  
+  return null;
+};
+
+// Detect overlay type once at module level
+const OVERLAY_TYPE = getOverlayType();
+
+// Lightweight overlay router component - renders only the overlay without main app overhead
+const OverlayRouter: React.FC<{ type: string }> = ({ type }) => {
+  // Set document title for OBS identification
+  useEffect(() => {
+    document.title = '🎬 OVERLAY - Twitch Vote';
+  }, []);
+
+  switch (type) {
+    case 'countdown':
+      return <Countdown onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+    case 'spinner':
+      return <SpinnerWheel options={[
+        { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+        { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+        { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+      ]} onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+    case 'randomWinner':
+      return <RandomWinnerOverlay chatMessages={[]} onClose={() => window.close()} />;
+    case 'judgePanel':
+      return <JudgePanel chatMessages={[]} onClose={() => window.close()} isOverlayMode={true} />;
+    case 'pium':
+      return <PiumOverlay />;
+    case 'roulette':
+      return <RouletteOverlay />;
+    case 'fishing':
+      return <FishingOverlay />;
+    case 'potato':
+      return <PotatoOverlay />;
+    case 'trivia':
+      return <TriviaOverlay />;
+    case 'battleship':
+      return <BattleshipOverlay />;
+    case 'duckHunt':
+      return <DuckHuntOverlay />;
+    case 'veoVeo':
+      return <VeoVeoOverlay />;
+    case 'ppt':
+      return <PPTOverlay />;
+    case 'ahorcado':
+      return <AhorcadoOverlay />;
+    case 'carrera':
+      return <CarreraOverlay />;
+    case 'memoria':
+      return <MemoriaOverlay />;
+    case 'partyCo':
+      return <PartyCoOverlay />;
+    case 'poll':
+    case 'legacyPoll':
+      return <PollOverlay />;
+    default:
+      return null;
+  }
+};
+
 const App: React.FC = () => {
+  // If overlay mode, render overlay component immediately without loading main app hooks
+  if (OVERLAY_TYPE) {
+    return <OverlayRouter type={OVERLAY_TYPE} />;
+  }
+  
   const { theme, toggleTheme, setTheme } = useTheme();
   const { t, locale, setLocale } = useI18n();
 
@@ -660,238 +750,8 @@ const App: React.FC = () => {
     // Do NOT call twitchService.onStatusChange here as it overwrites the hook's callback
   }, []);
 
-  // Check for Component Overlay Modes
-  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const isCountdownOverlay = urlParams?.get('overlayCountdown') === 'true';
-  const isSpinnerOverlay = urlParams?.get('overlaySpinner') === 'true';
-  const isRandomWinnerOverlay = urlParams?.get('overlayRandomWinner') === 'true';
-  const isJudgePanelOverlay = urlParams?.get('overlayJudgePanel') === 'true';
-  const isPiumOverlay = urlParams?.get('overlayPium') === 'true';
-  const isRouletteOverlay = urlParams?.get('overlayRoulette') === 'true';
-  const isFishingOverlay = urlParams?.get('overlayFishing') === 'true';
-  const isPotatoOverlay = urlParams?.get('overlayPotato') === 'true';
-  const isTriviaOverlay = urlParams?.get('overlayTrivia') === 'true';
-  const isBattleshipOverlay = urlParams?.get('overlayBattleship') === 'true';
-  const isDuckHuntOverlay = urlParams?.get('overlayDuckHunt') === 'true';
-  const isVeoVeoOverlay = urlParams?.get('overlayVeoVeo') === 'true';
-  const isPPTOverlay = urlParams?.get('overlayPPT') === 'true';
-  const isAhorcadoOverlay = urlParams?.get('overlayAhorcado') === 'true';
-  const isCarreraOverlay = urlParams?.get('overlayCarrera') === 'true';
-  const isMemoriaOverlay = urlParams?.get('overlayMemoria') === 'true';
-  const isPartyCoOverlay = urlParams?.get('overlayPartyCo') === 'true';
-  const isPollOverlay = urlParams?.get('overlayPoll') === 'true';
-  
-  // Countdown Overlay Mode Render
-  if (isCountdownOverlay) {
-    return <Countdown onClose={() => window.close()} chatMessages={chatMessages} isOverlayMode={true} />;
-  }
-
-  // Spinner Overlay Mode Render
-  if (isSpinnerOverlay) {
-    const defaultOptions = poll.currentPoll?.options || [
-      { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
-      { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
-      { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
-    ];
-    return <SpinnerWheel options={defaultOptions} onClose={() => window.close()} chatMessages={chatMessages} isOverlayMode={true} />;
-  }
-
-  // Random Winner Overlay Mode Render
-  if (isRandomWinnerOverlay) {
-    return <RandomWinnerOverlay chatMessages={chatMessages} onClose={() => window.close()} />;
-  }
-
-  // Judge Panel Overlay Mode Render
-  if (isJudgePanelOverlay) {
-    return <JudgePanel chatMessages={chatMessages} onClose={() => window.close()} isOverlayMode={true} />;
-  }
-
-  // Pium Game Overlay Mode Render
-  if (isPiumOverlay) {
-    return <PiumOverlay />;
-  }
-
-  // Casino Roulette Overlay Mode Render
-  if (isRouletteOverlay) {
-    return <RouletteOverlay />;
-  }
-
-  // Fishing Game Overlay Mode Render
-  if (isFishingOverlay) {
-    return <FishingOverlay />;
-  }
-
-  // Hot Potato Overlay Mode Render
-  if (isPotatoOverlay) {
-    return <PotatoOverlay />;
-  }
-
-  // Trivia Battle Overlay Mode Render
-  if (isTriviaOverlay) {
-    return <TriviaOverlay />;
-  }
-
-  // Battleship Game Overlay Mode Render
-  if (isBattleshipOverlay) {
-    return <BattleshipOverlay />;
-  }
-
-  // Duck Hunt Game Overlay Mode Render
-  if (isDuckHuntOverlay) {
-    return <DuckHuntOverlay />;
-  }
-
-  // Veo Veo Overlay Mode Render
-  if (isVeoVeoOverlay) {
-    return <VeoVeoOverlay />;
-  }
-
-  // Piedra Papel Tijera Overlay Mode Render
-  if (isPPTOverlay) {
-    return <PPTOverlay />;
-  }
-
-  // Ahorcado Overlay Mode Render
-  if (isAhorcadoOverlay) {
-    return <AhorcadoOverlay />;
-  }
-
-  // Carrera Emotes Overlay Mode Render
-  if (isCarreraOverlay) {
-    return <CarreraOverlay />;
-  }
-
-  // Memoria IRL Overlay Mode Render
-  if (isMemoriaOverlay) {
-    return <MemoriaOverlay />;
-  }
-
-  // Party & Co Overlay Mode Render
-  if (isPartyCoOverlay) {
-    return <PartyCoOverlay />;
-  }
-
-  // Generic Overlay Mode - backwards compatibility, redirect to overlayPoll
-  if (isOverlayMode && !isPollOverlay) {
-    // Redirect old ?overlay=true to ?overlayPoll=true
-    if (typeof window !== 'undefined') {
-      const newUrl = window.location.href.replace('overlay=true', 'overlayPoll=true');
-      window.location.replace(newUrl);
-    }
-    return null;
-  }
-
-  // Poll Overlay Mode Render - Full featured overlay with settings
-  if (isPollOverlay) {
-    const presetColors = ['transparent', '#00FF00', '#FF00FF', '#0000FF', '#000000', '#FFFFFF', '#1a1a2e'];
-    const textColors = ['#FFFFFF', '#000000', '#FFD700', '#00FFFF', '#FF6B6B', '#4ADE80'];
-    
-    // Clean body background for true transparency in OBS
-    useEffect(() => {
-      document.body.style.background = 'transparent';
-      document.body.classList.remove('bg-dot-pattern-light', 'bg-dot-pattern', 'dark:bg-dot-pattern');
-      document.documentElement.style.background = 'transparent';
-      return () => {
-        document.body.style.background = '';
-        document.documentElement.style.background = '';
-      };
-    }, []);
-    
-    return (
-      <div className="h-screen w-screen overflow-hidden relative" style={{ background: overlaySettings.bgColor }}>
-        {/* Settings Toggle Button */}
-        <button 
-          onClick={toggleOverlaySettings}
-          className="absolute top-2 right-2 z-50 p-2 rounded-lg bg-black/50 hover:bg-black/70 text-white transition-all"
-          title="Configuración"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-        
-        {/* Settings Panel */}
-        {showOverlaySettings && (
-          <div className="absolute top-12 right-2 z-50 bg-zinc-900 rounded-xl p-4 shadow-2xl border border-zinc-700 w-64">
-            <h3 className="text-white font-bold mb-3 text-sm">{t.overlay.title}</h3>
-            
-            {/* Background Color */}
-            <div className="mb-3">
-              <label className="text-zinc-400 text-xs block mb-1">{t.overlay.background} ({t.overlay.chromaKey})</label>
-              <div className="flex gap-1 flex-wrap">
-                {presetColors.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setOverlaySettings({ bgColor: color })}
-                    className={`w-6 h-6 rounded border-2 ${overlaySettings.bgColor === color ? 'border-white' : 'border-transparent'} ${color === 'transparent' ? 'bg-[conic-gradient(#666_25%,#888_25%_50%,#666_50%_75%,#888_75%)] bg-[length:8px_8px]' : ''}`}
-                    style={{ background: color === 'transparent' ? undefined : color }}
-                    title={color === 'transparent' ? 'Transparente' : color}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            {/* Text Color */}
-            <div className="mb-3">
-              <label className="text-zinc-400 text-xs block mb-1">{t.overlay.textColor}</label>
-              <div className="flex gap-1 flex-wrap">
-                {textColors.map(color => (
-                  <button
-                    key={color}
-                    onClick={() => setOverlaySettings({ textColor: color })}
-                    className={`w-6 h-6 rounded border-2 ${overlaySettings.textColor === color ? 'border-white' : 'border-transparent'}`}
-                    style={{ background: color }}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            {/* Font Size */}
-            <div className="mb-3">
-              <label className="text-zinc-400 text-xs block mb-1">{t.overlay.fontSize}</label>
-              <div className="flex gap-1">
-                {(['small', 'medium', 'large'] as const).map(size => (
-                  <button
-                    key={size}
-                    onClick={() => setOverlaySettings({ fontSize: size })}
-                    className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${overlaySettings.fontSize === size ? 'bg-twitch-brand text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                  >
-                    {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {poll.currentPoll ? (
-          <LivePoll 
-            poll={poll.currentPoll} 
-            voteHistory={poll.voteHistory} 
-            onStop={()=>{}} 
-            onReset={()=>{}} 
-            theme={overlaySettings.theme}
-            variant="overlay"
-            shouldRenderChart={true}
-            overlayStyles={{
-              textColor: overlaySettings.textColor,
-              borderColor: overlaySettings.borderColor,
-              showBorders: overlaySettings.showBorders,
-              fontSize: overlaySettings.fontSize,
-              fontStyle: overlaySettings.fontStyle,
-            }}
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center" style={{ color: overlaySettings.textColor }}>
-            <div className="text-center p-8 bg-black/70 rounded-xl shadow-xl max-w-md">
-              <div className="text-5xl mb-4">📊</div>
-              <p className="font-bold mb-2 text-xl">{t.poll.waitingPoll}</p>
-              <p className="text-sm opacity-70">{t.poll.createPollHint}</p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  // Note: Overlay detection is now handled at module level by OVERLAY_TYPE and OverlayRouter
+  // This prevents the flash/flicker that occurred when detecting overlays after hooks ran
 
   // Disconnected State Render
   if (status !== ConnectionStatus.CONNECTED) {
