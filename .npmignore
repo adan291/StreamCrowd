@@ -1,0 +1,20 @@
+# Test files
+tests/
+test-results/
+playwright-report/
+
+# Config files
+.env*
+.vscode/
+.kiro/
+
+# Build artifacts
+dist/
+release/
+
+# Documentation
+*.md
+!README.md
+
+# Electron specific
+electron/
