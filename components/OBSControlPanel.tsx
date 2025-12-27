@@ -691,9 +691,12 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
               
               {scenes.map((scene) => (
                 <div key={scene.name} className="border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => loadSceneSources(scene.name)}
-                    className={`w-full flex items-center justify-between p-3 text-left transition-colors ${
+                    onKeyDown={(e) => e.key === 'Enter' && loadSceneSources(scene.name)}
+                    className={`w-full flex items-center justify-between p-3 text-left transition-colors cursor-pointer ${
                       currentScene === scene.name
                         ? 'bg-purple-50 dark:bg-purple-500/10'
                         : 'hover:bg-zinc-50 dark:hover:bg-zinc-800'
@@ -729,7 +732,7 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
                     {currentScene === scene.name && (
                       <span className="text-xs text-purple-500 font-medium">ACTIVA</span>
                     )}
-                  </button>
+                  </div>
                   
                   {/* Scene Sources */}
                   {expandedScene === scene.name && sceneSources[scene.name] && (
