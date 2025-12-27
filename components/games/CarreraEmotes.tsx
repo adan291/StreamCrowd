@@ -4,6 +4,7 @@ import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Up
 import { twitchService } from '../../services/twitchService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Racer {
   id: string;
@@ -331,6 +332,8 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
         if (finisher) {
           setWinner(finisher);
           setGameState('finished');
+          // OBS Trigger: Game end
+          triggerGameEnd();
           return newRacers;
         }
 
@@ -525,11 +528,16 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
     }
   };
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startBetting = () => {
     if (racers.length < 2) return;
     setTimeLeft(bettingTime);
     setGameState('betting');
     lastProcessedRef.current = chatMessages.length;
+    // OBS Trigger: Game start (betting phase)
+    triggerGameStart();
   };
 
   const startRace = () => {

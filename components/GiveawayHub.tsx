@@ -39,6 +39,7 @@ import { useI18n } from '../i18n';
 import { twitchService, StreamEventData } from '../services/twitchService';
 import { giveawaySync } from '../services/firebaseSync';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
+import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
 
 interface GiveawayHubProps {
   chatMessages: TwitchMessage[];
@@ -385,6 +386,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   userId: propUserId,
 }) => {
   const { t } = useI18n();
+  const { triggerGiveawayStart, triggerGiveawayWinner } = useOBSTriggers();
   const [activeTab, setActiveTab] = useState<TabType>('raffle');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -894,6 +896,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   const finishAndSelectWinner = () => {
     setIsRunning(false);
     
+    // OBS Trigger: Giveaway start (selection animation)
+    triggerGiveawayStart();
+    
     if (raffleMode === 'subs') {
       // Use subs participants array (allows duplicates for weighted selection)
       const participantList = subsParticipantsRef.current;
@@ -936,6 +941,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         setIsSelecting(false);
         syncToOverlay({ winner: winnerName, displayName: winnerName, isSelecting: false });
         saveToHistory(winnerName, filteredCandidates.length);
+        // OBS Trigger: Giveaway winner selected
+        triggerGiveawayWinner();
       }
     }, 100);
   };

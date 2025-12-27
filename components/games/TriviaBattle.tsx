@@ -4,6 +4,7 @@ import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, Extern
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Question {
   id: string;
@@ -485,6 +486,9 @@ IMPORTANTE:
     setIsGenerating(false);
   };
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startGame = () => {
     if (questions.length === 0) return;
     setCurrentQuestionIndex(0);
@@ -493,6 +497,7 @@ IMPORTANTE:
     setAnswerCounts([0, 0, 0, 0]);
     setShowCorrect(false);
     setGameState('question');
+    triggerGameStart();
   };
 
   const nextQuestion = () => {
@@ -547,6 +552,7 @@ IMPORTANTE:
     setAnswerCounts([0, 0, 0, 0]);
     setShowCorrect(false);
     if (timerRef.current) clearInterval(timerRef.current);
+    triggerGameEnd();
   };
 
   const toggleCategory = (catId: string) => {

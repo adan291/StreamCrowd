@@ -12,6 +12,7 @@ import { ModerationConfigForm } from './ModerationConfigForm';
 import { useI18n } from '../i18n';
 import { TwitchMessage } from '../types';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
+import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
@@ -35,6 +36,7 @@ interface PollCreatorProps {
 
 export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true, onShowCountdown }) => {
   const { t } = useI18n();
+  const { triggerPollStart } = useOBSTriggers();
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string; voteKey?: string }[]>([
@@ -419,6 +421,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     
     onCreate(title.trim() || t.poll.liveTitle, question, finalOptions, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig, prefix, 'exact');
     setShowConfirm(false);
+    
+    // OBS Trigger: Poll start
+    triggerPollStart();
   };
   
   const handleModerationConfigChange = (config: ModerationConfig) => {

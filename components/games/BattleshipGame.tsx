@@ -3,6 +3,7 @@ import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Ship, Target, Trophy, ExternalLink, Crosshair } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Ship {
   id: string;
@@ -229,10 +230,14 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
     setPlacingShipIndex(prev => prev + 1);
   };
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startGame = () => {
     if (ships.length < SHIPS_CONFIG.length) return;
     setGameState('playing');
     setShipsRemaining(ships.length);
+    triggerGameStart();
   };
 
   const resetGame = () => {
@@ -246,6 +251,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
     setShipsRemaining(5);
     setPlacingShipIndex(0);
     lastProcessedRef.current = chatMessages.length;
+    triggerGameEnd();
   };
 
   const autoPlaceShips = () => {

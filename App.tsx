@@ -16,6 +16,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
 import { twitchService } from './services/twitchService';
 import { StoredMessage } from './services/aiAnalyticsService';
+import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
   ConnectionStatus, 
   Poll, 
@@ -47,7 +48,7 @@ import {
   TourStep,
 } from './hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2 } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
@@ -71,6 +72,7 @@ import { TriviaOverlay } from './components/games/TriviaOverlay';
 import { PollOverlay } from './components/PollOverlay';
 import { PartyCoOverlay } from './components/games/PartyCoOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
+import { OBSControlPanel } from './components/OBSControlPanel';
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
@@ -167,6 +169,7 @@ const App: React.FC = () => {
   
   const { theme, toggleTheme, setTheme } = useTheme();
   const { t, locale, setLocale } = useI18n();
+  const { triggerPollEnd, triggerPollResults } = useOBSTriggers();
 
   // Use custom hooks for state management
   const { 
@@ -230,6 +233,7 @@ const App: React.FC = () => {
 
   // Stream events hook - captures subs, resubs, gifts, etc.
   const streamEventsHook = useStreamEvents();
+  const { triggerRaidIncoming } = useOBSTriggers();
   
   // Sync channel name with stream events hook
   useEffect(() => {
@@ -238,11 +242,26 @@ const App: React.FC = () => {
     }
   }, [channelName]);
 
+  // Detect raids and trigger OBS automation
+  const lastRaidRef = useRef<string | null>(null);
+  useEffect(() => {
+    const raidEvents = streamEventsHook.events.filter(e => e.type === 'raid');
+    if (raidEvents.length > 0) {
+      const latestRaid = raidEvents[raidEvents.length - 1];
+      if (latestRaid.id !== lastRaidRef.current) {
+        lastRaidRef.current = latestRaid.id;
+        // Trigger OBS raid automation
+        triggerRaidIncoming();
+        addNotification('info', `🎉 Raid de ${latestRaid.username} con ${latestRaid.data?.viewerCount || '?'} viewers!`);
+      }
+    }
+  }, [streamEventsHook.events, triggerRaidIncoming]);
+
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream' | 'collab'>('chat');
-  const [leftTab, setLeftTab] = useState<'poll' | 'judge' | 'giveaway' | 'games' | 'gallery' | 'data'>('poll');
+  const [leftTab, setLeftTab] = useState<'poll' | 'judge' | 'giveaway' | 'games' | 'obs' | 'gallery' | 'data'>('poll');
   const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
@@ -534,6 +553,9 @@ const App: React.FC = () => {
     const finishedPoll = poll.stopPoll(auto);
     if (!finishedPoll) return;
     
+    // OBS Trigger: Poll end
+    triggerPollEnd();
+    
     // Save poll results to current session for analytics
     if (aiAnalytics.currentSession) {
       const totalVotes = finishedPoll.options.reduce((acc, o) => acc + o.votes, 0);
@@ -556,6 +578,9 @@ const App: React.FC = () => {
       twitchService.sendMessage(`${t.chat.pollEnded}: ${finishedPoll.question}`);
       twitchService.sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
     }
+    
+    // OBS Trigger: Poll results (after a short delay)
+    setTimeout(() => triggerPollResults(), 1000);
     
     if (auto) addNotification('info', t.notifications.autoEnded);
   };
@@ -954,6 +979,7 @@ const App: React.FC = () => {
           <NavButton active={leftTab === 'judge'} onClick={() => setLeftTab('judge')} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} dataTour="nav-judge" />
           <NavButton active={leftTab === 'giveaway'} onClick={() => setLeftTab('giveaway')} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} dataTour="nav-giveaway" />
           <NavButton active={leftTab === 'games'} onClick={() => setLeftTab('games')} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} dataTour="nav-games" />
+          <NavButton active={leftTab === 'obs'} onClick={() => setLeftTab('obs')} icon={<Monitor size={20} />} label="OBS" dataTour="nav-obs" />
           <div className="relative">
             <NavButton active={leftTab === 'data'} onClick={() => setLeftTab('data')} icon={<BarChart3 size={20} />} label={t.nav.data} />
             {aiAnalytics.currentSession && aiAnalytics.currentSession.messages.length > 0 && (
@@ -1008,6 +1034,7 @@ const App: React.FC = () => {
         <MobileNavButton active={leftTab === 'judge'} onClick={() => { setLeftTab('judge'); setShowMobileSidebar(false); }} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} />
         <MobileNavButton active={leftTab === 'giveaway'} onClick={() => { setLeftTab('giveaway'); setShowMobileSidebar(false); }} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} />
         <MobileNavButton active={leftTab === 'games'} onClick={() => { setLeftTab('games'); setShowMobileSidebar(false); }} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} />
+        <MobileNavButton active={leftTab === 'obs'} onClick={() => { setLeftTab('obs'); setShowMobileSidebar(false); }} icon={<Monitor size={20} />} label="OBS" />
         <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
         <MobileNavButton active={leftTab === 'data'} onClick={() => { setLeftTab('data'); setShowMobileSidebar(false); }} icon={<BarChart3 size={20} />} label={t.nav.data} />
       </div>
@@ -1144,6 +1171,11 @@ const App: React.FC = () => {
                   onRemoveCollaborator={removeCollaborator}
                   authToken={authToken}
                 />
+              </div>
+            )}
+            {leftTab === 'obs' && (
+              <div data-tour="obs-control" className="h-full p-4 overflow-y-auto">
+                <OBSControlPanel onNotification={addNotification} />
               </div>
             )}
             {leftTab === 'gallery' && (

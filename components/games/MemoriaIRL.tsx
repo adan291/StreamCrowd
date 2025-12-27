@@ -4,6 +4,7 @@ import { Play, Trophy, RotateCcw, ExternalLink, Camera, Eye, EyeOff, Plus, Trash
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface MemoryObject {
   id: string;
@@ -315,6 +316,9 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
     setObjects(prev => prev.filter(o => o.id !== id));
   };
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startGame = () => {
     if (!imageUrl || objects.length < 3) return;
     setTimeLeft(viewingTime);
@@ -322,6 +326,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
     setObjects(prev => prev.map(o => ({ ...o, found: false, foundBy: undefined })));
     setGameState('viewing');
     lastProcessedRef.current = chatMessages.length;
+    triggerGameStart();
   };
 
   const resetGame = () => {
@@ -331,6 +336,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
     setScores(new Map());
     setTimeLeft(0);
     if (timerRef.current) clearInterval(timerRef.current);
+    triggerGameEnd();
   };
 
   const sortedScores = [...scores.values()].sort((a, b) => b.points - a.points);

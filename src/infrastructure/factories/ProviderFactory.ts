@@ -9,14 +9,17 @@
 import type { IChatProvider, IMultiChannelProvider } from '../../domain/ports/IChatProvider';
 import type { IOverlaySync } from '../../domain/ports/IOverlaySync';
 import type { IStorage, IReactiveStorage } from '../../domain/ports/IStorage';
+import type { IOBSController } from '../../domain/ports/IOBSController';
 
 import { TwitchAdapter, getTwitchAdapter } from '../adapters/TwitchAdapter';
 import { FirebaseSyncAdapter, getFirebaseSyncAdapter } from '../adapters/FirebaseSyncAdapter';
 import { LocalStorageAdapter, getLocalStorageAdapter } from '../adapters/LocalStorageAdapter';
+import { OBSWebSocketAdapter, getOBSAdapter } from '../adapters/OBSWebSocketAdapter';
 
 export type ChatProviderType = 'twitch' | 'youtube' | 'obs' | 'custom';
 export type SyncProviderType = 'firebase' | 'websocket' | 'broadcast' | 'obs';
 export type StorageProviderType = 'localStorage' | 'indexedDB' | 'supabase';
+export type OBSProviderType = 'obs-websocket';
 
 interface ProviderConfig {
   chat?: {
@@ -31,6 +34,26 @@ interface ProviderConfig {
     type: StorageProviderType;
     options?: Record<string, unknown>;
   };
+  obs?: {
+    type: OBSProviderType;
+    options?: Record<string, unknown>;
+  };
+}
+
+/**
+ * Factory para crear controlador OBS
+ */
+export function createOBSController(
+  type: OBSProviderType = 'obs-websocket',
+  options?: Record<string, unknown>
+): IOBSController {
+  switch (type) {
+    case 'obs-websocket':
+      return new OBSWebSocketAdapter();
+    
+    default:
+      throw new Error(`Unknown OBS controller type: ${type}`);
+  }
 }
 
 /**
@@ -119,6 +142,7 @@ class DependencyContainer {
   private chatProvider: IChatProvider | null = null;
   private syncProvider: IOverlaySync | null = null;
   private storageProvider: IStorage | null = null;
+  private obsController: IOBSController | null = null;
   
   getChatProvider(): IChatProvider {
     if (!this.chatProvider) {
@@ -141,6 +165,13 @@ class DependencyContainer {
     return this.storageProvider as IReactiveStorage;
   }
   
+  getOBSController(): IOBSController {
+    if (!this.obsController) {
+      this.obsController = getOBSAdapter();
+    }
+    return this.obsController;
+  }
+  
   setChatProvider(provider: IChatProvider): void {
     if (this.chatProvider) {
       this.chatProvider.dispose();
@@ -159,6 +190,13 @@ class DependencyContainer {
     this.storageProvider = provider;
   }
   
+  setOBSController(controller: IOBSController): void {
+    if (this.obsController) {
+      this.obsController.dispose();
+    }
+    this.obsController = controller;
+  }
+  
   configure(config: ProviderConfig): void {
     if (config.chat) {
       this.setChatProvider(createChatProvider(config.chat.type, config.chat.options));
@@ -169,14 +207,19 @@ class DependencyContainer {
     if (config.storage) {
       this.setStorageProvider(createStorageProvider(config.storage.type, config.storage.options));
     }
+    if (config.obs) {
+      this.setOBSController(createOBSController(config.obs.type, config.obs.options));
+    }
   }
   
   dispose(): void {
     this.chatProvider?.dispose();
     this.syncProvider?.dispose();
+    this.obsController?.dispose();
     this.chatProvider = null;
     this.syncProvider = null;
     this.storageProvider = null;
+    this.obsController = null;
   }
 }
 
@@ -189,3 +232,4 @@ export const container = new DependencyContainer();
 export const getChatProvider = () => container.getChatProvider();
 export const getSyncProvider = () => container.getSyncProvider();
 export const getStorageProvider = () => container.getStorageProvider();
+export const getOBSController = () => container.getOBSController();

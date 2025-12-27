@@ -8,6 +8,7 @@ import {
 import { loadAIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 // Tipos de pruebas del Party & Co
 type ChallengeType = 'trivia' | 'mimica' | 'dibujo' | 'palabras' | 'cultura' | 'rapidez';
@@ -153,6 +154,9 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const diceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
   const playersArray = [...players.values()];
   const sortedPlayers = playersArray.sort((a, b) => b.score - a.score);
@@ -250,7 +254,10 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
             
             // Verificar si ganó el juego
             if (updatedPlayer.score >= pointsToWin) {
-              setTimeout(() => setGameState('final'), 2000);
+              setTimeout(() => {
+                setGameState('final');
+                triggerGameEnd();
+              }, 2000);
             } else {
               setTimeout(() => setGameState('results'), 2000);
             }
@@ -289,6 +296,8 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
     
     setIsRolling(true);
     setGameState('rolling');
+    // OBS Trigger: Game start
+    triggerGameStart();
     
     // Animación del dado
     let rolls = 0;

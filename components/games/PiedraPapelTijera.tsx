@@ -3,6 +3,7 @@ import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Swords, Timer } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../services/firebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {
   oderId: string;
@@ -120,6 +121,9 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [gameState]);
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startGame = () => {
     setPlayers(new Map());
     setRound(1);
@@ -128,6 +132,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
     setTimeLeft(roundTime);
     setGameState('choosing');
     lastProcessedRef.current = chatMessages.length;
+    triggerGameStart();
   };
 
   const resolveRound = () => {
@@ -210,6 +215,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
     setResults([]);
     setChampion(null);
     if (timerRef.current) clearInterval(timerRef.current);
+    triggerGameEnd();
   };
 
   const activePlayers = getActivePlayers();
