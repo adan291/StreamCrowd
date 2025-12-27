@@ -61,6 +61,24 @@ export interface OBSConnectionConfig {
   autoConnect: boolean;
 }
 
+/** Tipos de acciones para comandos rápidos */
+export type QuickCommandAction = 
+  | { type: 'switch_scene'; sceneName: string }
+  | { type: 'toggle_source'; sceneName: string; sourceName: string; visible: boolean }
+  | { type: 'set_transition'; transitionName: string }
+  | { type: 'start_recording' }
+  | { type: 'stop_recording' }
+  | { type: 'start_stream' }
+  | { type: 'stop_stream' };
+
+/** Comando rápido personalizado */
+export interface QuickCommand {
+  id: string;
+  name: string;
+  icon: string; // emoji o nombre de icono lucide
+  actions: QuickCommandAction[];
+}
+
 const STORAGE_KEY_AUTOMATIONS = 'obs_automations';
 const STORAGE_KEY_CONNECTION = 'obs_connection_config';
 

@@ -110,6 +110,9 @@ export class TwitchService {
   private streamEventCallbacks: Set<StreamEventCallback> = new Set();
   private currentOptions: TwitchConnectionOptions | null = null;
   
+  // Track unsubscribe functions to prevent duplicate callbacks
+  private adapterUnsubscribers: Array<() => void> = [];
+  
   constructor(adapter?: TwitchAdapter, config: Partial<TwitchServiceConfig> = {}) {
     this.adapter = adapter || getTwitchAdapter();
     this.config = { ...DEFAULT_TWITCH_SERVICE_CONFIG, ...config };
@@ -133,6 +136,9 @@ export class TwitchService {
   async connect(options: TwitchConnectionOptions): Promise<void> {
     this.currentOptions = options;
     
+    // Clean up previous adapter subscriptions to prevent duplicate callbacks
+    this.cleanupAdapterSubscriptions();
+    
     // Set callbacks
     if (options.onMessage) {
       this.messageCallback = options.onMessage;
@@ -144,15 +150,16 @@ export class TwitchService {
       this.reconnectAttemptCallback = options.onReconnectAttempt;
     }
     
-    // Register adapter callbacks
-    this.adapter.onMessage((message: ChatMessage) => {
+    // Register adapter callbacks (and track unsubscribers)
+    const messageUnsub = this.adapter.onMessage((message: ChatMessage) => {
       if (this.messageCallback) {
         // Convert to legacy format for backward compatibility
         this.messageCallback(message);
       }
     });
+    this.adapterUnsubscribers.push(messageUnsub);
     
-    this.adapter.onStatusChange((status: ConnectionStatus, error?: string) => {
+    const statusUnsub = this.adapter.onStatusChange((status: ConnectionStatus, error?: string) => {
       if (this.statusCallback) {
         this.statusCallback(status, error);
       }
@@ -165,9 +172,10 @@ export class TwitchService {
         }
       }
     });
+    this.adapterUnsubscribers.push(statusUnsub);
     
     // Register stream event callback
-    this.adapter.onStreamEvent((event: StreamEvent) => {
+    const streamEventUnsub = this.adapter.onStreamEvent((event: StreamEvent) => {
       this.streamEventCallbacks.forEach(cb => {
         try {
           cb(event);
@@ -176,6 +184,7 @@ export class TwitchService {
         }
       });
     });
+    this.adapterUnsubscribers.push(streamEventUnsub);
     
     // Connect via adapter
     const connectionOptions: ConnectionOptions = {
@@ -187,9 +196,26 @@ export class TwitchService {
   }
   
   /**
+   * Clean up adapter subscriptions to prevent duplicate callbacks
+   */
+  private cleanupAdapterSubscriptions(): void {
+    this.adapterUnsubscribers.forEach(unsub => {
+      try {
+        unsub();
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    });
+    this.adapterUnsubscribers = [];
+  }
+  
+  /**
    * Disconnect from the current channel
    */
   disconnect(): void {
+    // Clean up adapter subscriptions
+    this.cleanupAdapterSubscriptions();
+    
     // Disconnect all collaboration channels first
     this.disconnectAllCollaborations();
     
@@ -650,6 +676,7 @@ export class TwitchService {
    * Dispose of the service and clean up resources
    */
   dispose(): void {
+    this.cleanupAdapterSubscriptions();
     this.disconnect();
     this.streamEventCallbacks.clear();
     this.messageCallback = null;

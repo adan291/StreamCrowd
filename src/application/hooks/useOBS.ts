@@ -25,6 +25,8 @@ import {
   type SceneAutomation, 
   type AutomationTrigger,
   type OBSConnectionConfig,
+  type QuickCommand,
+  type QuickCommandAction,
 } from '../services/OBSService';
 import type { 
   OBSConnectionStatus, 
@@ -33,6 +35,15 @@ import type {
   OBSStreamStatus,
   OBSVersion,
 } from '../../domain/ports/IOBSController';
+
+/** Storage key for favorite scenes */
+const STORAGE_KEY_FAVORITE_SCENES = 'obs_favorite_scenes';
+
+/** Storage key for quick commands */
+const STORAGE_KEY_QUICK_COMMANDS = 'obs_quick_commands';
+
+/** Maximum number of favorite scenes allowed */
+export const MAX_FAVORITE_SCENES = 6;
 
 export interface UseOBSReturn {
   // Estado de conexión
@@ -46,6 +57,17 @@ export interface UseOBSReturn {
   // Escenas
   scenes: OBSScene[];
   currentScene: string | null;
+  
+  // Escenas favoritas
+  favoriteScenes: string[];
+  saveFavoriteScenes: (scenes: string[]) => void;
+  
+  // Quick Commands
+  quickCommands: QuickCommand[];
+  addQuickCommand: (command: Omit<QuickCommand, 'id'>) => QuickCommand;
+  updateQuickCommand: (id: string, updates: Partial<Omit<QuickCommand, 'id'>>) => boolean;
+  removeQuickCommand: (id: string) => boolean;
+  executeQuickCommand: (command: QuickCommand) => Promise<boolean>;
   
   // Stream status
   streamStatus: OBSStreamStatus | null;
@@ -107,6 +129,153 @@ export function useOBS(): UseOBSReturn {
   const [transitions, setTransitions] = useState<string[]>([]);
   const [currentTransition, setCurrentTransition] = useState<string | null>(null);
   const [automations, setAutomations] = useState<SceneAutomation[]>([]);
+  
+  // Estado de escenas favoritas - cargar desde localStorage
+  const [favoriteScenes, setFavoriteScenes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_FAVORITE_SCENES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Limitar a MAX_FAVORITE_SCENES
+          return parsed.slice(0, MAX_FAVORITE_SCENES);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading favorite scenes:', e);
+    }
+    return [];
+  });
+  
+  // Estado de comandos rápidos - cargar desde localStorage
+  const [quickCommands, setQuickCommands] = useState<QuickCommand[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_QUICK_COMMANDS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading quick commands:', e);
+    }
+    return [];
+  });
+  
+  // Función para guardar escenas favoritas
+  const saveFavoriteScenes = useCallback((newFavorites: string[]) => {
+    // Limitar a MAX_FAVORITE_SCENES
+    const limitedFavorites = newFavorites.slice(0, MAX_FAVORITE_SCENES);
+    setFavoriteScenes(limitedFavorites);
+    try {
+      localStorage.setItem(STORAGE_KEY_FAVORITE_SCENES, JSON.stringify(limitedFavorites));
+    } catch (e) {
+      console.error('Error saving favorite scenes:', e);
+    }
+  }, []);
+  
+  // Función para guardar comandos rápidos en localStorage
+  const saveQuickCommandsToStorage = useCallback((commands: QuickCommand[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY_QUICK_COMMANDS, JSON.stringify(commands));
+    } catch (e) {
+      console.error('Error saving quick commands:', e);
+    }
+  }, []);
+  
+  // Función para añadir un comando rápido
+  const addQuickCommand = useCallback((command: Omit<QuickCommand, 'id'>): QuickCommand => {
+    const newCommand: QuickCommand = {
+      ...command,
+      id: `qc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    };
+    setQuickCommands(prev => {
+      const updated = [...prev, newCommand];
+      saveQuickCommandsToStorage(updated);
+      return updated;
+    });
+    return newCommand;
+  }, [saveQuickCommandsToStorage]);
+  
+  // Función para actualizar un comando rápido
+  const updateQuickCommand = useCallback((id: string, updates: Partial<Omit<QuickCommand, 'id'>>): boolean => {
+    let found = false;
+    setQuickCommands(prev => {
+      const index = prev.findIndex(c => c.id === id);
+      if (index === -1) return prev;
+      found = true;
+      const updated = [...prev];
+      updated[index] = { ...updated[index], ...updates };
+      saveQuickCommandsToStorage(updated);
+      return updated;
+    });
+    return found;
+  }, [saveQuickCommandsToStorage]);
+  
+  // Función para eliminar un comando rápido
+  const removeQuickCommand = useCallback((id: string): boolean => {
+    let found = false;
+    setQuickCommands(prev => {
+      const index = prev.findIndex(c => c.id === id);
+      if (index === -1) return prev;
+      found = true;
+      const updated = prev.filter(c => c.id !== id);
+      saveQuickCommandsToStorage(updated);
+      return updated;
+    });
+    return found;
+  }, [saveQuickCommandsToStorage]);
+  
+  // Función para ejecutar un comando rápido (acciones en secuencia)
+  const executeQuickCommand = useCallback(async (command: QuickCommand): Promise<boolean> => {
+    if (!service.current.isConnected()) return false;
+    
+    try {
+      for (const action of command.actions) {
+        switch (action.type) {
+          case 'switch_scene':
+            await service.current.switchScene(action.sceneName);
+            break;
+          case 'toggle_source':
+            await service.current.setSourceVisible(action.sceneName, action.sourceName, action.visible);
+            break;
+          case 'set_transition':
+            await service.current.setTransition(action.transitionName);
+            break;
+          case 'start_recording':
+            await service.current.startRecording();
+            break;
+          case 'stop_recording':
+            await service.current.stopRecording();
+            break;
+          case 'start_stream':
+            await service.current.startStream();
+            break;
+          case 'stop_stream':
+            await service.current.stopStream();
+            break;
+        }
+        // Pequeño delay entre acciones para evitar race conditions
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return true;
+    } catch (error) {
+      console.error('Error executing quick command:', error);
+      return false;
+    }
+  }, []);
+  
+  // Validar que las escenas favoritas existen en OBS
+  useEffect(() => {
+    if (scenes.length > 0 && favoriteScenes.length > 0) {
+      const sceneNames = scenes.map(s => s.name);
+      const validFavorites = favoriteScenes.filter(f => sceneNames.includes(f));
+      if (validFavorites.length !== favoriteScenes.length) {
+        saveFavoriteScenes(validFavorites);
+      }
+    }
+  }, [scenes, favoriteScenes, saveFavoriteScenes]);
   
   // Cargar automatizaciones al montar
   useEffect(() => {
@@ -312,6 +481,13 @@ export function useOBS(): UseOBSReturn {
     connectionConfig: service.current.getConnectionConfig(),
     scenes,
     currentScene,
+    favoriteScenes,
+    saveFavoriteScenes,
+    quickCommands,
+    addQuickCommand,
+    updateQuickCommand,
+    removeQuickCommand,
+    executeQuickCommand,
     streamStatus,
     transitions,
     currentTransition,
