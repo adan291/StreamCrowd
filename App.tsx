@@ -617,7 +617,7 @@ const App: React.FC = () => {
 
   // Process Messages
   useEffect(() => {
-    getTwitchService().onMessage((chatMessage) => {
+    const unsubscribe = getTwitchService().onMessage((chatMessage) => {
       const message = chatMessage.message;
       const sourceChannel = chatMessage.sourceChannel;
       const isSubscriber = chatMessage.isSubscriber || 
@@ -800,6 +800,11 @@ const App: React.FC = () => {
 
     // Note: Status changes are handled by useTwitchConnection hook
     // Do NOT call twitchService.onStatusChange here as it overwrites the hook's callback
+    
+    // Cleanup: unsubscribe from message callback to prevent duplicates
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Note: Overlay detection is now handled at module level by OVERLAY_TYPE and OverlayRouter

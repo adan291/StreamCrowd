@@ -265,7 +265,10 @@ export class TwitchService {
    */
   onMessage(callback: MessageCallback): () => void {
     this.messageCallback = callback;
-    return this.adapter.onMessage(callback);
+    const unsub = this.adapter.onMessage(callback);
+    // Track this unsubscriber so it gets cleaned up on reconnect
+    this.adapterUnsubscribers.push(unsub);
+    return unsub;
   }
   
   /**
@@ -275,7 +278,10 @@ export class TwitchService {
    */
   onStatusChange(callback: StatusCallback): () => void {
     this.statusCallback = callback;
-    return this.adapter.onStatusChange(callback);
+    const unsub = this.adapter.onStatusChange(callback);
+    // Track this unsubscriber so it gets cleaned up on reconnect
+    this.adapterUnsubscribers.push(unsub);
+    return unsub;
   }
   
   // ============================================
