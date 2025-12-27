@@ -5,6 +5,9 @@
  * una interfaz limpia que puede ser intercambiada por otros proveedores.
  * 
  * Arquitectura Hexagonal: Este es un "adapter" de infraestructura.
+ * 
+ * @requirements 2.3 - THE TwitchAdapter SHALL implement `IStreamEventProvider` to emit stream events
+ * @requirements 4.1 - THE TwitchAdapter SHALL handle connection, disconnection, and reconnection with exponential backoff
  */
 
 import tmi from 'tmi.js';
@@ -20,6 +23,8 @@ import type {
   StatusCallback,
   StreamEventCallback,
 } from '../../domain/ports/IChatProvider';
+import type { IStreamEventProvider, StreamEventCallback as DomainStreamEventCallback } from '../../domain/ports/IStreamEventProvider';
+import type { StreamEvent as DomainStreamEvent, SubTier } from '../../domain/entities/StreamEvent';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
@@ -35,7 +40,19 @@ const DEFAULT_CONFIG: Required<TwitchAdapterConfig> = {
   reconnectMaxDelay: 30000,
 };
 
-export class TwitchAdapter implements IMultiChannelProvider {
+/**
+ * Parse subscription tier from TMI method plan
+ */
+function parseTier(plan?: string): SubTier {
+  switch (plan) {
+    case 'Prime': return 'Prime';
+    case '2000': return '2000';
+    case '3000': return '3000';
+    default: return '1000';
+  }
+}
+
+export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvider {
   readonly providerId = 'twitch';
   readonly providerName = 'Twitch';
   
@@ -47,7 +64,8 @@ export class TwitchAdapter implements IMultiChannelProvider {
   
   private messageCallbacks = new Set<MessageCallback>();
   private statusCallbacks = new Set<StatusCallback>();
-  private streamEventCallbacks = new Set<StreamEventCallback>();
+  private chatProviderStreamEventCallbacks = new Set<StreamEventCallback>();
+  private domainStreamEventCallbacks = new Set<DomainStreamEventCallback>();
   
   private reconnectAttempts = 0;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -159,9 +177,29 @@ export class TwitchAdapter implements IMultiChannelProvider {
     return () => this.statusCallbacks.delete(callback);
   }
   
-  onStreamEvent(callback: StreamEventCallback): () => void {
-    this.streamEventCallbacks.add(callback);
-    return () => this.streamEventCallbacks.delete(callback);
+  /**
+   * Register callback for stream events
+   * Supports both IChatProvider StreamEventCallback and IStreamEventProvider DomainStreamEventCallback
+   * @param callback - Callback to receive stream events
+   * @returns Unsubscribe function
+   */
+  onStreamEvent(callback: StreamEventCallback | DomainStreamEventCallback): () => void {
+    // Add to both callback sets - the emit methods will handle the type differences
+    this.chatProviderStreamEventCallbacks.add(callback as StreamEventCallback);
+    this.domainStreamEventCallbacks.add(callback as DomainStreamEventCallback);
+    return () => {
+      this.chatProviderStreamEventCallbacks.delete(callback as StreamEventCallback);
+      this.domainStreamEventCallbacks.delete(callback as DomainStreamEventCallback);
+    };
+  }
+  
+  /**
+   * Remove a stream event callback (IStreamEventProvider interface)
+   * @param callback - Callback to remove
+   */
+  offStreamEvent(callback: DomainStreamEventCallback): void {
+    this.chatProviderStreamEventCallbacks.delete(callback as StreamEventCallback);
+    this.domainStreamEventCallbacks.delete(callback);
   }
   
   async getChannelInfo(channel?: string): Promise<ChannelInfo | null> {
@@ -260,7 +298,8 @@ export class TwitchAdapter implements IMultiChannelProvider {
     this.disconnect();
     this.messageCallbacks.clear();
     this.statusCallbacks.clear();
-    this.streamEventCallbacks.clear();
+    this.chatProviderStreamEventCallbacks.clear();
+    this.domainStreamEventCallbacks.clear();
   }
   
   // Private methods
@@ -285,8 +324,11 @@ export class TwitchAdapter implements IMultiChannelProvider {
       }
     });
     
-    // Stream events
+    // Stream events - Subscription
     this.client.on('subscription', (channel, username, method, message, userstate) => {
+      const tier = parseTier(method?.plan);
+      
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `sub_${username}_${Date.now()}`,
         type: 'sub',
@@ -295,11 +337,30 @@ export class TwitchAdapter implements IMultiChannelProvider {
         timestamp: Date.now(),
         channel: channel.replace('#', ''),
         provider: 'twitch',
-        data: { tier: method?.plan, message },
+        data: { tier, message },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `sub_${username}_${Date.now()}`,
+        type: 'sub',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        tier,
+        message: message || undefined,
       });
     });
     
+    // Stream events - Resub
     this.client.on('resub', (channel, username, months, message, userstate, methods) => {
+      const tier = parseTier(methods?.plan);
+      const cumulativeMonths = parseInt(userstate['msg-param-cumulative-months'] || '0', 10) || months;
+      const streakMonths = parseInt(userstate['msg-param-streak-months'] || '0', 10) || undefined;
+      
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `resub_${username}_${Date.now()}`,
         type: 'resub',
@@ -308,11 +369,31 @@ export class TwitchAdapter implements IMultiChannelProvider {
         timestamp: Date.now(),
         channel: channel.replace('#', ''),
         provider: 'twitch',
-        data: { tier: methods?.plan, months, message },
+        data: { tier, months, cumulativeMonths, streakMonths, message },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `resub_${username}_${Date.now()}`,
+        type: 'resub',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        tier,
+        months,
+        cumulativeMonths,
+        streakMonths,
+        message: message || undefined,
       });
     });
     
+    // Stream events - Gift sub (single gift)
     this.client.on('subgift', (channel, username, streakMonths, recipient, methods, userstate) => {
+      const tier = parseTier(methods?.plan);
+      
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `gift_${username}_${recipient}_${Date.now()}`,
         type: 'gift',
@@ -321,11 +402,113 @@ export class TwitchAdapter implements IMultiChannelProvider {
         timestamp: Date.now(),
         channel: channel.replace('#', ''),
         provider: 'twitch',
-        data: { tier: methods?.plan, recipient },
+        data: { tier, recipient, recipientDisplayName: userstate['msg-param-recipient-display-name'] || recipient },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `subgift_${username}_${recipient}_${Date.now()}`,
+        type: 'subgift',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        tier,
+        recipientUsername: recipient,
+        giftCount: 1,
       });
     });
     
+    // Stream events - Mystery gift (mass gift subs)
+    this.client.on('submysterygift', (channel, username, numbOfSubs, methods, userstate) => {
+      const tier = parseTier(methods?.plan);
+      const senderCount = parseInt(userstate['msg-param-sender-count'] || '0', 10) || undefined;
+      
+      // Emit IChatProvider StreamEvent
+      this.emitStreamEvent({
+        id: `mysterygift_${username}_${Date.now()}`,
+        type: 'gift',
+        username,
+        displayName: userstate['display-name'] || username,
+        timestamp: Date.now(),
+        channel: channel.replace('#', ''),
+        provider: 'twitch',
+        data: { tier, giftCount: numbOfSubs, senderCount },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `submysterygift_${username}_${Date.now()}`,
+        type: 'submysterygift',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        tier,
+        giftCount: numbOfSubs,
+      });
+    });
+    
+    // Stream events - Prime paid upgrade
+    this.client.on('primepaidupgrade', (channel, username, methods, userstate) => {
+      const tier = parseTier(methods?.plan);
+      
+      // Emit IChatProvider StreamEvent
+      this.emitStreamEvent({
+        id: `primepaidupgrade_${username}_${Date.now()}`,
+        type: 'sub',
+        username,
+        displayName: userstate['display-name'] || username,
+        timestamp: Date.now(),
+        channel: channel.replace('#', ''),
+        provider: 'twitch',
+        data: { tier, isPrimeUpgrade: true },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `primepaidupgrade_${username}_${Date.now()}`,
+        type: 'primepaidupgrade',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        tier,
+      });
+    });
+    
+    // Stream events - Gift paid upgrade
+    this.client.on('giftpaidupgrade', (channel, username, sender, userstate) => {
+      // Emit IChatProvider StreamEvent
+      this.emitStreamEvent({
+        id: `giftpaidupgrade_${username}_${Date.now()}`,
+        type: 'sub',
+        username,
+        displayName: userstate['display-name'] || username,
+        timestamp: Date.now(),
+        channel: channel.replace('#', ''),
+        provider: 'twitch',
+        data: { isGiftUpgrade: true, gifterUsername: sender },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `giftpaidupgrade_${username}_${Date.now()}`,
+        type: 'giftpaidupgrade',
+        username,
+        displayName: userstate['display-name'] || username,
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+      });
+    });
+    
+    // Stream events - Raid
     this.client.on('raided', (channel, username, viewers) => {
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `raid_${username}_${Date.now()}`,
         type: 'raid',
@@ -336,9 +519,53 @@ export class TwitchAdapter implements IMultiChannelProvider {
         provider: 'twitch',
         data: { viewerCount: viewers },
       });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `raid_${username}_${Date.now()}`,
+        type: 'raid',
+        username,
+        displayName: username,
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        viewerCount: viewers,
+      });
     });
     
+    // Stream events - Hosted (when someone hosts you)
+    this.client.on('hosted', (channel, username, viewers, autohost) => {
+      // Only emit for manual hosts, not autohosts
+      if (!autohost) {
+        // Emit IChatProvider StreamEvent
+        this.emitStreamEvent({
+          id: `hosted_${username}_${Date.now()}`,
+          type: 'raid', // Map to raid for IChatProvider
+          username,
+          displayName: username,
+          timestamp: Date.now(),
+          channel: channel.replace('#', ''),
+          provider: 'twitch',
+          data: { viewerCount: viewers, isHost: true },
+        });
+        
+        // Emit domain StreamEvent
+        this.emitDomainStreamEvent({
+          id: `hosted_${username}_${Date.now()}`,
+          type: 'hosted',
+          username,
+          displayName: username,
+          channel: channel.replace('#', ''),
+          timestamp: Date.now(),
+          viewerCount: viewers,
+        });
+      }
+    });
+    
+    // Stream events - Cheer/Bits
     this.client.on('cheer', (channel, userstate, message) => {
+      const bits = parseInt(userstate.bits || '0', 10);
+      
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `bits_${userstate.username}_${Date.now()}`,
         type: 'bits',
@@ -347,11 +574,26 @@ export class TwitchAdapter implements IMultiChannelProvider {
         timestamp: Date.now(),
         channel: channel.replace('#', ''),
         provider: 'twitch',
-        data: { bits: parseInt(userstate.bits || '0', 10), message },
+        data: { bits, message },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `cheer_${userstate.username}_${Date.now()}`,
+        type: 'cheer',
+        username: userstate.username || 'anonymous',
+        displayName: userstate['display-name'] || userstate.username || 'Anonymous',
+        userId: userstate['user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        bits,
+        message,
       });
     });
     
+    // Stream events - Ban (permanent)
     this.client.on('ban', (channel, username, reason, userstate) => {
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `ban_${username}_${Date.now()}`,
         type: 'ban',
@@ -362,9 +604,23 @@ export class TwitchAdapter implements IMultiChannelProvider {
         provider: 'twitch',
         data: { reason },
       });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `ban_${username}_${Date.now()}`,
+        type: 'ban',
+        username,
+        displayName: username,
+        userId: userstate?.['target-user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        reason: reason || undefined,
+      });
     });
     
+    // Stream events - Timeout (temporary ban)
     this.client.on('timeout', (channel, username, reason, duration, userstate) => {
+      // Emit IChatProvider StreamEvent
       this.emitStreamEvent({
         id: `timeout_${username}_${Date.now()}`,
         type: 'timeout',
@@ -374,6 +630,19 @@ export class TwitchAdapter implements IMultiChannelProvider {
         channel: channel.replace('#', ''),
         provider: 'twitch',
         data: { reason, duration },
+      });
+      
+      // Emit domain StreamEvent
+      this.emitDomainStreamEvent({
+        id: `timeout_${username}_${Date.now()}`,
+        type: 'timeout',
+        username,
+        displayName: username,
+        userId: userstate?.['target-user-id'],
+        channel: channel.replace('#', ''),
+        timestamp: Date.now(),
+        duration,
+        reason: reason || undefined,
       });
     });
   }
@@ -400,7 +669,17 @@ export class TwitchAdapter implements IMultiChannelProvider {
   }
   
   private emitStreamEvent(event: StreamEvent): void {
-    this.streamEventCallbacks.forEach(cb => cb(event));
+    this.chatProviderStreamEventCallbacks.forEach(cb => cb(event));
+  }
+  
+  private emitDomainStreamEvent(event: DomainStreamEvent): void {
+    this.domainStreamEventCallbacks.forEach(cb => {
+      try {
+        cb(event);
+      } catch (e) {
+        console.error('Error in domain stream event callback:', e);
+      }
+    });
   }
   
   private setStatus(status: ConnectionStatus, error?: string): void {
@@ -465,6 +744,276 @@ export class TwitchAdapter implements IMultiChannelProvider {
         return url;
       }
       return null;
+    } catch {
+      return null;
+    }
+  }
+  
+  // ============================================
+  // OAuth Methods
+  // ============================================
+  
+  /**
+   * Get the OAuth scopes required for full functionality
+   */
+  static getRequiredScopes(): string[] {
+    return [
+      'chat:read',
+      'chat:edit',
+      'channel:read:subscriptions',
+      'moderator:read:chatters',
+      'moderator:read:followers',
+      'channel:read:vips',
+      'moderation:read',
+      'bits:read',
+    ];
+  }
+  
+  /**
+   * Build the Twitch OAuth authorization URL
+   * @param state - CSRF protection state string
+   * @param redirectUri - OAuth redirect URI (must match Twitch Dev Console)
+   * @returns Authorization URL
+   */
+  static buildAuthUrl(state: string, redirectUri: string): string {
+    const params = new URLSearchParams({
+      client_id: TWITCH_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: TwitchAdapter.getRequiredScopes().join(' '),
+      state: state,
+      force_verify: 'false',
+    });
+    
+    return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
+  }
+  
+  /**
+   * Generate a random state string for CSRF protection
+   */
+  static generateOAuthState(): string {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+  
+  /**
+   * Validate an OAuth token and get user info
+   * @param accessToken - OAuth access token to validate
+   * @returns Token info including username, userId, and expiration
+   */
+  async validateToken(accessToken: string): Promise<{
+    valid: boolean;
+    expiresIn: number;
+    login?: string;
+    userId?: string;
+    scopes?: string[];
+  } | null> {
+    try {
+      let cleanToken = accessToken.trim();
+      if (cleanToken.toLowerCase().startsWith('oauth:')) {
+        cleanToken = cleanToken.substring(6);
+      }
+      
+      const response = await fetch('https://id.twitch.tv/oauth2/validate', {
+        headers: {
+          'Authorization': `OAuth ${cleanToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        return { valid: false, expiresIn: 0 };
+      }
+      
+      const data = await response.json();
+      return {
+        valid: true,
+        expiresIn: data.expires_in || 0,
+        login: data.login,
+        userId: data.user_id,
+        scopes: data.scopes || [],
+      };
+    } catch (err) {
+      console.error('Error validating token:', err);
+      return null;
+    }
+  }
+  
+  /**
+   * Revoke an OAuth token
+   * @param accessToken - Token to revoke
+   * @returns True if revocation was successful
+   */
+  async revokeToken(accessToken: string): Promise<boolean> {
+    try {
+      const response = await fetch('https://id.twitch.tv/oauth2/revoke', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: TWITCH_CLIENT_ID,
+          token: accessToken,
+        }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Check if a token is about to expire
+   * @param expiresIn - Seconds until token expires
+   * @param warningThreshold - Threshold in seconds to trigger warning (default: 1 hour)
+   * @returns True if token is about to expire
+   */
+  static isTokenExpiringSoon(expiresIn: number, warningThreshold: number = 3600): boolean {
+    return expiresIn > 0 && expiresIn <= warningThreshold;
+  }
+  
+  /**
+   * Get the current token (if connected with authentication)
+   */
+  getCurrentToken(): string | null {
+    return this.currentToken;
+  }
+  
+  /**
+   * Calculate exponential backoff delay for reconnection
+   * @param attempt - Current attempt number (1-based)
+   * @returns Delay in milliseconds
+   */
+  calculateBackoffDelay(attempt: number): number {
+    const delay = this.config.reconnectBaseDelay * Math.pow(2, attempt - 1);
+    return Math.min(delay, this.config.reconnectMaxDelay);
+  }
+  
+  /**
+   * Get the current reconnection attempt count
+   */
+  getReconnectAttempts(): number {
+    return this.reconnectAttempts;
+  }
+  
+  /**
+   * Update adapter configuration
+   * @param config - Partial configuration to merge
+   */
+  setConfig(config: Partial<TwitchAdapterConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+  
+  /**
+   * Get the current adapter configuration
+   */
+  getConfig(): Required<TwitchAdapterConfig> {
+    return { ...this.config };
+  }
+  
+  // ============================================
+  // Twitch API Methods
+  // ============================================
+  
+  /**
+   * Get user ID for a channel
+   * @param token - OAuth token with required scopes
+   * @param channel - Channel name (optional, uses current channel if not provided)
+   * @returns User ID or null if not found
+   */
+  async getUserId(token: string, channel?: string): Promise<string | null> {
+    const targetChannel = channel || this.currentChannel;
+    if (!targetChannel) return null;
+    
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/users?login=${targetChannel.toLowerCase()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          },
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.[0]?.id || null;
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get chatters (users in chat) for a channel
+   * Requires OAuth token with moderator:read:chatters scope
+   * @param token - OAuth token with required scope
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID (usually same as broadcaster)
+   * @returns Array of usernames or null if failed
+   */
+  async getChatters(token: string, broadcasterId: string, moderatorId: string): Promise<string[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          },
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((chatter: { user_login: string }) => chatter.user_login) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get subscribers for a channel
+   * Requires OAuth token with channel:read:subscriptions scope
+   * @param token - OAuth token with required scope
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Array of subscriber usernames or null if failed
+   */
+  async getSubscribers(token: string, broadcasterId: string): Promise<string[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const allSubs: string[] = [];
+      let cursor: string | undefined;
+      
+      do {
+        const url = new URL('https://api.twitch.tv/helix/subscriptions');
+        url.searchParams.set('broadcaster_id', broadcasterId);
+        url.searchParams.set('first', '100');
+        if (cursor) {
+          url.searchParams.set('after', cursor);
+        }
+        
+        const response = await fetch(url.toString(), {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          },
+        });
+        
+        if (!response.ok) return null;
+        
+        const data = await response.json();
+        const subs = data.data?.map((sub: { user_login: string }) => sub.user_login) || [];
+        allSubs.push(...subs);
+        
+        cursor = data.pagination?.cursor;
+      } while (cursor);
+      
+      return allSubs;
     } catch {
       return null;
     }

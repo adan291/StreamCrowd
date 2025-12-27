@@ -15,7 +15,7 @@ import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
 import { twitchService } from './services/twitchService';
-import { StoredMessage } from './services/aiAnalyticsService';
+import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
   ConnectionStatus, 
@@ -37,16 +37,18 @@ import {
   usePoll, 
   useModeration, 
   useOverlay, 
-  useTwitchConnection, 
-  useAIAnalytics,
   useDemoTour,
   useViewerCount,
-  useStreamEvents,
   DEFAULT_OVERLAY_SETTINGS,
   getChannelFromUrl,
   getPollConfigFromUrl,
   TourStep,
 } from './hooks';
+import { 
+  useTwitchService as useTwitchConnection,
+  useStreamEventService as useStreamEvents,
+  useAnalyticsService as useAIAnalytics,
+} from './src/application/hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
 import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
@@ -252,7 +254,7 @@ const App: React.FC = () => {
         lastRaidRef.current = latestRaid.id;
         // Trigger OBS raid automation
         triggerRaidIncoming();
-        addNotification('info', `🎉 Raid de ${latestRaid.username} con ${latestRaid.data?.viewerCount || '?'} viewers!`);
+        addNotification('info', `🎉 Raid de ${latestRaid.username} con ${latestRaid.viewerCount || '?'} viewers!`);
       }
     }
   }, [streamEventsHook.events, triggerRaidIncoming]);
@@ -563,6 +565,7 @@ const App: React.FC = () => {
         question: finishedPoll.question,
         winner: finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b).label,
         totalVotes,
+        timestamp: Date.now(),
         options: finishedPoll.options.map(o => ({
           label: o.label,
           votes: o.votes,

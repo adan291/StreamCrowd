@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Key, Eye, EyeOff, Check, Sparkles, Shield, Trash2, Settings } from 'lucide-react';
-import { AIConfig, AIProvider, saveAIConfig, loadAIConfig, clearAIConfig, isUsingEnvKey, getProviderForFunction } from '../services/aiAnalyticsService';
+import { useAnalyticsService, type AIConfig } from '../src/application/hooks';
+import type { AIProvider } from '../src/domain/ports/IAnalyticsProvider';
 
 interface AIConfigPanelProps {
   onConfigChange?: (config: AIConfig) => void;
@@ -12,8 +13,34 @@ const PROVIDERS: { id: AIProvider; name: string; icon: string; color: string }[]
   { id: 'anthropic', name: 'Anthropic Claude', icon: '🧠', color: 'from-orange-500 to-amber-500' },
 ];
 
+// Check if using env-based API key
+const isUsingEnvKey = (provider?: AIProvider): boolean => {
+  if (typeof window === 'undefined') return false;
+  const getEnvKey = (p: AIProvider): string | null => {
+    switch (p) {
+      case 'gemini': return (import.meta as any).env?.VITE_GEMINI_API_KEY || null;
+      case 'openai': return (import.meta as any).env?.VITE_OPENAI_API_KEY || null;
+      case 'anthropic': return (import.meta as any).env?.VITE_ANTHROPIC_API_KEY || null;
+      default: return null;
+    }
+  };
+  if (provider) {
+    return !!getEnvKey(provider);
+  }
+  return !!getEnvKey('gemini') || !!getEnvKey('openai') || !!getEnvKey('anthropic');
+};
+
 export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) => {
-  const [config, setConfig] = useState<AIConfig>(loadAIConfig());
+  const { config: loadedConfig, setConfig: saveConfig } = useAnalyticsService();
+  const [config, setConfig] = useState<AIConfig>(() => loadedConfig || {
+    providers: {
+      gemini: { apiKey: '', enabled: false },
+      openai: { apiKey: '', enabled: false },
+      anthropic: { apiKey: '', enabled: false },
+    },
+    analyticsProvider: 'gemini',
+    gamesProvider: 'gemini',
+  });
   const [activeTab, setActiveTab] = useState<AIProvider>('gemini');
   const [showKey, setShowKey] = useState<Record<AIProvider, boolean>>({ gemini: false, openai: false, anthropic: false });
   const [saved, setSaved] = useState(false);
@@ -21,10 +48,11 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
   const [testResult, setTestResult] = useState<Record<AIProvider, 'success' | 'error' | null>>({ gemini: null, openai: null, anthropic: null });
 
   useEffect(() => {
-    const loaded = loadAIConfig();
-    setConfig(loaded);
-    onConfigChange?.(loaded);
-  }, []);
+    if (loadedConfig) {
+      setConfig(loadedConfig);
+      onConfigChange?.(loadedConfig);
+    }
+  }, [loadedConfig, onConfigChange]);
 
   const handleKeyChange = (provider: AIProvider, apiKey: string) => {
     const newConfig = {
@@ -38,7 +66,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
   };
 
   const handleSave = (provider: AIProvider) => {
-    saveAIConfig(config);
+    saveConfig(config);
     onConfigChange?.(config);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -53,7 +81,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
       }
     };
     setConfig(newConfig);
-    saveAIConfig(newConfig);
+    saveConfig(newConfig);
     onConfigChange?.(newConfig);
   };
 
@@ -63,7 +91,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
       [fn === 'analytics' ? 'analyticsProvider' : 'gamesProvider']: provider
     };
     setConfig(newConfig);
-    saveAIConfig(newConfig);
+    saveConfig(newConfig);
     onConfigChange?.(newConfig);
   };
 
@@ -121,7 +149,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ onConfigChange }) 
   };
 
   const activeProvider = PROVIDERS.find(p => p.id === activeTab)!;
-  const hasAnyKey = Object.values(config.providers).some(p => p.apiKey);
+  const hasAnyKey = Object.values(config.providers).some((p: { apiKey: string; enabled: boolean }) => p.apiKey);
 
   return (
     <div className="space-y-4">

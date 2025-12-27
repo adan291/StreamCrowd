@@ -192,52 +192,374 @@ export interface CollaborationState {
   channels: CollaborationChannel[];
 }
 
-// Re-export moderation types from voteModerationService
+// Re-export moderation types from domain entities
 export type {
   RejectionReason,
   ModerationConfig,
-  VoteValidationResult,
-  ModerationLogEntry,
+  ModerationResult,
   ModerationStats,
-  ModerationPreset,
-  UserVoteState,
-  VoteValidationInput,
-} from './services/voteModerationService';
+} from './src/domain/entities/ModerationConfig';
 
 export {
   DEFAULT_MODERATION_CONFIG,
   DEFAULT_MODERATION_STATS,
-  validateAccountAge,
-  validateCooldown,
-  canChangeVote,
-  validateVote,
-  isValidWeight,
-  calculateWeight,
-  calculateWeightedTotal,
-  createLogEntry,
-  addLogEntry,
-  getLogEntries,
-  groupLogByReason,
-  exportLogToCSV,
-  clearLogEntries,
-  clearAllLogEntries,
-  updateStats,
-  calculateAcceptanceRate,
-  shouldShowWarning,
-  handleVoteChange,
-  savePreset,
-  loadPreset,
-  deletePreset,
-  getAllPresets,
-  formatPresetSummary,
-  clearAllPresets,
-} from './services/voteModerationService';
+} from './src/domain/entities/ModerationConfig';
+
+// Re-export from ModerationService
+export type {
+  VoteInput,
+  UserVoteState,
+  ModerationPreset,
+} from './src/application/services/ModerationService';
+
+// Legacy type aliases for backward compatibility
+export type VoteValidationResult = import('./src/domain/entities/ModerationConfig').ModerationResult;
+export type VoteValidationInput = {
+  username?: string;
+  accountAgeDays: number;
+  hasVoted: boolean;
+  lastVoteTime: number;
+  currentTime: number;
+  isSubscriber: boolean;
+  isFollower: boolean;
+};
+
+// Legacy ModerationLogEntry type for backward compatibility
+export interface ModerationLogEntry {
+  timestamp: number;
+  username: string;
+  oderId: string;
+  action: 'REJECTED' | 'ACCEPTED' | 'VOTE_CHANGED';
+  reason?: import('./src/domain/entities/ModerationConfig').RejectionReason;
+  optionId: number;
+  weight: number;
+}
+
+// ============================================================================
+// Legacy Moderation Functions (for backward compatibility)
+// These functions are kept for components that still use them directly.
+// New code should use ModerationService instead.
+// ============================================================================
+
+/**
+ * Validates if an account meets the minimum age requirement.
+ * @deprecated Use ModerationService.processVote() instead
+ */
+export function validateAccountAge(accountAgeDays: number, minAge: number): boolean {
+  if (minAge === 0) return true;
+  return accountAgeDays >= minAge;
+}
+
+/**
+ * Validates if a user can vote based on cooldown period.
+ * @deprecated Use ModerationService.processVote() instead
+ */
+export function validateCooldown(
+  lastVoteTime: number,
+  cooldownSeconds: number,
+  currentTime: number
+): boolean {
+  if (lastVoteTime === 0) return true;
+  const elapsedSeconds = (currentTime - lastVoteTime) / 1000;
+  return elapsedSeconds >= cooldownSeconds;
+}
+
+/**
+ * Validates if a user can change their vote.
+ * @deprecated Use ModerationService.processVote() instead
+ */
+export function canChangeVote(hasVoted: boolean, voteChangeEnabled: boolean): boolean {
+  if (!hasVoted) return true;
+  return voteChangeEnabled;
+}
+
+/**
+ * Main vote validation function.
+ * @deprecated Use ModerationService.processVote() instead
+ */
+export function validateVote(
+  input: VoteValidationInput,
+  config: import('./src/domain/entities/ModerationConfig').ModerationConfig
+): VoteValidationResult {
+  const normalizedUsername = input.username?.toLowerCase() || '';
+
+  if (config.blacklist?.enabled && config.blacklist.usernames.length > 0) {
+    const isBlacklisted = config.blacklist.usernames.some(
+      (name) => name.toLowerCase() === normalizedUsername
+    );
+    if (isBlacklisted) {
+      return { isValid: false, rejectionReason: 'BLACKLISTED', weight: 0 };
+    }
+  }
+
+  if (config.whitelist?.enabled && config.whitelist.usernames.length > 0) {
+    const isWhitelisted = config.whitelist.usernames.some(
+      (name) => name.toLowerCase() === normalizedUsername
+    );
+    if (!isWhitelisted) {
+      return { isValid: false, rejectionReason: 'NOT_WHITELISTED', weight: 0 };
+    }
+  }
+
+  if (!validateAccountAge(input.accountAgeDays, config.minAccountAgeDays)) {
+    return { isValid: false, rejectionReason: 'ACCOUNT_TOO_YOUNG', weight: 0 };
+  }
+
+  if (!canChangeVote(input.hasVoted, config.voteChangeEnabled)) {
+    return { isValid: false, rejectionReason: 'VOTE_CHANGE_DISABLED', weight: 0 };
+  }
+
+  if (input.hasVoted && !validateCooldown(input.lastVoteTime, config.voteChangeCooldownSeconds, input.currentTime)) {
+    return { isValid: false, rejectionReason: 'COOLDOWN_ACTIVE', weight: 0 };
+  }
+
+  let weight = config.weights.regular;
+  if (input.isSubscriber) {
+    weight = config.weights.subscriber;
+  } else if (input.isFollower) {
+    weight = config.weights.follower;
+  }
+
+  return { isValid: true, weight };
+}
+
+/**
+ * Validates if a weight value is within the valid range (1-5).
+ * @deprecated Use ModerationService instead
+ */
+export function isValidWeight(weight: number): boolean {
+  return Number.isInteger(weight) && weight >= 1 && weight <= 5;
+}
+
+/**
+ * Calculates the vote weight based on user trust level.
+ * @deprecated Use ModerationService instead
+ */
+export function calculateWeight(
+  isSubscriber: boolean,
+  isFollower: boolean,
+  config: import('./src/domain/entities/ModerationConfig').ModerationConfig
+): number {
+  if (isSubscriber) return config.weights.subscriber;
+  if (isFollower) return config.weights.follower;
+  return 1;
+}
+
+/**
+ * Calculates the weighted total of votes.
+ * @deprecated Use ModerationService instead
+ */
+export function calculateWeightedTotal(
+  votes: { oderId: string }[],
+  weights: Map<string, number>
+): number {
+  return votes.reduce((total, vote) => {
+    const weight = weights.get(vote.oderId) ?? 1;
+    return total + weight;
+  }, 0);
+}
+
+/**
+ * Creates a moderation log entry.
+ * @deprecated Use ModerationService instead
+ */
+export function createLogEntry(
+  username: string,
+  oderId: string,
+  action: 'REJECTED' | 'ACCEPTED' | 'VOTE_CHANGED',
+  reason: import('./src/domain/entities/ModerationConfig').RejectionReason | undefined,
+  optionId: number,
+  weight: number
+): ModerationLogEntry {
+  return { timestamp: Date.now(), username, oderId, action, reason, optionId, weight };
+}
+
+// In-memory storage for log entries
+const logStorage: Map<string, ModerationLogEntry[]> = new Map();
+
+export function addLogEntry(pollId: string, entry: ModerationLogEntry): void {
+  const entries = logStorage.get(pollId) ?? [];
+  entries.push(entry);
+  logStorage.set(pollId, entries);
+}
+
+export function getLogEntries(pollId: string, limit: number = 100): ModerationLogEntry[] {
+  const entries = logStorage.get(pollId) ?? [];
+  if (entries.length <= limit) return [...entries];
+  return entries.slice(-limit);
+}
+
+export function groupLogByReason(entries: ModerationLogEntry[]): Record<import('./src/domain/entities/ModerationConfig').RejectionReason, number> {
+  const result: Record<import('./src/domain/entities/ModerationConfig').RejectionReason, number> = {
+    ACCOUNT_TOO_YOUNG: 0,
+    COOLDOWN_ACTIVE: 0,
+    VOTE_CHANGE_DISABLED: 0,
+    INVALID_OPTION: 0,
+    NOT_WHITELISTED: 0,
+    BLACKLISTED: 0,
+  };
+  for (const entry of entries) {
+    if (entry.action === 'REJECTED' && entry.reason) {
+      result[entry.reason]++;
+    }
+  }
+  return result;
+}
+
+export function exportLogToCSV(entries: ModerationLogEntry[]): string {
+  const headers = ['timestamp', 'username', 'oderId', 'action', 'reason', 'optionId', 'weight'];
+  const rows = entries.map(entry => [
+    entry.timestamp.toString(),
+    `"${entry.username.replace(/"/g, '""')}"`,
+    `"${entry.oderId.replace(/"/g, '""')}"`,
+    entry.action,
+    entry.reason ?? '',
+    entry.optionId.toString(),
+    entry.weight.toString(),
+  ].join(','));
+  return [headers.join(','), ...rows].join('\n');
+}
+
+export function clearLogEntries(pollId: string): void {
+  logStorage.delete(pollId);
+}
+
+export function clearAllLogEntries(): void {
+  logStorage.clear();
+}
+
+export function updateStats(
+  stats: import('./src/domain/entities/ModerationConfig').ModerationStats,
+  isAccepted: boolean,
+  reason?: import('./src/domain/entities/ModerationConfig').RejectionReason
+): import('./src/domain/entities/ModerationConfig').ModerationStats {
+  const newTotalAttempts = stats.totalAttempts + 1;
+  const newAcceptedVotes = isAccepted ? stats.acceptedVotes + 1 : stats.acceptedVotes;
+  const newRejectedByReason = { ...stats.rejectedByReason };
+  if (!isAccepted && reason) {
+    newRejectedByReason[reason] = (newRejectedByReason[reason] ?? 0) + 1;
+  }
+  const newAcceptanceRate = newTotalAttempts > 0 ? (newAcceptedVotes / newTotalAttempts) * 100 : 100;
+  return {
+    totalAttempts: newTotalAttempts,
+    acceptedVotes: newAcceptedVotes,
+    rejectedByReason: newRejectedByReason,
+    acceptanceRate: newAcceptanceRate,
+  };
+}
+
+export function calculateAcceptanceRate(stats: import('./src/domain/entities/ModerationConfig').ModerationStats): number {
+  if (stats.totalAttempts === 0) return 100;
+  return (stats.acceptedVotes / stats.totalAttempts) * 100;
+}
+
+export function shouldShowWarning(acceptanceRate: number): boolean {
+  return acceptanceRate < 50;
+}
+
+export function handleVoteChange(
+  poll: ModeratedPoll,
+  _oderId: string,
+  oldOptionId: number,
+  newOptionId: number,
+  weight: number
+): ModeratedPoll {
+  const updatedPoll: ModeratedPoll = {
+    ...poll,
+    options: poll.options.map(option => ({ ...option })),
+    moderationStats: { ...poll.moderationStats, rejectedByReason: { ...poll.moderationStats.rejectedByReason } },
+    moderationLog: [...poll.moderationLog],
+  };
+  const oldOption = updatedPoll.options.find(opt => opt.id === oldOptionId);
+  if (oldOption) oldOption.votes -= weight;
+  const newOption = updatedPoll.options.find(opt => opt.id === newOptionId);
+  if (newOption) newOption.votes += weight;
+  return updatedPoll;
+}
+
+// Preset functions - delegate to ModerationService
+const PRESETS_STORAGE_KEY = 'twitch_vote_mod_presets';
+let inMemoryPresets: import('./src/application/services/ModerationService').ModerationPreset[] = [];
+
+function generatePresetId(): string {
+  return `preset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+export function getAllPresets(): import('./src/application/services/ModerationService').ModerationPreset[] {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem(PRESETS_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    }
+  } catch { /* ignore */ }
+  return [...inMemoryPresets];
+}
+
+function saveAllPresets(presets: import('./src/application/services/ModerationService').ModerationPreset[]): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    }
+  } catch { /* ignore */ }
+  inMemoryPresets = [...presets];
+}
+
+export function savePreset(name: string, config: import('./src/domain/entities/ModerationConfig').ModerationConfig): import('./src/application/services/ModerationService').ModerationPreset {
+  const preset: import('./src/application/services/ModerationService').ModerationPreset = {
+    id: generatePresetId(),
+    name,
+    config: { ...config, weights: { ...config.weights } },
+    createdAt: Date.now(),
+  };
+  const presets = getAllPresets();
+  presets.push(preset);
+  saveAllPresets(presets);
+  return preset;
+}
+
+export function loadPreset(id: string): import('./src/application/services/ModerationService').ModerationPreset | null {
+  const presets = getAllPresets();
+  return presets.find(p => p.id === id) ?? null;
+}
+
+export function deletePreset(id: string): boolean {
+  const presets = getAllPresets();
+  const initialLength = presets.length;
+  const filteredPresets = presets.filter(p => p.id !== id);
+  if (filteredPresets.length < initialLength) {
+    saveAllPresets(filteredPresets);
+    return true;
+  }
+  return false;
+}
+
+export function formatPresetSummary(preset: import('./src/application/services/ModerationService').ModerationPreset): string {
+  const { name, config } = preset;
+  const parts: string[] = [name];
+  if (config.minAccountAgeDays > 0) {
+    parts.push(`Min Age: ${config.minAccountAgeDays} days`);
+  } else {
+    parts.push('Min Age: None');
+  }
+  parts.push(`Vote Change: ${config.voteChangeEnabled ? 'Enabled' : 'Disabled'}`);
+  parts.push(`Weights: Sub=${config.weights.subscriber}, Follow=${config.weights.follower}`);
+  return parts.join(' | ');
+}
+
+export function clearAllPresets(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(PRESETS_STORAGE_KEY);
+    }
+  } catch { /* ignore */ }
+  inMemoryPresets = [];
+}
 
 // Extended Poll type with moderation support
 export interface ModeratedPoll extends Poll {
-  moderationConfig: import('./services/voteModerationService').ModerationConfig;
-  moderationStats: import('./services/voteModerationService').ModerationStats;
-  moderationLog: import('./services/voteModerationService').ModerationLogEntry[];
+  moderationConfig: import('./src/domain/entities/ModerationConfig').ModerationConfig;
+  moderationStats: import('./src/domain/entities/ModerationConfig').ModerationStats;
+  moderationLog: ModerationLogEntry[];
 }
 
 // ============================================

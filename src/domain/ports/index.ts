@@ -6,5 +6,8 @@
  */
 
 export * from './IChatProvider';
+export * from './IOBSController';
 export * from './IOverlaySync';
 export * from './IStorage';
+export * from './IStreamEventProvider';
+export * from './IAnalyticsProvider';

@@ -38,25 +38,23 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import {
-  StreamSession,
-  AIConfig,
-  saveSession,
-  loadAllSessions,
-} from '../services/aiAnalyticsService';
+import { useAnalyticsService, type AnalyticsSession, type AIConfig } from '../src/application/hooks';
 import {
   analyzeChat,
   generateTimeSeries,
   getActivityLabel,
   getInsights,
   calculateHealthScore,
-  ChatMetrics,
-  TimeSlotData,
-} from '../services/chatAnalysisService';
+  type ChatMetrics,
+  type TimeSlotData,
+} from '../src/application/services/AnalyticsService';
 import { useI18n } from '../i18n';
 
+// Re-export StreamSession type for compatibility
+export type StreamSession = AnalyticsSession;
+
 interface StreamAnalyticsProps {
-  currentSession?: StreamSession | null;
+  currentSession?: AnalyticsSession | null;
   aiConfig: AIConfig | null;
   isStreamActive: boolean;
   onClose?: () => void;
@@ -69,16 +67,17 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
   onClose,
 }) => {
   const { t } = useI18n();
+  const { getSessions, saveSession } = useAnalyticsService();
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
-  const [savedSessions, setSavedSessions] = useState<StreamSession[]>([]);
+  const [savedSessions, setSavedSessions] = useState<AnalyticsSession[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Load saved sessions on mount and when tab changes
   useEffect(() => {
     if (activeTab === 'history') {
-      setSavedSessions(loadAllSessions());
+      setSavedSessions(getSessions());
     }
-  }, [activeTab]);
+  }, [activeTab, getSessions]);
 
   // Analyze current session
   const metrics = useMemo<ChatMetrics>(() => {
@@ -762,7 +761,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 2000);
                 // Refresh saved sessions list
-                setSavedSessions(loadAllSessions());
+                setSavedSessions(getSessions());
               }
             }}
             disabled={saveSuccess}

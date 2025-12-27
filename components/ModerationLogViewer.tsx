@@ -1,12 +1,64 @@
 import React, { useState, useMemo } from 'react';
 import { Download, Filter, CheckCircle, XCircle, RefreshCcw, Clock, Shield, UserX, List } from 'lucide-react';
 import { Button } from './Button';
-import {
-  ModerationLogEntry,
-  RejectionReason,
-  exportLogToCSV,
-  groupLogByReason,
-} from '../services/voteModerationService';
+import type { RejectionReason } from '../src/domain/entities/ModerationConfig';
+
+/**
+ * Log entry for moderation actions - compatible with useModerationService
+ */
+export interface ModerationLogEntry {
+  id?: string;
+  timestamp: number;
+  username: string;
+  oderId?: string;
+  userId?: string;
+  action: 'REJECTED' | 'ACCEPTED' | 'VOTE_CHANGED';
+  reason?: RejectionReason;
+  rejectionReason?: RejectionReason;
+  optionId: number;
+  weight: number;
+}
+
+/**
+ * Groups log entries by rejection reason and returns counts.
+ */
+function groupLogByReason(entries: ModerationLogEntry[]): Record<RejectionReason, number> {
+  const result: Record<RejectionReason, number> = {
+    ACCOUNT_TOO_YOUNG: 0,
+    COOLDOWN_ACTIVE: 0,
+    VOTE_CHANGE_DISABLED: 0,
+    INVALID_OPTION: 0,
+    NOT_WHITELISTED: 0,
+    BLACKLISTED: 0,
+  };
+
+  for (const entry of entries) {
+    const reason = entry.reason || entry.rejectionReason;
+    if (entry.action === 'REJECTED' && reason) {
+      result[reason]++;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Exports log entries to CSV format.
+ */
+function exportLogToCSV(entries: ModerationLogEntry[]): string {
+  const headers = ['timestamp', 'username', 'userId', 'action', 'reason', 'optionId', 'weight'];
+  const rows = entries.map(entry => [
+    entry.timestamp.toString(),
+    `"${entry.username.replace(/"/g, '""')}"`,
+    `"${(entry.oderId || entry.userId || '').replace(/"/g, '""')}"`,
+    entry.action,
+    entry.reason || entry.rejectionReason || '',
+    entry.optionId.toString(),
+    entry.weight.toString(),
+  ].join(','));
+
+  return [headers.join(','), ...rows].join('\n');
+}
 
 interface ModerationLogViewerProps {
   entries: ModerationLogEntry[];

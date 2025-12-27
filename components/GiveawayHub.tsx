@@ -36,7 +36,8 @@ import {
 } from 'lucide-react';
 import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel, SubsGiveawayConfig, SubsGiveawayEntry, DEFAULT_SUBS_CONFIG } from '../types';
 import { useI18n } from '../i18n';
-import { twitchService, StreamEventData } from '../services/twitchService';
+import { getTwitchService } from '../src/application/services/TwitchService';
+import type { StreamEvent as DomainStreamEvent } from '../src/domain/entities/StreamEvent';
 import { giveawaySync } from '../services/firebaseSync';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
@@ -663,7 +664,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
   // Set up stream event listener for subs mode
   useEffect(() => {
-    const handleSubEvent = (data: StreamEventData) => {
+    const handleSubEvent = (data: DomainStreamEvent) => {
       // Only process if subs raffle is active
       if (!subsRaffleActiveRef.current) return;
       
@@ -748,6 +749,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       }
     };
     
+    const twitchService = getTwitchService();
     twitchService.onStreamEvent(handleSubEvent);
     
     return () => {
@@ -804,7 +806,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
   // Process stream events for active subs threads
   useEffect(() => {
-    const handleSubEventForThreads = (data: StreamEventData) => {
+    const handleSubEventForThreads = (data: DomainStreamEvent) => {
       const activeSubsThreads = threads.filter(t => t.isActive && t.mode === 'subs');
       if (activeSubsThreads.length === 0) return;
       
@@ -859,6 +861,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       });
     };
     
+    const twitchService = getTwitchService();
     twitchService.onStreamEvent(handleSubEventForThreads);
     
     return () => {
@@ -1314,9 +1317,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     setApiError(null);
     
     try {
+      const twitchService = getTwitchService();
       const channel = twitchService.getCurrentChannel();
       // Use prop userId if available, otherwise fetch it
-      const odUserId = propUserId || await twitchService.getUserId(authToken, channel);
+      const odUserId = propUserId || await twitchService.getUserId(authToken, channel || '');
       
       if (!odUserId) {
         setApiError('No se pudo obtener el ID del canal');
@@ -1366,9 +1370,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     setApiError(null);
     
     try {
+      const twitchService = getTwitchService();
       const channel = twitchService.getCurrentChannel();
       // Use prop userId if available, otherwise fetch it
-      const odUserId = propUserId || await twitchService.getUserId(authToken, channel);
+      const odUserId = propUserId || await twitchService.getUserId(authToken, channel || '');
       
       if (!odUserId) {
         setApiError('No se pudo obtener el ID del canal');

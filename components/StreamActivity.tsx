@@ -42,7 +42,8 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { twitchService } from '../services/twitchService';
-import { storageHelpers, generateEventId, getTodayString } from '../hooks/useStreamEvents';
+import { getTwitchService } from '../src/application/services/TwitchService';
+import { storageHelpers, generateEventId, getTodayString } from '../src/application/hooks/useStreamEventService';
 
 // Twitch Client ID from environment
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';

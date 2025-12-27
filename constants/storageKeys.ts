@@ -13,9 +13,13 @@ export const STORAGE_KEYS = {
   // Assets
   MEDIA_ASSETS: 'twitch_vote_assets',
   
-  // AI Config
+  // AI Config (v2 is the current format, legacy is for migration)
   AI_CONFIG: 'twitch_ai_config',
+  AI_CONFIG_V2: 'twitch_ai_config_v2',
   STREAM_SESSIONS: 'twitch_stream_sessions',
+  
+  // Stream Events (hexagonal architecture)
+  STREAM_EVENT_SESSIONS: 'stream_event_sessions',
   
   // Theme
   THEME: 'twitch_vote_theme',
@@ -34,6 +38,7 @@ export const STORAGE_KEYS = {
   
   // Moderation Presets
   MODERATION_PRESETS: 'twitch_vote_moderation_presets',
+  MOD_PRESETS: 'twitch_vote_mod_presets',
   
   // Poll History
   POLL_HISTORY: 'twitch_vote_poll_history',
