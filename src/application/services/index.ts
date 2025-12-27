@@ -5,8 +5,12 @@
  * con las implementaciones de infraestructura.
  */
 
+export * from './AdvancedAnalyticsService';
+export * from './AlertProviderService';
+export * from './AlertService';
 export * from './AnalyticsService';
 export * from './ChatService';
+export * from './CommandService';
 export * from './GameService';
 export * from './ModerationService';
 export * from './OBSService';

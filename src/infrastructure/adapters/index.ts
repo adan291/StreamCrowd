@@ -7,5 +7,10 @@
 
 export * from './FirebaseSyncAdapter';
 export * from './LocalStorageAdapter';
+export * from './LocalStorageAlertAdapter';
+export * from './LocalStorageAnalyticsAdapter';
+export * from './LocalStorageCommandAdapter';
 export * from './OBSWebSocketAdapter';
+export * from './StreamElementsAdapter';
+export * from './StreamlabsAdapter';
 export * from './TwitchAdapter';

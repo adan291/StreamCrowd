@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Settings, ExternalLink, Timer, Users, Trash2 } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Bet {

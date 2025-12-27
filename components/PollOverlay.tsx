@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings, Trophy, Users } from 'lucide-react';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { pollSync } from '../services/firebaseSync';
+import { pollSync } from '../src/infrastructure/sync/FirebaseSync';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
 
 interface PollOption {

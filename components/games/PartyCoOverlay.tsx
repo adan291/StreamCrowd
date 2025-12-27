@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Trophy, Crown, Users, Dice6, Brain, Eye, Pencil, MessageCircle, HelpCircle, Zap } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 type ChallengeType = 'trivia' | 'mimica' | 'dibujo' | 'palabras' | 'cultura' | 'rapidez';
 

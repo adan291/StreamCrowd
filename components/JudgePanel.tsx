@@ -41,7 +41,7 @@ import {
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
-import { judgePanelSync } from '../services/firebaseSync';
+import { judgePanelSync } from '../src/infrastructure/sync/FirebaseSync';
 
 // Constants
 const JUDGE_PANEL_CHANNEL = 'judge_panel_sync';

@@ -1018,6 +1018,347 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       return null;
     }
   }
+  
+  // ============================================
+  // Twitch API Methods - Extended
+  // ============================================
+  
+  /**
+   * Get bits leaderboard for a channel
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param period - Time period for leaderboard
+   * @returns Leaderboard data or null if failed
+   */
+  async getBitsLeaderboard(
+    token: string, 
+    broadcasterId: string, 
+    period: 'day' | 'week' | 'month' | 'year' | 'all' = 'all'
+  ): Promise<{ rank: number; username: string; bits: number }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/bits/leaderboard');
+      url.searchParams.set('count', '100');
+      url.searchParams.set('period', period);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
+        }
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((entry: any) => ({
+        rank: entry.rank,
+        username: entry.user_name || entry.user_login,
+        bits: entry.score,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get clips for a channel
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param first - Number of clips to fetch (max 100)
+   * @param startedAt - Optional start date (ISO 8601 format)
+   * @param endedAt - Optional end date (ISO 8601 format)
+   * @returns Clips data or null if failed
+   */
+  async getClips(
+    token: string, 
+    broadcasterId: string, 
+    first: number = 20,
+    startedAt?: string,
+    endedAt?: string
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; creatorName: string; thumbnailUrl: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/clips');
+      url.searchParams.set('broadcaster_id', broadcasterId);
+      url.searchParams.set('first', first.toString());
+      
+      if (startedAt) url.searchParams.set('started_at', startedAt);
+      if (endedAt) url.searchParams.set('ended_at', endedAt);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
+        }
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((clip: any) => ({
+        id: clip.id,
+        title: clip.title,
+        url: clip.url,
+        viewCount: clip.view_count,
+        createdAt: clip.created_at,
+        creatorName: clip.creator_name,
+        thumbnailUrl: clip.thumbnail_url,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get VODs/videos for a channel
+   * @param token - OAuth token
+   * @param userId - User ID
+   * @param type - Video type filter
+   * @param first - Number of videos to fetch (max 100)
+   * @returns Videos data or null if failed
+   */
+  async getVideos(
+    token: string, 
+    userId: string, 
+    type: 'all' | 'upload' | 'archive' | 'highlight' = 'all',
+    first: number = 20
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; duration: string; thumbnailUrl: string; type: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/videos');
+      url.searchParams.set('user_id', userId);
+      url.searchParams.set('first', first.toString());
+      if (type !== 'all') url.searchParams.set('type', type);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
+        }
+      });
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((video: any) => ({
+        id: video.id,
+        title: video.title,
+        url: video.url,
+        viewCount: video.view_count,
+        createdAt: video.created_at,
+        duration: video.duration,
+        thumbnailUrl: video.thumbnail_url.replace('%{width}', '320').replace('%{height}', '180'),
+        type: video.type,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get moderators for a channel
+   * Requires OAuth token with moderation:read scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Moderators list or null if failed
+   */
+  async getModerators(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((mod: any) => ({
+        id: mod.user_id,
+        username: mod.user_login,
+        displayName: mod.user_name,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Get VIPs for a channel
+   * Requires OAuth token with channel:read:vips scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns VIPs list or null if failed
+   */
+  async getVIPs(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((vip: any) => ({
+        id: vip.user_id,
+        username: vip.user_login,
+        displayName: vip.user_name,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
+   * Ban a user from the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to ban
+   * @param reason - Optional reason for the ban
+   * @returns True if successful
+   */
+  async banUser(token: string, broadcasterId: string, userId: string, reason?: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: {
+              user_id: userId,
+              reason: reason || undefined,
+            }
+          })
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Timeout a user in the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to timeout
+   * @param duration - Duration in seconds (1-1209600, max 2 weeks)
+   * @param reason - Optional reason for the timeout
+   * @returns True if successful
+   */
+  async timeoutUser(token: string, broadcasterId: string, userId: string, duration: number, reason?: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const clampedDuration = Math.max(1, Math.min(duration, 1209600));
+      
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: {
+              user_id: userId,
+              duration: clampedDuration,
+              reason: reason || undefined,
+            }
+          })
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Unban a user from the channel
+   * Requires OAuth token with moderator:manage:banned_users scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to unban
+   * @returns True if successful
+   */
+  async unbanUser(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+  
+  /**
+   * Get detailed chatters list with user info
+   * Requires OAuth token with moderator:read:chatters scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @returns Detailed chatters list or null if failed
+   */
+  async getChattersDetailed(token: string, broadcasterId: string, moderatorId: string): Promise<{ userId: string; userLogin: string; userName: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          },
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((chatter: any) => ({
+        oderId: chatter.user_id,
+        userLogin: chatter.user_login,
+        userName: chatter.user_name,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
 }
 
 // Singleton instance for backward compatibility

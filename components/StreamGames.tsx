@@ -1,24 +1,38 @@
-import React, { useState } from 'react';
-import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair, Eye, Swords, Skull, Flag, Camera, Dice6, ChevronDown, Tv, Brain, Users } from 'lucide-react';
+import React, { useState, lazy, Suspense } from 'react';
+import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair, Eye, Swords, Skull, Flag, Camera, Dice6, ChevronDown, Tv, Users, Loader2 } from 'lucide-react';
 import { TwitchMessage, CollaborationChannel } from '../types';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
-import { PiumGame } from './games/PiumGame';
-import { CasinoRoulette } from './games/CasinoRoulette';
-import { ChatFishing } from './games/ChatFishing';
-import { HotPotato } from './games/HotPotato';
-import { TriviaBattle } from './games/TriviaBattle';
-import { BattleshipGame } from './games/BattleshipGame';
-import { DuckHunt } from './games/DuckHunt';
-import { VeoVeo } from './games/VeoVeo';
-import { PiedraPapelTijera } from './games/PiedraPapelTijera';
-import { Ahorcado } from './games/Ahorcado';
-import { CarreraEmotes } from './games/CarreraEmotes';
-import { MemoriaIRL } from './games/MemoriaIRL';
-import { PartyCo } from './games/PartyCo';
 
-type GameTab = 'pium' | 'roulette' | 'fishing' | 'potato' | 'trivia' | 'battleship' | 'duckhunt' | 'veoveo' | 'ppt' | 'ahorcado' | 'carrera' | 'memoria' | 'partyco';
+// Lazy loaded game components
+const LazyGames = {
+  pium: lazy(() => import('./games/PiumGame').then(m => ({ default: m.PiumGame }))),
+  roulette: lazy(() => import('./games/CasinoRoulette').then(m => ({ default: m.CasinoRoulette }))),
+  fishing: lazy(() => import('./games/ChatFishing').then(m => ({ default: m.ChatFishing }))),
+  potato: lazy(() => import('./games/HotPotato').then(m => ({ default: m.HotPotato }))),
+  trivia: lazy(() => import('./games/TriviaBattle').then(m => ({ default: m.TriviaBattle }))),
+  battleship: lazy(() => import('./games/BattleshipGame').then(m => ({ default: m.BattleshipGame }))),
+  duckhunt: lazy(() => import('./games/DuckHunt').then(m => ({ default: m.DuckHunt }))),
+  veoveo: lazy(() => import('./games/VeoVeo').then(m => ({ default: m.VeoVeo }))),
+  ppt: lazy(() => import('./games/PiedraPapelTijera').then(m => ({ default: m.PiedraPapelTijera }))),
+  ahorcado: lazy(() => import('./games/Ahorcado').then(m => ({ default: m.Ahorcado }))),
+  carrera: lazy(() => import('./games/CarreraEmotes').then(m => ({ default: m.CarreraEmotes }))),
+  memoria: lazy(() => import('./games/MemoriaIRL').then(m => ({ default: m.MemoriaIRL }))),
+  partyco: lazy(() => import('./games/PartyCo').then(m => ({ default: m.PartyCo }))),
+};
+
+type GameTab = keyof typeof LazyGames;
 type GameCategory = 'chat' | 'irl' | 'streamer';
+
+// Loading spinner component for Suspense fallback
+const GameLoadingSpinner: React.FC = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="w-8 h-8 animate-spin text-twitch-brand" />
+      <span className="text-sm text-zinc-500 dark:text-zinc-400">Cargando juego...</span>
+    </div>
+  </div>
+);
 
 interface GameInfo {
   id: GameTab;
@@ -27,6 +41,7 @@ interface GameInfo {
   cmd: string;
   category: GameCategory;
 }
+
 
 interface StreamGamesProps {
   chatMessages: TwitchMessage[];
@@ -68,6 +83,44 @@ const GAMES: GameInfo[] = [
   { id: 'memoria', name: 'Memoria', icon: <Camera size={16} />, cmd: 'IRL', category: 'irl' },
 ];
 
+// GameLoader component with Suspense
+interface GameLoaderProps {
+  gameId: GameTab;
+  chatMessages: TwitchMessage[];
+  isConnected: boolean;
+  authToken?: string;
+  mainChannel?: string;
+}
+
+const GameLoader: React.FC<GameLoaderProps> = ({ gameId, chatMessages, isConnected, authToken, mainChannel }) => {
+  const GameComponent = LazyGames[gameId];
+  
+  if (!GameComponent) {
+    return <div className="p-4 text-center text-zinc-500">Juego no encontrado</div>;
+  }
+
+  // Special handling for carrera which needs extra props
+  if (gameId === 'carrera') {
+    return (
+      <Suspense fallback={<GameLoadingSpinner />}>
+        <GameComponent 
+          chatMessages={chatMessages} 
+          isConnected={isConnected} 
+          authToken={authToken}
+          channelName={mainChannel}
+        />
+      </Suspense>
+    );
+  }
+
+  return (
+    <Suspense fallback={<GameLoadingSpinner />}>
+      <GameComponent chatMessages={chatMessages} isConnected={isConnected} />
+    </Suspense>
+  );
+};
+
+
 export const StreamGames: React.FC<StreamGamesProps> = ({
   chatMessages,
   onClose,
@@ -99,25 +152,6 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
     const firstGame = GAMES.find(g => g.category === categoryId);
     if (firstGame) {
       setActiveGame(firstGame.id);
-    }
-  };
-
-  const renderGameContent = () => {
-    switch (activeGame) {
-      case 'pium': return <PiumGame chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'roulette': return <CasinoRoulette chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'fishing': return <ChatFishing chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'potato': return <HotPotato chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'trivia': return <TriviaBattle chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'battleship': return <BattleshipGame chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'duckhunt': return <DuckHunt chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'veoveo': return <VeoVeo chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'ppt': return <PiedraPapelTijera chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'ahorcado': return <Ahorcado chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'carrera': return <CarreraEmotes chatMessages={chatMessages} isConnected={isConnected} authToken={authToken} channelName={mainChannel} />;
-      case 'memoria': return <MemoriaIRL chatMessages={chatMessages} isConnected={isConnected} />;
-      case 'partyco': return <PartyCo chatMessages={chatMessages} isConnected={isConnected} />;
-      default: return null;
     }
   };
 
@@ -214,9 +248,15 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
         </div>
       </div>
 
-      {/* Game Content */}
+      {/* Game Content - Now using lazy loading */}
       <div className="flex-1 overflow-y-auto">
-        {renderGameContent()}
+        <GameLoader 
+          gameId={activeGame} 
+          chatMessages={chatMessages} 
+          isConnected={isConnected}
+          authToken={authToken}
+          mainChannel={mainChannel}
+        />
       </div>
     </div>
   );

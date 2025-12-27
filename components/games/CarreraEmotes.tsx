@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Upload, Loader2, Sparkles } from 'lucide-react';
-import { twitchService } from '../../services/twitchService';
+import { getTwitchService } from '../../src/application/services/TwitchService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Racer {
@@ -141,6 +141,7 @@ const fetchFFZEmotes = async (channelName: string): Promise<EmoteData[]> => {
 // Obtener emotes de Twitch usando la API Helix (requiere token)
 const fetchTwitchEmotesWithToken = async (channelName: string, token: string): Promise<EmoteData[]> => {
   try {
+    const twitchService = getTwitchService();
     // Obtener el broadcaster_id
     const broadcasterId = await twitchService.getUserId(token, channelName);
     if (!broadcasterId) return [];

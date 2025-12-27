@@ -1,3 +1,12 @@
+/**
+ * Firebase Sync - Real-time synchronization for overlays
+ * 
+ * This module provides real-time synchronization between the main app
+ * and overlay windows using Firebase Realtime Database.
+ * 
+ * @module infrastructure/sync/FirebaseSync
+ */
+
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, off, DatabaseReference } from 'firebase/database';
 
@@ -16,7 +25,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-// Tipos para el estado sincronizado
+// ============ TYPES ============
+
+/**
+ * Synced overlay state types
+ */
 export interface SyncedOverlayState {
   poll?: {
     question: string;
@@ -65,7 +78,13 @@ export interface SyncedOverlayState {
   };
 }
 
-// Escribir estado a Firebase
+// ============ CORE FUNCTIONS ============
+
+/**
+ * Write state to Firebase
+ * @param path - Database path
+ * @param data - Data to sync
+ */
 export async function syncState(path: string, data: any): Promise<void> {
   try {
     const dbRef = ref(database, `overlays/${path}`);
@@ -79,7 +98,12 @@ export async function syncState(path: string, data: any): Promise<void> {
   }
 }
 
-// Escuchar cambios en tiempo real
+/**
+ * Subscribe to real-time changes
+ * @param path - Database path
+ * @param callback - Callback for data changes
+ * @returns Unsubscribe function
+ */
 export function subscribeToState<T>(
   path: string, 
   callback: (data: T | null) => void
@@ -93,35 +117,51 @@ export function subscribeToState<T>(
     console.error(`Firebase subscription error for ${path}:`, error);
   });
 
-  // Retorna función para cancelar suscripción
+  // Return unsubscribe function
   return () => off(dbRef);
 }
 
-// Helpers específicos para cada tipo de overlay
+// ============ OVERLAY-SPECIFIC HELPERS ============
+
+/**
+ * Poll sync helpers
+ */
 export const pollSync = {
   update: (data: SyncedOverlayState['poll']) => syncState('poll', data),
   subscribe: (callback: (data: SyncedOverlayState['poll'] | null) => void) => 
     subscribeToState<SyncedOverlayState['poll']>('poll', callback)
 };
 
+/**
+ * Countdown sync helpers
+ */
 export const countdownSync = {
   update: (data: Omit<NonNullable<SyncedOverlayState['countdown']>, 'updatedAt'>) => syncState('countdown', data),
   subscribe: (callback: (data: SyncedOverlayState['countdown'] | null) => void) => 
     subscribeToState<SyncedOverlayState['countdown']>('countdown', callback)
 };
 
+/**
+ * Giveaway sync helpers
+ */
 export const giveawaySync = {
   update: (data: SyncedOverlayState['giveaway']) => syncState('giveaway', data),
   subscribe: (callback: (data: SyncedOverlayState['giveaway'] | null) => void) => 
     subscribeToState<SyncedOverlayState['giveaway']>('giveaway', callback)
 };
 
+/**
+ * Judge panel sync helpers
+ */
 export const judgePanelSync = {
   update: (data: SyncedOverlayState['judgePanel']) => syncState('judgePanel', data),
   subscribe: (callback: (data: SyncedOverlayState['judgePanel'] | null) => void) => 
     subscribeToState<SyncedOverlayState['judgePanel']>('judgePanel', callback)
 };
 
+/**
+ * Game sync helpers
+ */
 export const gameSync = {
   update: (type: string, state: any) => syncState('game', { type, state }),
   subscribe: (callback: (data: SyncedOverlayState['game'] | null) => void) => 

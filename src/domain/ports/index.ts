@@ -11,3 +11,7 @@ export * from './IOverlaySync';
 export * from './IStorage';
 export * from './IStreamEventProvider';
 export * from './IAnalyticsProvider';
+export * from './IAlertPort';
+export * from './IAlertProvider';
+export * from './ICommandPort';
+export * from './IAdvancedAnalyticsPort';

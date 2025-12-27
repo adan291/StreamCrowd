@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Skull, Heart, Sparkles } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface AhorcadoProps {

@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
-import { StreamActivity } from './components/StreamActivity';
 import { PollHistory } from './components/PollHistory';
 import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
@@ -14,7 +13,7 @@ import { StreamAnalytics } from './components/StreamAnalytics';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
-import { twitchService } from './services/twitchService';
+import { getTwitchService } from './src/application/services/TwitchService';
 import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
@@ -50,7 +49,7 @@ import {
   useAnalyticsService as useAIAnalytics,
 } from './src/application/hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2 } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
@@ -59,22 +58,37 @@ import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
 import { JudgePanel } from './components/JudgePanel';
 import { GiveawayHub } from './components/GiveawayHub';
 import { StreamGames } from './components/StreamGames';
-import { PiumOverlay } from './components/games/PiumOverlay';
-import { RouletteOverlay } from './components/games/RouletteOverlay';
-import { FishingOverlay } from './components/games/FishingOverlay';
-import { BattleshipOverlay } from './components/games/BattleshipOverlay';
-import { DuckHuntOverlay } from './components/games/DuckHuntOverlay';
-import { VeoVeoOverlay } from './components/games/VeoVeoOverlay';
-import { PPTOverlay } from './components/games/PPTOverlay';
-import { AhorcadoOverlay } from './components/games/AhorcadoOverlay';
-import { CarreraOverlay } from './components/games/CarreraOverlay';
-import { MemoriaOverlay } from './components/games/MemoriaOverlay';
-import { PotatoOverlay } from './components/games/PotatoOverlay';
-import { TriviaOverlay } from './components/games/TriviaOverlay';
 import { PollOverlay } from './components/PollOverlay';
-import { PartyCoOverlay } from './components/games/PartyCoOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
-import { OBSControlPanel } from './components/OBSControlPanel';
+
+// Lazy load heavy components for better initial bundle size
+const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
+const StreamActivity = lazy(() => import('./components/StreamActivity'));
+
+// Lazy load game overlays - only loaded when overlay mode is active
+const PiumOverlay = lazy(() => import('./components/games/PiumOverlay'));
+const RouletteOverlay = lazy(() => import('./components/games/RouletteOverlay'));
+const FishingOverlay = lazy(() => import('./components/games/FishingOverlay'));
+const BattleshipOverlay = lazy(() => import('./components/games/BattleshipOverlay'));
+const DuckHuntOverlay = lazy(() => import('./components/games/DuckHuntOverlay'));
+const VeoVeoOverlay = lazy(() => import('./components/games/VeoVeoOverlay'));
+const PPTOverlay = lazy(() => import('./components/games/PPTOverlay'));
+const AhorcadoOverlay = lazy(() => import('./components/games/AhorcadoOverlay'));
+const CarreraOverlay = lazy(() => import('./components/games/CarreraOverlay'));
+const MemoriaOverlay = lazy(() => import('./components/games/MemoriaOverlay'));
+const PotatoOverlay = lazy(() => import('./components/games/PotatoOverlay'));
+const TriviaOverlay = lazy(() => import('./components/games/TriviaOverlay'));
+const PartyCoOverlay = lazy(() => import('./components/games/PartyCoOverlay'));
+
+// Loading fallback component
+const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Cargando...' }) => (
+  <div className="flex items-center justify-center h-full w-full min-h-[200px]">
+    <div className="flex flex-col items-center gap-3 text-zinc-400">
+      <Loader2 className="w-8 h-8 animate-spin text-twitch-brand" />
+      <span className="text-sm">{message}</span>
+    </div>
+  </div>
+);
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
@@ -116,51 +130,59 @@ const OverlayRouter: React.FC<{ type: string }> = ({ type }) => {
     document.title = '🎬 OVERLAY - Twitch Vote';
   }, []);
 
-  switch (type) {
-    case 'countdown':
-      return <Countdown onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
-    case 'spinner':
-      return <SpinnerWheel options={[
-        { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
-        { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
-        { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
-      ]} onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
-    case 'randomWinner':
-      return <RandomWinnerOverlay chatMessages={[]} onClose={() => window.close()} />;
-    case 'judgePanel':
-      return <JudgePanel chatMessages={[]} onClose={() => window.close()} isOverlayMode={true} />;
-    case 'pium':
-      return <PiumOverlay />;
-    case 'roulette':
-      return <RouletteOverlay />;
-    case 'fishing':
-      return <FishingOverlay />;
-    case 'potato':
-      return <PotatoOverlay />;
-    case 'trivia':
-      return <TriviaOverlay />;
-    case 'battleship':
-      return <BattleshipOverlay />;
-    case 'duckHunt':
-      return <DuckHuntOverlay />;
-    case 'veoVeo':
-      return <VeoVeoOverlay />;
-    case 'ppt':
-      return <PPTOverlay />;
-    case 'ahorcado':
-      return <AhorcadoOverlay />;
-    case 'carrera':
-      return <CarreraOverlay />;
-    case 'memoria':
-      return <MemoriaOverlay />;
-    case 'partyCo':
-      return <PartyCoOverlay />;
-    case 'poll':
-    case 'legacyPoll':
-      return <PollOverlay />;
-    default:
-      return null;
-  }
+  const renderOverlay = () => {
+    switch (type) {
+      case 'countdown':
+        return <Countdown onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+      case 'spinner':
+        return <SpinnerWheel options={[
+          { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+          { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+          { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+        ]} onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+      case 'randomWinner':
+        return <RandomWinnerOverlay chatMessages={[]} onClose={() => window.close()} />;
+      case 'judgePanel':
+        return <JudgePanel chatMessages={[]} onClose={() => window.close()} isOverlayMode={true} />;
+      case 'pium':
+        return <PiumOverlay />;
+      case 'roulette':
+        return <RouletteOverlay />;
+      case 'fishing':
+        return <FishingOverlay />;
+      case 'potato':
+        return <PotatoOverlay />;
+      case 'trivia':
+        return <TriviaOverlay />;
+      case 'battleship':
+        return <BattleshipOverlay />;
+      case 'duckHunt':
+        return <DuckHuntOverlay />;
+      case 'veoVeo':
+        return <VeoVeoOverlay />;
+      case 'ppt':
+        return <PPTOverlay />;
+      case 'ahorcado':
+        return <AhorcadoOverlay />;
+      case 'carrera':
+        return <CarreraOverlay />;
+      case 'memoria':
+        return <MemoriaOverlay />;
+      case 'partyCo':
+        return <PartyCoOverlay />;
+      case 'poll':
+      case 'legacyPoll':
+        return <PollOverlay />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Suspense fallback={<LoadingFallback message="Cargando overlay..." />}>
+      {renderOverlay()}
+    </Suspense>
+  );
 };
 
 const App: React.FC = () => {
@@ -381,7 +403,7 @@ const App: React.FC = () => {
       
       const channel = getChannelFromUrl();
       if (channel) {
-        twitchService.connect(channel);
+        getTwitchService().connect({ channel });
         
         const pollConfig = getPollConfigFromUrl();
         if (pollConfig) {
@@ -543,11 +565,11 @@ const App: React.FC = () => {
     // Announce in chat and sync with overlay
     if (authToken) {
       const optLabels = newPoll.options.map(o => o.label).join('|');
-      twitchService.sendMessage(`!pollsync ${question}|${optLabels}`);
-      twitchService.sendMessage(`${t.chat.newPoll}: ${question}`);
+      getTwitchService().sendMessage(`!pollsync ${question}|${optLabels}`);
+      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question}`);
       const opts = newPoll.options.map(o => `${prefix}${o.id} ${o.label}`).join(' | ');
-      twitchService.sendMessage(`${t.chat.options}: ${opts}`);
-      twitchService.sendMessage(t.chat.voteHint.replace('+', prefix));
+      getTwitchService().sendMessage(`${t.chat.options}: ${opts}`);
+      getTwitchService().sendMessage(t.chat.voteHint.replace('+', prefix));
     }
   };
 
@@ -576,10 +598,10 @@ const App: React.FC = () => {
     }
     
     if (authToken) {
-      twitchService.sendMessage(`!pollend`);
+      getTwitchService().sendMessage(`!pollend`);
       const winner = finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b);
-      twitchService.sendMessage(`${t.chat.pollEnded}: ${finishedPoll.question}`);
-      twitchService.sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
+      getTwitchService().sendMessage(`${t.chat.pollEnded}: ${finishedPoll.question}`);
+      getTwitchService().sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
     }
     
     // OBS Trigger: Poll results (after a short delay)
@@ -595,15 +617,17 @@ const App: React.FC = () => {
 
   // Process Messages
   useEffect(() => {
-    twitchService.onMessage((tags, message, self, sourceChannel) => {
-      const isSubscriber = tags.subscriber === true || tags.subscriber === '1' || 
-        (tags.badges && ('subscriber' in tags.badges || 'founder' in tags.badges));
+    getTwitchService().onMessage((chatMessage) => {
+      const message = chatMessage.message;
+      const sourceChannel = chatMessage.sourceChannel;
+      const isSubscriber = chatMessage.isSubscriber || 
+        (chatMessage.badges && ('subscriber' in chatMessage.badges || 'founder' in chatMessage.badges));
       const msg: TwitchMessage = {
-        username: tags['display-name'] || tags.username || 'Anon',
+        username: chatMessage.displayName || chatMessage.username || 'Anon',
         message,
-        color: tags.color || '#a970ff',
-        id: tags.id,
-        userId: tags['user-id'],
+        color: chatMessage.color || '#a970ff',
+        id: chatMessage.id,
+        userId: chatMessage.userId,
         isSubscriber: !!isSubscriber,
         timestamp: Date.now(),
         sourceChannel: sourceChannel, // Track which channel the message came from
@@ -622,8 +646,8 @@ const App: React.FC = () => {
       addMessageToSessionRef.current(storedMsg);
 
       // Process chat commands for overlay mode (broadcaster/mod only)
-      const isBroadcaster = tags.badges && 'broadcaster' in tags.badges;
-      const isMod = tags.mod === true || tags.mod === '1';
+      const isBroadcaster = chatMessage.isBroadcaster;
+      const isMod = chatMessage.isModerator;
       const canControl = isBroadcaster || isMod;
       
       if (canControl) {
@@ -733,11 +757,11 @@ const App: React.FC = () => {
         }
         
         if (optionId !== null) {
-          const userId = tags['user-id'] || tags.username || 'unknown';
+          const userId = chatMessage.userId || chatMessage.username || 'unknown';
           
-          // Extract user attributes from Twitch tags
-          const isSubscriber = tags.subscriber === true || tags.subscriber === '1';
-          const isFollower = tags.badges ? 'follower' in tags.badges : false;
+          // Extract user attributes from ChatMessage
+          const isSubForVote = chatMessage.isSubscriber;
+          const isFollower = chatMessage.badges ? 'follower' in chatMessage.badges : false;
           
           // Get valid option IDs
           const validOptionIds = pollRef.current.options.map(o => o.id);
@@ -748,7 +772,7 @@ const App: React.FC = () => {
               userId,
               username: msg.username,
               optionId,
-              isSubscriber,
+              isSubscriber: isSubForVote,
               isFollower,
               accountAgeDays: 365, // Default to 1 year
             },
@@ -1178,7 +1202,9 @@ const App: React.FC = () => {
             )}
             {leftTab === 'obs' && (
               <div data-tour="obs-control" className="h-full p-4 overflow-y-auto">
-                <OBSControlPanel onNotification={addNotification} />
+                <Suspense fallback={<LoadingFallback message="Cargando panel OBS..." />}>
+                  <OBSControlPanel onNotification={addNotification} />
+                </Suspense>
               </div>
             )}
             {leftTab === 'gallery' && (
@@ -1215,15 +1241,17 @@ const App: React.FC = () => {
                 {/* Sub-tab content */}
                 <div className="flex-1 overflow-y-auto">
                   {dataSubTab === 'activity' && (
-                    <StreamActivity 
-                      events={streamEventsHook.events}
-                      votes={poll.voteHistory} 
-                      pollOptions={poll.currentPoll ? poll.currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
-                      channelName={channelName}
-                      authToken={authToken}
-                      userId={userId}
-                      onEventAdded={streamEventsHook.addEvent}
-                    />
+                    <Suspense fallback={<LoadingFallback message="Cargando actividad..." />}>
+                      <StreamActivity 
+                        events={streamEventsHook.events}
+                        votes={poll.voteHistory} 
+                        pollOptions={poll.currentPoll ? poll.currentPoll.options.reduce((acc, opt) => ({...acc, [opt.id]: opt}), {}) : {}}
+                        channelName={channelName}
+                        authToken={authToken}
+                        userId={userId}
+                        onEventAdded={streamEventsHook.addEvent}
+                      />
+                    </Suspense>
                   )}
                   {dataSubTab === 'analytics' && (
                     <div className="p-4 space-y-4">

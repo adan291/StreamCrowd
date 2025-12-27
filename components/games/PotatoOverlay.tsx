@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bomb, Timer } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 interface Player {
   oderId: string;

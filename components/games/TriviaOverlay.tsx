@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Trophy, Check } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 interface Question {
   question: string;

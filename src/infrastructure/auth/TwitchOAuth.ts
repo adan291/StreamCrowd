@@ -1,6 +1,10 @@
 /**
  * Twitch OAuth Service
- * Handles OAuth Implicit Flow for Twitch authentication via popup
+ * 
+ * Handles OAuth Implicit Flow for Twitch authentication via popup.
+ * This is a browser-specific utility for handling Twitch authentication.
+ * 
+ * @module infrastructure/auth/TwitchOAuth
  */
 
 // You need to register your app at https://dev.twitch.tv/console/apps
@@ -22,6 +26,8 @@ const OAUTH_SCOPES = [
 // Callback path - can be root or specific path, must match Twitch Dev Console
 const CALLBACK_PATH = '/';
 
+// ============ TYPES ============
+
 export interface TwitchOAuthResult {
   accessToken: string;
   username: string;
@@ -33,6 +39,8 @@ export interface TwitchOAuthError {
   error: string;
   errorDescription: string;
 }
+
+// ============ HELPER FUNCTIONS ============
 
 /**
  * Get the redirect URI based on current location
@@ -88,6 +96,8 @@ async function validateToken(accessToken: string): Promise<{ username: string; u
     expiresIn: data.expires_in,
   };
 }
+
+// ============ PUBLIC API ============
 
 /**
  * Open OAuth popup and handle the authentication flow

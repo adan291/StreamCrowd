@@ -564,6 +564,88 @@ export class TwitchService {
     return this.adapter.getSubscribers(token, broadcasterId);
   }
   
+  // ============================================
+  // Twitch API Methods - Extended
+  // ============================================
+  
+  /**
+   * Get bits leaderboard for a channel
+   */
+  async getBitsLeaderboard(
+    token: string, 
+    broadcasterId: string, 
+    period: 'day' | 'week' | 'month' | 'year' | 'all' = 'all'
+  ): Promise<{ rank: number; username: string; bits: number }[] | null> {
+    return this.adapter.getBitsLeaderboard(token, broadcasterId, period);
+  }
+  
+  /**
+   * Get clips for a channel
+   */
+  async getClips(
+    token: string, 
+    broadcasterId: string, 
+    first?: number,
+    startedAt?: string,
+    endedAt?: string
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; creatorName: string; thumbnailUrl: string }[] | null> {
+    return this.adapter.getClips(token, broadcasterId, first, startedAt, endedAt);
+  }
+  
+  /**
+   * Get VODs/videos for a channel
+   */
+  async getVideos(
+    token: string, 
+    userId: string, 
+    type?: 'all' | 'upload' | 'archive' | 'highlight',
+    first?: number
+  ): Promise<{ id: string; title: string; url: string; viewCount: number; createdAt: string; duration: string; thumbnailUrl: string; type: string }[] | null> {
+    return this.adapter.getVideos(token, userId, type, first);
+  }
+  
+  /**
+   * Get moderators for a channel
+   */
+  async getModerators(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    return this.adapter.getModerators(token, broadcasterId);
+  }
+  
+  /**
+   * Get VIPs for a channel
+   */
+  async getVIPs(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
+    return this.adapter.getVIPs(token, broadcasterId);
+  }
+  
+  /**
+   * Ban a user from the channel
+   */
+  async banUser(token: string, broadcasterId: string, userId: string, reason?: string): Promise<boolean> {
+    return this.adapter.banUser(token, broadcasterId, userId, reason);
+  }
+  
+  /**
+   * Timeout a user in the channel
+   */
+  async timeoutUser(token: string, broadcasterId: string, userId: string, duration: number, reason?: string): Promise<boolean> {
+    return this.adapter.timeoutUser(token, broadcasterId, userId, duration, reason);
+  }
+  
+  /**
+   * Unban a user from the channel
+   */
+  async unbanUser(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    return this.adapter.unbanUser(token, broadcasterId, userId);
+  }
+  
+  /**
+   * Get detailed chatters list
+   */
+  async getChattersDetailed(token: string, broadcasterId: string, moderatorId: string): Promise<{ userId: string; userLogin: string; userName: string }[] | null> {
+    return this.adapter.getChattersDetailed(token, broadcasterId, moderatorId);
+  }
+  
   /**
    * Dispose of the service and clean up resources
    */

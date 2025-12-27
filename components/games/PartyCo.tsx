@@ -5,9 +5,9 @@ import {
   Check, X, Timer, Sparkles, MessageCircle, Eye, Pencil, 
   Music, Brain, Zap, HelpCircle, Crown, Plus, Trash2
 } from 'lucide-react';
-import { loadAIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
+import { loadAIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 // Tipos de pruebas del Party & Co

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Fish, Trophy } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 interface SwimmingFish {
   id: string;

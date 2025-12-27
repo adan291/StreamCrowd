@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import { VoteRecord } from '../types';
 import { 
   Activity, 
@@ -41,7 +40,6 @@ import {
   Sliders
 } from 'lucide-react';
 import { useI18n } from '../i18n';
-import { twitchService } from '../services/twitchService';
 import { getTwitchService } from '../src/application/services/TwitchService';
 import { storageHelpers, generateEventId, getTodayString } from '../src/application/hooks/useStreamEventService';
 
@@ -368,7 +366,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   // Verificar scopes del token
   useEffect(() => {
     if (authToken) {
-      twitchService.validateToken(authToken).then(result => {
+      getTwitchService().validateToken(authToken).then(result => {
         if (result?.scopes) {
           setAvailableScopes(result.scopes);
         }
@@ -380,7 +378,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   const getBroadcasterId = async (): Promise<string | null> => {
     if (userId) return userId;
     if (!authToken || !channelName) return null;
-    return await twitchService.getUserId(authToken, channelName);
+    return await getTwitchService().getUserId(authToken, channelName);
   };
 
   const hasScope = (scope: string) => availableScopes.includes(scope);
@@ -855,7 +853,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const leaderboard = await twitchService.getBitsLeaderboard(authToken, broadcasterId, period);
+      const leaderboard = await getTwitchService().getBitsLeaderboard(authToken, broadcasterId, period);
       if (!leaderboard) {
         setFetchError(OAUTH_ERRORS['missing_scope_bits']);
         return;
@@ -906,7 +904,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       const startedAt = clipDateFrom ? new Date(clipDateFrom).toISOString() : undefined;
       const endedAt = clipDateTo ? new Date(clipDateTo + 'T23:59:59').toISOString() : undefined;
       
-      const clips = await twitchService.getClips(authToken, broadcasterId, 100, startedAt, endedAt);
+      const clips = await getTwitchService().getClips(authToken, broadcasterId, 100, startedAt, endedAt);
       if (!clips) {
         setFetchError(OAUTH_ERRORS['server_error']);
         return;
@@ -938,7 +936,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const videos = await twitchService.getVideos(authToken, broadcasterId, 'all', 50);
+      const videos = await getTwitchService().getVideos(authToken, broadcasterId, 'all', 50);
       if (!videos) {
         setFetchError(OAUTH_ERRORS['server_error']);
         return;
@@ -970,7 +968,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const mods = await twitchService.getModerators(authToken, broadcasterId);
+      const mods = await getTwitchService().getModerators(authToken, broadcasterId);
       if (!mods) {
         setFetchError(OAUTH_ERRORS['missing_scope_moderation']);
         return;
@@ -1002,7 +1000,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const vips = await twitchService.getVIPs(authToken, broadcasterId);
+      const vips = await getTwitchService().getVIPs(authToken, broadcasterId);
       if (!vips) {
         setFetchError(OAUTH_ERRORS['missing_scope_vips']);
         return;
@@ -1047,13 +1045,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       }
       
       // Obtener el ID del usuario a banear
-      const targetUserId = await twitchService.getUserId(authToken, username);
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
       if (!targetUserId) {
         setModerationResult({ success: false, message: 'Usuario no encontrado' });
         return;
       }
       
-      const success = await twitchService.banUser(authToken, broadcasterId, targetUserId, reason);
+      const success = await getTwitchService().banUser(authToken, broadcasterId, targetUserId, reason);
       
       if (success) {
         setModerationResult({ success: true, message: `${username} ha sido baneado permanentemente` });
@@ -1091,13 +1089,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const targetUserId = await twitchService.getUserId(authToken, username);
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
       if (!targetUserId) {
         setModerationResult({ success: false, message: 'Usuario no encontrado' });
         return;
       }
       
-      const success = await twitchService.timeoutUser(authToken, broadcasterId, targetUserId, duration, reason);
+      const success = await getTwitchService().timeoutUser(authToken, broadcasterId, targetUserId, duration, reason);
       
       if (success) {
         const formatDuration = (s: number) => {
@@ -1140,13 +1138,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const targetUserId = await twitchService.getUserId(authToken, username);
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
       if (!targetUserId) {
         setModerationResult({ success: false, message: 'Usuario no encontrado' });
         return;
       }
       
-      const success = await twitchService.unbanUser(authToken, broadcasterId, targetUserId);
+      const success = await getTwitchService().unbanUser(authToken, broadcasterId, targetUserId);
       
       if (success) {
         setModerationResult({ success: true, message: `${username} ha sido desbaneado` });
@@ -1178,7 +1176,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const chatters = await twitchService.getChattersDetailed(authToken, broadcasterId, broadcasterId);
+      const chatters = await getTwitchService().getChattersDetailed(authToken, broadcasterId, broadcasterId);
       
       if (chatters) {
         setLiveChatters(chatters);
@@ -1546,7 +1544,10 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   };
 
   // Exportar TODO en un archivo Excel con múltiples hojas
-  const exportAllData = () => {
+  const exportAllData = async () => {
+    // Dynamic import of xlsx for code splitting
+    const XLSX = await import('xlsx');
+    
     const workbook = XLSX.utils.book_new();
     const date = new Date().toISOString().split('T')[0];
     
@@ -3263,3 +3264,5 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     </div>
   );
 };
+
+export default StreamActivity;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Eye, Play, Trophy, RotateCcw, ExternalLink, Check, X, HelpCircle } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {

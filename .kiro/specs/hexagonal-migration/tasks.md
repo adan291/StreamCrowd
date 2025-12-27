@@ -283,7 +283,7 @@ Este plan implementa la migración completa a arquitectura hexagonal, consolidan
     - Actualizar `services/firebaseSync.ts` para usar FirebaseSyncAdapter
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-  - [ ] 16.3 Eliminar hooks legacy
+  - [x] 16.3 Eliminar hooks legacy
     - Eliminar `hooks/usePoll.ts`
     - Eliminar `hooks/useModeration.ts`
     - Eliminar `hooks/useStreamEvents.ts`
@@ -291,7 +291,7 @@ Este plan implementa la migración completa a arquitectura hexagonal, consolidan
     - Eliminar `hooks/useAIAnalytics.ts`
     - _Requirements: 5.7_
 
-  - [ ] 16.4 Actualizar imports restantes
+  - [-] 16.4 Actualizar imports restantes
     - Buscar y actualizar cualquier import de `services/` a `src/application/services/`
     - Buscar y actualizar cualquier import de `hooks/` a `src/application/hooks/`
     - _Requirements: 6.7_
@@ -334,10 +334,11 @@ Este plan implementa la migración completa a arquitectura hexagonal, consolidan
     - Actualizar `HEXAGONAL_MIGRATION_PLAN.md` como completado
     - _Requirements: 8.6_
 
-- [ ] 19. Checkpoint final
+- [x] 19. Checkpoint final
   - Ensure all tests pass, ask the user if questions arise.
   - Verificar que la carpeta `services/` está vacía o eliminada.
   - Verificar que `hooks/` solo contiene re-exports.
+  - **BLOCKED**: Task 16 incomplete - tests failing due to legacy imports, services/ still has files
 
 ## Notes
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Camera, Eye, EyeOff, Plus, Trash2, Check, Sparkles, Loader2 } from 'lucide-react';
-import { loadAIConfig, AIConfig, getProviderForFunction } from '../../services/aiAnalyticsService';
+import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface MemoryObject {

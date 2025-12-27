@@ -38,7 +38,7 @@ import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChanne
 import { useI18n } from '../i18n';
 import { getTwitchService } from '../src/application/services/TwitchService';
 import type { StreamEvent as DomainStreamEvent } from '../src/domain/entities/StreamEvent';
-import { giveawaySync } from '../services/firebaseSync';
+import { giveawaySync } from '../src/infrastructure/sync/FirebaseSync';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
 

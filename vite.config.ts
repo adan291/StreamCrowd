@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
@@ -15,6 +16,13 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      visualizer({
+        filename: 'dist/bundle-report.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+        template: 'treemap',
+      }),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['ai-vision-icon.svg', 'ai-vision-icon.png', 'ai-vision-icon.ico'],
@@ -103,7 +111,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 1500,
+      chunkSizeWarningLimit: 500,
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -113,10 +121,83 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-icons': ['lucide-react'],
-            'vendor-charts': ['recharts']
+          manualChunks: (id) => {
+            // Vendor chunks - split by library for better caching
+            if (id.includes('node_modules')) {
+              // React core - essential, loaded first
+              if (id.includes('react-dom') || id.includes('react/') || id.includes('/react/')) {
+                return 'vendor-react';
+              }
+              // Framer Motion - heavy animation library
+              if (id.includes('framer-motion') || id.includes('motion')) {
+                return 'vendor-motion';
+              }
+              // UI icons
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              // Charts library - heavy
+              if (id.includes('recharts') || id.includes('d3-')) {
+                return 'vendor-charts';
+              }
+              // OBS WebSocket
+              if (id.includes('obs-websocket-js')) {
+                return 'vendor-obs';
+              }
+              // Firebase - heavy
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              // Twitch chat
+              if (id.includes('tmi.js')) {
+                return 'vendor-twitch';
+              }
+              // Excel export - very heavy
+              if (id.includes('xlsx')) {
+                return 'vendor-xlsx';
+              }
+              // Socket.io for real-time
+              if (id.includes('socket.io')) {
+                return 'vendor-socket';
+              }
+              // Other vendor modules
+              return 'vendor-misc';
+            }
+            // Game components - each game gets its own chunk via lazy loading
+            if (id.includes('/components/games/')) {
+              const match = id.match(/\/games\/([^/]+)\.(tsx|ts)$/);
+              if (match) {
+                return `game-${match[1].toLowerCase()}`;
+              }
+            }
+            // Application services - separate chunk
+            if (id.includes('/src/application/services/')) {
+              return 'app-services';
+            }
+            // Infrastructure adapters - separate chunk
+            if (id.includes('/src/infrastructure/')) {
+              return 'app-infrastructure';
+            }
+            // Analytics components
+            if (id.includes('Analytics') || id.includes('analytics')) {
+              return 'feature-analytics';
+            }
+            // OBS related
+            if (id.includes('OBS') || id.includes('obs')) {
+              return 'feature-obs';
+            }
+            // Alert system
+            if (id.includes('Alert')) {
+              return 'feature-alerts';
+            }
+            // Command system
+            if (id.includes('Command')) {
+              return 'feature-commands';
+            }
+            // Giveaway and Judge panels - heavy components
+            if (id.includes('Giveaway') || id.includes('Judge')) {
+              return 'feature-giveaway';
+            }
           }
         }
       }

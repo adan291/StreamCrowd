@@ -5,8 +5,12 @@
  * Proporcionan una API reactiva sobre los servicios desacoplados.
  */
 
+export * from './useAdvancedAnalytics';
+export * from './useAlertProviders';
+export * from './useAlerts';
 export * from './useAnalyticsService';
 export * from './useChatService';
+export * from './useCommands';
 export * from './useGameService';
 export * from './useModerationService';
 export * from './useOBS';

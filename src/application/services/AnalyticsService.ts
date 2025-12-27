@@ -1388,3 +1388,45 @@ export function compareSessions(current: ChatMetrics, previous: ChatMetrics): {
 
 // Re-export ChatMetrics type for backward compatibility
 export type { ChatMetrics, ActivityLevel, Sentiment, SpecialMood } from '../../domain/entities/ChatMetrics';
+
+// ============ STANDALONE AI CONFIG FUNCTIONS ============
+// These are exported for backward compatibility with game components
+
+/**
+ * Load AI configuration from storage (standalone function)
+ * @returns AI configuration or null
+ */
+export function loadAIConfig(): AIConfig | null {
+  const service = getAnalyticsService();
+  const config = service.getFullAIConfig();
+  // Check if any provider has a key configured
+  const hasKey = Object.values(config.providers).some(p => p.apiKey);
+  return hasKey ? config : null;
+}
+
+/**
+ * Get provider info for a specific function (standalone function)
+ * @param config - AI configuration
+ * @param fn - Function type ('analytics' or 'games')
+ * @returns Provider info or null
+ */
+export function getProviderForFunction(
+  config: AIConfig, 
+  fn: 'analytics' | 'games'
+): { provider: AIProvider; apiKey: string } | null {
+  const provider = fn === 'analytics' ? config.analyticsProvider : config.gamesProvider;
+  const providerConfig = config.providers[provider];
+  
+  if (providerConfig.apiKey) {
+    return { provider, apiKey: providerConfig.apiKey };
+  }
+  
+  // Fallback: find any provider with key
+  for (const p of ['gemini', 'openai', 'anthropic'] as AIProvider[]) {
+    if (config.providers[p].apiKey) {
+      return { provider: p, apiKey: config.providers[p].apiKey };
+    }
+  }
+  
+  return null;
+}

@@ -64,7 +64,10 @@ export class ModerationService {
     this.config = config 
       ? { ...DEFAULT_MODERATION_CONFIG, ...config }
       : { ...DEFAULT_MODERATION_CONFIG };
-    this.stats = { ...DEFAULT_MODERATION_STATS };
+    this.stats = { 
+      ...DEFAULT_MODERATION_STATS,
+      rejectedByReason: { ...DEFAULT_MODERATION_STATS.rejectedByReason }
+    };
     this.userVotes = new Map();
   }
 
@@ -262,7 +265,10 @@ export class ModerationService {
    * Reinicia las estadísticas de moderación
    */
   resetStats(): void {
-    this.stats = { ...DEFAULT_MODERATION_STATS };
+    this.stats = { 
+      ...DEFAULT_MODERATION_STATS,
+      rejectedByReason: { ...DEFAULT_MODERATION_STATS.rejectedByReason }
+    };
   }
 
   // ============================================================================

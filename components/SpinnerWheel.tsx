@@ -4,7 +4,7 @@ import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, Settings, Us
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
-import { gameSync } from '../services/firebaseSync';
+import { gameSync } from '../src/infrastructure/sync/FirebaseSync';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
 
 type WheelMode = 'classic' | 'voting';
