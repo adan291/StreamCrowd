@@ -3,7 +3,7 @@ import { Crown, Trophy, Settings } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
-import { giveawaySync } from '../services/firebaseSync';
+import { giveawaySync } from '../src/infrastructure/sync/FirebaseSync';
 
 interface RandomWinnerOverlayProps {
   chatMessages: TwitchMessage[];

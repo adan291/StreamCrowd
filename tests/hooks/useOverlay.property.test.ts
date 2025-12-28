@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
-import { detectOverlayMode, getChannelFromUrl, getPollConfigFromUrl, DEFAULT_OVERLAY_SETTINGS } from '../../hooks/useOverlay';
+import { detectOverlayMode, getChannelFromUrl, getPollConfigFromUrl, DEFAULT_OVERLAY_SETTINGS } from '../../hooks';
 
 describe('useOverlay Property Tests', () => {
   // Store original window.location

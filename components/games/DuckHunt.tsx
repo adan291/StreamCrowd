@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, RotateCcw, Trophy, ExternalLink, Crosshair } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Duck {
   id: string;
@@ -43,6 +44,9 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
   const channelRef = useRef<BroadcastChannel | null>(null);
   // Procesar mensajes en tiempo real
   const processedIdsRef = useRef<Set<string>>(new Set());
+  
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
   useEffect(() => {
     channelRef.current = new BroadcastChannel(GAME_CHANNEL);
@@ -372,7 +376,15 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     <div className="p-4 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setIsActive(!isActive)}
+          onClick={() => {
+            const newState = !isActive;
+            setIsActive(newState);
+            if (newState) {
+              triggerGameStart();
+            } else {
+              triggerGameEnd();
+            }
+          }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
             isActive ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
           }`}

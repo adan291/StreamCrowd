@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Settings, ExternalLink, Timer, Users, Trash2 } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Bet {
 visitorId: string;
@@ -41,6 +42,9 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
   const lastProcessedRef = useRef(0);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const rotationRef = useRef(0);
+  
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
   const getNumberColor = (num: number): string => {
     if (num === 0) return '#00AA00';
@@ -177,6 +181,9 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
     setBettingOpen(false);
     setShowResult(false);
     setResult(null);
+    
+    // OBS Trigger: Game start
+    triggerGameStart();
 
     const resultIndex = Math.floor(Math.random() * ROULETTE_NUMBERS.length);
     const resultNumber = ROULETTE_NUMBERS[resultIndex];
@@ -211,11 +218,13 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
         setShowResult(true);
         setIsSpinning(false);
         syncToOverlay({ type: 'result', result: resultNumber, bets });
+        // OBS Trigger: Game end
+        triggerGameEnd();
       }
     };
     
     requestAnimationFrame(animateSpin);
-  }, [isSpinning, bets, syncToOverlay, drawWheel]);
+  }, [isSpinning, bets, syncToOverlay, drawWheel, triggerGameStart, triggerGameEnd]);
 
   const reset = () => {
     setBets([]);

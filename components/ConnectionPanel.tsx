@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, ShieldAlert, LogIn } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
-import { openTwitchOAuthPopup, TwitchOAuthError } from '../services/twitchOAuth';
+import { openTwitchOAuthPopup, TwitchOAuthError } from '../src/infrastructure/auth/TwitchOAuth';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;

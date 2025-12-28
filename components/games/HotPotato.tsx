@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Bomb, Timer, Trophy, RotateCcw, Users, ExternalLink } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {
   oderId: string; // visitorId typo kept for compatibility
@@ -34,6 +35,9 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
   const lastProcessedRef = useRef(0);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
   // Setup BroadcastChannel
   useEffect(() => {
@@ -168,6 +172,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     setTimeLeft(time);
     setGameState('playing');
     setLoser(null);
+    triggerGameStart();
   };
 
   const nextRound = () => {
@@ -202,6 +207,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     setRound(1);
     setCurrentHolder(null);
     if (timerRef.current) clearInterval(timerRef.current);
+    triggerGameEnd();
   };
 
   const activePlayers = players.filter((p: Player) => !p.isOut);

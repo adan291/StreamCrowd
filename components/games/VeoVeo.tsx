@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Eye, Play, Trophy, RotateCcw, ExternalLink, Check, X, HelpCircle } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {
   oderId: string;
@@ -102,6 +103,9 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
     });
   }, [chatMessages, isConnected, gameState, secretWord]);
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startGame = () => {
     if (!secretWord.trim() || !hint.trim()) return;
     setGameState('playing');
@@ -109,6 +113,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
     setWinner(null);
     setHintsGiven([hint]);
     lastProcessedRef.current = chatMessages.length;
+    triggerGameStart();
   };
 
   const addHint = (newHint: string) => {
@@ -128,6 +133,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
     setGuesses([]);
     setWinner(null);
     setHintsGiven([]);
+    triggerGameEnd();
   };
 
   const sortedPlayers = [...players.values()].sort((a, b) => b.score - a.score);

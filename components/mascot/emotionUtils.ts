@@ -2,7 +2,7 @@
 import { TwitchMessage } from '../../types';
 import { MascotEmotion, ChatSentiment, EmotionResult } from './types';
 
-import { analyzeChat, ChatMetrics } from '../../services/chatAnalysisService';
+import { analyzeChat, ChatMetrics } from '../../src/application/services/AnalyticsService';
 
 // Mensajes variados para cada estado - se elige uno aleatorio
 const MESSAGES = {

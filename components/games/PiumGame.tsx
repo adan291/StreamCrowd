@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, ExternalLink, Trash2, Volume2, VolumeX, Trophy, RotateCcw } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 const STORAGE_KEY_PIUM = 'pium_game_state';
 
@@ -55,6 +56,9 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const lastProcessedRef = useRef(0);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
   // Pocket positions (6 pockets like real pool)
   const getPockets = useCallback(() => {
@@ -645,7 +649,15 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setIsActive(!isActive)}
+          onClick={() => {
+            const newState = !isActive;
+            setIsActive(newState);
+            if (newState) {
+              triggerGameStart();
+            } else {
+              triggerGameEnd();
+            }
+          }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
             isActive ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
           }`}

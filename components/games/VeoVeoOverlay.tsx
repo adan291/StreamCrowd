@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Trophy, Check, X } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 const GAME_CHANNEL = 'veoveo_sync';
 const STORAGE_KEY_VEOVEO = 'veoveo_state';

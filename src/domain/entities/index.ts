@@ -7,3 +7,6 @@
 
 export * from './Poll';
 export * from './Vote';
+export * from './StreamEvent';
+export * from './ModerationConfig';
+export * from './ChatMetrics';

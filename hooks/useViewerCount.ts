@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { twitchService } from '../services/twitchService';
+import { getTwitchService } from '../src/application/services/TwitchService';
 
 interface UseViewerCountOptions {
   /** Update interval in milliseconds (default: 30000 = 30 seconds) */
@@ -38,6 +38,7 @@ export function useViewerCount(options: UseViewerCountOptions = {}): UseViewerCo
     setError(null);
     
     try {
+      const twitchService = getTwitchService();
       const count = await twitchService.getViewerCount();
       setViewerCount(count);
     } catch (err) {

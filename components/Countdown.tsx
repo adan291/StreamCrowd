@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
-import { countdownSync } from '../services/firebaseSync';
+import { countdownSync } from '../src/infrastructure/sync/FirebaseSync';
 
 interface CountdownConfig {
   initialDays: number;

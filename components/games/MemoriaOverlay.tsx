@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Eye, EyeOff, Camera, Check } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 
 const GAME_CHANNEL = 'memoria_irl_sync';
 const STORAGE_KEY_MEMORIA = 'memoria_irl_state';

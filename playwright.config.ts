@@ -12,10 +12,18 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   
+  // Global setup for E2E tests
+  globalSetup: './tests/e2e/global-setup.ts',
+  
+  // Timeout for each test
+  timeout: 30000,
+  
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // Increase action timeout for slower operations
+    actionTimeout: 10000,
   },
 
   projects: [

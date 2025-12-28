@@ -1,53 +1,131 @@
 # Arquitectura Hexagonal - TwitchVote Live
 
+## Estado: ✅ MIGRACIÓN COMPLETADA
+
+La migración a arquitectura hexagonal ha sido completada exitosamente. Este documento describe la estructura final del proyecto.
+
 ## Visión General
 
-Este proyecto está siendo migrado a una arquitectura hexagonal para:
-1. **Desacoplar** la lógica de negocio de las implementaciones concretas
-2. **Facilitar** la adición de nuevos proveedores (OBS, YouTube, multistream)
-3. **Mejorar** la testabilidad del código
-4. **Reducir** el código duplicado
+TwitchVote Live utiliza una arquitectura hexagonal (puertos y adaptadores) que proporciona:
+
+1. **Desacoplamiento** - Lógica de negocio separada de implementaciones concretas
+2. **Testabilidad** - Domain layer 100% testeable sin mocks
+3. **Extensibilidad** - Fácil adición de nuevos proveedores (OBS, YouTube, etc.)
+4. **Mantenibilidad** - Responsabilidades claras por capa
 
 ## Estructura de Carpetas
 
 ```
 src/
-├── domain/                    # 🎯 Lógica de negocio PURA
-│   ├── entities/              # Modelos de datos y lógica
-│   │   ├── Poll.ts           # Entidad de encuesta
-│   │   └── Vote.ts           # Entidad de voto y moderación
-│   └── ports/                 # Interfaces (contratos)
-│       ├── IChatProvider.ts  # Interfaz para chat (Twitch/YouTube/OBS)
-│       ├── IOverlaySync.ts   # Interfaz para sync de overlays
-│       └── IStorage.ts       # Interfaz para persistencia
+├── domain/                           # 🎯 Lógica de negocio PURA
+│   ├── entities/                     # Modelos de datos
+│   │   ├── Poll.ts                   # Entidad de encuesta
+│   │   ├── Vote.ts                   # Entidad de voto
+│   │   ├── StreamEvent.ts            # Eventos de stream (subs, raids, etc.)
+│   │   ├── ModerationConfig.ts       # Configuración de moderación
+│   │   └── ChatMetrics.ts            # Métricas de análisis de chat
+│   └── ports/                        # Interfaces (contratos)
+│       ├── IChatProvider.ts          # Interfaz para chat (Twitch/YouTube)
+│       ├── IOBSController.ts         # Interfaz para control de OBS
+│       ├── IOverlaySync.ts           # Interfaz para sync de overlays
+│       ├── IStorage.ts               # Interfaz para persistencia
+│       ├── IStreamEventProvider.ts   # Interfaz para eventos de stream
+│       └── IAnalyticsProvider.ts     # Interfaz para análisis con AI
 │
-├── infrastructure/            # 🔧 Implementaciones concretas
-│   ├── adapters/
-│   │   ├── TwitchAdapter.ts      # Implementa IChatProvider
-│   │   ├── FirebaseSyncAdapter.ts # Implementa IOverlaySync
-│   │   └── LocalStorageAdapter.ts # Implementa IStorage
-│   └── factories/
-│       └── ProviderFactory.ts    # Crea el adapter correcto + DI Container
-│
-├── application/               # 📋 Orquestación
-│   ├── services/              # Servicios de aplicación
-│   │   ├── ChatService.ts    # Gestión de conexión al chat
-│   │   ├── PollService.ts    # Gestión de encuestas
-│   │   └── GameService.ts    # Clase base para juegos
-│   ├── hooks/                 # Hooks de React
-│   │   ├── useChatService.ts # Hook para ChatService
-│   │   ├── usePollService.ts # Hook para PollService
-│   │   └── useGameService.ts # Hook genérico para juegos
-│   └── games/                 # Servicios de juegos (13 juegos)
+├── application/                      # 📋 Orquestación y casos de uso
+│   ├── services/                     # Servicios de aplicación
+│   │   ├── PollService.ts            # Gestión de encuestas
+│   │   ├── ChatService.ts            # Gestión de conexión al chat
+│   │   ├── GameService.ts            # Clase base para juegos
+│   │   ├── ModerationService.ts      # Validación y moderación de votos
+│   │   ├── StreamEventService.ts     # Gestión de eventos de stream
+│   │   ├── AnalyticsService.ts       # Análisis de chat y métricas
+│   │   ├── TwitchService.ts          # Orquestación de conexión Twitch
+│   │   └── OBSService.ts             # Control de OBS WebSocket
+│   ├── hooks/                        # Hooks de React
+│   │   ├── usePollService.ts         # Hook para PollService
+│   │   ├── useChatService.ts         # Hook para ChatService
+│   │   ├── useGameService.ts         # Hook genérico para juegos
+│   │   ├── useModerationService.ts   # Hook para ModerationService
+│   │   ├── useStreamEventService.ts  # Hook para StreamEventService
+│   │   ├── useAnalyticsService.ts    # Hook para AnalyticsService
+│   │   ├── useTwitchService.ts       # Hook para TwitchService
+│   │   ├── useOBS.ts                 # Hook para OBSService
+│   │   └── useOBSTriggers.ts         # Hook para triggers de OBS
+│   └── games/                        # Servicios de juegos (14 juegos)
 │       ├── HotPotatoService.ts
 │       ├── TriviaBattleService.ts
 │       ├── CasinoRouletteService.ts
-│       └── ... (10 más)
+│       ├── DuckHuntService.ts
+│       ├── PiumService.ts
+│       ├── AhorcadoService.ts
+│       ├── BattleshipService.ts
+│       ├── CarreraService.ts
+│       ├── ChatFishingService.ts
+│       ├── MemoriaService.ts
+│       ├── PartyCoService.ts
+│       ├── PPTService.ts
+│       └── VeoVeoService.ts
 │
-└── [archivos legacy]          # Código existente (funciona en paralelo)
-    ├── services/              # twitchService, firebaseSync, etc.
-    ├── hooks/                 # useTwitchConnection, usePoll, etc.
-    └── components/            # Componentes de React
+├── infrastructure/                   # 🔧 Implementaciones concretas
+│   ├── adapters/
+│   │   ├── TwitchAdapter.ts          # Implementa IChatProvider + IStreamEventProvider
+│   │   ├── OBSWebSocketAdapter.ts    # Implementa IOBSController
+│   │   ├── FirebaseSyncAdapter.ts    # Implementa IOverlaySync
+│   │   └── LocalStorageAdapter.ts    # Implementa IStorage
+│   └── factories/
+│       └── ProviderFactory.ts        # Factory + DI Container
+│
+└── index.ts                          # Exports principales
+```
+
+## Diagrama de Arquitectura
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      PRESENTATION LAYER                          │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │ Components  │ │   Hooks     │ │  Overlays   │               │
+│  │ (React)     │ │ (React)     │ │  (React)    │               │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘               │
+└─────────┼───────────────┼───────────────┼───────────────────────┘
+          │               │               │
+          ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      APPLICATION LAYER                           │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │ PollService │ │ Moderation  │ │  Analytics  │               │
+│  │             │ │  Service    │ │   Service   │               │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘               │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │   Twitch    │ │ StreamEvent │ │    OBS      │               │
+│  │   Service   │ │   Service   │ │   Service   │               │
+│  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘               │
+└─────────┼───────────────┼───────────────┼───────────────────────┘
+          │               │               │
+          ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        DOMAIN LAYER                              │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │   Entities  │ │    Ports    │ │   Types     │               │
+│  │ Poll, Vote  │ │ IChatProv.  │ │ Moderation  │               │
+│  │ StreamEvent │ │ IOBSCtrl    │ │ ChatMetrics │               │
+│  │ ChatMetrics │ │ IStorage    │ │             │               │
+│  └─────────────┘ └─────────────┘ └─────────────┘               │
+└─────────────────────────────────────────────────────────────────┘
+          │               │               │
+          ▼               ▼               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    INFRASTRUCTURE LAYER                          │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │   Twitch    │ │    OBS      │ │  Firebase   │               │
+│  │   Adapter   │ │   Adapter   │ │   Adapter   │               │
+│  └─────────────┘ └─────────────┘ └─────────────┘               │
+│  ┌─────────────┐ ┌─────────────┐                               │
+│  │ LocalStorage│ │  Provider   │                               │
+│  │   Adapter   │ │   Factory   │                               │
+│  └─────────────┘ └─────────────┘                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Capas y Reglas
@@ -58,20 +136,55 @@ src/
 - Contiene solo lógica de negocio pura y tipos
 - Es 100% testeable sin mocks
 
-### Infrastructure (Exterior)
-- Implementa las interfaces de `domain/ports/`
-- Puede usar dependencias externas
-- **NO** importa de `presentation/`
-
 ### Application (Orquestación)
 - Usa `domain/` para lógica de negocio
-- Usa `infrastructure/` a través de interfaces
+- Usa `infrastructure/` a través de interfaces (ports)
 - Contiene hooks de React y servicios de aplicación
+- Orquesta casos de uso
+
+### Infrastructure (Exterior)
+- Implementa las interfaces de `domain/ports/`
+- Puede usar dependencias externas (tmi.js, Firebase, obs-websocket-js)
+- **NO** importa de `presentation/`
 
 ### Presentation (UI)
-- Solo componentes de React
-- Usa hooks de `application/`
+- Solo componentes de React (en `components/`)
+- Usa hooks de `application/hooks/`
 - **NO** accede directamente a `infrastructure/`
+
+## Servicios Implementados
+
+### ModerationService
+Gestiona la validación y moderación de votos:
+- Validación de edad de cuenta, cooldowns, whitelist/blacklist
+- Cálculo de pesos por subscriber/follower status
+- Estadísticas de moderación
+- Gestión de presets
+
+### StreamEventService
+Gestiona eventos de stream:
+- Suscripciones, raids, cheers, bans
+- Agregaciones y estadísticas por sesión
+- Sistema de listeners para notificaciones
+
+### AnalyticsService
+Análisis de chat y métricas:
+- Detección de sentimiento y mood
+- Generación de word clouds
+- Integración con AI (Gemini, OpenAI, Anthropic)
+- Historial de sesiones
+
+### TwitchService
+Orquestación de conexión a Twitch:
+- Conexión/desconexión con reconexión automática
+- Canales de colaboración
+- Gestión de OAuth tokens
+
+### OBSService
+Control de OBS via WebSocket:
+- Cambio de escenas
+- Control de fuentes
+- Triggers automáticos
 
 ## Cómo Añadir un Nuevo Proveedor
 
@@ -85,10 +198,9 @@ export class YouTubeAdapter implements IChatProvider {
   readonly providerId = 'youtube';
   readonly providerName = 'YouTube';
   
+  async connect(options) { /* ... */ }
+  async disconnect() { /* ... */ }
   // Implementar todos los métodos de IChatProvider
-  async connect(options) { ... }
-  async disconnect() { ... }
-  // etc.
 }
 ```
 
@@ -102,40 +214,32 @@ case 'youtube':
 ```typescript
 import { container } from './infrastructure/factories/ProviderFactory';
 
-// Cambiar a YouTube
 container.configure({
   chat: { type: 'youtube', options: { apiKey: '...' } }
 });
 
-// El resto del código funciona igual
 const provider = container.getChatProvider();
 await provider.connect({ channel: 'UCxxx' });
 ```
 
-## Migración Gradual
+## Tests
 
-El código legacy sigue funcionando mientras migramos:
+El proyecto incluye:
+- **Tests unitarios**: Para servicios y entidades
+- **Tests de propiedades**: Para validar invariantes (fast-check)
+- **Tests E2E**: Para flujos completos (Playwright)
 
-1. **Fase 1** (Actual): Crear estructura base y adapters
-2. **Fase 2**: Migrar servicios a usar adapters
-3. **Fase 3**: Migrar hooks a usar servicios de aplicación
-4. **Fase 4**: Migrar componentes a presentation/
-5. **Fase 5**: Eliminar código legacy
+Ejecutar tests:
+```bash
+npm run test        # Tests unitarios y de propiedades
+npm run test:e2e    # Tests E2E
+npm run test:all    # Todos los tests
+```
 
-## Beneficios
+## Beneficios Logrados
 
 - ✅ **Testabilidad**: Domain es 100% testeable sin mocks
 - ✅ **Flexibilidad**: Cambiar Twitch por YouTube = cambiar 1 línea
 - ✅ **Mantenibilidad**: Cada capa tiene responsabilidad clara
 - ✅ **Escalabilidad**: Añadir OBS/multistream sin romper nada
-
-## Próximos Pasos
-
-1. [x] Crear `application/services/PollService.ts` ✅
-2. [x] Crear `application/services/ChatService.ts` ✅
-3. [x] Crear `application/services/GameService.ts` ✅
-4. [x] Crear hooks de aplicación (`useChatService`, `usePollService`, `useGameService`) ✅
-5. [x] Migrar 13 juegos a servicios (`src/application/games/`) ✅
-6. [ ] Crear adapter para OBS WebSocket
-7. [ ] Crear adapter para YouTube Live Chat
-8. [ ] Migrar componentes para usar nuevos hooks (opcional, gradual)
+- ✅ **Código limpio**: Servicios legacy consolidados en arquitectura hexagonal

@@ -3,16 +3,10 @@ import { Save, FolderOpen, Trash2, Clock, Users, Shield, Sliders } from 'lucide-
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
-import {
-  ModerationConfig,
-  ModerationPreset,
-  DEFAULT_MODERATION_CONFIG,
-  savePreset,
-  loadPreset,
-  deletePreset,
-  getAllPresets,
-  isValidWeight,
-} from '../services/voteModerationService';
+import { useModerationService } from '../src/application/hooks';
+import type { ModerationConfig } from '../src/domain/entities/ModerationConfig';
+import { DEFAULT_MODERATION_CONFIG } from '../src/domain/entities/ModerationConfig';
+import type { ModerationPreset } from '../src/application/services/ModerationService';
 
 interface ModerationConfigFormProps {
   config: ModerationConfig;
@@ -26,13 +20,14 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
   onNotification,
 }) => {
   const { t } = useI18n();
+  const { savePreset, loadPreset, deletePreset, getAllPresets } = useModerationService();
   const [presets, setPresets] = useState<ModerationPreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [showPresetList, setShowPresetList] = useState(false);
 
   useEffect(() => {
     setPresets(getAllPresets());
-  }, []);
+  }, [getAllPresets]);
 
   const handleMinAgeChange = (value: string) => {
     const numValue = parseInt(value, 10);
@@ -76,18 +71,19 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       onNotification?.('error', t.moderation.enterPresetName);
       return;
     }
-    const newPreset = savePreset(presetName.trim(), config);
+    savePreset(presetName.trim());
     setPresets(getAllPresets());
     setPresetName('');
-    onNotification?.('success', t.moderation.presetSaved.replace('{name}', newPreset.name));
+    onNotification?.('success', t.moderation.presetSaved.replace('{name}', presetName.trim()));
   };
 
   const handleLoadPreset = (id: string) => {
-    const preset = loadPreset(id);
-    if (preset) {
-      onChange(preset.config);
+    const loadedConfig = loadPreset(id);
+    if (loadedConfig) {
+      onChange(loadedConfig);
       setShowPresetList(false);
-      onNotification?.('info', t.moderation.presetLoaded.replace('{name}', preset.name));
+      const preset = presets.find(p => p.id === id);
+      onNotification?.('info', t.moderation.presetLoaded.replace('{name}', preset?.name || ''));
     }
   };
 

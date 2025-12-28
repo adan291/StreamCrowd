@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TwitchMessage, PollOption, CollaborationChannel } from '../types';
-import { MessageSquare, CheckCircle2, ArrowDown, Settings, Send, X, Type, Minus, Plus } from 'lucide-react';
+import { MessageSquare, CheckCircle2, ArrowDown, Settings, Send, X, Type, Minus, Plus, Clock, Ban, Crown, Heart, ExternalLink, User } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { getTwitchService } from '../src/application/services/TwitchService';
 
 interface ChatSettings {
   fontSize: 'xs' | 'sm' | 'base' | 'lg';
@@ -24,9 +25,10 @@ interface ChatFeedProps {
   collaborationChannels?: CollaborationChannel[];
   mainChannel?: string;
   isConnected?: boolean;
+  authToken?: string | null;
 }
 
-export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options, collaborationChannels = [], mainChannel, isConnected = false }) => {
+export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options, collaborationChannels = [], mainChannel, isConnected = false, authToken }) => {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
@@ -84,11 +86,175 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
     }
   }, [messages, isAutoScroll]);
 
-  const handleSendMessage = () => {
-    if (!chatMessage.trim()) return;
-    // TODO: Implementar envío real cuando tengamos auth de Twitch
-    console.log('Mensaje a enviar:', chatMessage);
-    setChatMessage('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  // Estado para menú de moderación
+  const [selectedUser, setSelectedUser] = useState<{ username: string; userId?: string; color?: string; position: { x: number; y: number } } | null>(null);
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [moderationResult, setModerationResult] = useState<{ success: boolean; message: string } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setSelectedUser(null);
+        setModerationResult(null);
+      }
+    };
+    if (selectedUser) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [selectedUser]);
+
+  // Funciones de moderación
+  const timeoutUser = async (username: string, duration: number) => {
+    if (!authToken || !mainChannel) return;
+    setModerationLoading(true);
+    setModerationResult(null);
+    try {
+      const broadcasterId = await getTwitchService().getUserId(authToken, mainChannel);
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      const success = await getTwitchService().timeoutUser(authToken, broadcasterId, targetUserId, duration);
+      if (success) {
+        const durationStr = duration < 60 ? `${duration}s` : duration < 3600 ? `${Math.floor(duration/60)}m` : `${Math.floor(duration/3600)}h`;
+        setModerationResult({ success: true, message: `${username} silenciado ${durationStr}` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al silenciar. Verifica permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al silenciar usuario' });
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const banUser = async (username: string) => {
+    if (!authToken || !mainChannel) return;
+    setModerationLoading(true);
+    setModerationResult(null);
+    try {
+      const broadcasterId = await getTwitchService().getUserId(authToken, mainChannel);
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      const success = await getTwitchService().banUser(authToken, broadcasterId, targetUserId);
+      if (success) {
+        setModerationResult({ success: true, message: `${username} baneado` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al banear. Verifica permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al banear usuario' });
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const unbanUser = async (username: string) => {
+    if (!authToken || !mainChannel) return;
+    setModerationLoading(true);
+    setModerationResult(null);
+    try {
+      const broadcasterId = await getTwitchService().getUserId(authToken, mainChannel);
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      const success = await getTwitchService().unbanUser(authToken, broadcasterId, targetUserId);
+      if (success) {
+        setModerationResult({ success: true, message: `${username} desbaneado` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al desbanear. Verifica permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al desbanear usuario' });
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const addVIP = async (username: string) => {
+    if (!authToken || !mainChannel) return;
+    setModerationLoading(true);
+    setModerationResult(null);
+    try {
+      const broadcasterId = await getTwitchService().getUserId(authToken, mainChannel);
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      const success = await getTwitchService().addVIP(authToken, broadcasterId, targetUserId);
+      if (success) {
+        setModerationResult({ success: true, message: `${username} ahora es VIP` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al dar VIP. Verifica permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al dar VIP' });
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const handleUsernameClick = (e: React.MouseEvent, msg: TwitchMessage) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setSelectedUser({
+      username: msg.username,
+      userId: msg.userId,
+      color: msg.color,
+      position: { x: rect.left, y: rect.bottom + 5 }
+    });
+    setModerationResult(null);
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || !isConnected || !authToken) return;
+    
+    setSendingMessage(true);
+    setSendError(null);
+    
+    try {
+      const success = await getTwitchService().sendMessage(chatMessage.trim());
+      if (success) {
+        setChatMessage('');
+      } else {
+        setSendError('No se pudo enviar el mensaje');
+      }
+    } catch (err) {
+      console.error('Error enviando mensaje:', err);
+      setSendError('Error al enviar mensaje');
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -302,12 +468,14 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                   </div>
                 )}
                 
-                <span 
-                  className="font-bold whitespace-nowrap" 
+                <button 
+                  onClick={(e) => authToken && handleUsernameClick(e, msg)}
+                  className={`font-bold whitespace-nowrap ${authToken ? 'hover:underline cursor-pointer' : 'cursor-default'}`}
                   style={{ color: msg.color || '#a970ff' }}
+                  title={authToken ? 'Clic para opciones de moderación' : msg.username}
                 >
                   {msg.username}:
-                </span>
+                </button>
 
                 {hasVoted && previousVoteOption && (
                   <div 
@@ -373,25 +541,143 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isConnected ? "Escribe un mensaje..." : "Conecta para chatear"}
-            disabled={!isConnected}
+            placeholder={isConnected && authToken ? "Escribe un mensaje..." : "Conecta con OAuth para chatear"}
+            disabled={!isConnected || !authToken || sendingMessage}
             className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!isConnected || !chatMessage.trim()}
+            disabled={!isConnected || !authToken || !chatMessage.trim() || sendingMessage}
             className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-twitch-brand"
-            title={isConnected ? "Enviar mensaje" : "Requiere autenticación de Twitch"}
+            title={isConnected && authToken ? "Enviar mensaje" : "Requiere autenticación OAuth de Twitch"}
           >
-            <Send size={16} />
+            {sendingMessage ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
           </button>
         </div>
-        {!isConnected && (
-          <p className="text-[10px] text-zinc-400 mt-1 text-center">
-            🔒 Enviar mensajes requiere autenticación de Twitch (próximamente)
+        {sendError && (
+          <p className="text-[10px] text-red-400 mt-1 text-center">
+            ⚠️ {sendError}
+          </p>
+        )}
+        {!authToken && isConnected && (
+          <p className="text-[10px] text-amber-400 mt-1 text-center">
+            🔒 Enviar mensajes requiere autenticación OAuth (scope: chat:edit)
           </p>
         )}
       </div>
+
+      {/* Menú de moderación */}
+      {selectedUser && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden animate-fade-in"
+          style={{
+            left: Math.min(selectedUser.position.x, window.innerWidth - 220),
+            top: Math.min(selectedUser.position.y, window.innerHeight - 350),
+            minWidth: '200px'
+          }}
+        >
+          {/* Header */}
+          <div className="p-3 border-b border-zinc-700 flex items-center gap-2">
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: (selectedUser.color || '#a970ff') + '30' }}
+            >
+              <User className="w-4 h-4" style={{ color: selectedUser.color || '#a970ff' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-white truncate">{selectedUser.username}</p>
+            </div>
+            <button
+              onClick={() => { setSelectedUser(null); setModerationResult(null); }}
+              className="p-1 rounded hover:bg-zinc-800 text-zinc-400"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Resultado */}
+          {moderationResult && (
+            <div className={`px-3 py-2 text-xs ${moderationResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              {moderationResult.message}
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="p-2 space-y-1">
+            {/* Timeouts */}
+            <p className="text-[10px] text-zinc-500 px-2 pt-1">Timeout</p>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { label: '1m', seconds: 60 },
+                { label: '5m', seconds: 300 },
+                { label: '10m', seconds: 600 },
+                { label: '1h', seconds: 3600 },
+              ].map(({ label, seconds }) => (
+                <button
+                  key={label}
+                  onClick={() => timeoutUser(selectedUser.username, seconds)}
+                  disabled={moderationLoading}
+                  className="py-1.5 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-[10px] font-bold disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Ban/Unban */}
+            <div className="grid grid-cols-2 gap-1 pt-1">
+              <button
+                onClick={() => banUser(selectedUser.username)}
+                disabled={moderationLoading}
+                className="py-1.5 rounded bg-red-600/20 hover:bg-red-600/30 text-red-500 text-[10px] font-bold disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                <Ban className="w-3 h-3" /> Ban
+              </button>
+              <button
+                onClick={() => unbanUser(selectedUser.username)}
+                disabled={moderationLoading}
+                className="py-1.5 rounded bg-green-500/20 hover:bg-green-500/30 text-green-400 text-[10px] font-bold disabled:opacity-50 flex items-center justify-center gap-1"
+              >
+                <Heart className="w-3 h-3" /> Unban
+              </button>
+            </div>
+
+            {/* VIP */}
+            <button
+              onClick={() => addVIP(selectedUser.username)}
+              disabled={moderationLoading}
+              className="w-full py-1.5 rounded bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 text-[10px] font-bold disabled:opacity-50 flex items-center justify-center gap-1"
+            >
+              <Crown className="w-3 h-3" /> Dar VIP
+            </button>
+
+            {/* Links */}
+            <div className="grid grid-cols-2 gap-1 pt-1 border-t border-zinc-700 mt-2">
+              <a
+                href={`https://twitch.tv/${selectedUser.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-1.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-[10px] font-bold flex items-center justify-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" /> Canal
+              </a>
+              <a
+                href={`https://www.twitch.tv/popout/${mainChannel}/viewercard/${selectedUser.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-1.5 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-[10px] font-bold flex items-center justify-center gap-1"
+              >
+                <User className="w-3 h-3" /> Card
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

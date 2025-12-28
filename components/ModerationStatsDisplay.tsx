@@ -1,10 +1,14 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle, XCircle, BarChart3, Users, Clock, Shield, UserX } from 'lucide-react';
-import {
-  ModerationStats,
-  RejectionReason,
-  shouldShowWarning,
-} from '../services/voteModerationService';
+import type { ModerationStats, RejectionReason } from '../src/domain/entities/ModerationConfig';
+
+/**
+ * Determines if a warning should be displayed based on acceptance rate.
+ * Warning is shown when acceptance rate falls below 50%.
+ */
+function shouldShowWarning(acceptanceRate: number): boolean {
+  return acceptanceRate < 50;
+}
 
 interface ModerationStatsDisplayProps {
   stats: ModerationStats;

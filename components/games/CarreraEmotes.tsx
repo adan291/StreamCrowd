@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Upload, Loader2, Sparkles } from 'lucide-react';
-import { twitchService } from '../../services/twitchService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../services/firebaseSync';
+import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
+import { getTwitchService } from '../../src/application/services/TwitchService';
+import { AuthService } from '../../src/application/services/AuthService';
 
 interface Racer {
   id: string;
@@ -137,21 +139,40 @@ const fetchFFZEmotes = async (channelName: string): Promise<EmoteData[]> => {
   }
 };
 
-// Obtener emotes de Twitch usando la API Helix (requiere token)
-const fetchTwitchEmotesWithToken = async (channelName: string, token: string): Promise<EmoteData[]> => {
+// Nota: La API de emotes de Twitch (Helix) requiere implementación adicional
+// Por ahora usamos siempre el fallback con APIs públicas que funcionan sin token
+
+// Obtener emotes de Twitch con token (usando AuthService)
+const fetchTwitchEmotesWithToken = async (channelName: string): Promise<EmoteData[]> => {
   try {
-    // Obtener el broadcaster_id
-    const broadcasterId = await twitchService.getUserId(token, channelName);
-    if (!broadcasterId) return [];
+    // Check if we have OAuth access
+    if (!AuthService.hasCapability('canAccessAPI')) {
+      return [];
+    }
     
-    // Obtener emotes del canal
+    const token = AuthService.getToken();
+    if (!token) {
+      return [];
+    }
+    
+    const twitchService = getTwitchService();
+    
+    // Get broadcaster ID
+    const broadcasterId = await twitchService.getUserId(token, channelName);
+    if (!broadcasterId) {
+      return [];
+    }
+    
+    // Get channel emotes
     const emotes = await twitchService.getChannelEmotes(token, broadcasterId);
-    if (!emotes) return [];
+    if (!emotes) {
+      return [];
+    }
     
     return emotes.map(e => ({
       code: e.code,
       url: e.url,
-      source: 'twitch' as const
+      source: 'twitch' as const,
     }));
   } catch (err) {
     console.error('Error fetching Twitch emotes with token:', err);
@@ -161,8 +182,14 @@ const fetchTwitchEmotesWithToken = async (channelName: string, token: string): P
 
 // Obtener emotes de Twitch sin token (fallback con APIs públicas)
 const fetchTwitchEmotes = async (channelName: string): Promise<EmoteData[]> => {
+  // First try with token if available
+  const tokenEmotes = await fetchTwitchEmotesWithToken(channelName);
+  if (tokenEmotes.length > 0) {
+    return tokenEmotes;
+  }
+  
+  // Fallback: try to get broadcaster ID from public APIs
   try {
-    // Intentar obtener el ID del canal con decapi
     let broadcasterId: string | null = null;
     
     try {
@@ -331,6 +358,8 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
         if (finisher) {
           setWinner(finisher);
           setGameState('finished');
+          // OBS Trigger: Game end
+          triggerGameEnd();
           return newRacers;
         }
 
@@ -398,18 +427,13 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
     
     try {
       // Usar Promise.allSettled para que no falle si una API falla
+      // Nota: Los errores 404 de BTTV/FFZ son normales si el canal no tiene emotes ahí
       const fetchPromises = [
         fetch7TVEmotes(targetChannel.toLowerCase()),
         fetchBTTVEmotes(targetChannel.toLowerCase()),
         fetchFFZEmotes(targetChannel.toLowerCase()),
+        fetchTwitchEmotes(targetChannel.toLowerCase()),
       ];
-      
-      // Si tenemos token, usar la API de Twitch autenticada
-      if (authToken) {
-        fetchPromises.push(fetchTwitchEmotesWithToken(targetChannel.toLowerCase(), authToken));
-      } else {
-        fetchPromises.push(fetchTwitchEmotes(targetChannel.toLowerCase()));
-      }
       
       const results = await Promise.allSettled(fetchPromises);
       
@@ -525,11 +549,16 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
     }
   };
 
+  // OBS Triggers
+  const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
+
   const startBetting = () => {
     if (racers.length < 2) return;
     setTimeLeft(bettingTime);
     setGameState('betting');
     lastProcessedRef.current = chatMessages.length;
+    // OBS Trigger: Game start (betting phase)
+    triggerGameStart();
   };
 
   const startRace = () => {
