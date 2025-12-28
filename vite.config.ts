@@ -124,15 +124,15 @@ export default defineConfig(({ mode }) => {
           manualChunks: (id) => {
             // Vendor chunks - split by library for better caching
             if (id.includes('node_modules')) {
-              // React core - essential, loaded first
-              if (id.includes('react-dom') || id.includes('react/') || id.includes('/react/')) {
+              // React ecosystem - keep together to avoid initialization issues
+              if (id.includes('react-dom') || id.includes('react/') || id.includes('/react/') || id.includes('scheduler')) {
                 return 'vendor-react';
               }
-              // Framer Motion - heavy animation library
+              // Framer Motion - heavy animation library (depends on React)
               if (id.includes('framer-motion') || id.includes('motion')) {
                 return 'vendor-motion';
               }
-              // UI icons
+              // UI icons - lucide-react depends on React, keep separate
               if (id.includes('lucide-react')) {
                 return 'vendor-icons';
               }
@@ -160,8 +160,9 @@ export default defineConfig(({ mode }) => {
               if (id.includes('socket.io')) {
                 return 'vendor-socket';
               }
-              // Other vendor modules
-              return 'vendor-misc';
+              // Don't chunk other small modules - let Vite handle them
+              // This prevents initialization order issues
+              return undefined;
             }
             // Game components - each game gets its own chunk via lazy loading
             if (id.includes('/components/games/')) {
