@@ -77,6 +77,37 @@
       }
     </style>
     
+    <!-- Service Worker cleanup on version mismatch -->
+    <script>
+      (function() {
+        // Detectar errores de carga de módulos y limpiar SW
+        window.addEventListener('error', function(e) {
+          if (e.message && e.message.includes('MIME type')) {
+            console.warn('[SW] MIME type error detected, clearing service worker...');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                registrations.forEach(function(registration) {
+                  registration.unregister();
+                });
+                // Limpiar caches
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    names.forEach(function(name) {
+                      caches.delete(name);
+                    });
+                  });
+                }
+                // Recargar después de limpiar
+                setTimeout(function() {
+                  window.location.reload(true);
+                }, 500);
+              });
+            }
+          }
+        }, true);
+      })();
+    </script>
+    
     <!-- Twitch Embed -->
     <script src="https://embed.twitch.tv/embed/v1.js"></script>
     
