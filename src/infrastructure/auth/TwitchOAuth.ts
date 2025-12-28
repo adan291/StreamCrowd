@@ -21,6 +21,12 @@ const OAUTH_SCOPES = [
   'channel:read:vips',
   'moderation:read',
   'bits:read',
+  // Moderation action scopes
+  'moderator:manage:banned_users',
+  'moderator:manage:chat_messages',
+  'moderator:manage:chat_settings',
+  'moderator:manage:announcements',
+  'channel:manage:vips',
 ].join(' ');
 
 // Callback path - can be root or specific path, must match Twitch Dev Console

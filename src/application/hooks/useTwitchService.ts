@@ -17,6 +17,7 @@ import {
   TwitchConnectionOptions,
   CollaborationChannel 
 } from '../services/TwitchService';
+import { AuthService } from '../services/AuthService';
 import type { ConnectionStatus as DomainConnectionStatus, MessageCallback, StatusCallback } from '../../domain/ports/IChatProvider';
 import { ConnectionStatus } from '../../../types';
 
@@ -296,12 +297,28 @@ export function useTwitchService(
           } catch (e) {
             console.error('Error saving credentials to localStorage:', e);
           }
+          
+          // Update AuthService with OAuth authentication
+          AuthService.setOAuthAuth({
+            token,
+            userId: finalUserId || undefined,
+            channelName: channel,
+            scopes: validation.scopes || [],
+            expiresIn: validation.expiresIn > 0 ? validation.expiresIn : undefined,
+          });
         } else {
           console.warn('Token validation failed, continuing without expiration tracking');
+          // Set anonymous auth since token is invalid
+          AuthService.setAnonymousAuth(channel);
         }
       }).catch(err => {
         console.warn('Token validation error:', err);
+        // Set anonymous auth on validation error
+        AuthService.setAnonymousAuth(channel);
       });
+    } else {
+      // No token provided - anonymous connection
+      AuthService.setAnonymousAuth(channel);
     }
     
     // Clear collaboration channels on new connection
@@ -347,6 +364,9 @@ export function useTwitchService(
     setAuthToken('');
     setUserId('');
     setError(null);
+    
+    // Clear AuthService
+    AuthService.clear();
     setCollaborationChannels([]);
     setTokenExpiresIn(null);
     setTokenExpiringSoon(false);

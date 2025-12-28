@@ -9,6 +9,7 @@ export * from './useAdvancedAnalytics';
 export * from './useAlertProviders';
 export * from './useAlerts';
 export * from './useAnalyticsService';
+export * from './useAuth';
 export * from './useChatService';
 export * from './useCommands';
 export * from './useGameService';

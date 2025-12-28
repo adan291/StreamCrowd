@@ -643,11 +643,59 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
     toggleAutomation,
   } = useOBS();
 
-  // Connection form
-  const [host, setHost] = useState('localhost');
-  const [port, setPort] = useState('4455');
-  const [password, setPassword] = useState('');
+  // Storage key for OBS connection settings
+  const OBS_CONNECTION_STORAGE_KEY = 'obs_connection_settings';
+
+  // Load saved connection settings
+  const loadSavedConnection = (): { host: string; port: string; password: string; rememberPassword: boolean } | null => {
+    try {
+      const saved = localStorage.getItem(OBS_CONNECTION_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Decode password if saved (basic obfuscation)
+        if (parsed.password && parsed.rememberPassword) {
+          try {
+            parsed.password = atob(parsed.password);
+          } catch {
+            parsed.password = '';
+          }
+        } else {
+          parsed.password = '';
+        }
+        return parsed;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
+
+  // Connection form with saved values
+  const savedConnection = loadSavedConnection();
+  const [host, setHost] = useState(savedConnection?.host || 'localhost');
+  const [port, setPort] = useState(savedConnection?.port || '4455');
+  const [password, setPassword] = useState(savedConnection?.password || '');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(savedConnection?.rememberPassword ?? false);
+
+  // Save connection settings
+  const saveConnectionSettings = (includePassword: boolean) => {
+    try {
+      const settings = {
+        host,
+        port,
+        password: includePassword ? btoa(password) : '', // Basic obfuscation
+        rememberPassword: includePassword,
+      };
+      localStorage.setItem(OBS_CONNECTION_STORAGE_KEY, JSON.stringify(settings));
+    } catch { /* ignore */ }
+  };
+
+  // Clear saved connection settings
+  const clearSavedConnection = () => {
+    try {
+      localStorage.removeItem(OBS_CONNECTION_STORAGE_KEY);
+      setRememberPassword(false);
+    } catch { /* ignore */ }
+  };
   
   // UI state
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
@@ -697,6 +745,8 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
   const handleConnect = async () => {
     try {
       await connect(password || undefined, host, parseInt(port));
+      // Save connection settings on successful connect
+      saveConnectionSettings(rememberPassword);
     } catch {
       // Error is handled by the hook
     }
@@ -995,6 +1045,12 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
       {/* Connection Form */}
       {!isConnected && (
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+          {savedConnection && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 p-2 rounded-lg">
+              <Check size={14} />
+              Configuración guardada cargada
+            </div>
+          )}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -1037,6 +1093,30 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+            
+            {/* Remember settings checkbox */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberPassword}
+                  onChange={(e) => setRememberPassword(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+                />
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  Recordar configuración
+                </span>
+              </label>
+              {savedConnection && (
+                <button
+                  type="button"
+                  onClick={clearSavedConnection}
+                  className="text-xs text-red-500 hover:text-red-600 hover:underline"
+                >
+                  Olvidar
+                </button>
+              )}
             </div>
             
             {error && (

@@ -13,6 +13,7 @@ import { StreamAnalytics } from './components/StreamAnalytics';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
+import { AuthCapabilitiesIndicator } from './components/AuthCapabilitiesIndicator';
 import { getTwitchService } from './src/application/services/TwitchService';
 import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
@@ -902,6 +903,7 @@ const App: React.FC = () => {
             )}
           </div>
           <span className="font-bold text-sm text-zinc-900 dark:text-white">{channelName}</span>
+          <AuthCapabilitiesIndicator compact />
           {isCollaborationActive && (
             <span className="text-[10px] bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded-full font-medium">
               Collab
@@ -1247,6 +1249,10 @@ const App: React.FC = () => {
                 <div className="flex-1 overflow-y-auto">
                   {dataSubTab === 'activity' && (
                     <Suspense fallback={<LoadingFallback message="Cargando actividad..." />}>
+                      {/* Auth Capabilities Indicator */}
+                      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
+                        <AuthCapabilitiesIndicator />
+                      </div>
                       <StreamActivity 
                         events={streamEventsHook.events}
                         votes={poll.voteHistory} 
@@ -1426,6 +1432,7 @@ const App: React.FC = () => {
                       collaborationChannels={collaborationChannels}
                       mainChannel={channelName}
                       isConnected={status === ConnectionStatus.CONNECTED}
+                      authToken={authToken}
                     />
                   ) : activeRightTab === 'stream' ? (
                     <div className="h-full p-2 bg-black">
@@ -1482,6 +1489,7 @@ const App: React.FC = () => {
                         collaborationChannels={collaborationChannels}
                         mainChannel={channelName}
                         isConnected={status === ConnectionStatus.CONNECTED}
+                        authToken={authToken}
                       />
                     </div>
                     

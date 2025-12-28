@@ -679,6 +679,114 @@ export class TwitchService {
   }
   
   /**
+   * Get channel emotes for a broadcaster
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Array of emotes or null if failed
+   */
+  async getChannelEmotes(token: string, broadcasterId: string): Promise<{ code: string; url: string; id: string }[] | null> {
+    return this.adapter.getChannelEmotes(token, broadcasterId);
+  }
+
+  /**
+   * Delete a specific chat message
+   * Requires OAuth token with moderator:manage:chat_messages scope
+   */
+  async deleteMessage(token: string, broadcasterId: string, moderatorId: string, messageId: string): Promise<boolean> {
+    return this.adapter.deleteMessage(token, broadcasterId, moderatorId, messageId);
+  }
+
+  /**
+   * Clear all chat messages in the channel
+   * Requires OAuth token with moderator:manage:chat_messages scope
+   */
+  async clearChat(token: string, broadcasterId: string, moderatorId: string): Promise<boolean> {
+    return this.adapter.clearChat(token, broadcasterId, moderatorId);
+  }
+
+  /**
+   * Get banned users in the channel
+   * Requires OAuth token with moderation:read scope
+   */
+  async getBannedUsers(token: string, broadcasterId: string): Promise<{ 
+    id: string; 
+    username: string; 
+    displayName: string; 
+    reason: string;
+    moderatorName: string;
+    bannedAt: string;
+    expiresAt: string | null;
+  }[] | null> {
+    return this.adapter.getBannedUsers(token, broadcasterId);
+  }
+
+  /**
+   * Update chat settings (slow mode, follower-only, etc.)
+   * Requires OAuth token with moderator:manage:chat_settings scope
+   */
+  async updateChatSettings(
+    token: string, 
+    broadcasterId: string, 
+    moderatorId: string,
+    settings: {
+      slowMode?: boolean;
+      slowModeWaitTime?: number;
+      followerMode?: boolean;
+      followerModeDuration?: number;
+      subscriberMode?: boolean;
+      emoteMode?: boolean;
+      uniqueChatMode?: boolean;
+    }
+  ): Promise<boolean> {
+    return this.adapter.updateChatSettings(token, broadcasterId, moderatorId, settings);
+  }
+
+  /**
+   * Get current chat settings
+   */
+  async getChatSettings(token: string, broadcasterId: string): Promise<{
+    slowMode: boolean;
+    slowModeWaitTime: number;
+    followerMode: boolean;
+    followerModeDuration: number;
+    subscriberMode: boolean;
+    emoteMode: boolean;
+    uniqueChatMode: boolean;
+  } | null> {
+    return this.adapter.getChatSettings(token, broadcasterId);
+  }
+
+  /**
+   * Send an announcement to chat
+   * Requires OAuth token with moderator:manage:announcements scope
+   */
+  async sendAnnouncement(
+    token: string, 
+    broadcasterId: string, 
+    moderatorId: string,
+    message: string,
+    color?: 'blue' | 'green' | 'orange' | 'purple' | 'primary'
+  ): Promise<boolean> {
+    return this.adapter.sendAnnouncement(token, broadcasterId, moderatorId, message, color);
+  }
+
+  /**
+   * Add a VIP to the channel
+   * Requires OAuth token with channel:manage:vips scope
+   */
+  async addVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    return this.adapter.addVIP(token, broadcasterId, userId);
+  }
+
+  /**
+   * Remove a VIP from the channel
+   * Requires OAuth token with channel:manage:vips scope
+   */
+  async removeVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    return this.adapter.removeVIP(token, broadcasterId, userId);
+  }
+  
+  /**
    * Dispose of the service and clean up resources
    */
   dispose(): void {

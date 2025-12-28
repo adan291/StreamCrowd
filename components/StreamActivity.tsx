@@ -37,10 +37,12 @@ import {
   Play,
   Square,
   Settings,
-  Sliders
+  Sliders,
+  Megaphone
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { getTwitchService } from '../src/application/services/TwitchService';
+import { AuthService } from '../src/application/services/AuthService';
 import { storageHelpers, generateEventId, getTodayString } from '../src/application/hooks/useStreamEventService';
 
 // Twitch Client ID from environment
@@ -314,10 +316,18 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
   const [viewerTab, setViewerTab] = useState<'activity' | 'live'>('activity');
   
   // Estado para chatters en tiempo real
-  const [liveChatters, setLiveChatters] = useState<{ oderId: string; username: string; displayName: string }[]>([]);
+  const [liveChatters, setLiveChatters] = useState<{ userId: string; username: string; displayName: string }[]>([]);
   const [loadingChatters, setLoadingChatters] = useState(false);
   const [chattersError, setChattersError] = useState<string | null>(null);
   const [lastChattersUpdate, setLastChattersUpdate] = useState<number | null>(null);
+  
+  // Estado para modal de moderación expandido
+  const [quickModUser, setQuickModUser] = useState<{ userId: string; username: string; displayName: string } | null>(null);
+  const [customTimeoutDuration, setCustomTimeoutDuration] = useState<number>(300); // 5 minutos por defecto
+  const [customTimeoutUnit, setCustomTimeoutUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes');
+  const [moderationReason, setModerationReason] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [announcementColor, setAnnouncementColor] = useState<'blue' | 'green' | 'orange' | 'purple' | 'primary'>('primary');
   
   // Estado para polling automático de chatters
   const [chattersPollingActive, setChattersPollingActive] = useState(false);
@@ -955,7 +965,14 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
 
   // Fetch moderators desde API
   const fetchModerators = async () => {
-    if (!authToken || !channelName) return;
+    // Check capability first
+    if (!AuthService.hasCapability('canModerate')) {
+      setFetchError('Necesitas conectarte con OAuth y permisos de moderación');
+      return;
+    }
+    
+    const token = AuthService.getToken();
+    if (!token || !channelName) return;
     
     setIsLoading(true);
     setLoadingType('moderators');
@@ -968,7 +985,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const mods = await getTwitchService().getModerators(authToken, broadcasterId);
+      const mods = await getTwitchService().getModerators(token, broadcasterId);
       if (!mods) {
         setFetchError(OAUTH_ERRORS['missing_scope_moderation']);
         return;
@@ -987,7 +1004,14 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
 
   // Fetch VIPs desde API
   const fetchVIPs = async () => {
-    if (!authToken || !channelName) return;
+    // Check capability first
+    if (!AuthService.hasCapability('canReadVIPs')) {
+      setFetchError('Necesitas conectarte con OAuth y el permiso channel:read:vips');
+      return;
+    }
+    
+    const token = AuthService.getToken();
+    if (!token || !channelName) return;
     
     setIsLoading(true);
     setLoadingType('vips');
@@ -1000,7 +1024,7 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
         return;
       }
       
-      const vips = await getTwitchService().getVIPs(authToken, broadcasterId);
+      const vips = await getTwitchService().getVIPs(token, broadcasterId);
       if (!vips) {
         setFetchError(OAUTH_ERRORS['missing_scope_vips']);
         return;
@@ -1159,6 +1183,162 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
     }
   };
 
+  // Añadir VIP
+  const addVIP = async (username: string) => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      
+      const success = await getTwitchService().addVIP(authToken, broadcasterId, targetUserId);
+      
+      if (success) {
+        setModerationResult({ success: true, message: `${username} ahora es VIP` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al añadir VIP. Verifica los permisos (channel:manage:vips)' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al añadir VIP' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Quitar VIP
+  const removeVIP = async (username: string) => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const targetUserId = await getTwitchService().getUserId(authToken, username);
+      if (!targetUserId) {
+        setModerationResult({ success: false, message: 'Usuario no encontrado' });
+        return;
+      }
+      
+      const success = await getTwitchService().removeVIP(authToken, broadcasterId, targetUserId);
+      
+      if (success) {
+        setModerationResult({ success: true, message: `${username} ya no es VIP` });
+      } else {
+        setModerationResult({ success: false, message: 'Error al quitar VIP. Verifica los permisos.' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al quitar VIP' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Enviar anuncio al chat
+  const sendAnnouncement = async (message: string, color: 'blue' | 'green' | 'orange' | 'purple' | 'primary' = 'primary') => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const success = await getTwitchService().sendAnnouncement(authToken, broadcasterId, broadcasterId, message, color);
+      
+      if (success) {
+        setModerationResult({ success: true, message: 'Anuncio enviado' });
+      } else {
+        setModerationResult({ success: false, message: 'Error al enviar anuncio. Verifica los permisos (moderator:manage:announcements)' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al enviar anuncio' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Limpiar chat
+  const clearChat = async () => {
+    if (!authToken || !channelName) return;
+    
+    setModerationLoading(true);
+    setModerationResult(null);
+    
+    try {
+      const broadcasterId = await getBroadcasterId();
+      if (!broadcasterId) {
+        setModerationResult({ success: false, message: 'No se pudo obtener el ID del canal' });
+        return;
+      }
+      
+      const success = await getTwitchService().clearChat(authToken, broadcasterId, broadcasterId);
+      
+      if (success) {
+        setModerationResult({ success: true, message: 'Chat limpiado' });
+      } else {
+        setModerationResult({ success: false, message: 'Error al limpiar chat. Verifica los permisos (moderator:manage:chat_messages)' });
+      }
+    } catch (err) {
+      setModerationResult({ success: false, message: 'Error al limpiar chat' });
+      console.error(err);
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  // Helper para convertir duración a segundos
+  const getTimeoutSeconds = (duration: number, unit: 'seconds' | 'minutes' | 'hours' | 'days'): number => {
+    switch (unit) {
+      case 'seconds': return duration;
+      case 'minutes': return duration * 60;
+      case 'hours': return duration * 3600;
+      case 'days': return duration * 86400;
+      default: return duration;
+    }
+  };
+
+  // Timeout personalizado con razón
+  const applyCustomTimeout = async () => {
+    if (!quickModUser || !authToken) return;
+    const seconds = getTimeoutSeconds(customTimeoutDuration, customTimeoutUnit);
+    await timeoutUser(quickModUser.username, seconds, moderationReason || undefined);
+    setQuickModUser(null);
+    setModerationReason('');
+  };
+
+  // Ban con razón
+  const applyBanWithReason = async () => {
+    if (!quickModUser || !authToken) return;
+    await banUser(quickModUser.username, moderationReason || undefined);
+    setQuickModUser(null);
+    setModerationReason('');
+  };
+
   // Cargar chatters en tiempo real
   const fetchLiveChatters = async () => {
     if (!authToken || !channelName) {
@@ -1179,7 +1359,13 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
       const chatters = await getTwitchService().getChattersDetailed(authToken, broadcasterId, broadcasterId);
       
       if (chatters) {
-        setLiveChatters(chatters);
+        // Mapear los datos de la API al formato esperado
+        const mappedChatters = chatters.map(c => ({
+          userId: c.userId,
+          username: c.userLogin,
+          displayName: c.userName
+        }));
+        setLiveChatters(mappedChatters);
         setLastChattersUpdate(Date.now());
         setChattersError(null);
       } else {
@@ -1794,6 +1980,17 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
               >
                 <RefreshCw className={`w-4 h-4 ${loadingChatters ? 'animate-spin' : ''}`} />
               </button>
+              {/* Botón de limpiar chat */}
+              {authToken && (
+                <button
+                  onClick={clearChat}
+                  disabled={moderationLoading}
+                  className="p-1.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 disabled:opacity-50"
+                  title="Limpiar chat"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </>
           )}
           {/* Botón de configuración */}
@@ -1895,6 +2092,53 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
             <p className="text-[9px] text-zinc-500">
               Ejemplo: Si Tier 3 = 3, un voto de sub Tier 3 cuenta como 3 votos
             </p>
+          </div>
+        )}
+        
+        {/* Panel de anuncios (solo en tab live con auth) */}
+        {viewerTab === 'live' && authToken && (
+          <div className="p-3 rounded-lg bg-zinc-800/80 border border-zinc-700 space-y-2">
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-bold text-zinc-300">Enviar anuncio</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={announcementMessage}
+                onChange={(e) => setAnnouncementMessage(e.target.value)}
+                placeholder="Mensaje del anuncio..."
+                className="flex-1 px-2 py-1.5 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+              />
+              <select
+                value={announcementColor}
+                onChange={(e) => setAnnouncementColor(e.target.value as any)}
+                className="px-2 py-1.5 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200"
+              >
+                <option value="primary">Normal</option>
+                <option value="blue">Azul</option>
+                <option value="green">Verde</option>
+                <option value="orange">Naranja</option>
+                <option value="purple">Morado</option>
+              </select>
+              <button
+                onClick={() => {
+                  if (announcementMessage.trim()) {
+                    sendAnnouncement(announcementMessage, announcementColor);
+                    setAnnouncementMessage('');
+                  }
+                }}
+                disabled={moderationLoading || !announcementMessage.trim()}
+                className="px-3 py-1.5 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-50 transition-colors"
+              >
+                Enviar
+              </button>
+            </div>
+            {moderationResult && (
+              <p className={`text-[10px] ${moderationResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                {moderationResult.message}
+              </p>
+            )}
           </div>
         )}
         
@@ -2115,6 +2359,24 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
                     <Heart className="w-3 h-3" /> Desbanear
                   </button>
                 </div>
+                
+                {/* VIP Actions */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => addVIP(selectedViewerData.username)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Crown className="w-3 h-3" /> Dar VIP
+                  </button>
+                  <button
+                    onClick={() => removeVIP(selectedViewerData.username)}
+                    disabled={moderationLoading}
+                    className="flex-1 py-1.5 px-2 rounded bg-zinc-600/20 hover:bg-zinc-600/30 text-zinc-400 text-[10px] font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Crown className="w-3 h-3" /> Quitar VIP
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2241,6 +2503,28 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
                           title="Ban"
                         >
                           <Ban className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addVIP(chatter.username);
+                          }}
+                          disabled={moderationLoading}
+                          className="p-1 rounded bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 disabled:opacity-50"
+                          title="Dar VIP"
+                        >
+                          <Crown className="w-3 h-3" />
+                        </button>
+                        {/* Botón para abrir panel de moderación expandido */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickModUser(chatter);
+                          }}
+                          className="p-1 rounded bg-zinc-600/50 hover:bg-zinc-600 text-zinc-300"
+                          title="Más opciones"
+                        >
+                          <Settings className="w-3 h-3" />
                         </button>
                         {activityData && (
                           <button
@@ -3249,6 +3533,169 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({
               <p className="text-xs">No hay datos para esta fecha</p>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Modal de moderación expandido */}
+      {quickModUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md shadow-2xl">
+            {/* Header */}
+            <div className="p-4 border-b border-zinc-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">{quickModUser.displayName}</h3>
+                  <p className="text-xs text-zinc-500">@{quickModUser.username}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setQuickModUser(null);
+                  setModerationReason('');
+                }}
+                className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Contenido */}
+            <div className="p-4 space-y-4">
+              {/* Resultado de moderación */}
+              {moderationResult && (
+                <div className={`p-3 rounded-lg text-sm ${moderationResult.success ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                  {moderationResult.message}
+                </div>
+              )}
+              
+              {/* Razón (opcional) */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Razón (opcional)</label>
+                <input
+                  type="text"
+                  value={moderationReason}
+                  onChange={(e) => setModerationReason(e.target.value)}
+                  placeholder="Motivo del timeout/ban..."
+                  className="w-full px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              
+              {/* Timeouts rápidos */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-2 block">Timeout rápido</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: '1m', seconds: 60 },
+                    { label: '5m', seconds: 300 },
+                    { label: '10m', seconds: 600 },
+                    { label: '1h', seconds: 3600 },
+                    { label: '24h', seconds: 86400 },
+                  ].map(({ label, seconds }) => (
+                    <button
+                      key={label}
+                      onClick={() => timeoutUser(quickModUser.username, seconds, moderationReason || undefined)}
+                      disabled={moderationLoading}
+                      className="py-2 px-3 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs font-bold disabled:opacity-50 transition-colors"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Timeout personalizado */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-2 block">Timeout personalizado</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={customTimeoutDuration}
+                    onChange={(e) => setCustomTimeoutDuration(parseInt(e.target.value) || 1)}
+                    className="flex-1 px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-yellow-500"
+                  />
+                  <select
+                    value={customTimeoutUnit}
+                    onChange={(e) => setCustomTimeoutUnit(e.target.value as any)}
+                    className="px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-yellow-500"
+                  >
+                    <option value="seconds">Segundos</option>
+                    <option value="minutes">Minutos</option>
+                    <option value="hours">Horas</option>
+                    <option value="days">Días</option>
+                  </select>
+                  <button
+                    onClick={applyCustomTimeout}
+                    disabled={moderationLoading}
+                    className="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-black text-sm font-bold disabled:opacity-50 transition-colors"
+                  >
+                    <Clock className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Acciones principales */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={applyBanWithReason}
+                  disabled={moderationLoading}
+                  className="py-3 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Ban className="w-4 h-4" /> Ban permanente
+                </button>
+                <button
+                  onClick={() => {
+                    unbanUser(quickModUser.username);
+                  }}
+                  disabled={moderationLoading}
+                  className="py-3 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Heart className="w-4 h-4" /> Desbanear
+                </button>
+              </div>
+              
+              {/* VIP */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => addVIP(quickModUser.username)}
+                  disabled={moderationLoading}
+                  className="py-2 px-4 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 text-sm font-bold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Crown className="w-4 h-4" /> Dar VIP
+                </button>
+                <button
+                  onClick={() => removeVIP(quickModUser.username)}
+                  disabled={moderationLoading}
+                  className="py-2 px-4 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm font-bold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Crown className="w-4 h-4" /> Quitar VIP
+                </button>
+              </div>
+              
+              {/* Links externos */}
+              <div className="pt-2 border-t border-zinc-700 flex gap-2">
+                <a
+                  href={`https://twitch.tv/${quickModUser.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2 px-3 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> Canal
+                </a>
+                <a
+                  href={`https://www.twitch.tv/popout/${channelName}/viewercard/${quickModUser.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-2 px-3 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <User className="w-3 h-3" /> Viewer Card
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       

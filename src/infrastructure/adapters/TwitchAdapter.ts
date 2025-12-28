@@ -766,6 +766,12 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       'channel:read:vips',
       'moderation:read',
       'bits:read',
+      // Moderation action scopes
+      'moderator:manage:banned_users',
+      'moderator:manage:chat_messages',
+      'moderator:manage:chat_settings',
+      'moderator:manage:announcements',
+      'channel:manage:vips',
     ];
   }
   
@@ -1062,6 +1068,38 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   }
   
   /**
+   * Get channel emotes for a broadcaster
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Array of emotes or null if failed
+   */
+  async getChannelEmotes(token: string, broadcasterId: string): Promise<{ code: string; url: string; id: string }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/emotes?broadcaster_id=${broadcasterId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((emote: any) => ({
+        id: emote.id,
+        code: emote.name,
+        url: emote.images?.url_1x || emote.images?.url_2x || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+  
+  /**
    * Get clips for a channel
    * @param token - OAuth token
    * @param broadcasterId - Broadcaster user ID
@@ -1351,12 +1389,309 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       
       const data = await response.json();
       return data.data?.map((chatter: any) => ({
-        oderId: chatter.user_id,
+        userId: chatter.user_id,
         userLogin: chatter.user_login,
         userName: chatter.user_name,
       })) || [];
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Delete a specific chat message
+   * Requires OAuth token with moderator:manage:chat_messages scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @param messageId - ID of the message to delete
+   * @returns True if successful
+   */
+  async deleteMessage(token: string, broadcasterId: string, moderatorId: string, messageId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&message_id=${messageId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Clear all chat messages in the channel
+   * Requires OAuth token with moderator:manage:chat_messages scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @returns True if successful
+   */
+  async clearChat(token: string, broadcasterId: string, moderatorId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get banned users in the channel
+   * Requires OAuth token with moderation:read scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns List of banned users or null if failed
+   */
+  async getBannedUsers(token: string, broadcasterId: string): Promise<{ 
+    id: string; 
+    username: string; 
+    displayName: string; 
+    reason: string;
+    moderatorName: string;
+    bannedAt: string;
+    expiresAt: string | null;
+  }[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/banned?broadcaster_id=${broadcasterId}&first=100`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((ban: any) => ({
+        id: ban.user_id,
+        username: ban.user_login,
+        displayName: ban.user_name,
+        reason: ban.reason || '',
+        moderatorName: ban.moderator_name || '',
+        bannedAt: ban.created_at,
+        expiresAt: ban.expires_at || null,
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Update chat settings (slow mode, follower-only, etc.)
+   * Requires OAuth token with moderator:manage:chat_settings scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @param settings - Chat settings to update
+   * @returns True if successful
+   */
+  async updateChatSettings(
+    token: string, 
+    broadcasterId: string, 
+    moderatorId: string,
+    settings: {
+      slowMode?: boolean;
+      slowModeWaitTime?: number;
+      followerMode?: boolean;
+      followerModeDuration?: number;
+      subscriberMode?: boolean;
+      emoteMode?: boolean;
+      uniqueChatMode?: boolean;
+    }
+  ): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      
+      const body: Record<string, any> = {};
+      if (settings.slowMode !== undefined) body.slow_mode = settings.slowMode;
+      if (settings.slowModeWaitTime !== undefined) body.slow_mode_wait_time = settings.slowModeWaitTime;
+      if (settings.followerMode !== undefined) body.follower_mode = settings.followerMode;
+      if (settings.followerModeDuration !== undefined) body.follower_mode_duration = settings.followerModeDuration;
+      if (settings.subscriberMode !== undefined) body.subscriber_mode = settings.subscriberMode;
+      if (settings.emoteMode !== undefined) body.emote_mode = settings.emoteMode;
+      if (settings.uniqueChatMode !== undefined) body.unique_chat_mode = settings.uniqueChatMode;
+      
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body)
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get current chat settings
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Chat settings or null if failed
+   */
+  async getChatSettings(token: string, broadcasterId: string): Promise<{
+    slowMode: boolean;
+    slowModeWaitTime: number;
+    followerMode: boolean;
+    followerModeDuration: number;
+    subscriberMode: boolean;
+    emoteMode: boolean;
+    uniqueChatMode: boolean;
+  } | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${broadcasterId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const settings = data.data?.[0];
+      if (!settings) return null;
+      
+      return {
+        slowMode: settings.slow_mode || false,
+        slowModeWaitTime: settings.slow_mode_wait_time || 0,
+        followerMode: settings.follower_mode || false,
+        followerModeDuration: settings.follower_mode_duration || 0,
+        subscriberMode: settings.subscriber_mode || false,
+        emoteMode: settings.emote_mode || false,
+        uniqueChatMode: settings.unique_chat_mode || false,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Send an announcement to chat
+   * Requires OAuth token with moderator:manage:announcements scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @param message - Announcement message
+   * @param color - Announcement color (blue, green, orange, purple, primary)
+   * @returns True if successful
+   */
+  async sendAnnouncement(
+    token: string, 
+    broadcasterId: string, 
+    moderatorId: string,
+    message: string,
+    color: 'blue' | 'green' | 'orange' | 'purple' | 'primary' = 'primary'
+  ): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message, color })
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Add a VIP to the channel
+   * Requires OAuth token with channel:manage:vips scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to add as VIP
+   * @returns True if successful
+   */
+  async addVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Remove a VIP from the channel
+   * Requires OAuth token with channel:manage:vips scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to remove as VIP
+   * @returns True if successful
+   */
+  async removeVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
     }
   }
 }
