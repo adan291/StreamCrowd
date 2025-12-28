@@ -122,83 +122,28 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: (id) => {
-            // Vendor chunks - split by library for better caching
+            // Solo separar librerías pesadas que NO dependen de React
+            // Esto evita problemas de orden de inicialización
             if (id.includes('node_modules')) {
-              // React ecosystem - keep together to avoid initialization issues
-              if (id.includes('react-dom') || id.includes('react/') || id.includes('/react/') || id.includes('scheduler')) {
-                return 'vendor-react';
-              }
-              // Framer Motion - heavy animation library (depends on React)
-              if (id.includes('framer-motion') || id.includes('motion')) {
-                return 'vendor-motion';
-              }
-              // UI icons - lucide-react depends on React, keep separate
-              if (id.includes('lucide-react')) {
-                return 'vendor-icons';
-              }
-              // Charts library - heavy
-              if (id.includes('recharts') || id.includes('d3-')) {
-                return 'vendor-charts';
-              }
-              // OBS WebSocket
-              if (id.includes('obs-websocket-js')) {
-                return 'vendor-obs';
-              }
-              // Firebase - heavy
+              // Firebase - muy pesado, no depende de React
               if (id.includes('firebase')) {
                 return 'vendor-firebase';
               }
-              // Twitch chat
-              if (id.includes('tmi.js')) {
-                return 'vendor-twitch';
-              }
-              // Excel export - very heavy
+              // Excel export - muy pesado, no depende de React
               if (id.includes('xlsx')) {
                 return 'vendor-xlsx';
               }
-              // Socket.io for real-time
-              if (id.includes('socket.io')) {
-                return 'vendor-socket';
+              // D3 (sin recharts) - pesado, no depende de React
+              if (id.includes('d3-') && !id.includes('recharts')) {
+                return 'vendor-d3';
               }
-              // Don't chunk other small modules - let Vite handle them
-              // This prevents initialization order issues
+              // Dejar que Vite maneje todo lo demás automáticamente
+              // Esto incluye React, recharts, lucide, framer-motion, etc.
+              // Vite resolverá el orden correcto de dependencias
               return undefined;
             }
-            // Game components - each game gets its own chunk via lazy loading
-            if (id.includes('/components/games/')) {
-              const match = id.match(/\/games\/([^/]+)\.(tsx|ts)$/);
-              if (match) {
-                return `game-${match[1].toLowerCase()}`;
-              }
-            }
-            // Application services - separate chunk
-            if (id.includes('/src/application/services/')) {
-              return 'app-services';
-            }
-            // Infrastructure adapters - separate chunk
-            if (id.includes('/src/infrastructure/')) {
-              return 'app-infrastructure';
-            }
-            // Analytics components
-            if (id.includes('Analytics') || id.includes('analytics')) {
-              return 'feature-analytics';
-            }
-            // OBS related
-            if (id.includes('OBS') || id.includes('obs')) {
-              return 'feature-obs';
-            }
-            // Alert system
-            if (id.includes('Alert')) {
-              return 'feature-alerts';
-            }
-            // Command system
-            if (id.includes('Command')) {
-              return 'feature-commands';
-            }
-            // Giveaway and Judge panels - heavy components
-            if (id.includes('Giveaway') || id.includes('Judge')) {
-              return 'feature-giveaway';
-            }
+            // No separar código de la app - dejar que Vite optimice
+            return undefined;
           }
         }
       }
