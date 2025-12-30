@@ -44,9 +44,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
 
   const variantStyles = {
     primary: `
-      bg-primary-500 text-white
-      hover:bg-primary-600
-      focus-visible:ring-primary-500
+      bg-[#9146ff] text-white
+      hover:bg-[#772ce8]
+      focus-visible:ring-[#9146ff]
       shadow-sm hover:shadow-md
     `,
     secondary: `
@@ -66,10 +66,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       focus-visible:ring-gray-500
     `,
     outline: `
-      bg-transparent text-primary-400
-      border border-primary-500
-      hover:bg-primary-500/10
-      focus-visible:ring-primary-500
+      bg-transparent text-[#a970ff]
+      border border-[#9146ff]
+      hover:bg-[#9146ff]/10
+      focus-visible:ring-[#9146ff]
     `,
   };
 

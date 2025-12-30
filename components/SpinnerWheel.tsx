@@ -241,23 +241,26 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       if (optionsKey !== prevOptionsRef.current) {
         prevOptionsRef.current = optionsKey;
         setCurrentOptions(options);
-        // Sync with the new options directly - use refs to avoid stale closures
-        const fullState = {
-          rotation,
-          isSpinning,
-          winner,
-          showWinner,
-          options: options,
-        };
-        console.log('[SpinnerMain] Options changed, syncing:', fullState);
-        channelRef.current?.postMessage(fullState);
-        try {
-          localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
-        } catch { /* ignore */ }
-        gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
+        // Don't sync during spin - the spin function handles its own sync
+        // Only sync when options actually change (not on every state change)
+        if (!isSpinning) {
+          const fullState = {
+            rotation,
+            isSpinning,
+            winner,
+            showWinner,
+            options: options,
+          };
+          console.log('[SpinnerMain] Options changed, syncing:', fullState);
+          channelRef.current?.postMessage(fullState);
+          try {
+            localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
+          } catch { /* ignore */ }
+          gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
+        }
       }
     }
-  }, [options, isOverlayMode, rotation, isSpinning, winner, showWinner]);
+  }, [options, isOverlayMode]); // Only react to options changes, not state changes
 
 
   // Calculate total votes helper
