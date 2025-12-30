@@ -9,13 +9,20 @@
  * @requirements 5.1, 5.6
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type React from 'react';
 import { PollService, getPollService, CreatePollParams, ProcessVoteParams, ProcessVoteResult } from '../services/PollService';
 import { ModerationService } from '../services/ModerationService';
 import type { Poll, PollOption, VoteRecord, PollResult } from '../../domain/entities/Poll';
 import type { ModerationConfig, ModerationStats } from '../../domain/entities/ModerationConfig';
 import type { ChatMessage } from '../../domain/ports/IChatProvider';
+import { pollSync } from '../../infrastructure/sync/FirebaseSync';
+
+// Debug logging for poll state
+const DEBUG_POLL = false;
+const logPoll = (msg: string, data?: any) => {
+  if (DEBUG_POLL) console.log(`[PollService] ${msg}`, data || '');
+};
 
 export interface UsePollServiceReturn {
   /** Encuesta actual */
@@ -115,9 +122,28 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     acceptanceRate: 0,
   });
   
+  // Ref to always have access to the latest poll state (avoids stale closure issues)
+  const currentPollRef = useRef<Poll | null>(currentPoll);
+  // Flag to ignore onChange callback when we're updating state ourselves
+  const ignoreOnChangeRef = useRef(false);
+  
+  useEffect(() => {
+    currentPollRef.current = currentPoll;
+    logPoll('currentPollRef updated', { 
+      question: currentPoll?.question, 
+      totalVotes: currentPoll?.totalVotes,
+      options: currentPoll?.options.map(o => ({ id: o.id, label: o.label, votes: o.votes }))
+    });
+  }, [currentPoll]);
+  
   // Suscribirse a cambios
   useEffect(() => {
     const unsubscribe = service.onChange((poll) => {
+      // Ignore onChange if we're updating state ourselves (e.g., during stopPoll)
+      if (ignoreOnChangeRef.current) {
+        logPoll('onChange ignored (ignoreOnChangeRef is true)');
+        return;
+      }
       setCurrentPoll(poll);
       setVoteHistory(service.getVoteHistory());
       setPastPolls(service.getPollHistory());
@@ -126,6 +152,40 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     
     return unsubscribe;
   }, [service, onPollChange]);
+
+  // Sync poll state to Firebase for overlay (only in non-overlay mode)
+  const isOverlayMode = options.isOverlayMode;
+  const lastSyncRef = useRef<string>('');
+  
+  useEffect(() => {
+    if (isOverlayMode) return; // Don't sync from overlay mode
+    
+    // Create a key to detect actual changes
+    const syncKey = currentPoll 
+      ? `${currentPoll.question}-${currentPoll.totalVotes}-${currentPoll.isActive}-${currentPoll.options.map(o => `${o.id}:${o.votes}`).join(',')}`
+      : 'null';
+    
+    // Only sync if state actually changed
+    if (syncKey === lastSyncRef.current) return;
+    lastSyncRef.current = syncKey;
+    
+    if (currentPoll) {
+      // Sync to Firebase for overlay
+      pollSync.update({
+        question: currentPoll.question,
+        options: currentPoll.options.map(opt => ({
+          text: opt.label,
+          votes: opt.votes,
+          color: opt.color,
+        })),
+        totalVotes: currentPoll.totalVotes,
+        isActive: currentPoll.isActive,
+      }).catch(err => console.error('[PollService] Firebase sync error:', err));
+    } else {
+      // Clear poll in Firebase
+      pollSync.update(null).catch(err => console.error('[PollService] Firebase clear error:', err));
+    }
+  }, [currentPoll, isOverlayMode]);
   
   // Mapa de usuario -> opción votada
   const userVoteMap = useMemo(() => {
@@ -143,8 +203,62 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
   }, [service, moderationConfig]);
   
   const stopPoll = useCallback((auto?: boolean): PollResult | null => {
-    const result = service.stopPoll();
-    // auto parameter is for compatibility - the service handles the logic
+    // Use ref to get the latest poll state (avoids stale closure issues)
+    const poll = currentPollRef.current;
+    
+    logPoll('stopPoll called', { 
+      auto, 
+      hasPoll: !!poll,
+      question: poll?.question,
+      totalVotes: poll?.totalVotes,
+      options: poll?.options.map(o => ({ id: o.id, label: o.label, votes: o.votes }))
+    });
+    
+    if (!poll) {
+      logPoll('stopPoll: no poll to stop');
+      return null;
+    }
+    
+    const stoppedPoll: Poll = {
+      ...poll,
+      isActive: false,
+      endTime: Date.now(),
+    };
+    
+    // Calculate result from local state
+    const winner = stoppedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b);
+    const totalVotes = stoppedPoll.options.reduce((sum, o) => sum + o.votes, 0);
+    
+    logPoll('stopPoll result', { 
+      winner: winner.label, 
+      winnerVotes: winner.votes, 
+      totalVotes,
+      allOptions: stoppedPoll.options.map(o => ({ label: o.label, votes: o.votes }))
+    });
+    
+    const result: PollResult = {
+      poll: stoppedPoll,
+      winner,
+      totalVotes,
+      duration: stoppedPoll.endTime! - stoppedPoll.startTime,
+      votesByOption: stoppedPoll.options.map(o => ({
+        option: o,
+        percentage: totalVotes > 0 ? (o.votes / totalVotes) * 100 : 0,
+      })),
+    };
+    
+    // Update local state and ref
+    setCurrentPoll(stoppedPoll);
+    currentPollRef.current = stoppedPoll;
+    
+    // Ignore onChange callback from service.stopPoll() to prevent overwriting our state
+    ignoreOnChangeRef.current = true;
+    service.stopPoll();
+    // Reset the flag after a short delay to allow future onChange callbacks
+    setTimeout(() => {
+      ignoreOnChangeRef.current = false;
+    }, 100);
+    
     return result;
   }, [service]);
   
@@ -216,8 +330,13 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
 
   // Add vote directly (for external vote processing)
   const addVote = useCallback((vote: VoteRecord, weight: number = 1): void => {
+    logPoll('addVote called', { optionId: vote.optionId, username: vote.username, weight });
+    
     setCurrentPoll(prev => {
-      if (!prev || !prev.isActive) return prev;
+      if (!prev || !prev.isActive) {
+        logPoll('addVote: poll not active or null', { hasPrev: !!prev, isActive: prev?.isActive });
+        return prev;
+      }
       
       const updatedOptions = prev.options.map(opt =>
         opt.id === vote.optionId
@@ -225,11 +344,21 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
           : opt
       );
       
-      return {
+      const newPoll = {
         ...prev,
         options: updatedOptions,
         totalVotes: prev.totalVotes + weight,
       };
+      
+      logPoll('addVote: updated poll', { 
+        totalVotes: newPoll.totalVotes,
+        options: newPoll.options.map(o => ({ id: o.id, label: o.label, votes: o.votes }))
+      });
+      
+      // Update ref synchronously to avoid race conditions
+      currentPollRef.current = newPoll;
+      
+      return newPoll;
     });
     
     setVoteHistory(prev => [...prev, { ...vote, weight }]);
@@ -243,6 +372,8 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     previousWeight: number,
     newWeight: number
   ): void => {
+    logPoll('updateVote called', { userId, previousOptionId, newOptionId, previousWeight, newWeight });
+    
     setCurrentPoll(prev => {
       if (!prev || !prev.isActive) return prev;
       
@@ -258,11 +389,21 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
       
       const totalDiff = newWeight - previousWeight;
       
-      return {
+      const newPoll = {
         ...prev,
         options: updatedOptions,
         totalVotes: prev.totalVotes + totalDiff,
       };
+      
+      // Update ref synchronously to avoid race conditions
+      currentPollRef.current = newPoll;
+      
+      logPoll('updateVote: updated poll', { 
+        totalVotes: newPoll.totalVotes,
+        options: newPoll.options.map(o => ({ id: o.id, label: o.label, votes: o.votes }))
+      });
+      
+      return newPoll;
     });
     
     setVoteHistory(prev => prev.map(v =>

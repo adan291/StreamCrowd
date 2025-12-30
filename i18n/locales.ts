@@ -318,6 +318,10 @@ export interface Translations {
     judgeDescription: string;
     giveaway: string;
     giveawayDescription: string;
+    countdown: string;
+    countdownDescription: string;
+    spinner: string;
+    spinnerDescription: string;
     dynamics: string;
     dynamicsSelector: string;
     dynamicsDescription: string;
@@ -1632,6 +1636,10 @@ export const translations: Record<Locale, Translations> = {
       judgeDescription: 'Panel de puntuación en vivo',
       giveaway: 'Sorteos',
       giveawayDescription: 'Sorteos y giveaways para tu comunidad',
+      countdown: 'Countdown',
+      countdownDescription: 'Temporizador con cuenta atrás para eventos',
+      spinner: 'Ruleta',
+      spinnerDescription: 'Ruleta de la fortuna para decisiones aleatorias',
       dynamics: 'Dinámicas',
       dynamicsSelector: 'Selector de dinámicas',
       dynamicsDescription: 'Selecciona una actividad interactiva para tu stream',
@@ -2942,6 +2950,10 @@ export const translations: Record<Locale, Translations> = {
       judgeDescription: 'Live scoring panel',
       giveaway: 'Giveaways',
       giveawayDescription: 'Giveaways and raffles for your community',
+      countdown: 'Countdown',
+      countdownDescription: 'Countdown timer for events',
+      spinner: 'Spinner',
+      spinnerDescription: 'Fortune wheel for random decisions',
       dynamics: 'Dynamics',
       dynamicsSelector: 'Dynamics selector',
       dynamicsDescription: 'Select an interactive activity for your stream',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Vote, Trophy, Gift } from 'lucide-react';
+import { Vote, Trophy, Gift, Timer, Dices } from 'lucide-react';
 import { DynamicsView, ACTIVITIES } from '../types';
 import { useI18n } from '../i18n';
 
@@ -8,6 +8,8 @@ const ACTIVITY_ICONS: Record<Exclude<DynamicsView, 'selector'>, React.ReactNode>
   poll: <Vote size={28} />,
   judge: <Trophy size={28} />,
   giveaway: <Gift size={28} />,
+  countdown: <Timer size={28} />,
+  spinner: <Dices size={28} />,
 };
 
 interface ActivityCardProps {
@@ -90,6 +92,10 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
         return t.nav?.judge || 'Jurado';
       case 'giveaway':
         return t.nav?.giveaway || 'Sorteos';
+      case 'countdown':
+        return t.nav?.countdown || 'Countdown';
+      case 'spinner':
+        return t.nav?.spinner || 'Ruleta';
       default:
         return id;
     }
@@ -103,6 +109,10 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
         return t.nav?.judgeDescription || 'Panel de puntuación en vivo';
       case 'giveaway':
         return t.nav?.giveawayDescription || 'Sorteos y giveaways para tu comunidad';
+      case 'countdown':
+        return t.nav?.countdownDescription || 'Temporizador con cuenta atrás para eventos';
+      case 'spinner':
+        return t.nav?.spinnerDescription || 'Ruleta de la fortuna para decisiones aleatorias';
       default:
         return '';
     }

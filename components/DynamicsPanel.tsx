@@ -5,6 +5,8 @@ import { ActivitySelector } from './ActivitySelector';
 import { PollCreator } from './PollCreator';
 import { JudgePanel } from './JudgePanel';
 import { GiveawayHub } from './GiveawayHub';
+import { Countdown } from './Countdown';
+import { SpinnerWheel } from './SpinnerWheel';
 import { useI18n } from '../i18n';
 
 export interface DynamicsPanelProps {
@@ -47,6 +49,9 @@ export interface DynamicsPanelProps {
   // GiveawayHub specific props
   authToken?: string;
   userId?: string;
+  
+  // Spinner specific props
+  spinnerOptions?: { id: number; label: string; votes: number; color: string }[];
 }
 
 export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
@@ -71,6 +76,7 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
   onShowCountdown,
   authToken,
   userId,
+  spinnerOptions,
 }) => {
   const { t } = useI18n();
 
@@ -178,6 +184,50 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
                 mainChannel={mainChannel}
                 authToken={authToken}
                 userId={userId}
+              />
+            </div>
+          </div>
+        );
+
+      case 'countdown':
+        return (
+          <div className="h-full flex flex-col">
+            <div className="px-4 pt-4">
+              {renderBackButton()}
+            </div>
+            <div className="flex-1 min-h-0">
+              <Countdown
+                chatMessages={chatMessages}
+                onClose={handleBack}
+              />
+            </div>
+          </div>
+        );
+
+      case 'spinner':
+        // Default options if none provided
+        const defaultSpinnerOptions = spinnerOptions || [
+          { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+          { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+          { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+          { id: 4, label: 'Opción 4', votes: 0, color: '#4ade80' },
+        ];
+        return (
+          <div className="h-full flex flex-col">
+            <div className="px-4 pt-4">
+              {renderBackButton()}
+            </div>
+            <div className="flex-1 min-h-0">
+              <SpinnerWheel
+                options={defaultSpinnerOptions}
+                onClose={handleBack}
+                chatMessages={chatMessages}
+                userVoteMap={userVoteMap}
+                collaborationChannels={collaborationChannels}
+                mainChannel={mainChannel}
+                onAddCollaborator={onAddCollaborator}
+                onRemoveCollaborator={onRemoveCollaborator}
+                isConnected={isConnected}
               />
             </div>
           </div>

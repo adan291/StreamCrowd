@@ -395,7 +395,7 @@ const App: React.FC = () => {
 
   // Handler for dynamics navigation
   const handleDynamicsNavigation = useCallback((view: DynamicsView) => {
-    const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway'];
+    const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway', 'countdown', 'spinner'];
     if (validViews.includes(view)) {
       setDynamicsView(view);
     } else {
@@ -750,14 +750,14 @@ const App: React.FC = () => {
     }
     moderation.reset();
     
-    // Announce in chat and sync with overlay
+    // Announce in chat and sync with overlay - single compact message
     if (authToken) {
       const optLabels = newPoll.options.map(o => o.label).join('|');
       getTwitchService().sendMessage(`!pollsync ${question}|${optLabels}`);
-      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question}`);
-      const opts = newPoll.options.map(o => `${prefix}${o.id} ${o.label}`).join(' | ');
-      getTwitchService().sendMessage(`${t.chat.options}: ${opts}`);
-      getTwitchService().sendMessage(t.chat.voteHint.replace('+', prefix));
+      // Single compact message: "📊 Encuesta: pregunta | +1 Op1 | +2 Op2 | Vota con +1, +2..."
+      const opts = newPoll.options.map((o, idx) => `${prefix}${idx + 1} ${o.label}`).join(' | ');
+      const voteHint = t.chat.voteHint.replace('+', prefix);
+      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question} | ${opts} | ${voteHint}`);
     }
   };
 
@@ -793,8 +793,8 @@ const App: React.FC = () => {
     
     if (authToken) {
       getTwitchService().sendMessage(`!pollend`);
-      getTwitchService().sendMessage(`${t.chat.pollEnded}: ${result.poll.question}`);
-      getTwitchService().sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
+      // Single compact message: "📊 Encuesta Finalizada: {nombre} | 🏆 Ganador: {opción} ({votos} votos)"
+      getTwitchService().sendMessage(`📊 ${t.chat.pollEnded}: ${result.poll.question} | 🏆 ${t.chat.winner}: ${winner.label} (${winner.votes} ${t.poll.votesLabel || 'votos'})`);
     }
     
     // OBS Trigger: Poll results (after a short delay)

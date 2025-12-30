@@ -12,7 +12,7 @@ export type LeftTab = 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | '
 /**
  * Sub-views within the Dynamics section
  */
-export type DynamicsView = 'selector' | 'poll' | 'judge' | 'giveaway';
+export type DynamicsView = 'selector' | 'poll' | 'judge' | 'giveaway' | 'countdown' | 'spinner';
 
 // ============================================
 // PLATFORMS NAVIGATION TYPES
@@ -75,6 +75,20 @@ export const ACTIVITIES: ActivityConfig[] = [
     title: 'Sorteos',
     description: 'Sorteos y giveaways para tu comunidad',
     color: '#f472b6', // Pink
+  },
+  {
+    id: 'countdown',
+    icon: 'Timer',
+    title: 'Countdown',
+    description: 'Temporizador con cuenta atrás para eventos',
+    color: '#3b82f6', // Blue
+  },
+  {
+    id: 'spinner',
+    icon: 'Dices',
+    title: 'Ruleta',
+    description: 'Ruleta de la fortuna para decisiones aleatorias',
+    color: '#22c55e', // Green
   },
 ];
 

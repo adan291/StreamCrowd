@@ -96,8 +96,8 @@ export const DEFAULT_MODERATION_CONFIG: ModerationConfig = {
   voteChangeEnabled: true,
   voteChangeCooldownSeconds: 30,
   weights: {
-    subscriber: 2,
-    follower: 1.5,
+    subscriber: 1,
+    follower: 1,
     regular: 1,
   },
   whitelist: { enabled: false, usernames: [] },
