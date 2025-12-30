@@ -1198,13 +1198,6 @@ html.dark {
   .card-hover-transition {
     transition: none !important;
   }
-
-  /* Keep essential visual feedback but make it instant */
-  * {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
 }
 
 
