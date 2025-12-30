@@ -20,9 +20,13 @@ const DEFAULT_SHORTCUTS: ShortcutConfig[] = [
   { id: 'reset-poll', name: 'Nueva Encuesta', description: 'Reinicia para crear nueva encuesta', keys: ['Ctrl', 'N'], category: 'poll', action: 'resetPoll', enabled: true },
   
   // Navigation shortcuts
-  { id: 'nav-panel', name: 'Ir a Panel', description: 'Navega al panel de encuestas', keys: ['Alt', '1'], category: 'navigation', action: 'navPanel', enabled: true },
-  { id: 'nav-gallery', name: 'Ir a Galería', description: 'Navega a la galería de assets', keys: ['Alt', '2'], category: 'navigation', action: 'navGallery', enabled: true },
-  { id: 'nav-data', name: 'Ir a Data', description: 'Navega a analytics', keys: ['Alt', '3'], category: 'navigation', action: 'navData', enabled: true },
+  { id: 'nav-dynamics', name: 'Ir a Dinámicas', description: 'Navega al selector de dinámicas', keys: ['Alt', '1'], category: 'navigation', action: 'navDynamics', enabled: true },
+  { id: 'nav-poll', name: 'Ir a Encuesta', description: 'Navega directamente a Encuesta', keys: ['Alt', 'P'], category: 'navigation', action: 'navPoll', enabled: true },
+  { id: 'nav-judge', name: 'Ir a Jurado', description: 'Navega directamente a Jurado', keys: ['Alt', 'J'], category: 'navigation', action: 'navJudge', enabled: true },
+  { id: 'nav-giveaway', name: 'Ir a Sorteos', description: 'Navega directamente a Sorteos', keys: ['Alt', 'G'], category: 'navigation', action: 'navGiveaway', enabled: true },
+  { id: 'nav-games', name: 'Ir a Juegos', description: 'Navega a la sección de juegos', keys: ['Alt', '2'], category: 'navigation', action: 'navGames', enabled: true },
+  { id: 'nav-gallery', name: 'Ir a Galería', description: 'Navega a la galería de assets', keys: ['Alt', '3'], category: 'navigation', action: 'navGallery', enabled: true },
+  { id: 'nav-data', name: 'Ir a Data', description: 'Navega a analytics', keys: ['Alt', '4'], category: 'navigation', action: 'navData', enabled: true },
   
   // General shortcuts
   { id: 'close-modal', name: 'Cerrar Modal', description: 'Cierra cualquier modal abierto', keys: ['Escape'], category: 'general', action: 'closeModal', enabled: true },

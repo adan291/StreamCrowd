@@ -214,9 +214,11 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
       {gameState === 'setup' && (
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
           <div>
-            <label className="text-sm text-zinc-400 mb-1 block">Palabra secreta</label>
+            <label htmlFor="ahorcado-secret-word" className="text-sm text-zinc-400 mb-1 block">Palabra secreta</label>
             <input
               type="text"
+              id="ahorcado-secret-word"
+              name="ahorcado-secret-word"
               value={secretWord}
               onChange={(e) => setSecretWord(e.target.value.toUpperCase())}
               placeholder="Ej: PROGRAMACION, TWITCH STREAMER..."
@@ -224,9 +226,11 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-400 mb-1 block">Pista (opcional)</label>
+            <label htmlFor="ahorcado-hint" className="text-sm text-zinc-400 mb-1 block">Pista (opcional)</label>
             <input
               type="text"
+              id="ahorcado-hint"
+              name="ahorcado-hint"
               value={hint}
               onChange={(e) => setHint(e.target.value)}
               placeholder="Ej: Es un lenguaje de programación..."

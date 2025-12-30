@@ -39,6 +39,10 @@ const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
   brb_end: '👋 Fin BRB',
   stream_start: '🔴 Inicio de stream',
   stream_end: '⏹️ Fin de stream',
+  prediction_start: '🔮 Inicio de predicción',
+  prediction_lock: '🔒 Predicción bloqueada',
+  prediction_resolve: '✅ Predicción resuelta',
+  reward_redeemed: '🎁 Recompensa canjeada',
   custom: '⚡ Personalizado',
 };
 

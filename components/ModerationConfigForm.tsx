@@ -119,13 +119,15 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
 
       {/* Account Age Filter */}
       <div className="space-y-1">
-        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+        <label htmlFor="mod-min-account-age" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
           {t.moderation.minAccountAge}
           <Tooltip text={t.moderation.minAccountAgeTooltip} />
         </label>
         <div className="relative">
           <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
+            id="mod-min-account-age"
+            name="mod-min-account-age"
             type="number"
             min="0"
             value={config.minAccountAgeDays}
@@ -172,13 +174,15 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
       {/* Cooldown Period */}
       {config.voteChangeEnabled && (
         <div className="space-y-1 animate-fade-in">
-          <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
+          <label htmlFor="mod-cooldown" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">
             {t.moderation.cooldown}
             <Tooltip text={t.moderation.cooldownTooltip} />
           </label>
           <div className="relative">
             <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
+              id="mod-cooldown"
+              name="mod-cooldown"
               type="number"
               min="0"
               value={config.voteChangeCooldownSeconds}
@@ -201,10 +205,12 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {/* Subscriber Weight */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-600 dark:text-zinc-400">{t.moderation.subscriber}</span>
+            <label htmlFor="mod-weight-subscriber" className="text-zinc-600 dark:text-zinc-400">{t.moderation.subscriber}</label>
             <span className="font-bold text-twitch-brand">{config.weights.subscriber}x</span>
           </div>
           <input
+            id="mod-weight-subscriber"
+            name="mod-weight-subscriber"
             type="range"
             min="1"
             max="5"
@@ -217,10 +223,12 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {/* Follower Weight */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-600 dark:text-zinc-400">{t.moderation.follower}</span>
+            <label htmlFor="mod-weight-follower" className="text-zinc-600 dark:text-zinc-400">{t.moderation.follower}</label>
             <span className="font-bold text-blue-500">{config.weights.follower}x</span>
           </div>
           <input
+            id="mod-weight-follower"
+            name="mod-weight-follower"
             type="range"
             min="1"
             max="5"
@@ -280,6 +288,9 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {config.whitelist?.enabled && (
           <div className="space-y-1">
             <textarea
+              id="mod-whitelist-usernames"
+              name="mod-whitelist-usernames"
+              aria-label={t.moderation.whitelist}
               value={config.whitelist?.usernames?.join('\n') || ''}
               onChange={(e) => {
                 const usernames = e.target.value
@@ -351,6 +362,9 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {config.blacklist?.enabled && (
           <div className="space-y-1">
             <textarea
+              id="mod-blacklist-usernames"
+              name="mod-blacklist-usernames"
+              aria-label={t.moderation.blacklist}
               value={config.blacklist?.usernames?.join('\n') || ''}
               onChange={(e) => {
                 const usernames = e.target.value
@@ -386,10 +400,13 @@ export const ModerationConfigForm: React.FC<ModerationConfigFormProps> = ({
         {/* Save Preset */}
         <div className="flex gap-2">
           <input
+            id="mod-preset-name"
+            name="mod-preset-name"
             type="text"
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
             placeholder={t.moderation.presetName}
+            aria-label={t.moderation.presetName}
             className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand"
           />
           <Button variant="secondary" onClick={handleSavePreset} className="shrink-0">

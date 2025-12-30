@@ -360,8 +360,10 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
           {/* Subir imagen */}
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Imagen (foto del IRL)</label>
+            <label htmlFor="memoria-image-upload" className="text-sm text-zinc-400 mb-2 block">Imagen (foto del IRL)</label>
             <input
+              id="memoria-image-upload"
+              name="imageUpload"
               ref={fileInputRef}
               type="file"
               accept="image/*"
@@ -429,9 +431,11 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
 
           {/* Lista de objetos */}
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Objetos a recordar ({objects.length})</label>
+            <label htmlFor="memoria-new-object" className="text-sm text-zinc-400 mb-2 block">Objetos a recordar ({objects.length})</label>
             <div className="flex gap-2 mb-2">
               <input
+                id="memoria-new-object"
+                name="newObject"
                 type="text"
                 value={newObject}
                 onChange={(e) => setNewObject(e.target.value)}
@@ -458,8 +462,10 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
           {/* Tiempos */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Tiempo para ver</label>
+              <label htmlFor="memoria-viewing-time" className="text-xs text-zinc-400 mb-1 block">Tiempo para ver</label>
               <select
+                id="memoria-viewing-time"
+                name="viewingTime"
                 value={viewingTime}
                 onChange={(e) => setViewingTime(parseInt(e.target.value))}
                 className="w-full px-2 py-1 bg-zinc-700 rounded text-white"
@@ -471,8 +477,10 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Tiempo para adivinar</label>
+              <label htmlFor="memoria-guessing-time" className="text-xs text-zinc-400 mb-1 block">Tiempo para adivinar</label>
               <select
+                id="memoria-guessing-time"
+                name="guessingTime"
                 value={guessingTime}
                 onChange={(e) => setGuessingTime(parseInt(e.target.value))}
                 className="w-full px-2 py-1 bg-zinc-700 rounded text-white"

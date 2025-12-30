@@ -626,8 +626,10 @@ IMPORTANTE:
                 <span className="text-sm font-medium text-white">Selecciona categorías</span>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-400">Preguntas:</span>
+                    <label htmlFor="trivia-questions-per-category" className="text-xs text-zinc-400">Preguntas:</label>
                     <input
+                      id="trivia-questions-per-category"
+                      name="questionsPerCategory"
                       type="number"
                       min="1"
                       max="5"
@@ -638,7 +640,11 @@ IMPORTANTE:
                   </div>
                   <div className="flex items-center gap-2">
                     <Timer size={14} className="text-zinc-400" />
+                    <label htmlFor="trivia-question-time-category" className="sr-only">Tiempo por pregunta</label>
                     <select
+                      id="trivia-question-time-category"
+                      name="questionTime"
+                      aria-label="Tiempo por pregunta"
                       value={questionTime}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
                       className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
@@ -749,8 +755,10 @@ IMPORTANTE:
               ) : (
                 <>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Tema de la trivia</label>
+                    <label htmlFor="trivia-ai-topic" className="text-xs text-zinc-400 mb-1 block">Tema de la trivia</label>
                     <input
+                      id="trivia-ai-topic"
+                      name="aiTopic"
                       type="text"
                       value={aiTopic}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAiTopic(e.target.value)}
@@ -761,8 +769,10 @@ IMPORTANTE:
                   
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-400">Preguntas:</span>
+                      <label htmlFor="trivia-ai-question-count" className="text-xs text-zinc-400">Preguntas:</label>
                       <input
+                        id="trivia-ai-question-count"
+                        name="aiQuestionCount"
                         type="number"
                         min="3"
                         max="15"
@@ -773,7 +783,11 @@ IMPORTANTE:
                     </div>
                     <div className="flex items-center gap-2">
                       <Timer size={14} className="text-zinc-400" />
+                      <label htmlFor="trivia-question-time-ai" className="sr-only">Tiempo por pregunta</label>
                       <select
+                        id="trivia-question-time-ai"
+                        name="questionTimeAi"
+                        aria-label="Tiempo por pregunta"
                         value={questionTime}
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
                         className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
@@ -846,7 +860,10 @@ IMPORTANTE:
                 <span className="text-sm font-medium text-white">Añadir Pregunta Manual</span>
               </div>
               
+              <label htmlFor="trivia-manual-question" className="sr-only">Pregunta</label>
               <input
+                id="trivia-manual-question"
+                name="editingQuestion"
                 type="text"
                 value={editingQuestion}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingQuestion(e.target.value)}
@@ -862,10 +879,14 @@ IMPORTANTE:
                       className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                         editingCorrect === i ? 'bg-green-500 text-white' : 'bg-zinc-600 text-zinc-400'
                       }`}
+                      aria-label={`Marcar opción ${i + 1} como correcta`}
                     >
                       {i + 1}
                     </button>
+                    <label htmlFor={`trivia-option-${i}`} className="sr-only">Opción {i + 1}</label>
                     <input
+                      id={`trivia-option-${i}`}
+                      name={`editingOption${i}`}
                       type="text"
                       value={opt}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -883,13 +904,17 @@ IMPORTANTE:
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Timer size={14} className="text-zinc-400" />
+                  <label htmlFor="trivia-manual-time" className="sr-only">Tiempo en segundos</label>
                   <input
+                    id="trivia-manual-time"
+                    name="editingTime"
                     type="number"
                     min="5"
                     max="60"
                     value={editingTime}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTime(parseInt(e.target.value) || 15)}
                     className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                    aria-label="Tiempo en segundos"
                   />
                   <span className="text-zinc-500 text-xs">seg</span>
                 </div>

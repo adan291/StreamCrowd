@@ -1,0 +1,45 @@
+{
+  "id": "example-plugin",
+  "name": "Plugin de Ejemplo",
+  "version": "1.0.0",
+  "description": "Un plugin de ejemplo que muestra las capacidades del sistema de plugins",
+  "author": "TwitchVote",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage",
+    "polls:read",
+    "notifications"
+  ],
+  "main": "index.js",
+  "homepage": "https://github.com/twitchvote/example-plugin",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "showNotifications": {
+        "type": "boolean",
+        "title": "Mostrar notificaciones",
+        "description": "Muestra notificaciones cuando se crean encuestas",
+        "default": true
+      },
+      "notificationSound": {
+        "type": "string",
+        "title": "Sonido de notificación",
+        "enum": ["default", "chime", "bell", "none"],
+        "default": "default"
+      },
+      "maxHistory": {
+        "type": "integer",
+        "title": "Historial máximo",
+        "description": "Número máximo de encuestas a recordar",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 10
+      }
+    }
+  },
+  "defaultConfig": {
+    "showNotifications": true,
+    "notificationSound": "default",
+    "maxHistory": 10
+  }
+}

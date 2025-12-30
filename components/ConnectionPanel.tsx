@@ -197,12 +197,14 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="text-left group">
-          <label className="text-xs text-slate-700 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
+          <label htmlFor="channel-input" className="text-xs text-slate-700 dark:text-zinc-400 font-bold ml-1 uppercase flex items-center mb-1 transition-colors group-focus-within:text-twitch-brand">
             {t.connection.channelLabel}
             <Tooltip text={t.connection.channelTooltip} />
           </label>
           <div className="relative">
               <input
+                id="channel-input"
+                name="channel"
                 type="text"
                 value={channel}
                 onChange={handleInputChange}
@@ -235,7 +237,10 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           </div>
           {showToken && (
             <div id="token-input-section" className="animate-fade-in-down">
+                <label htmlFor="oauth-token-input" className="sr-only">{t.connection.tokenLabel}</label>
                 <input
+                    id="oauth-token-input"
+                    name="oauth-token"
                     type="password"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
@@ -276,12 +281,12 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           </div>
         </div>
 
-        {/* Twitch OAuth Login Button */}
+        {/* Twitch OAuth Login Button - Primary action with Twitch purple */}
         <button
           type="button"
           onClick={handleTwitchLogin}
           disabled={status === ConnectionStatus.CONNECTING || isOAuthLoading}
-          className="w-full h-12 flex items-center justify-center gap-2 bg-[#9146FF] hover:bg-[#7c3aed] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40"
+          className="w-full h-12 flex items-center justify-center gap-2 bg-[#9146FF] hover:bg-[#772ce8] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all shadow-lg shadow-[#9146FF]/30 hover:shadow-[#9146FF]/50 ring-2 ring-[#9146FF]/20"
         >
           {isOAuthLoading ? (
             <>

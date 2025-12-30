@@ -283,13 +283,17 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
               <span className="text-sm text-zinc-400">Auto-spin cada:</span>
             </div>
             <div className="flex items-center gap-2">
+              <label htmlFor="roulette-auto-spin-interval" className="sr-only">Intervalo de auto-spin en segundos</label>
               <input
+                id="roulette-auto-spin-interval"
+                name="autoSpinInterval"
                 type="number"
                 min="10"
                 max="300"
                 value={autoSpinInterval}
                 onChange={(e) => setAutoSpinInterval(Math.max(10, parseInt(e.target.value) || 60))}
                 className="w-16 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
+                aria-label="Intervalo de auto-spin en segundos"
               />
               <span className="text-zinc-400 text-sm">seg</span>
             </div>

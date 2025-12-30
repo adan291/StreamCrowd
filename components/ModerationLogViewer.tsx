@@ -91,6 +91,8 @@ const REASON_LABELS: Record<RejectionReason, string> = {
   COOLDOWN_ACTIVE: 'Cooldown Active',
   VOTE_CHANGE_DISABLED: 'Vote Change Disabled',
   INVALID_OPTION: 'Invalid Option',
+  NOT_WHITELISTED: 'Not Whitelisted',
+  BLACKLISTED: 'Blacklisted',
 };
 
 export const ModerationLogViewer: React.FC<ModerationLogViewerProps> = ({

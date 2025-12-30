@@ -1116,8 +1116,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
           <div className="space-y-4 mb-6 p-4 bg-zinc-800/50 rounded-xl">
             {/* Title */}
             <div>
-              <label className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Título del Torneo</label>
+              <label htmlFor="judge-panel-title" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Título del Torneo</label>
               <input
+                id="judge-panel-title"
+                name="title"
                 type="text"
                 value={state.config.title}
                 onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, title: e.target.value } }))}
@@ -1129,8 +1131,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
             {/* Score Range */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Mínima</label>
+                <label htmlFor="judge-min-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Mínima</label>
                 <input
+                  id="judge-min-score"
+                  name="defaultMinScore"
                   type="number"
                   value={state.config.defaultMinScore}
                   onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMinScore: parseInt(e.target.value) || 1 } }))}
@@ -1139,8 +1143,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Máxima</label>
+                <label htmlFor="judge-max-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Máxima</label>
                 <input
+                  id="judge-max-score"
+                  name="defaultMaxScore"
                   type="number"
                   value={state.config.defaultMaxScore}
                   onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMaxScore: parseInt(e.target.value) || 10 } }))}
@@ -1162,16 +1168,21 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                     {editingCriterionId === criterion.id ? (
                       <div className="space-y-2">
                         <input
+                          id={`criterion-name-${criterion.id}`}
+                          name="criterionName"
                           type="text"
                           value={criterion.name}
                           onChange={(e) => updateCriterion(criterion.id, { name: e.target.value })}
                           className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
                           placeholder="Nombre del criterio"
+                          aria-label="Nombre del criterio"
                         />
                         <div className="flex gap-2">
                           <div className="flex-1">
-                            <label className="text-[10px] text-zinc-500">Mín</label>
+                            <label htmlFor={`criterion-min-${criterion.id}`} className="text-[10px] text-zinc-500">Mín</label>
                             <input
+                              id={`criterion-min-${criterion.id}`}
+                              name="criterionMinScore"
                               type="number"
                               value={criterion.minScore}
                               onChange={(e) => updateCriterion(criterion.id, { minScore: parseInt(e.target.value) || 0 })}
@@ -1180,8 +1191,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="text-[10px] text-zinc-500">Máx</label>
+                            <label htmlFor={`criterion-max-${criterion.id}`} className="text-[10px] text-zinc-500">Máx</label>
                             <input
+                              id={`criterion-max-${criterion.id}`}
+                              name="criterionMaxScore"
                               type="number"
                               value={criterion.maxScore}
                               onChange={(e) => updateCriterion(criterion.id, { maxScore: parseInt(e.target.value) || 10 })}
@@ -1190,8 +1203,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="text-[10px] text-zinc-500">Peso</label>
+                            <label htmlFor={`criterion-weight-${criterion.id}`} className="text-[10px] text-zinc-500">Peso</label>
                             <input
+                              id={`criterion-weight-${criterion.id}`}
+                              name="criterionWeight"
                               type="number"
                               value={criterion.weight}
                               onChange={(e) => updateCriterion(criterion.id, { weight: parseFloat(e.target.value) || 1 })}
@@ -1230,12 +1245,15 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               </div>
               <div className="flex gap-2">
                 <input
+                  id="new-criterion-input"
+                  name="newCriterionName"
                   type="text"
                   value={newCriterionName}
                   onChange={(e) => setNewCriterionName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addCriterion()}
                   className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
                   placeholder="Nuevo criterio..."
+                  aria-label="Nombre del nuevo criterio"
                 />
                 <button onClick={addCriterion} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
                   <Plus size={16} />
@@ -1251,8 +1269,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               
               {/* Vote prefix config */}
               <div className="flex items-center gap-2 mb-3 p-2 bg-zinc-700/30 rounded-lg">
-                <span className="text-xs text-zinc-400">Prefijo de voto:</span>
+                <label htmlFor="vote-prefix-input" className="text-xs text-zinc-400">Prefijo de voto:</label>
                 <input
+                  id="vote-prefix-input"
+                  name="publicVotePrefix"
                   type="text"
                   value={state.config.publicVotePrefix}
                   onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotePrefix: e.target.value } }))}
@@ -1298,7 +1318,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                         </div>
                       )}
                       <input 
-                        type="file" 
+                        type="file"
+                        id={`contestant-image-${contestant.id}`}
+                        name="contestant-image"
+                        aria-label="Subir imagen del concursante"
                         accept="image/*" 
                         className="hidden" 
                         ref={el => fileInputRefs.current[contestant.id] = el}
@@ -1306,21 +1329,27 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                       />
                     </div>
                     <input
+                      id={`contestant-name-${contestant.id}`}
+                      name="contestantName"
                       type="text"
                       value={contestant.name}
                       onChange={(e) => updateContestant(contestant.id, { name: e.target.value })}
                       className="flex-1 bg-zinc-600/50 border border-zinc-600 text-white rounded px-2 py-1 text-sm"
                       placeholder="Nombre"
+                      aria-label="Nombre del concursante"
                     />
                     <div className="relative w-16">
                       <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs font-mono">{state.config.publicVotePrefix}</span>
                       <input
+                        id={`contestant-votekey-${contestant.id}`}
+                        name="contestantVoteKey"
                         type="text"
                         value={contestant.voteKey || ''}
                         onChange={(e) => updateContestant(contestant.id, { voteKey: e.target.value })}
                         className="w-full bg-zinc-600/50 border border-zinc-600 text-white rounded pl-5 pr-1 py-1 text-xs font-mono"
                         placeholder={String(index + 1)}
                         title="Clave de voto"
+                        aria-label="Clave de voto del concursante"
                       />
                     </div>
                     <button 
@@ -1360,12 +1389,15 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               
               <div className="flex gap-2">
                 <input
+                  id="new-contestant-input"
+                  name="newContestantName"
                   type="text"
                   value={newContestantName}
                   onChange={(e) => setNewContestantName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addContestant()}
                   className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
                   placeholder="Nuevo concursante..."
+                  aria-label="Nombre del nuevo concursante"
                 />
                 <button onClick={addContestant} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
                   <Plus size={16} />
@@ -1384,11 +1416,14 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                     {editingJudgeId === judge.id ? (
                       <div className="space-y-2">
                         <input
+                          id={`judge-name-${judge.id}`}
+                          name="judgeName"
                           type="text"
                           value={judge.username}
                           onChange={(e) => updateJudge(judge.id, { username: e.target.value, channelName: e.target.value })}
                           className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
                           placeholder="Nombre del juez"
+                          aria-label="Nombre del juez"
                         />
                         <div className="flex gap-2 items-center">
                           <label className="text-[10px] text-zinc-500">Color:</label>
@@ -1402,8 +1437,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                               />
                             ))}
                           </div>
-                          <label className="text-[10px] text-zinc-500 ml-2 flex items-center gap-1">
+                          <label htmlFor={`judge-host-${judge.id}`} className="text-[10px] text-zinc-500 ml-2 flex items-center gap-1">
                             <input
+                              id={`judge-host-${judge.id}`}
+                              name="judgeIsHost"
                               type="checkbox"
                               checked={judge.isHost}
                               onChange={(e) => updateJudge(judge.id, { isHost: e.target.checked })}
@@ -1439,12 +1476,15 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               </div>
               <div className="flex gap-2">
                 <input
+                  id="new-judge-input"
+                  name="newJudgeName"
                   type="text"
                   value={newJudgeName}
                   onChange={(e) => setNewJudgeName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addJudge()}
                   className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
                   placeholder="Nombre del juez..."
+                  aria-label="Nombre del nuevo juez"
                 />
                 <button onClick={addJudge} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
                   <Plus size={16} />
@@ -1514,8 +1554,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               {state.config.publicVotingEnabled && (
                 <>
                   <div className="flex items-center gap-3">
-                    <label className="text-xs text-zinc-400">Duración (seg):</label>
+                    <label htmlFor="public-voting-duration" className="text-xs text-zinc-400">Duración (seg):</label>
                     <input
+                      id="public-voting-duration"
+                      name="publicVotingDuration"
                       type="number"
                       value={state.config.publicVotingDuration || ''}
                       onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingDuration: e.target.value ? parseInt(e.target.value) : undefined } }))}
@@ -1526,8 +1568,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                     <span className="text-zinc-500 text-xs">(vacío = manual)</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="text-xs text-zinc-400">Peso del voto público:</label>
+                    <label htmlFor="public-vote-weight" className="text-xs text-zinc-400">Peso del voto público:</label>
                     <input
+                      id="public-vote-weight"
+                      name="publicVoteWeight"
                       type="range"
                       min="0"
                       max="100"

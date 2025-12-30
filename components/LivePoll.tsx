@@ -472,7 +472,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
              
              {isEditing && !isOverlay && (
                  <input 
-                    type="text" 
+                    type="text"
+                    id="poll-edit-title"
+                    name="poll-edit-title"
+                    aria-label="Editar título de la encuesta"
                     value={editTitle} 
                     onChange={e => setEditTitle(e.target.value)}
                     className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase w-32 sm:w-40"
@@ -492,6 +495,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
           {isEditing && !isOverlay ? (
               <input 
                  type="text"
+                 id="poll-edit-question"
+                 name="poll-edit-question"
+                 aria-label="Editar pregunta de la encuesta"
                  value={editQuestion}
                  onChange={e => setEditQuestion(e.target.value)}
                  className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-1 font-bold text-zinc-900 dark:text-white text-lg md:text-xl mt-1 focus:ring-2 focus:ring-twitch-brand focus:outline-none"

@@ -35,6 +35,16 @@ const REJECTION_LABELS: Record<RejectionReason, { label: string; icon: React.Rea
     icon: <XCircle size={14} />,
     color: 'text-red-500',
   },
+  NOT_WHITELISTED: {
+    label: 'Not Whitelisted',
+    icon: <UserX size={14} />,
+    color: 'text-yellow-500',
+  },
+  BLACKLISTED: {
+    label: 'Blacklisted',
+    icon: <UserX size={14} />,
+    color: 'text-red-600',
+  },
 };
 
 export const ModerationStatsDisplay: React.FC<ModerationStatsDisplayProps> = ({ stats }) => {

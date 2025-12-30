@@ -927,20 +927,20 @@ export const Countdown: React.FC<CountdownProps> = ({
                 <p className="text-[10px] text-zinc-400 mb-2 font-bold uppercase">Tiempo inicial</p>
                 <div className="grid grid-cols-4 gap-1.5">
                   <div>
-                    <label className="text-[9px] text-zinc-500 block mb-0.5 text-center">Días</label>
-                    <input type="number" min="0" max="365" value={config.initialDays} onChange={(e) => updateConfig('initialDays', Math.max(0, parseInt(e.target.value) || 0))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
+                    <label htmlFor="countdown-days" className="text-[9px] text-zinc-500 block mb-0.5 text-center">Días</label>
+                    <input type="number" id="countdown-days" name="countdown-days" min="0" max="365" value={config.initialDays} onChange={(e) => updateConfig('initialDays', Math.max(0, parseInt(e.target.value) || 0))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-zinc-500 block mb-0.5 text-center">Horas</label>
-                    <input type="number" min="0" max="23" value={config.initialHours} onChange={(e) => updateConfig('initialHours', Math.min(23, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
+                    <label htmlFor="countdown-hours" className="text-[9px] text-zinc-500 block mb-0.5 text-center">Horas</label>
+                    <input type="number" id="countdown-hours" name="countdown-hours" min="0" max="23" value={config.initialHours} onChange={(e) => updateConfig('initialHours', Math.min(23, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-zinc-500 block mb-0.5 text-center">Min</label>
-                    <input type="number" min="0" max="59" value={config.initialMinutes} onChange={(e) => updateConfig('initialMinutes', Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
+                    <label htmlFor="countdown-minutes" className="text-[9px] text-zinc-500 block mb-0.5 text-center">Min</label>
+                    <input type="number" id="countdown-minutes" name="countdown-minutes" min="0" max="59" value={config.initialMinutes} onChange={(e) => updateConfig('initialMinutes', Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
                   </div>
                   <div>
-                    <label className="text-[9px] text-zinc-500 block mb-0.5 text-center">Seg</label>
-                    <input type="number" min="0" max="59" value={config.initialSeconds} onChange={(e) => updateConfig('initialSeconds', Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
+                    <label htmlFor="countdown-seconds" className="text-[9px] text-zinc-500 block mb-0.5 text-center">Seg</label>
+                    <input type="number" id="countdown-seconds" name="countdown-seconds" min="0" max="59" value={config.initialSeconds} onChange={(e) => updateConfig('initialSeconds', Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} className="w-full bg-zinc-700 rounded-lg px-1.5 py-1.5 text-white text-xs text-center" />
                   </div>
                 </div>
                 {/* Presets rápidos */}
@@ -979,23 +979,23 @@ export const Countdown: React.FC<CountdownProps> = ({
                 {config.enableSubs && (
                   <div className="ml-4 grid grid-cols-3 gap-1.5 p-2 bg-zinc-800/50 rounded-lg">
                     <div>
-                      <label className="text-[9px] text-pink-400 block mb-0.5 text-center">Tier 1</label>
+                      <label htmlFor="sub-time-tier1" className="text-[9px] text-pink-400 block mb-0.5 text-center">Tier 1</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.subTimeTier1} onChange={(e) => updateConfig('subTimeTier1', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="sub-time-tier1" name="sub-time-tier1" min="0" value={config.subTimeTier1} onChange={(e) => updateConfig('subTimeTier1', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[9px] text-blue-400 block mb-0.5 text-center">Tier 2</label>
+                      <label htmlFor="sub-time-tier2" className="text-[9px] text-blue-400 block mb-0.5 text-center">Tier 2</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.subTimeTier2} onChange={(e) => updateConfig('subTimeTier2', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="sub-time-tier2" name="sub-time-tier2" min="0" value={config.subTimeTier2} onChange={(e) => updateConfig('subTimeTier2', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[9px] text-yellow-400 block mb-0.5 text-center">Tier 3</label>
+                      <label htmlFor="sub-time-tier3" className="text-[9px] text-yellow-400 block mb-0.5 text-center">Tier 3</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.subTimeTier3} onChange={(e) => updateConfig('subTimeTier3', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="sub-time-tier3" name="sub-time-tier3" min="0" value={config.subTimeTier3} onChange={(e) => updateConfig('subTimeTier3', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
@@ -1015,23 +1015,23 @@ export const Countdown: React.FC<CountdownProps> = ({
                 {config.enableGiftSubs && (
                   <div className="ml-4 grid grid-cols-3 gap-1.5 p-2 bg-zinc-800/50 rounded-lg">
                     <div>
-                      <label className="text-[9px] text-pink-400 block mb-0.5 text-center">Tier 1</label>
+                      <label htmlFor="gift-sub-time-tier1" className="text-[9px] text-pink-400 block mb-0.5 text-center">Tier 1</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.giftSubTimeTier1} onChange={(e) => updateConfig('giftSubTimeTier1', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="gift-sub-time-tier1" name="gift-sub-time-tier1" min="0" value={config.giftSubTimeTier1} onChange={(e) => updateConfig('giftSubTimeTier1', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[9px] text-blue-400 block mb-0.5 text-center">Tier 2</label>
+                      <label htmlFor="gift-sub-time-tier2" className="text-[9px] text-blue-400 block mb-0.5 text-center">Tier 2</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.giftSubTimeTier2} onChange={(e) => updateConfig('giftSubTimeTier2', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="gift-sub-time-tier2" name="gift-sub-time-tier2" min="0" value={config.giftSubTimeTier2} onChange={(e) => updateConfig('giftSubTimeTier2', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
                     <div>
-                      <label className="text-[9px] text-yellow-400 block mb-0.5 text-center">Tier 3</label>
+                      <label htmlFor="gift-sub-time-tier3" className="text-[9px] text-yellow-400 block mb-0.5 text-center">Tier 3</label>
                       <div className="flex items-center gap-0.5">
-                        <input type="number" min="0" value={config.giftSubTimeTier3} onChange={(e) => updateConfig('giftSubTimeTier3', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
+                        <input type="number" id="gift-sub-time-tier3" name="gift-sub-time-tier3" min="0" value={config.giftSubTimeTier3} onChange={(e) => updateConfig('giftSubTimeTier3', parseInt(e.target.value) || 0)} className="w-full bg-zinc-600 rounded px-1 py-1 text-white text-[10px] text-center" />
                         <span className="text-[9px] text-zinc-500">s</span>
                       </div>
                     </div>
@@ -1045,8 +1045,8 @@ export const Countdown: React.FC<CountdownProps> = ({
                   <div className={`w-3 h-3 rounded-full bg-white transition-transform ${config.enableBits ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
                 <Coins className="text-yellow-500" size={14} />
-                <span className="text-xs text-white flex-1">Bits/100</span>
-                <input type="number" min="0" value={config.bitsPer100} onChange={(e) => updateConfig('bitsPer100', parseInt(e.target.value) || 0)} disabled={!config.enableBits} className="w-12 bg-zinc-600 rounded px-1.5 py-0.5 text-white text-xs text-center disabled:opacity-50" />
+                <label htmlFor="bits-per-100" className="text-xs text-white flex-1">Bits/100</label>
+                <input type="number" id="bits-per-100" name="bits-per-100" min="0" value={config.bitsPer100} onChange={(e) => updateConfig('bitsPer100', parseInt(e.target.value) || 0)} disabled={!config.enableBits} className="w-12 bg-zinc-600 rounded px-1.5 py-0.5 text-white text-xs text-center disabled:opacity-50" />
                 <span className="text-[10px] text-zinc-400">s</span>
               </div>
 
@@ -1056,8 +1056,8 @@ export const Countdown: React.FC<CountdownProps> = ({
                   <div className={`w-3 h-3 rounded-full bg-white transition-transform ${config.enableRaids ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
                 <Zap className="text-orange-500" size={14} />
-                <span className="text-xs text-white flex-1">Raids</span>
-                <input type="number" min="0" value={config.raidTime} onChange={(e) => updateConfig('raidTime', parseInt(e.target.value) || 0)} disabled={!config.enableRaids} className="w-12 bg-zinc-600 rounded px-1.5 py-0.5 text-white text-xs text-center disabled:opacity-50" />
+                <label htmlFor="raid-time" className="text-xs text-white flex-1">Raids</label>
+                <input type="number" id="raid-time" name="raid-time" min="0" value={config.raidTime} onChange={(e) => updateConfig('raidTime', parseInt(e.target.value) || 0)} disabled={!config.enableRaids} className="w-12 bg-zinc-600 rounded px-1.5 py-0.5 text-white text-xs text-center disabled:opacity-50" />
                 <span className="text-[10px] text-zinc-400">s</span>
               </div>
 

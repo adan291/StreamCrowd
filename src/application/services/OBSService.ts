@@ -30,6 +30,10 @@ export type AutomationTrigger =
   | 'brb_end'
   | 'stream_start'
   | 'stream_end'
+  | 'prediction_start'
+  | 'prediction_lock'
+  | 'prediction_resolve'
+  | 'reward_redeemed'
   | 'custom';
 
 /** Configuración de una automatización */

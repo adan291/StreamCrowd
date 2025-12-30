@@ -246,8 +246,10 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
           </div>
           <div className="flex items-center gap-2">
             <Timer size={16} className="text-zinc-400" />
-            <span className="text-sm text-zinc-400">Tiempo por ronda:</span>
+            <label htmlFor="ppt-round-time" className="text-sm text-zinc-400">Tiempo por ronda:</label>
             <select
+              id="ppt-round-time"
+              name="roundTime"
               value={roundTime}
               onChange={(e) => setRoundTime(parseInt(e.target.value))}
               className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"

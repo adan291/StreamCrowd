@@ -232,25 +232,32 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   }, [isOverlayMode, rotation, isSpinning, winner, showWinner, currentOptions]);
 
   // Update options when prop changes and sync to overlay
+  // Use a ref to track previous options to avoid unnecessary syncs
+  const prevOptionsRef = useRef<string>('');
   useEffect(() => {
     if (!isOverlayMode && options.length > 0) {
-      setCurrentOptions(options);
-      // Sync with the new options directly
-      const fullState = {
-        rotation,
-        isSpinning,
-        winner,
-        showWinner,
-        options: options, // Use the new options directly
-      };
-      console.log('[SpinnerMain] Options changed, syncing:', fullState);
-      channelRef.current?.postMessage(fullState);
-      try {
-        localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
-      } catch { /* ignore */ }
-      gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
+      // Only sync if options actually changed (compare by JSON)
+      const optionsKey = JSON.stringify(options.map(o => ({ id: o.id, label: o.label, color: o.color })));
+      if (optionsKey !== prevOptionsRef.current) {
+        prevOptionsRef.current = optionsKey;
+        setCurrentOptions(options);
+        // Sync with the new options directly - use refs to avoid stale closures
+        const fullState = {
+          rotation,
+          isSpinning,
+          winner,
+          showWinner,
+          options: options,
+        };
+        console.log('[SpinnerMain] Options changed, syncing:', fullState);
+        channelRef.current?.postMessage(fullState);
+        try {
+          localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
+        } catch { /* ignore */ }
+        gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
+      }
     }
-  }, [options, isOverlayMode]);
+  }, [options, isOverlayMode, rotation, isSpinning, winner, showWinner]);
 
 
   // Calculate total votes helper
@@ -674,8 +681,11 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
           </div>
           
           <div className="flex gap-2">
+            <label htmlFor="manual-participant-input" className="sr-only">Nombre del participante</label>
             <input 
-              type="text" 
+              type="text"
+              id="manual-participant-input"
+              name="manual-participant-input"
               value={manualParticipantInput} 
               onChange={(e) => setManualParticipantInput(e.target.value)} 
               placeholder="Nombre del participante" 
@@ -734,9 +744,9 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         {mode === 'voting' && (
           <div className="bg-zinc-800/50 rounded-xl p-4 mb-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Duración:</span>
+              <label htmlFor="voting-duration" className="text-sm text-zinc-400">Duración:</label>
               <div className="flex items-center gap-2">
-                <input type="number" min="10" max="300" value={votingDuration} onChange={(e) => setVotingDuration(Math.max(10, Math.min(300, parseInt(e.target.value) || 30)))} disabled={isVotingActive} className="w-16 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm disabled:opacity-50" />
+                <input type="number" id="voting-duration" name="voting-duration" min="10" max="300" value={votingDuration} onChange={(e) => setVotingDuration(Math.max(10, Math.min(300, parseInt(e.target.value) || 30)))} disabled={isVotingActive} className="w-16 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm disabled:opacity-50" />
                 <span className="text-zinc-400 text-sm">seg</span>
               </div>
             </div>

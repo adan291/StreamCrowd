@@ -513,8 +513,10 @@ Responde SOLO con JSON:
             </button>
             
             <div className="flex items-center gap-2">
-              <span className="text-zinc-400 text-xs">Tiempo:</span>
+              <label htmlFor="partyco-time-multiplier" className="text-zinc-400 text-xs">Tiempo:</label>
               <select
+                id="partyco-time-multiplier"
+                name="timeMultiplier"
                 value={timeMultiplier}
                 onChange={(e) => setTimeMultiplier(parseFloat(e.target.value))}
                 className="px-2 py-1 bg-zinc-700 rounded text-white text-xs"
@@ -524,8 +526,10 @@ Responde SOLO con JSON:
                 <option value={2}>2x</option>
               </select>
               
-              <span className="text-zinc-400 text-xs">Meta:</span>
+              <label htmlFor="partyco-points-to-win" className="text-zinc-400 text-xs">Meta:</label>
               <input
+                id="partyco-points-to-win"
+                name="pointsToWin"
                 type="number"
                 min="20"
                 max="200"
@@ -616,16 +620,23 @@ Responde SOLO con JSON:
             {showEditor && (
               <div className="mt-4 space-y-3">
                 <div className="flex gap-2">
+                  <label htmlFor="partyco-edit-type" className="sr-only">Tipo de prueba</label>
                   <select
+                    id="partyco-edit-type"
+                    name="editType"
                     value={editType}
                     onChange={(e) => setEditType(e.target.value as ChallengeType)}
                     className="px-3 py-2 bg-zinc-700 rounded-lg text-white text-sm"
+                    aria-label="Tipo de prueba"
                   >
                     {(Object.keys(CHALLENGE_NAMES) as ChallengeType[]).map(type => (
                       <option key={type} value={type}>{CHALLENGE_NAMES[type]}</option>
                     ))}
                   </select>
+                  <label htmlFor="partyco-edit-title" className="sr-only">Título de la prueba</label>
                   <input
+                    id="partyco-edit-title"
+                    name="editTitle"
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
@@ -635,30 +646,42 @@ Responde SOLO con JSON:
                 </div>
                 
                 <div className="flex gap-2">
+                  <label htmlFor="partyco-edit-answer" className="sr-only">Respuesta correcta</label>
                   <input
+                    id="partyco-edit-answer"
+                    name="editAnswer"
                     type="text"
                     value={editAnswer}
                     onChange={(e) => setEditAnswer(e.target.value)}
                     placeholder="Respuesta correcta..."
                     className="flex-1 px-3 py-2 bg-zinc-700 rounded-lg text-white text-sm"
                   />
+                  <label htmlFor="partyco-edit-time" className="sr-only">Tiempo en segundos</label>
                   <input
+                    id="partyco-edit-time"
+                    name="editTime"
                     type="number"
                     value={editTime}
                     onChange={(e) => setEditTime(parseInt(e.target.value) || 30)}
                     className="w-16 px-2 py-2 bg-zinc-700 rounded-lg text-white text-sm text-center"
                     title="Tiempo (seg)"
+                    aria-label="Tiempo en segundos"
                   />
+                  <label htmlFor="partyco-edit-points" className="sr-only">Puntos</label>
                   <input
+                    id="partyco-edit-points"
+                    name="editPoints"
                     type="number"
                     value={editPoints}
                     onChange={(e) => setEditPoints(parseInt(e.target.value) || 10)}
                     className="w-16 px-2 py-2 bg-zinc-700 rounded-lg text-white text-sm text-center"
                     title="Puntos"
+                    aria-label="Puntos"
                   />
                   <button
                     onClick={addCustomChallenge}
                     className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm"
+                    aria-label="Añadir prueba"
                   >
                     <Plus size={16} />
                   </button>
@@ -666,7 +689,10 @@ Responde SOLO con JSON:
                 
                 {/* Generador IA */}
                 <div className="flex gap-2 pt-2 border-t border-zinc-700">
+                  <label htmlFor="partyco-ai-topic" className="sr-only">Tema para generar con IA</label>
                   <input
+                    id="partyco-ai-topic"
+                    name="aiTopic"
                     type="text"
                     value={aiTopic}
                     onChange={(e) => setAiTopic(e.target.value)}

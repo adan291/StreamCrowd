@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import type React from 'react';
 import { PollService, getPollService, CreatePollParams, ProcessVoteParams, ProcessVoteResult } from '../services/PollService';
 import { ModerationService } from '../services/ModerationService';
 import type { Poll, PollOption, VoteRecord, PollResult } from '../../domain/entities/Poll';
@@ -28,7 +29,7 @@ export interface UsePollServiceReturn {
   /** Crear una nueva encuesta */
   createPoll: (params: CreatePollParams) => Poll;
   /** Detener la encuesta actual */
-  stopPoll: () => PollResult | null;
+  stopPoll: (auto?: boolean) => PollResult | null;
   /** Resetear todo el estado */
   resetPoll: () => void;
   /** Procesar un voto desde mensaje del chat */
@@ -45,6 +46,12 @@ export interface UsePollServiceReturn {
   setModerationConfig: (config: ModerationConfig) => void;
   /** Servicio subyacente */
   service: PollService;
+  /** Actualizar encuesta actual directamente */
+  setCurrentPoll: React.Dispatch<React.SetStateAction<Poll | null>>;
+  /** Añadir un voto directamente */
+  addVote: (vote: VoteRecord, weight?: number) => void;
+  /** Actualizar un voto existente */
+  updateVote: (userId: string, previousOptionId: number, newOptionId: number, previousWeight: number, newWeight: number) => void;
 }
 
 export interface UsePollServiceOptions {
@@ -54,6 +61,10 @@ export interface UsePollServiceOptions {
   onVote?: (result: ProcessVoteResult) => void;
   /** Configuración inicial de moderación */
   initialModerationConfig?: ModerationConfig;
+  /** Sincronizar con localStorage */
+  syncToStorage?: boolean;
+  /** Modo overlay (solo lectura) */
+  isOverlayMode?: boolean;
 }
 
 /**
@@ -131,8 +142,10 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     });
   }, [service, moderationConfig]);
   
-  const stopPoll = useCallback((): PollResult | null => {
-    return service.stopPoll();
+  const stopPoll = useCallback((auto?: boolean): PollResult | null => {
+    const result = service.stopPoll();
+    // auto parameter is for compatibility - the service handles the logic
+    return result;
   }, [service]);
   
   const resetPoll = useCallback(() => {
@@ -200,6 +213,64 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     service.setModerationConfig(config);
     setModerationConfigState(config);
   }, [service]);
+
+  // Add vote directly (for external vote processing)
+  const addVote = useCallback((vote: VoteRecord, weight: number = 1): void => {
+    setCurrentPoll(prev => {
+      if (!prev || !prev.isActive) return prev;
+      
+      const updatedOptions = prev.options.map(opt =>
+        opt.id === vote.optionId
+          ? { ...opt, votes: opt.votes + weight }
+          : opt
+      );
+      
+      return {
+        ...prev,
+        options: updatedOptions,
+        totalVotes: prev.totalVotes + weight,
+      };
+    });
+    
+    setVoteHistory(prev => [...prev, { ...vote, weight }]);
+  }, []);
+
+  // Update existing vote (for vote changes)
+  const updateVote = useCallback((
+    userId: string,
+    previousOptionId: number,
+    newOptionId: number,
+    previousWeight: number,
+    newWeight: number
+  ): void => {
+    setCurrentPoll(prev => {
+      if (!prev || !prev.isActive) return prev;
+      
+      const updatedOptions = prev.options.map(opt => {
+        if (opt.id === previousOptionId) {
+          return { ...opt, votes: Math.max(0, opt.votes - previousWeight) };
+        }
+        if (opt.id === newOptionId) {
+          return { ...opt, votes: opt.votes + newWeight };
+        }
+        return opt;
+      });
+      
+      const totalDiff = newWeight - previousWeight;
+      
+      return {
+        ...prev,
+        options: updatedOptions,
+        totalVotes: prev.totalVotes + totalDiff,
+      };
+    });
+    
+    setVoteHistory(prev => prev.map(v =>
+      v.oderId === userId || v.userId === userId
+        ? { ...v, optionId: newOptionId, timestamp: Date.now(), weight: newWeight }
+        : v
+    ));
+  }, []);
   
   return {
     currentPoll,
@@ -216,6 +287,9 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
     moderationStats,
     setModerationConfig,
     service,
+    setCurrentPoll,
+    addVote,
+    updateVote,
   };
 }
 

@@ -156,9 +156,11 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
       {gameState === 'setup' && (
         <div className="bg-zinc-800 rounded-xl p-4 space-y-4">
           <div>
-            <label className="text-sm text-zinc-400 mb-1 block">Palabra secreta (solo tú la ves)</label>
+            <label htmlFor="veoveo-secret-word" className="text-sm text-zinc-400 mb-1 block">Palabra secreta (solo tú la ves)</label>
             <input
               type="text"
+              id="veoveo-secret-word"
+              name="veoveo-secret-word"
               value={secretWord}
               onChange={(e) => setSecretWord(e.target.value)}
               placeholder="Ej: semáforo, perro, coche rojo..."
@@ -166,9 +168,11 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-400 mb-1 block">Primera pista</label>
+            <label htmlFor="veoveo-hint" className="text-sm text-zinc-400 mb-1 block">Primera pista</label>
             <input
               type="text"
+              id="veoveo-hint"
+              name="veoveo-hint"
               value={hint}
               onChange={(e) => setHint(e.target.value)}
               placeholder="Ej: Veo veo algo que empieza por S..."
@@ -201,8 +205,11 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
           </div>
 
           <div className="flex gap-2">
+            <label htmlFor="veoveo-new-hint" className="sr-only">Nueva pista</label>
             <input
               type="text"
+              id="veoveo-new-hint"
+              name="veoveo-new-hint"
               placeholder="Añadir nueva pista..."
               className="flex-1 px-3 py-2 bg-zinc-700 rounded-lg text-white text-sm"
               onKeyDown={(e) => {

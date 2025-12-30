@@ -343,9 +343,12 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">🔊 {t.soundboard.title}</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
+              <label htmlFor="soundboard-volume" className="sr-only">Volumen del soundboard</label>
               <Volume2 size={16} className="text-zinc-400" />
               <input
                 type="range"
+                id="soundboard-volume"
+                name="soundboard-volume"
                 min="0"
                 max="1"
                 step="0.1"
@@ -420,7 +423,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
             <>
               {/* Upload area */}
               <div className="mb-4">
-                <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
+                <input ref={fileInputRef} type="file" id="soundboard-upload" name="soundboard-upload" aria-label="Subir archivo de audio" accept="audio/*" onChange={handleFileUpload} className="hidden" />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
