@@ -678,6 +678,26 @@ export interface Translations {
     msgHappy: string;
     msgSad: string;
   };
+  chatSimulator: {
+    title: string;
+    active: string;
+    start: string;
+    pause: string;
+    reset: string;
+    settings: string;
+    context: string;
+    generic: string;
+    poll: string;
+    game: string;
+    trivia: string;
+    giveaway: string;
+    messagesPerMinute: string;
+    relevantProbability: string;
+    uniqueUsers: string;
+    burst: string;
+    simulateVotes: string;
+    simulateJoins: string;
+  };
   soundboard: {
     title: string;
     bitSounds: string;
@@ -717,6 +737,16 @@ export interface Translations {
   };
   spinner: {
     winnerTextColor: string;
+    optionsTitle: string;
+    presetsTitle: string;
+    presetYesNo: string;
+    presetNumbers: string;
+    presetDecisions: string;
+    presetPrizes: string;
+    newOptionPlaceholder: string;
+    clearAll: string;
+    spinning: string;
+    spin: string;
   };
   collaboration: {
     title: string;
@@ -1996,6 +2026,26 @@ export const translations: Record<Locale, Translations> = {
       msgHappy: '¡Buen ambiente! 😊',
       msgSad: 'El chat está triste... 😢',
     },
+    chatSimulator: {
+      title: 'Simulador de Chat',
+      active: 'Activo',
+      start: 'Iniciar',
+      pause: 'Pausar',
+      reset: 'Reset',
+      settings: 'Configuración',
+      context: 'Contexto',
+      generic: 'General',
+      poll: 'Encuesta',
+      game: 'Juego',
+      trivia: 'Trivia',
+      giveaway: 'Sorteo',
+      messagesPerMinute: 'Mensajes por minuto',
+      relevantProbability: 'Prob. mensaje relevante',
+      uniqueUsers: 'Usuarios únicos',
+      burst: 'Ráfaga',
+      simulateVotes: 'Simular votos',
+      simulateJoins: 'Simular joins',
+    },
     soundboard: {
       title: 'Panel de Sonidos',
       bitSounds: 'Sonidos BIT',
@@ -2035,6 +2085,16 @@ export const translations: Record<Locale, Translations> = {
     },
     spinner: {
       winnerTextColor: 'Color de texto ganador',
+      optionsTitle: 'Opciones de la Ruleta',
+      presetsTitle: 'Plantillas rápidas',
+      presetYesNo: 'Sí/No',
+      presetNumbers: 'Números 1-6',
+      presetDecisions: 'Decisiones A-D',
+      presetPrizes: 'Premios',
+      newOptionPlaceholder: 'Nueva opción...',
+      clearAll: 'Limpiar todas',
+      spinning: 'Girando...',
+      spin: 'Girar',
     },
     collaboration: {
       title: 'Colaboración',
@@ -3310,6 +3370,26 @@ export const translations: Record<Locale, Translations> = {
       msgHappy: 'Good vibes! 😊',
       msgSad: 'Chat is sad... 😢',
     },
+    chatSimulator: {
+      title: 'Chat Simulator',
+      active: 'Active',
+      start: 'Start',
+      pause: 'Pause',
+      reset: 'Reset',
+      settings: 'Settings',
+      context: 'Context',
+      generic: 'General',
+      poll: 'Poll',
+      game: 'Game',
+      trivia: 'Trivia',
+      giveaway: 'Giveaway',
+      messagesPerMinute: 'Messages per minute',
+      relevantProbability: 'Relevant message prob.',
+      uniqueUsers: 'Unique users',
+      burst: 'Burst',
+      simulateVotes: 'Simulate votes',
+      simulateJoins: 'Simulate joins',
+    },
     soundboard: {
       title: 'Sound Board',
       bitSounds: 'BIT Sounds',
@@ -3349,6 +3429,16 @@ export const translations: Record<Locale, Translations> = {
     },
     spinner: {
       winnerTextColor: 'Winner text color',
+      optionsTitle: 'Spinner Options',
+      presetsTitle: 'Quick presets',
+      presetYesNo: 'Yes/No',
+      presetNumbers: 'Numbers 1-6',
+      presetDecisions: 'Decisions A-D',
+      presetPrizes: 'Prizes',
+      newOptionPlaceholder: 'New option...',
+      clearAll: 'Clear all',
+      spinning: 'Spinning...',
+      spin: 'Spin',
     },
     collaboration: {
       title: 'Collaboration',

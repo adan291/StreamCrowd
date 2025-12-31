@@ -93,7 +93,7 @@ const deleteCustomCategory = (categoryId: string): void => {
   localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(filtered));
 };
 
-// Banco de preguntas predefinidas por categoría
+// Banco de preguntas predefinidas por categoría - EXPANDIDO
 const QUESTION_BANK: TriviaCategory[] = [
   {
     id: 'general',
@@ -105,6 +105,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 'g3', question: '¿Cuál es el océano más grande?', options: ['Atlántico', 'Índico', 'Pacífico', 'Ártico'], correctIndex: 2, timeLimit: 15 },
       { id: 'g4', question: '¿Cuántos huesos tiene el cuerpo humano adulto?', options: ['186', '206', '226', '256'], correctIndex: 1, timeLimit: 15 },
       { id: 'g5', question: '¿Cuál es el país más grande del mundo?', options: ['China', 'Estados Unidos', 'Canadá', 'Rusia'], correctIndex: 3, timeLimit: 15 },
+      { id: 'g6', question: '¿Cuántos colores tiene el arcoíris?', options: ['5', '6', '7', '8'], correctIndex: 2, timeLimit: 15 },
+      { id: 'g7', question: '¿Cuál es el animal más grande del mundo?', options: ['Elefante', 'Ballena azul', 'Jirafa', 'Tiburón ballena'], correctIndex: 1, timeLimit: 15 },
+      { id: 'g8', question: '¿Cuántos días tiene un año bisiesto?', options: ['364', '365', '366', '367'], correctIndex: 2, timeLimit: 15 },
+      { id: 'g9', question: '¿Qué gas necesitan las plantas para la fotosíntesis?', options: ['Oxígeno', 'Nitrógeno', 'Dióxido de carbono', 'Hidrógeno'], correctIndex: 2, timeLimit: 15 },
+      { id: 'g10', question: '¿Cuál es el metal más caro del mundo?', options: ['Oro', 'Platino', 'Rodio', 'Plata'], correctIndex: 2, timeLimit: 15 },
     ]
   },
   {
@@ -117,6 +122,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 'vg3', question: '¿Qué empresa creó PlayStation?', options: ['Nintendo', 'Microsoft', 'Sony', 'Sega'], correctIndex: 2, timeLimit: 15 },
       { id: 'vg4', question: '¿Cómo se llama el protagonista de The Legend of Zelda?', options: ['Zelda', 'Link', 'Ganon', 'Epona'], correctIndex: 1, timeLimit: 15 },
       { id: 'vg5', question: '¿Qué juego popularizó el Battle Royale?', options: ['Fortnite', 'PUBG', 'Apex Legends', 'H1Z1'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg6', question: '¿En qué año salió la primera Xbox?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg7', question: '¿Qué personaje es la mascota de Sega?', options: ['Mario', 'Sonic', 'Crash', 'Spyro'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg8', question: '¿En qué juego aparece Master Chief?', options: ['Gears of War', 'Halo', 'Destiny', 'Call of Duty'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg9', question: '¿Qué juego tiene el personaje Kratos?', options: ['Devil May Cry', 'God of War', 'Darksiders', 'Bayonetta'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg10', question: '¿Cuál es el juego principal de Riot Games?', options: ['Dota 2', 'League of Legends', 'Smite', 'Heroes of the Storm'], correctIndex: 1, timeLimit: 15 },
     ]
   },
   {
@@ -129,6 +139,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 'm3', question: '¿En qué año se estrenó El Señor de los Anillos: La Comunidad del Anillo?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15 },
       { id: 'm4', question: '¿Qué actor interpreta a Iron Man en el MCU?', options: ['Chris Evans', 'Chris Hemsworth', 'Robert Downey Jr.', 'Mark Ruffalo'], correctIndex: 2, timeLimit: 15 },
       { id: 'm5', question: '¿Cuál fue la primera película de Pixar?', options: ['Buscando a Nemo', 'Toy Story', 'Monsters Inc.', 'Bichos'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm6', question: '¿Quién interpreta a Jack Sparrow?', options: ['Orlando Bloom', 'Johnny Depp', 'Javier Bardem', 'Geoffrey Rush'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm7', question: '¿En qué película aparece el personaje Neo?', options: ['Blade Runner', 'Matrix', 'Tron', 'Ready Player One'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm8', question: '¿Cuántas películas de Star Wars hay en la saga principal?', options: ['6', '9', '11', '12'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm9', question: '¿Qué serie tiene dragones y el Trono de Hierro?', options: ['The Witcher', 'Game of Thrones', 'Vikings', 'The Last Kingdom'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm10', question: '¿Quién dirigió Inception?', options: ['James Cameron', 'Christopher Nolan', 'Denis Villeneuve', 'Ridley Scott'], correctIndex: 1, timeLimit: 15 },
     ]
   },
   {
@@ -141,6 +156,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 'mu3', question: '¿Cuántos miembros tenía The Beatles?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
       { id: 'mu4', question: '¿Qué instrumento toca Slash de Guns N\' Roses?', options: ['Batería', 'Bajo', 'Guitarra', 'Teclado'], correctIndex: 2, timeLimit: 15 },
       { id: 'mu5', question: '¿En qué década se popularizó el reggaetón?', options: ['1980s', '1990s', '2000s', '2010s'], correctIndex: 2, timeLimit: 15 },
+      { id: 'mu6', question: '¿Quién cantó "Bohemian Rhapsody"?', options: ['The Beatles', 'Queen', 'Led Zeppelin', 'Pink Floyd'], correctIndex: 1, timeLimit: 15 },
+      { id: 'mu7', question: '¿De qué país es Bad Bunny?', options: ['México', 'Colombia', 'Puerto Rico', 'España'], correctIndex: 2, timeLimit: 15 },
+      { id: 'mu8', question: '¿Qué banda cantó "Smells Like Teen Spirit"?', options: ['Pearl Jam', 'Nirvana', 'Soundgarden', 'Alice in Chains'], correctIndex: 1, timeLimit: 15 },
+      { id: 'mu9', question: '¿Cuál es el nombre real de Shakira?', options: ['Shakira Isabel', 'María Shakira', 'Shakira Ripoll', 'Ana Shakira'], correctIndex: 0, timeLimit: 15 },
+      { id: 'mu10', question: '¿Qué artista tiene el álbum "Thriller"?', options: ['Prince', 'Michael Jackson', 'Whitney Houston', 'Madonna'], correctIndex: 1, timeLimit: 15 },
     ]
   },
   {
@@ -153,6 +173,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 'geo3', question: '¿En qué continente está Egipto?', options: ['Asia', 'Europa', 'África', 'Oceanía'], correctIndex: 2, timeLimit: 15 },
       { id: 'geo4', question: '¿Cuál es el país con más habitantes?', options: ['India', 'China', 'Estados Unidos', 'Indonesia'], correctIndex: 0, timeLimit: 15 },
       { id: 'geo5', question: '¿Cuál es la montaña más alta del mundo?', options: ['K2', 'Everest', 'Kilimanjaro', 'Mont Blanc'], correctIndex: 1, timeLimit: 15 },
+      { id: 'geo6', question: '¿Cuál es la capital de Canadá?', options: ['Toronto', 'Vancouver', 'Ottawa', 'Montreal'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo7', question: '¿En qué país está Machu Picchu?', options: ['Chile', 'Bolivia', 'Perú', 'Ecuador'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo8', question: '¿Cuál es el desierto más grande del mundo?', options: ['Sahara', 'Gobi', 'Antártida', 'Kalahari'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo9', question: '¿Cuántos países hay en la Unión Europea (2024)?', options: ['25', '27', '29', '31'], correctIndex: 1, timeLimit: 15 },
+      { id: 'geo10', question: '¿Cuál es la capital de Brasil?', options: ['Río de Janeiro', 'São Paulo', 'Brasilia', 'Salvador'], correctIndex: 2, timeLimit: 15 },
     ]
   },
   {
@@ -165,6 +190,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 't3', question: '¿Qué significa "HTML"?', options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Management Language'], correctIndex: 0, timeLimit: 20 },
       { id: 't4', question: '¿Cuál fue la primera red social masiva?', options: ['Facebook', 'MySpace', 'Twitter', 'LinkedIn'], correctIndex: 1, timeLimit: 15 },
       { id: 't5', question: '¿Qué empresa creó Android?', options: ['Apple', 'Microsoft', 'Google', 'Samsung'], correctIndex: 2, timeLimit: 15 },
+      { id: 't6', question: '¿Qué significa "CPU"?', options: ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Processing Unit'], correctIndex: 0, timeLimit: 15 },
+      { id: 't7', question: '¿Quién fundó Amazon?', options: ['Elon Musk', 'Jeff Bezos', 'Mark Zuckerberg', 'Larry Page'], correctIndex: 1, timeLimit: 15 },
+      { id: 't8', question: '¿Qué empresa creó ChatGPT?', options: ['Google', 'Microsoft', 'OpenAI', 'Meta'], correctIndex: 2, timeLimit: 15 },
+      { id: 't9', question: '¿En qué año se fundó YouTube?', options: ['2003', '2005', '2007', '2009'], correctIndex: 1, timeLimit: 15 },
+      { id: 't10', question: '¿Qué significa "WiFi"?', options: ['Wireless Fidelity', 'Wired Fiber', 'Wide Frequency', 'No significa nada específico'], correctIndex: 3, timeLimit: 15 },
     ]
   },
   {
@@ -177,6 +207,11 @@ const QUESTION_BANK: TriviaCategory[] = [
       { id: 's3', question: '¿Cuántos Grand Slams hay en tenis?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
       { id: 's4', question: '¿Cada cuántos años se celebran los Juegos Olímpicos?', options: ['2', '3', '4', '5'], correctIndex: 2, timeLimit: 15 },
       { id: 's5', question: '¿Quién tiene más Balones de Oro?', options: ['Cristiano Ronaldo', 'Lionel Messi', 'Johan Cruyff', 'Michel Platini'], correctIndex: 1, timeLimit: 15 },
+      { id: 's6', question: '¿Cuántos sets se necesitan para ganar un partido de tenis masculino en Grand Slam?', options: ['2', '3', '4', '5'], correctIndex: 1, timeLimit: 15 },
+      { id: 's7', question: '¿En qué deporte se usa un "birdie"?', options: ['Golf', 'Bádminton', 'Tenis', 'Ambos A y B'], correctIndex: 3, timeLimit: 15 },
+      { id: 's8', question: '¿Cuántos puntos vale un touchdown en fútbol americano?', options: ['3', '6', '7', '10'], correctIndex: 1, timeLimit: 15 },
+      { id: 's9', question: '¿En qué país se originó el judo?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15 },
+      { id: 's10', question: '¿Cuántos jugadores hay en un equipo de baloncesto en cancha?', options: ['4', '5', '6', '7'], correctIndex: 1, timeLimit: 15 },
     ]
   },
   {
@@ -492,10 +527,11 @@ IMPORTANTE:
   const startGame = () => {
     if (questions.length === 0) return;
     setCurrentQuestionIndex(0);
-    setPlayers(new Map<string, PlayerScore>());
+    setPlayers(new Map<string, PlayerScore>()); // Clear players for new game
     setTimeLeft(questions[0].timeLimit);
     setAnswerCounts([0, 0, 0, 0]);
     setShowCorrect(false);
+    lastProcessedRef.current = chatMessages.length; // Reset to avoid processing old messages
     setGameState('question');
     triggerGameStart();
   };
@@ -503,6 +539,7 @@ IMPORTANTE:
   const nextQuestion = () => {
     if (currentQuestionIndex >= questions.length - 1) {
       setGameState('final');
+      triggerGameEnd();
       return;
     }
     

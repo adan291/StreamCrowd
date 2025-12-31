@@ -70,37 +70,104 @@ const CHALLENGE_NAMES: Record<ChallengeType, string> = {
   rapidez: 'Rapidez',
 };
 
-// Banco de pruebas predefinidas
+// Banco de pruebas predefinidas - EXPANDIDO
 const DEFAULT_CHALLENGES: Challenge[] = [
-  // Trivia
+  // ========== TRIVIA (15 preguntas) ==========
   { id: 't1', type: 'trivia', title: '¿Cuál es el planeta más cercano al Sol?', description: 'Responde en el chat', answer: 'mercurio', timeLimit: 20, points: 10 },
   { id: 't2', type: 'trivia', title: '¿En qué año cayó el Muro de Berlín?', description: 'Responde en el chat', answer: '1989', timeLimit: 20, points: 10 },
   { id: 't3', type: 'trivia', title: '¿Cuántos jugadores hay en un equipo de voleibol?', description: 'Responde en el chat', answer: '6', timeLimit: 15, points: 10 },
+  { id: 't4', type: 'trivia', title: '¿Cuántos lados tiene un hexágono?', description: 'Responde en el chat', answer: '6', hints: ['seis'], timeLimit: 15, points: 10 },
+  { id: 't5', type: 'trivia', title: '¿Cuál es el hueso más largo del cuerpo humano?', description: 'Responde en el chat', answer: 'femur', hints: ['fémur'], timeLimit: 20, points: 10 },
+  { id: 't6', type: 'trivia', title: '¿Cuántos corazones tiene un pulpo?', description: 'Responde en el chat', answer: '3', hints: ['tres'], timeLimit: 20, points: 10 },
+  { id: 't7', type: 'trivia', title: '¿En qué año se hundió el Titanic?', description: 'Responde en el chat', answer: '1912', timeLimit: 20, points: 10 },
+  { id: 't8', type: 'trivia', title: '¿Cuál es el metal más abundante en la Tierra?', description: 'Responde en el chat', answer: 'aluminio', timeLimit: 20, points: 10 },
+  { id: 't9', type: 'trivia', title: '¿Cuántos dientes tiene un adulto?', description: 'Responde en el chat', answer: '32', timeLimit: 15, points: 10 },
+  { id: 't10', type: 'trivia', title: '¿Qué gas respiramos principalmente?', description: 'Responde en el chat', answer: 'nitrogeno', hints: ['nitrógeno'], timeLimit: 15, points: 10 },
+  { id: 't11', type: 'trivia', title: '¿Cuántos minutos tiene una hora?', description: 'Responde en el chat', answer: '60', timeLimit: 10, points: 5 },
+  { id: 't12', type: 'trivia', title: '¿Cuál es el animal terrestre más rápido?', description: 'Responde en el chat', answer: 'guepardo', hints: ['cheetah', 'leopardo'], timeLimit: 20, points: 10 },
+  { id: 't13', type: 'trivia', title: '¿Cuántos continentes hay?', description: 'Responde en el chat', answer: '7', hints: ['siete'], timeLimit: 15, points: 10 },
+  { id: 't14', type: 'trivia', title: '¿Qué planeta es conocido como el planeta rojo?', description: 'Responde en el chat', answer: 'marte', hints: ['mars'], timeLimit: 15, points: 10 },
+  { id: 't15', type: 'trivia', title: '¿Cuántas patas tiene una araña?', description: 'Responde en el chat', answer: '8', hints: ['ocho'], timeLimit: 15, points: 10 },
   
-  // Mímica (el streamer actúa)
-  { id: 'm1', type: 'mimica', title: 'Imita: Un pingüino', description: 'El streamer debe actuar sin hablar', answer: 'pinguino', timeLimit: 45, points: 15 },
+  // ========== MÍMICA (15 pruebas) ==========
+  { id: 'm1', type: 'mimica', title: 'Imita: Un pingüino', description: 'El streamer debe actuar sin hablar', answer: 'pinguino', hints: ['pingüino'], timeLimit: 45, points: 15 },
   { id: 'm2', type: 'mimica', title: 'Imita: Alguien cocinando', description: 'El streamer debe actuar sin hablar', answer: 'cocinar', hints: ['cocinando', 'cocina', 'chef'], timeLimit: 45, points: 15 },
   { id: 'm3', type: 'mimica', title: 'Imita: Un astronauta', description: 'El streamer debe actuar sin hablar', answer: 'astronauta', timeLimit: 45, points: 15 },
+  { id: 'm4', type: 'mimica', title: 'Imita: Un mono', description: 'El streamer debe actuar sin hablar', answer: 'mono', hints: ['chimpance', 'gorila', 'simio'], timeLimit: 45, points: 15 },
+  { id: 'm5', type: 'mimica', title: 'Imita: Alguien nadando', description: 'El streamer debe actuar sin hablar', answer: 'nadar', hints: ['nadando', 'natacion'], timeLimit: 45, points: 15 },
+  { id: 'm6', type: 'mimica', title: 'Imita: Un robot', description: 'El streamer debe actuar sin hablar', answer: 'robot', timeLimit: 45, points: 15 },
+  { id: 'm7', type: 'mimica', title: 'Imita: Alguien con frío', description: 'El streamer debe actuar sin hablar', answer: 'frio', hints: ['frío', 'congelado', 'temblando'], timeLimit: 45, points: 15 },
+  { id: 'm8', type: 'mimica', title: 'Imita: Un futbolista', description: 'El streamer debe actuar sin hablar', answer: 'futbol', hints: ['fútbol', 'futbolista'], timeLimit: 45, points: 15 },
+  { id: 'm9', type: 'mimica', title: 'Imita: Un zombie', description: 'El streamer debe actuar sin hablar', answer: 'zombie', hints: ['zombi', 'muerto viviente'], timeLimit: 45, points: 15 },
+  { id: 'm10', type: 'mimica', title: 'Imita: Alguien pescando', description: 'El streamer debe actuar sin hablar', answer: 'pescar', hints: ['pescando', 'pesca'], timeLimit: 45, points: 15 },
+  { id: 'm11', type: 'mimica', title: 'Imita: Un bebé', description: 'El streamer debe actuar sin hablar', answer: 'bebe', hints: ['bebé', 'niño'], timeLimit: 45, points: 15 },
+  { id: 'm12', type: 'mimica', title: 'Imita: Alguien boxeando', description: 'El streamer debe actuar sin hablar', answer: 'boxeo', hints: ['boxear', 'boxeando', 'pelea'], timeLimit: 45, points: 15 },
+  { id: 'm13', type: 'mimica', title: 'Imita: Un perro', description: 'El streamer debe actuar sin hablar', answer: 'perro', hints: ['can', 'cachorro'], timeLimit: 45, points: 15 },
+  { id: 'm14', type: 'mimica', title: 'Imita: Alguien durmiendo', description: 'El streamer debe actuar sin hablar', answer: 'dormir', hints: ['durmiendo', 'sueño'], timeLimit: 45, points: 15 },
+  { id: 'm15', type: 'mimica', title: 'Imita: Un vaquero', description: 'El streamer debe actuar sin hablar', answer: 'vaquero', hints: ['cowboy'], timeLimit: 45, points: 15 },
   
-  // Dibujo (el streamer dibuja)
+  // ========== DIBUJO (15 pruebas) ==========
   { id: 'd1', type: 'dibujo', title: 'Dibuja: Una pizza', description: 'El streamer dibuja, el chat adivina', answer: 'pizza', timeLimit: 60, points: 15 },
   { id: 'd2', type: 'dibujo', title: 'Dibuja: Un cohete', description: 'El streamer dibuja, el chat adivina', answer: 'cohete', hints: ['nave', 'espacial'], timeLimit: 60, points: 15 },
   { id: 'd3', type: 'dibujo', title: 'Dibuja: Un gato', description: 'El streamer dibuja, el chat adivina', answer: 'gato', hints: ['gatito', 'minino'], timeLimit: 60, points: 15 },
+  { id: 'd4', type: 'dibujo', title: 'Dibuja: Una casa', description: 'El streamer dibuja, el chat adivina', answer: 'casa', hints: ['hogar', 'vivienda'], timeLimit: 60, points: 15 },
+  { id: 'd5', type: 'dibujo', title: 'Dibuja: Un árbol', description: 'El streamer dibuja, el chat adivina', answer: 'arbol', hints: ['árbol'], timeLimit: 60, points: 15 },
+  { id: 'd6', type: 'dibujo', title: 'Dibuja: Un helado', description: 'El streamer dibuja, el chat adivina', answer: 'helado', hints: ['ice cream'], timeLimit: 60, points: 15 },
+  { id: 'd7', type: 'dibujo', title: 'Dibuja: Un avión', description: 'El streamer dibuja, el chat adivina', answer: 'avion', hints: ['avión', 'aeroplano'], timeLimit: 60, points: 15 },
+  { id: 'd8', type: 'dibujo', title: 'Dibuja: Una guitarra', description: 'El streamer dibuja, el chat adivina', answer: 'guitarra', timeLimit: 60, points: 15 },
+  { id: 'd9', type: 'dibujo', title: 'Dibuja: Un sol', description: 'El streamer dibuja, el chat adivina', answer: 'sol', timeLimit: 45, points: 10 },
+  { id: 'd10', type: 'dibujo', title: 'Dibuja: Una hamburguesa', description: 'El streamer dibuja, el chat adivina', answer: 'hamburguesa', hints: ['burger'], timeLimit: 60, points: 15 },
+  { id: 'd11', type: 'dibujo', title: 'Dibuja: Un elefante', description: 'El streamer dibuja, el chat adivina', answer: 'elefante', timeLimit: 60, points: 15 },
+  { id: 'd12', type: 'dibujo', title: 'Dibuja: Una bicicleta', description: 'El streamer dibuja, el chat adivina', answer: 'bicicleta', hints: ['bici'], timeLimit: 60, points: 15 },
+  { id: 'd13', type: 'dibujo', title: 'Dibuja: Un reloj', description: 'El streamer dibuja, el chat adivina', answer: 'reloj', timeLimit: 60, points: 15 },
+  { id: 'd14', type: 'dibujo', title: 'Dibuja: Una flor', description: 'El streamer dibuja, el chat adivina', answer: 'flor', hints: ['rosa', 'margarita'], timeLimit: 60, points: 15 },
+  { id: 'd15', type: 'dibujo', title: 'Dibuja: Un dinosaurio', description: 'El streamer dibuja, el chat adivina', answer: 'dinosaurio', hints: ['dino', 't-rex'], timeLimit: 60, points: 15 },
   
-  // Palabras (el streamer describe sin decir la palabra)
+  // ========== PALABRAS (15 pruebas) ==========
   { id: 'p1', type: 'palabras', title: 'Describe sin decir: PLAYA', description: 'El streamer describe, el chat adivina', answer: 'playa', timeLimit: 45, points: 15 },
   { id: 'p2', type: 'palabras', title: 'Describe sin decir: ORDENADOR', description: 'El streamer describe, el chat adivina', answer: 'ordenador', hints: ['computadora', 'pc', 'computador'], timeLimit: 45, points: 15 },
   { id: 'p3', type: 'palabras', title: 'Describe sin decir: CHOCOLATE', description: 'El streamer describe, el chat adivina', answer: 'chocolate', timeLimit: 45, points: 15 },
+  { id: 'p4', type: 'palabras', title: 'Describe sin decir: HOSPITAL', description: 'El streamer describe, el chat adivina', answer: 'hospital', hints: ['clinica', 'clínica'], timeLimit: 45, points: 15 },
+  { id: 'p5', type: 'palabras', title: 'Describe sin decir: NAVIDAD', description: 'El streamer describe, el chat adivina', answer: 'navidad', hints: ['christmas'], timeLimit: 45, points: 15 },
+  { id: 'p6', type: 'palabras', title: 'Describe sin decir: CINE', description: 'El streamer describe, el chat adivina', answer: 'cine', hints: ['pelicula', 'película', 'teatro'], timeLimit: 45, points: 15 },
+  { id: 'p7', type: 'palabras', title: 'Describe sin decir: DENTISTA', description: 'El streamer describe, el chat adivina', answer: 'dentista', hints: ['odontologo', 'odontólogo'], timeLimit: 45, points: 15 },
+  { id: 'p8', type: 'palabras', title: 'Describe sin decir: SUPERMERCADO', description: 'El streamer describe, el chat adivina', answer: 'supermercado', hints: ['super', 'tienda'], timeLimit: 45, points: 15 },
+  { id: 'p9', type: 'palabras', title: 'Describe sin decir: CUMPLEAÑOS', description: 'El streamer describe, el chat adivina', answer: 'cumpleaños', hints: ['cumple', 'birthday'], timeLimit: 45, points: 15 },
+  { id: 'p10', type: 'palabras', title: 'Describe sin decir: AEROPUERTO', description: 'El streamer describe, el chat adivina', answer: 'aeropuerto', hints: ['airport'], timeLimit: 45, points: 15 },
+  { id: 'p11', type: 'palabras', title: 'Describe sin decir: BIBLIOTECA', description: 'El streamer describe, el chat adivina', answer: 'biblioteca', timeLimit: 45, points: 15 },
+  { id: 'p12', type: 'palabras', title: 'Describe sin decir: PARAGUAS', description: 'El streamer describe, el chat adivina', answer: 'paraguas', hints: ['sombrilla'], timeLimit: 45, points: 15 },
+  { id: 'p13', type: 'palabras', title: 'Describe sin decir: VIDEOJUEGO', description: 'El streamer describe, el chat adivina', answer: 'videojuego', hints: ['juego', 'game'], timeLimit: 45, points: 15 },
+  { id: 'p14', type: 'palabras', title: 'Describe sin decir: MONTAÑA', description: 'El streamer describe, el chat adivina', answer: 'montaña', hints: ['montana', 'monte'], timeLimit: 45, points: 15 },
+  { id: 'p15', type: 'palabras', title: 'Describe sin decir: RESTAURANTE', description: 'El streamer describe, el chat adivina', answer: 'restaurante', hints: ['restaurant'], timeLimit: 45, points: 15 },
   
-  // Cultura general
+  // ========== CULTURA (15 preguntas) ==========
   { id: 'c1', type: 'cultura', title: '¿Quién pintó La Mona Lisa?', description: 'Responde en el chat', answer: 'leonardo', hints: ['da vinci', 'davinci'], timeLimit: 20, points: 10 },
   { id: 'c2', type: 'cultura', title: '¿Cuál es la capital de Japón?', description: 'Responde en el chat', answer: 'tokio', hints: ['tokyo'], timeLimit: 15, points: 10 },
   { id: 'c3', type: 'cultura', title: '¿Qué elemento químico tiene el símbolo "Au"?', description: 'Responde en el chat', answer: 'oro', hints: ['gold'], timeLimit: 20, points: 10 },
+  { id: 'c4', type: 'cultura', title: '¿Quién escribió Don Quijote?', description: 'Responde en el chat', answer: 'cervantes', hints: ['miguel de cervantes'], timeLimit: 20, points: 10 },
+  { id: 'c5', type: 'cultura', title: '¿En qué país está la Torre Eiffel?', description: 'Responde en el chat', answer: 'francia', hints: ['france', 'paris'], timeLimit: 15, points: 10 },
+  { id: 'c6', type: 'cultura', title: '¿Cuál es el río más largo del mundo?', description: 'Responde en el chat', answer: 'nilo', hints: ['amazonas'], timeLimit: 20, points: 10 },
+  { id: 'c7', type: 'cultura', title: '¿Quién descubrió América?', description: 'Responde en el chat', answer: 'colon', hints: ['colón', 'cristobal colon'], timeLimit: 20, points: 10 },
+  { id: 'c8', type: 'cultura', title: '¿Cuál es el océano más grande?', description: 'Responde en el chat', answer: 'pacifico', hints: ['pacífico'], timeLimit: 15, points: 10 },
+  { id: 'c9', type: 'cultura', title: '¿En qué año comenzó la Segunda Guerra Mundial?', description: 'Responde en el chat', answer: '1939', timeLimit: 20, points: 10 },
+  { id: 'c10', type: 'cultura', title: '¿Cuál es la montaña más alta del mundo?', description: 'Responde en el chat', answer: 'everest', hints: ['monte everest'], timeLimit: 20, points: 10 },
+  { id: 'c11', type: 'cultura', title: '¿Quién fue el primer hombre en pisar la Luna?', description: 'Responde en el chat', answer: 'armstrong', hints: ['neil armstrong'], timeLimit: 20, points: 10 },
+  { id: 'c12', type: 'cultura', title: '¿Cuál es el país más grande del mundo?', description: 'Responde en el chat', answer: 'rusia', hints: ['russia'], timeLimit: 15, points: 10 },
+  { id: 'c13', type: 'cultura', title: '¿Quién pintó La Noche Estrellada?', description: 'Responde en el chat', answer: 'van gogh', hints: ['vangogh', 'vincent'], timeLimit: 20, points: 10 },
+  { id: 'c14', type: 'cultura', title: '¿Cuál es la capital de Australia?', description: 'Responde en el chat', answer: 'canberra', timeLimit: 20, points: 10 },
+  { id: 'c15', type: 'cultura', title: '¿Qué instrumento tocaba Mozart?', description: 'Responde en el chat', answer: 'piano', hints: ['clavicordio'], timeLimit: 20, points: 10 },
   
-  // Rapidez (primero en escribir algo)
+  // ========== RAPIDEZ (10 pruebas) ==========
   { id: 'r1', type: 'rapidez', title: 'Escribe 5 países que empiecen por "A"', description: 'El primero en escribir 5 correctos gana', timeLimit: 30, points: 20 },
   { id: 'r2', type: 'rapidez', title: 'Escribe 3 colores en inglés', description: 'El primero en escribir 3 correctos gana', timeLimit: 20, points: 15 },
   { id: 'r3', type: 'rapidez', title: 'Escribe el nombre de 4 frutas', description: 'El primero en escribir 4 correctas gana', timeLimit: 25, points: 15 },
+  { id: 'r4', type: 'rapidez', title: 'Escribe 3 capitales europeas', description: 'El primero en escribir 3 correctas gana', timeLimit: 25, points: 15 },
+  { id: 'r5', type: 'rapidez', title: 'Escribe 4 animales que vuelen', description: 'El primero en escribir 4 correctos gana', timeLimit: 25, points: 15 },
+  { id: 'r6', type: 'rapidez', title: 'Escribe 3 marcas de coches', description: 'El primero en escribir 3 correctas gana', timeLimit: 20, points: 15 },
+  { id: 'r7', type: 'rapidez', title: 'Escribe 5 números primos', description: 'El primero en escribir 5 correctos gana', timeLimit: 25, points: 15 },
+  { id: 'r8', type: 'rapidez', title: 'Escribe 3 deportes olímpicos', description: 'El primero en escribir 3 correctos gana', timeLimit: 20, points: 15 },
+  { id: 'r9', type: 'rapidez', title: 'Escribe 4 instrumentos musicales', description: 'El primero en escribir 4 correctos gana', timeLimit: 25, points: 15 },
+  { id: 'r10', type: 'rapidez', title: 'Escribe 3 planetas del sistema solar', description: 'El primero en escribir 3 correctos gana', timeLimit: 20, points: 15 },
 ];
 
 // Funciones de persistencia
@@ -134,6 +201,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   const [customChallenges, setCustomChallenges] = useState<Challenge[]>([]);
   const [pointsToWin, setPointsToWin] = useState(50);
   const [timeMultiplier, setTimeMultiplier] = useState(1); // 0.5x, 1x, 1.5x, 2x
+  const [maxPlayers, setMaxPlayers] = useState(0); // 0 = sin límite
   const [enabledTypes, setEnabledTypes] = useState<Set<ChallengeType>>(
     new Set(['trivia', 'mimica', 'dibujo', 'palabras', 'cultura', 'rapidez'])
   );
@@ -208,10 +276,13 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
       const msgLower = msg.message.toLowerCase().trim();
       const oderId = msg.userId || msg.username;
       
-      // Unirse al juego con !CO
-      if (gameState === 'lobby' && (msgLower === '!co' || msgLower === '!party')) {
+      // Unirse al juego con !CO - permitido en lobby, rolling, challenge y results
+      // Solo bloqueado en 'final' (cuando ya hay un ganador del juego completo)
+      if (gameState !== 'final' && (msgLower === '!co' || msgLower === '!party' || msgLower === '!join')) {
         setPlayers(prev => {
           if (prev.has(oderId)) return prev;
+          // Verificar límite de jugadores (0 = sin límite)
+          if (maxPlayers > 0 && prev.size >= maxPlayers) return prev;
           const newPlayers = new Map(prev);
           newPlayers.set(oderId, {
             oderId,
@@ -265,7 +336,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
         }
       }
     });
-  }, [chatMessages, isConnected, gameState, currentChallenge, winner, players, pointsToWin]);
+  }, [chatMessages, isConnected, gameState, currentChallenge, winner, players, pointsToWin, maxPlayers]);
 
   // Timer de la prueba
   useEffect(() => {
@@ -361,7 +432,6 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
 
   const resetGame = () => {
     setGameState('lobby');
-    setPlayers(new Map());
     setCurrentChallenge(null);
     setTimeLeft(0);
     setWinner(null);
@@ -369,6 +439,18 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
     setUsedChallenges(new Set());
     if (timerRef.current) clearInterval(timerRef.current);
     if (diceIntervalRef.current) clearInterval(diceIntervalRef.current);
+    // Note: Players are preserved - use clearPlayers() to reset them
+  };
+
+  const clearPlayers = () => {
+    setPlayers(new Map());
+  };
+
+  const newGame = () => {
+    // Full reset including players
+    resetGame();
+    clearPlayers();
+    lastProcessedRef.current = chatMessages.length; // Reset to start fresh
   };
 
   const toggleChallengeType = (type: ChallengeType) => {
@@ -538,6 +620,22 @@ Responde SOLO con JSON:
                 onChange={(e) => setPointsToWin(Math.max(20, parseInt(e.target.value) || 50))}
                 className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-xs"
               />
+              
+              <label htmlFor="partyco-max-players" className="text-zinc-400 text-xs">Máx:</label>
+              <select
+                id="partyco-max-players"
+                name="maxPlayers"
+                value={maxPlayers}
+                onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
+                className="px-2 py-1 bg-zinc-700 rounded text-white text-xs"
+                title="Límite de jugadores (0 = sin límite)"
+              >
+                <option value={0}>∞</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
             </div>
           </>
         )}
@@ -554,7 +652,7 @@ Responde SOLO con JSON:
         
         {gameState === 'final' && (
           <button
-            onClick={resetGame}
+            onClick={newGame}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:opacity-90 text-white font-bold rounded-lg transition-all"
           >
             <Trophy size={18} />
@@ -563,11 +661,20 @@ Responde SOLO con JSON:
         )}
         
         <div className="flex items-center gap-2 ml-auto">
+          {gameState === 'lobby' && players.size > 0 && (
+            <button
+              onClick={clearPlayers}
+              className="p-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition-all"
+              title="Limpiar jugadores"
+            >
+              <Users size={18} />
+            </button>
+          )}
           <OBSOverlayUrl overlayParam="overlayPartyCo" title="el Party & Co" />
           <button
-            onClick={resetGame}
+            onClick={newGame}
             className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
-            title="Reiniciar"
+            title="Reiniciar todo"
           >
             <RotateCcw size={18} />
           </button>
@@ -578,9 +685,9 @@ Responde SOLO con JSON:
         <>
           <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
             <p className="text-zinc-300 mb-2">
-              Escribe <span className="text-purple-400 font-bold">!CO</span> para unirte al juego
+              Escribe <span className="text-purple-400 font-bold">!CO</span>, <span className="text-purple-400 font-bold">!party</span> o <span className="text-purple-400 font-bold">!join</span> para unirte
             </p>
-            <p className="text-zinc-500 text-xs">El streamer lanza el dado y realiza las pruebas</p>
+            <p className="text-zinc-500 text-xs">Puedes unirte en cualquier momento durante el juego</p>
           </div>
           
           {/* Tipos de prueba habilitados */}
@@ -851,7 +958,7 @@ Responde SOLO con JSON:
         
         {players.size === 0 ? (
           <p className="text-zinc-500 text-sm text-center py-4">
-            Esperando jugadores... (!CO para unirse)
+            Esperando jugadores... (!CO, !party o !join para unirse)
           </p>
         ) : (
           <div className="space-y-1 max-h-48 overflow-y-auto">
