@@ -31,10 +31,9 @@ interface PollCreatorProps {
   onAddCollaborator?: (channel: string) => void;
   onRemoveCollaborator?: (channel: string) => void;
   isConnected?: boolean;
-  onShowCountdown?: () => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true, onShowCountdown }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
   const { t } = useI18n();
   const { triggerPollStart } = useOBSTriggers();
   const [title, setTitle] = useState(t.poll.title);
@@ -738,9 +737,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               <Tooltip text="Gira la ruleta con las opciones actuales">
                 <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> {t.poll.spinnerWheel}</button>
               </Tooltip>
-              <Tooltip text="Countdown que suma tiempo con subs y bits">
-                <button type="button" onClick={onShowCountdown} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
-              </Tooltip>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1089,7 +1085,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         </div>
       )}
 
-      {/* Spinner Wheel Modal */}
+      {/* Spinner Wheel - Widget flotante */}
       {showSpinner && (
         <SpinnerWheel 
           options={options.map((opt, i) => ({
@@ -1110,6 +1106,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           onAddCollaborator={onAddCollaborator}
           onRemoveCollaborator={onRemoveCollaborator}
           isConnected={isConnected}
+          isFloatingWidget={true}
         />
       )}
 

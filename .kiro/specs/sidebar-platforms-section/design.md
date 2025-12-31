@@ -39,8 +39,8 @@ stateDiagram-v2
     Sidebar --> PlatformSelector: Click "Plataformas"
     PlatformSelector --> TwitchTools: Click "Twitch"
     TwitchTools --> CommandPanel: Click "Comandos"
-    CommandPanel --> TwitchTools: Click "← Volver"
-    TwitchTools --> PlatformSelector: Click "← Volver"
+    CommandPanel --> TwitchTools: Click "Volver"
+    TwitchTools --> PlatformSelector: Click "Volver"
     PlatformSelector --> Sidebar: Click otro tab
 ```
 

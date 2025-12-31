@@ -109,7 +109,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
       className="flex items-center gap-2 px-3 py-2 mb-4 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-zinc-950"
     >
       <ArrowLeft size={16} />
-      <span>{t.platforms?.back || '← Volver'}</span>
+      <span>{t.platforms?.back || 'Volver'}</span>
     </button>
   );
 

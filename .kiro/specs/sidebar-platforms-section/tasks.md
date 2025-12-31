@@ -57,7 +57,7 @@ Este plan implementa la nueva sección "Plataformas" en el sidebar, con navegaci
     - _Requirements: 3.3, 3.5_
 
   - [x] 4.3 Implementar botón de retorno
-    - Añadir botón "← Volver" en header
+    - Añadir botón "Volver" en header
     - Conectar con callback `onBack`
     - _Requirements: 5.2_
 

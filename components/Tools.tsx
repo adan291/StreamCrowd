@@ -48,7 +48,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
               className="flex items-center gap-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
             >
               <ChevronRight size={16} className="rotate-180" />
-              <span className="text-sm">{t.platforms?.back || '← Volver'}</span>
+              <span className="text-sm">{t.platforms?.back || 'Volver'}</span>
             </button>
             <button
               onClick={onClose}

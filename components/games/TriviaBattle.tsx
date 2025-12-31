@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
-import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, ExternalLink, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils } from 'lucide-react';
+import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils, RefreshCw, Pause, X, Users } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -12,6 +12,7 @@ interface Question {
   options: string[];
   correctIndex: number;
   timeLimit: number;
+  source?: 'local' | 'api' | 'ai' | 'manual'; // Fuente de la pregunta
 }
 
 interface PlayerScore {
@@ -29,6 +30,7 @@ interface TriviaCategory {
   name: string;
   icon: React.ReactNode;
   questions: Question[];
+  apiCategoryId?: number; // ID de Open Trivia DB si aplica
 }
 
 interface TriviaBattleProps {
@@ -39,6 +41,45 @@ interface TriviaBattleProps {
 const GAME_CHANNEL = 'trivia_battle_sync';
 const STORAGE_KEY_TRIVIA = 'trivia_battle_state';
 const CUSTOM_QUESTIONS_KEY = 'trivia_custom_questions';
+const QUESTION_USAGE_KEY = 'trivia_question_usage'; // Contador de uso de preguntas
+
+// Sistema de contador de uso de preguntas
+interface QuestionUsage {
+  [questionId: string]: number;
+}
+
+const loadQuestionUsage = (): QuestionUsage => {
+  try {
+    const saved = localStorage.getItem(QUESTION_USAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveQuestionUsage = (usage: QuestionUsage): void => {
+  localStorage.setItem(QUESTION_USAGE_KEY, JSON.stringify(usage));
+};
+
+const incrementQuestionUsage = (questionIds: string[]): void => {
+  const usage = loadQuestionUsage();
+  questionIds.forEach(id => {
+    usage[id] = (usage[id] || 0) + 1;
+  });
+  saveQuestionUsage(usage);
+};
+
+// Ordenar preguntas priorizando las menos usadas
+const sortByUsage = (questions: Question[]): Question[] => {
+  const usage = loadQuestionUsage();
+  return [...questions].sort((a, b) => {
+    const usageA = usage[a.id] || 0;
+    const usageB = usage[b.id] || 0;
+    if (usageA !== usageB) return usageA - usageB;
+    // Si tienen el mismo uso, aleatorizar
+    return Math.random() - 0.5;
+  });
+};
 
 // Funciones para persistencia de preguntas personalizadas
 interface SavedCategory {
@@ -93,125 +134,309 @@ const deleteCustomCategory = (categoryId: string): void => {
   localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(filtered));
 };
 
-// Banco de preguntas predefinidas por categoría - EXPANDIDO
+// Función para decodificar HTML entities de la API
+const decodeHTML = (html: string): string => {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = html;
+  return txt.value;
+};
+
+// Cache de preguntas de API traducidas
+const API_QUESTIONS_CACHE_KEY = 'trivia_api_questions_cache';
+
+interface CachedQuestion extends Question {
+  originalQuestion: string; // Pregunta original en inglés
+  categoryId: number;
+}
+
+const loadCachedApiQuestions = (): CachedQuestion[] => {
+  try {
+    const saved = localStorage.getItem(API_QUESTIONS_CACHE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCachedApiQuestion = (question: CachedQuestion): void => {
+  const cached = loadCachedApiQuestions();
+  // Evitar duplicados por ID
+  if (!cached.find(q => q.id === question.id)) {
+    cached.push(question);
+    localStorage.setItem(API_QUESTIONS_CACHE_KEY, JSON.stringify(cached));
+  }
+};
+
+// Traducir texto usando la API de IA configurada
+const translateText = async (text: string, apiKey: string, provider: string): Promise<string> => {
+  const prompt = `Traduce el siguiente texto del inglés al español. Solo responde con la traducción, sin explicaciones ni comillas:\n\n${text}`;
+  
+  try {
+    if (provider === 'gemini') {
+      const model = localStorage.getItem('gemini_working_model') || 'gemini-2.0-flash-exp';
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 500 },
+          }),
+        }
+      );
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+    } else if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+        }),
+      });
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content?.trim() || text;
+    }
+  } catch (error) {
+    console.warn('Translation failed, using original:', error);
+  }
+  return text;
+};
+
+// Función para cargar preguntas de Open Trivia DB con traducción
+const fetchOpenTDBQuestions = async (
+  categoryId: number | null,
+  amount: number,
+  difficulty: 'easy' | 'medium' | 'hard' | 'any',
+  timeLimit: number,
+  translateToSpanish: boolean = true
+): Promise<Question[]> => {
+  // Primero, buscar en cache local
+  const cached = loadCachedApiQuestions();
+  const cachedForCategory = cached.filter(q => 
+    categoryId ? q.categoryId === categoryId : true
+  );
+  
+  // Si tenemos suficientes en cache, usar esas (priorizando menos usadas)
+  if (cachedForCategory.length >= amount) {
+    const usage = loadQuestionUsage();
+    const sorted = [...cachedForCategory].sort((a, b) => {
+      const usageA = usage[a.id] || 0;
+      const usageB = usage[b.id] || 0;
+      if (usageA !== usageB) return usageA - usageB;
+      return Math.random() - 0.5;
+    });
+    return sorted.slice(0, amount).map(q => ({ ...q, timeLimit }));
+  }
+  
+  // Si no hay suficientes en cache, cargar de API
+  let url = `https://opentdb.com/api.php?amount=${amount}&type=multiple`;
+  if (categoryId) url += `&category=${categoryId}`;
+  if (difficulty !== 'any') url += `&difficulty=${difficulty}`;
+  
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Error al conectar con Open Trivia DB');
+  
+  const data = await response.json();
+  if (data.response_code !== 0) {
+    if (data.response_code === 1) throw new Error('No hay suficientes preguntas para esta categoría');
+    throw new Error('Error en la API de trivia');
+  }
+  
+  // Obtener config de IA para traducción
+  let aiProvider: string | null = null;
+  let aiApiKey: string | null = null;
+  
+  if (translateToSpanish) {
+    const config = loadAIConfig();
+    const providerInfo = config ? getProviderForFunction(config, 'games') : null;
+    if (providerInfo) {
+      aiProvider = providerInfo.provider;
+      aiApiKey = providerInfo.apiKey;
+    }
+  }
+  
+  const questions: Question[] = [];
+  
+  for (let i = 0; i < data.results.length; i++) {
+    const q = data.results[i];
+    let questionText = decodeHTML(q.question);
+    let options = [...q.incorrect_answers, q.correct_answer].map(decodeHTML);
+    const correctAnswer = decodeHTML(q.correct_answer);
+    
+    // Traducir si tenemos IA configurada
+    if (translateToSpanish && aiProvider && aiApiKey) {
+      try {
+        // Traducir pregunta y opciones juntas para eficiencia
+        const toTranslate = [questionText, ...options].join('\n---\n');
+        const translated = await translateText(toTranslate, aiApiKey, aiProvider);
+        const parts = translated.split(/\n-+\n/);
+        if (parts.length >= options.length + 1) {
+          questionText = parts[0].trim();
+          options = parts.slice(1, options.length + 1).map(o => o.trim());
+        }
+      } catch (error) {
+        console.warn('Translation failed for question:', error);
+      }
+    }
+    
+    // Mezclar opciones
+    const shuffledOptions = options.sort(() => Math.random() - 0.5);
+    const correctIndex = shuffledOptions.indexOf(
+      translateToSpanish && aiProvider ? options[options.length - 1] : correctAnswer
+    );
+    
+    const question: Question = {
+      id: `opentdb_${categoryId || 'any'}_${Date.now()}_${i}`,
+      question: questionText,
+      options: shuffledOptions,
+      correctIndex: correctIndex >= 0 ? correctIndex : 0,
+      timeLimit,
+      source: 'api' as const
+    };
+    
+    questions.push(question);
+    
+    // Guardar en cache
+    saveCachedApiQuestion({
+      ...question,
+      originalQuestion: decodeHTML(q.question),
+      categoryId: categoryId || 0
+    });
+  }
+  
+  return questions;
+};
+
+// Banco de preguntas predefinidas por categoría - Con apiCategoryId para enriquecer desde API
 const QUESTION_BANK: TriviaCategory[] = [
   {
     id: 'general',
     name: 'Cultura General',
     icon: <BookOpen size={16} />,
+    apiCategoryId: 9, // Open Trivia DB category
     questions: [
-      { id: 'g1', question: '¿Cuál es el planeta más grande del sistema solar?', options: ['Marte', 'Júpiter', 'Saturno', 'Neptuno'], correctIndex: 1, timeLimit: 15 },
-      { id: 'g2', question: '¿En qué año llegó el hombre a la Luna?', options: ['1965', '1969', '1972', '1975'], correctIndex: 1, timeLimit: 15 },
-      { id: 'g3', question: '¿Cuál es el océano más grande?', options: ['Atlántico', 'Índico', 'Pacífico', 'Ártico'], correctIndex: 2, timeLimit: 15 },
-      { id: 'g4', question: '¿Cuántos huesos tiene el cuerpo humano adulto?', options: ['186', '206', '226', '256'], correctIndex: 1, timeLimit: 15 },
-      { id: 'g5', question: '¿Cuál es el país más grande del mundo?', options: ['China', 'Estados Unidos', 'Canadá', 'Rusia'], correctIndex: 3, timeLimit: 15 },
-      { id: 'g6', question: '¿Cuántos colores tiene el arcoíris?', options: ['5', '6', '7', '8'], correctIndex: 2, timeLimit: 15 },
-      { id: 'g7', question: '¿Cuál es el animal más grande del mundo?', options: ['Elefante', 'Ballena azul', 'Jirafa', 'Tiburón ballena'], correctIndex: 1, timeLimit: 15 },
-      { id: 'g8', question: '¿Cuántos días tiene un año bisiesto?', options: ['364', '365', '366', '367'], correctIndex: 2, timeLimit: 15 },
-      { id: 'g9', question: '¿Qué gas necesitan las plantas para la fotosíntesis?', options: ['Oxígeno', 'Nitrógeno', 'Dióxido de carbono', 'Hidrógeno'], correctIndex: 2, timeLimit: 15 },
-      { id: 'g10', question: '¿Cuál es el metal más caro del mundo?', options: ['Oro', 'Platino', 'Rodio', 'Plata'], correctIndex: 2, timeLimit: 15 },
+      { id: 'g1', question: '¿Cuál es el planeta más grande del sistema solar?', options: ['Marte', 'Júpiter', 'Saturno', 'Neptuno'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'g2', question: '¿En qué año llegó el hombre a la Luna?', options: ['1965', '1969', '1972', '1975'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'g3', question: '¿Cuál es el océano más grande?', options: ['Atlántico', 'Índico', 'Pacífico', 'Ártico'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'g4', question: '¿Cuántos huesos tiene el cuerpo humano adulto?', options: ['186', '206', '226', '256'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'g5', question: '¿Cuál es el país más grande del mundo?', options: ['China', 'Estados Unidos', 'Canadá', 'Rusia'], correctIndex: 3, timeLimit: 15, source: 'local' },
+      { id: 'g6', question: '¿Cuántos colores tiene el arcoíris?', options: ['5', '6', '7', '8'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'g7', question: '¿Cuál es el animal más grande del mundo?', options: ['Elefante', 'Ballena azul', 'Jirafa', 'Tiburón ballena'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'g8', question: '¿Cuántos días tiene un año bisiesto?', options: ['364', '365', '366', '367'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'g9', question: '¿Qué gas necesitan las plantas para la fotosíntesis?', options: ['Oxígeno', 'Nitrógeno', 'Dióxido de carbono', 'Hidrógeno'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'g10', question: '¿Cuál es el metal más caro del mundo?', options: ['Oro', 'Platino', 'Rodio', 'Plata'], correctIndex: 2, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'gaming',
     name: 'Videojuegos',
     icon: <Gamepad2 size={16} />,
+    apiCategoryId: 15,
     questions: [
-      { id: 'vg1', question: '¿En qué año se lanzó el primer Super Mario Bros?', options: ['1983', '1985', '1987', '1989'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg2', question: '¿Cuál es el videojuego más vendido de la historia?', options: ['GTA V', 'Minecraft', 'Tetris', 'Wii Sports'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg3', question: '¿Qué empresa creó PlayStation?', options: ['Nintendo', 'Microsoft', 'Sony', 'Sega'], correctIndex: 2, timeLimit: 15 },
-      { id: 'vg4', question: '¿Cómo se llama el protagonista de The Legend of Zelda?', options: ['Zelda', 'Link', 'Ganon', 'Epona'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg5', question: '¿Qué juego popularizó el Battle Royale?', options: ['Fortnite', 'PUBG', 'Apex Legends', 'H1Z1'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg6', question: '¿En qué año salió la primera Xbox?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg7', question: '¿Qué personaje es la mascota de Sega?', options: ['Mario', 'Sonic', 'Crash', 'Spyro'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg8', question: '¿En qué juego aparece Master Chief?', options: ['Gears of War', 'Halo', 'Destiny', 'Call of Duty'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg9', question: '¿Qué juego tiene el personaje Kratos?', options: ['Devil May Cry', 'God of War', 'Darksiders', 'Bayonetta'], correctIndex: 1, timeLimit: 15 },
-      { id: 'vg10', question: '¿Cuál es el juego principal de Riot Games?', options: ['Dota 2', 'League of Legends', 'Smite', 'Heroes of the Storm'], correctIndex: 1, timeLimit: 15 },
+      { id: 'vg1', question: '¿En qué año se lanzó el primer Super Mario Bros?', options: ['1983', '1985', '1987', '1989'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg2', question: '¿Cuál es el videojuego más vendido de la historia?', options: ['GTA V', 'Minecraft', 'Tetris', 'Wii Sports'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg3', question: '¿Qué empresa creó PlayStation?', options: ['Nintendo', 'Microsoft', 'Sony', 'Sega'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'vg4', question: '¿Cómo se llama el protagonista de The Legend of Zelda?', options: ['Zelda', 'Link', 'Ganon', 'Epona'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg5', question: '¿Qué juego popularizó el Battle Royale?', options: ['Fortnite', 'PUBG', 'Apex Legends', 'H1Z1'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg6', question: '¿En qué año salió la primera Xbox?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg7', question: '¿Qué personaje es la mascota de Sega?', options: ['Mario', 'Sonic', 'Crash', 'Spyro'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg8', question: '¿En qué juego aparece Master Chief?', options: ['Gears of War', 'Halo', 'Destiny', 'Call of Duty'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg9', question: '¿Qué juego tiene el personaje Kratos?', options: ['Devil May Cry', 'God of War', 'Darksiders', 'Bayonetta'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'vg10', question: '¿Cuál es el juego principal de Riot Games?', options: ['Dota 2', 'League of Legends', 'Smite', 'Heroes of the Storm'], correctIndex: 1, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'movies',
     name: 'Cine y Series',
     icon: <Film size={16} />,
+    apiCategoryId: 11,
     questions: [
-      { id: 'm1', question: '¿Quién dirigió Titanic?', options: ['Steven Spielberg', 'James Cameron', 'Christopher Nolan', 'Martin Scorsese'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm2', question: '¿Cuántas películas hay de Harry Potter?', options: ['6', '7', '8', '9'], correctIndex: 2, timeLimit: 15 },
-      { id: 'm3', question: '¿En qué año se estrenó El Señor de los Anillos: La Comunidad del Anillo?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm4', question: '¿Qué actor interpreta a Iron Man en el MCU?', options: ['Chris Evans', 'Chris Hemsworth', 'Robert Downey Jr.', 'Mark Ruffalo'], correctIndex: 2, timeLimit: 15 },
-      { id: 'm5', question: '¿Cuál fue la primera película de Pixar?', options: ['Buscando a Nemo', 'Toy Story', 'Monsters Inc.', 'Bichos'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm6', question: '¿Quién interpreta a Jack Sparrow?', options: ['Orlando Bloom', 'Johnny Depp', 'Javier Bardem', 'Geoffrey Rush'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm7', question: '¿En qué película aparece el personaje Neo?', options: ['Blade Runner', 'Matrix', 'Tron', 'Ready Player One'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm8', question: '¿Cuántas películas de Star Wars hay en la saga principal?', options: ['6', '9', '11', '12'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm9', question: '¿Qué serie tiene dragones y el Trono de Hierro?', options: ['The Witcher', 'Game of Thrones', 'Vikings', 'The Last Kingdom'], correctIndex: 1, timeLimit: 15 },
-      { id: 'm10', question: '¿Quién dirigió Inception?', options: ['James Cameron', 'Christopher Nolan', 'Denis Villeneuve', 'Ridley Scott'], correctIndex: 1, timeLimit: 15 },
+      { id: 'm1', question: '¿Quién dirigió Titanic?', options: ['Steven Spielberg', 'James Cameron', 'Christopher Nolan', 'Martin Scorsese'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm2', question: '¿Cuántas películas hay de Harry Potter?', options: ['6', '7', '8', '9'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'm3', question: '¿En qué año se estrenó El Señor de los Anillos: La Comunidad del Anillo?', options: ['1999', '2001', '2003', '2005'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm4', question: '¿Qué actor interpreta a Iron Man en el MCU?', options: ['Chris Evans', 'Chris Hemsworth', 'Robert Downey Jr.', 'Mark Ruffalo'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'm5', question: '¿Cuál fue la primera película de Pixar?', options: ['Buscando a Nemo', 'Toy Story', 'Monsters Inc.', 'Bichos'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm6', question: '¿Quién interpreta a Jack Sparrow?', options: ['Orlando Bloom', 'Johnny Depp', 'Javier Bardem', 'Geoffrey Rush'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm7', question: '¿En qué película aparece el personaje Neo?', options: ['Blade Runner', 'Matrix', 'Tron', 'Ready Player One'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm8', question: '¿Cuántas películas de Star Wars hay en la saga principal?', options: ['6', '9', '11', '12'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm9', question: '¿Qué serie tiene dragones y el Trono de Hierro?', options: ['The Witcher', 'Game of Thrones', 'Vikings', 'The Last Kingdom'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'm10', question: '¿Quién dirigió Inception?', options: ['James Cameron', 'Christopher Nolan', 'Denis Villeneuve', 'Ridley Scott'], correctIndex: 1, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'music',
     name: 'Música',
     icon: <Music size={16} />,
+    apiCategoryId: 12,
     questions: [
-      { id: 'mu1', question: '¿De qué país es originaria la banda Queen?', options: ['Estados Unidos', 'Reino Unido', 'Australia', 'Canadá'], correctIndex: 1, timeLimit: 15 },
-      { id: 'mu2', question: '¿Quién es conocido como el "Rey del Pop"?', options: ['Elvis Presley', 'Prince', 'Michael Jackson', 'Freddie Mercury'], correctIndex: 2, timeLimit: 15 },
-      { id: 'mu3', question: '¿Cuántos miembros tenía The Beatles?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
-      { id: 'mu4', question: '¿Qué instrumento toca Slash de Guns N\' Roses?', options: ['Batería', 'Bajo', 'Guitarra', 'Teclado'], correctIndex: 2, timeLimit: 15 },
-      { id: 'mu5', question: '¿En qué década se popularizó el reggaetón?', options: ['1980s', '1990s', '2000s', '2010s'], correctIndex: 2, timeLimit: 15 },
-      { id: 'mu6', question: '¿Quién cantó "Bohemian Rhapsody"?', options: ['The Beatles', 'Queen', 'Led Zeppelin', 'Pink Floyd'], correctIndex: 1, timeLimit: 15 },
-      { id: 'mu7', question: '¿De qué país es Bad Bunny?', options: ['México', 'Colombia', 'Puerto Rico', 'España'], correctIndex: 2, timeLimit: 15 },
-      { id: 'mu8', question: '¿Qué banda cantó "Smells Like Teen Spirit"?', options: ['Pearl Jam', 'Nirvana', 'Soundgarden', 'Alice in Chains'], correctIndex: 1, timeLimit: 15 },
-      { id: 'mu9', question: '¿Cuál es el nombre real de Shakira?', options: ['Shakira Isabel', 'María Shakira', 'Shakira Ripoll', 'Ana Shakira'], correctIndex: 0, timeLimit: 15 },
-      { id: 'mu10', question: '¿Qué artista tiene el álbum "Thriller"?', options: ['Prince', 'Michael Jackson', 'Whitney Houston', 'Madonna'], correctIndex: 1, timeLimit: 15 },
+      { id: 'mu1', question: '¿De qué país es originaria la banda Queen?', options: ['Estados Unidos', 'Reino Unido', 'Australia', 'Canadá'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'mu2', question: '¿Quién es conocido como el "Rey del Pop"?', options: ['Elvis Presley', 'Prince', 'Michael Jackson', 'Freddie Mercury'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'mu3', question: '¿Cuántos miembros tenía The Beatles?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'mu4', question: '¿Qué instrumento toca Slash de Guns N\' Roses?', options: ['Batería', 'Bajo', 'Guitarra', 'Teclado'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'mu5', question: '¿En qué década se popularizó el reggaetón?', options: ['1980s', '1990s', '2000s', '2010s'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'mu6', question: '¿Quién cantó "Bohemian Rhapsody"?', options: ['The Beatles', 'Queen', 'Led Zeppelin', 'Pink Floyd'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'mu7', question: '¿De qué país es Bad Bunny?', options: ['México', 'Colombia', 'Puerto Rico', 'España'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'mu8', question: '¿Qué banda cantó "Smells Like Teen Spirit"?', options: ['Pearl Jam', 'Nirvana', 'Soundgarden', 'Alice in Chains'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'mu9', question: '¿Cuál es el nombre real de Shakira?', options: ['Shakira Isabel', 'María Shakira', 'Shakira Ripoll', 'Ana Shakira'], correctIndex: 0, timeLimit: 15, source: 'local' },
+      { id: 'mu10', question: '¿Qué artista tiene el álbum "Thriller"?', options: ['Prince', 'Michael Jackson', 'Whitney Houston', 'Madonna'], correctIndex: 1, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'geography',
     name: 'Geografía',
     icon: <Globe size={16} />,
+    apiCategoryId: 22,
     questions: [
-      { id: 'geo1', question: '¿Cuál es la capital de Australia?', options: ['Sídney', 'Melbourne', 'Canberra', 'Brisbane'], correctIndex: 2, timeLimit: 15 },
-      { id: 'geo2', question: '¿Cuál es el río más largo del mundo?', options: ['Amazonas', 'Nilo', 'Yangtsé', 'Misisipi'], correctIndex: 1, timeLimit: 15 },
-      { id: 'geo3', question: '¿En qué continente está Egipto?', options: ['Asia', 'Europa', 'África', 'Oceanía'], correctIndex: 2, timeLimit: 15 },
-      { id: 'geo4', question: '¿Cuál es el país con más habitantes?', options: ['India', 'China', 'Estados Unidos', 'Indonesia'], correctIndex: 0, timeLimit: 15 },
-      { id: 'geo5', question: '¿Cuál es la montaña más alta del mundo?', options: ['K2', 'Everest', 'Kilimanjaro', 'Mont Blanc'], correctIndex: 1, timeLimit: 15 },
-      { id: 'geo6', question: '¿Cuál es la capital de Canadá?', options: ['Toronto', 'Vancouver', 'Ottawa', 'Montreal'], correctIndex: 2, timeLimit: 15 },
-      { id: 'geo7', question: '¿En qué país está Machu Picchu?', options: ['Chile', 'Bolivia', 'Perú', 'Ecuador'], correctIndex: 2, timeLimit: 15 },
-      { id: 'geo8', question: '¿Cuál es el desierto más grande del mundo?', options: ['Sahara', 'Gobi', 'Antártida', 'Kalahari'], correctIndex: 2, timeLimit: 15 },
-      { id: 'geo9', question: '¿Cuántos países hay en la Unión Europea (2024)?', options: ['25', '27', '29', '31'], correctIndex: 1, timeLimit: 15 },
-      { id: 'geo10', question: '¿Cuál es la capital de Brasil?', options: ['Río de Janeiro', 'São Paulo', 'Brasilia', 'Salvador'], correctIndex: 2, timeLimit: 15 },
+      { id: 'geo1', question: '¿Cuál es la capital de Australia?', options: ['Sídney', 'Melbourne', 'Canberra', 'Brisbane'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'geo2', question: '¿Cuál es el río más largo del mundo?', options: ['Amazonas', 'Nilo', 'Yangtsé', 'Misisipi'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'geo3', question: '¿En qué continente está Egipto?', options: ['Asia', 'Europa', 'África', 'Oceanía'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'geo4', question: '¿Cuál es el país con más habitantes?', options: ['India', 'China', 'Estados Unidos', 'Indonesia'], correctIndex: 0, timeLimit: 15, source: 'local' },
+      { id: 'geo5', question: '¿Cuál es la montaña más alta del mundo?', options: ['K2', 'Everest', 'Kilimanjaro', 'Mont Blanc'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'geo6', question: '¿Cuál es la capital de Canadá?', options: ['Toronto', 'Vancouver', 'Ottawa', 'Montreal'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'geo7', question: '¿En qué país está Machu Picchu?', options: ['Chile', 'Bolivia', 'Perú', 'Ecuador'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'geo8', question: '¿Cuál es el desierto más grande del mundo?', options: ['Sahara', 'Gobi', 'Antártida', 'Kalahari'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'geo9', question: '¿Cuántos países hay en la Unión Europea (2024)?', options: ['25', '27', '29', '31'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'geo10', question: '¿Cuál es la capital de Brasil?', options: ['Río de Janeiro', 'São Paulo', 'Brasilia', 'Salvador'], correctIndex: 2, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'tech',
     name: 'Tecnología',
     icon: <Cpu size={16} />,
+    apiCategoryId: 18,
     questions: [
-      { id: 't1', question: '¿Quién fundó Microsoft?', options: ['Steve Jobs', 'Bill Gates', 'Mark Zuckerberg', 'Elon Musk'], correctIndex: 1, timeLimit: 15 },
-      { id: 't2', question: '¿En qué año se lanzó el primer iPhone?', options: ['2005', '2007', '2009', '2011'], correctIndex: 1, timeLimit: 15 },
-      { id: 't3', question: '¿Qué significa "HTML"?', options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Management Language'], correctIndex: 0, timeLimit: 20 },
-      { id: 't4', question: '¿Cuál fue la primera red social masiva?', options: ['Facebook', 'MySpace', 'Twitter', 'LinkedIn'], correctIndex: 1, timeLimit: 15 },
-      { id: 't5', question: '¿Qué empresa creó Android?', options: ['Apple', 'Microsoft', 'Google', 'Samsung'], correctIndex: 2, timeLimit: 15 },
-      { id: 't6', question: '¿Qué significa "CPU"?', options: ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Processing Unit'], correctIndex: 0, timeLimit: 15 },
-      { id: 't7', question: '¿Quién fundó Amazon?', options: ['Elon Musk', 'Jeff Bezos', 'Mark Zuckerberg', 'Larry Page'], correctIndex: 1, timeLimit: 15 },
-      { id: 't8', question: '¿Qué empresa creó ChatGPT?', options: ['Google', 'Microsoft', 'OpenAI', 'Meta'], correctIndex: 2, timeLimit: 15 },
-      { id: 't9', question: '¿En qué año se fundó YouTube?', options: ['2003', '2005', '2007', '2009'], correctIndex: 1, timeLimit: 15 },
-      { id: 't10', question: '¿Qué significa "WiFi"?', options: ['Wireless Fidelity', 'Wired Fiber', 'Wide Frequency', 'No significa nada específico'], correctIndex: 3, timeLimit: 15 },
+      { id: 't1', question: '¿Quién fundó Microsoft?', options: ['Steve Jobs', 'Bill Gates', 'Mark Zuckerberg', 'Elon Musk'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 't2', question: '¿En qué año se lanzó el primer iPhone?', options: ['2005', '2007', '2009', '2011'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 't3', question: '¿Qué significa "HTML"?', options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Management Language'], correctIndex: 0, timeLimit: 20, source: 'local' },
+      { id: 't4', question: '¿Cuál fue la primera red social masiva?', options: ['Facebook', 'MySpace', 'Twitter', 'LinkedIn'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 't5', question: '¿Qué empresa creó Android?', options: ['Apple', 'Microsoft', 'Google', 'Samsung'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 't6', question: '¿Qué significa "CPU"?', options: ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Processing Unit'], correctIndex: 0, timeLimit: 15, source: 'local' },
+      { id: 't7', question: '¿Quién fundó Amazon?', options: ['Elon Musk', 'Jeff Bezos', 'Mark Zuckerberg', 'Larry Page'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 't8', question: '¿Qué empresa creó ChatGPT?', options: ['Google', 'Microsoft', 'OpenAI', 'Meta'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 't9', question: '¿En qué año se fundó YouTube?', options: ['2003', '2005', '2007', '2009'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 't10', question: '¿Qué significa "WiFi"?', options: ['Wireless Fidelity', 'Wired Fiber', 'Wide Frequency', 'No significa nada específico'], correctIndex: 3, timeLimit: 15, source: 'local' },
     ]
   },
   {
     id: 'sports',
     name: 'Deportes',
     icon: <Dumbbell size={16} />,
+    apiCategoryId: 21,
     questions: [
-      { id: 's1', question: '¿Cuántos jugadores tiene un equipo de fútbol en el campo?', options: ['9', '10', '11', '12'], correctIndex: 2, timeLimit: 15 },
-      { id: 's2', question: '¿En qué país se inventó el baloncesto?', options: ['Estados Unidos', 'Canadá', 'Reino Unido', 'España'], correctIndex: 0, timeLimit: 15 },
-      { id: 's3', question: '¿Cuántos Grand Slams hay en tenis?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15 },
-      { id: 's4', question: '¿Cada cuántos años se celebran los Juegos Olímpicos?', options: ['2', '3', '4', '5'], correctIndex: 2, timeLimit: 15 },
-      { id: 's5', question: '¿Quién tiene más Balones de Oro?', options: ['Cristiano Ronaldo', 'Lionel Messi', 'Johan Cruyff', 'Michel Platini'], correctIndex: 1, timeLimit: 15 },
-      { id: 's6', question: '¿Cuántos sets se necesitan para ganar un partido de tenis masculino en Grand Slam?', options: ['2', '3', '4', '5'], correctIndex: 1, timeLimit: 15 },
-      { id: 's7', question: '¿En qué deporte se usa un "birdie"?', options: ['Golf', 'Bádminton', 'Tenis', 'Ambos A y B'], correctIndex: 3, timeLimit: 15 },
-      { id: 's8', question: '¿Cuántos puntos vale un touchdown en fútbol americano?', options: ['3', '6', '7', '10'], correctIndex: 1, timeLimit: 15 },
-      { id: 's9', question: '¿En qué país se originó el judo?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15 },
-      { id: 's10', question: '¿Cuántos jugadores hay en un equipo de baloncesto en cancha?', options: ['4', '5', '6', '7'], correctIndex: 1, timeLimit: 15 },
+      { id: 's1', question: '¿Cuántos jugadores tiene un equipo de fútbol en el campo?', options: ['9', '10', '11', '12'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 's2', question: '¿En qué país se inventó el baloncesto?', options: ['Estados Unidos', 'Canadá', 'Reino Unido', 'España'], correctIndex: 0, timeLimit: 15, source: 'local' },
+      { id: 's3', question: '¿Cuántos Grand Slams hay en tenis?', options: ['3', '4', '5', '6'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 's4', question: '¿Cada cuántos años se celebran los Juegos Olímpicos?', options: ['2', '3', '4', '5'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 's5', question: '¿Quién tiene más Balones de Oro?', options: ['Cristiano Ronaldo', 'Lionel Messi', 'Johan Cruyff', 'Michel Platini'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 's6', question: '¿Cuántos sets se necesitan para ganar un partido de tenis masculino en Grand Slam?', options: ['2', '3', '4', '5'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 's7', question: '¿En qué deporte se usa un "birdie"?', options: ['Golf', 'Bádminton', 'Tenis', 'Ambos A y B'], correctIndex: 3, timeLimit: 15, source: 'local' },
+      { id: 's8', question: '¿Cuántos puntos vale un touchdown en fútbol americano?', options: ['3', '6', '7', '10'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 's9', question: '¿En qué país se originó el judo?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 's10', question: '¿Cuántos jugadores hay en un equipo de baloncesto en cancha?', options: ['4', '5', '6', '7'], correctIndex: 1, timeLimit: 15, source: 'local' },
     ]
   },
   {
@@ -219,21 +444,23 @@ const QUESTION_BANK: TriviaCategory[] = [
     name: 'Gastronomía',
     icon: <Utensils size={16} />,
     questions: [
-      { id: 'f1', question: '¿De qué país es originaria la pizza?', options: ['España', 'Francia', 'Italia', 'Grecia'], correctIndex: 2, timeLimit: 15 },
-      { id: 'f2', question: '¿Cuál es el ingrediente principal del guacamole?', options: ['Tomate', 'Aguacate', 'Chile', 'Cebolla'], correctIndex: 1, timeLimit: 15 },
-      { id: 'f3', question: '¿De qué país es el sushi?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15 },
-      { id: 'f4', question: '¿Qué fruta es conocida como "la reina de las frutas"?', options: ['Mango', 'Piña', 'Fresa', 'Mangostán'], correctIndex: 3, timeLimit: 15 },
-      { id: 'f5', question: '¿Cuál es la especia más cara del mundo?', options: ['Vainilla', 'Azafrán', 'Canela', 'Cardamomo'], correctIndex: 1, timeLimit: 15 },
+      { id: 'f1', question: '¿De qué país es originaria la pizza?', options: ['España', 'Francia', 'Italia', 'Grecia'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'f2', question: '¿Cuál es el ingrediente principal del guacamole?', options: ['Tomate', 'Aguacate', 'Chile', 'Cebolla'], correctIndex: 1, timeLimit: 15, source: 'local' },
+      { id: 'f3', question: '¿De qué país es el sushi?', options: ['China', 'Corea', 'Japón', 'Tailandia'], correctIndex: 2, timeLimit: 15, source: 'local' },
+      { id: 'f4', question: '¿Qué fruta es conocida como "la reina de las frutas"?', options: ['Mango', 'Piña', 'Fresa', 'Mangostán'], correctIndex: 3, timeLimit: 15, source: 'local' },
+      { id: 'f5', question: '¿Cuál es la especia más cara del mundo?', options: ['Vainilla', 'Azafrán', 'Canela', 'Cardamomo'], correctIndex: 1, timeLimit: 15, source: 'local' },
     ]
   },
 ];
 
-type TriviaMode = 'manual' | 'category' | 'ai';
+// Modos simplificados: category (unifica local + API), ai, manual
+type TriviaMode = 'category' | 'ai' | 'manual';
 
 export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConnected = true }) => {
-  const [gameState, setGameState] = useState<'setup' | 'question' | 'results' | 'final'>('setup');
+  const [gameState, setGameState] = useState<'setup' | 'question' | 'results' | 'final' | 'paused'>('setup');
   const [triviaMode, setTriviaMode] = useState<TriviaMode>('category');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [pausedTimeLeft, setPausedTimeLeft] = useState(0); // Guardar tiempo al pausar
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [players, setPlayers] = useState<Map<string, PlayerScore>>(new Map<string, PlayerScore>());
@@ -242,8 +469,8 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   
   // Category selection
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['general']);
-  const [questionsPerCategory, setQuestionsPerCategory] = useState(3);
-  const [questionTime, setQuestionTime] = useState(15); // Tiempo por pregunta configurable
+  const [questionsPerCategory, setQuestionsPerCategory] = useState(5);
+  const [questionTime, setQuestionTime] = useState(35); // Tiempo por pregunta configurable
   
   // AI Mode
   const [aiTopic, setAiTopic] = useState('');
@@ -252,6 +479,13 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
   const [aiSuccess, setAiSuccess] = useState<string | null>(null);
+  
+  // Loading state para categorías (local + API)
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  
+  // Opción para enriquecer con API (activado por defecto)
+  const [enrichWithApi, setEnrichWithApi] = useState(true);
   
   // Custom saved categories
   const [customCategories, setCustomCategories] = useState<SavedCategory[]>([]);
@@ -318,17 +552,26 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       const msgLower = msg.message.toLowerCase().trim();
       const oderId = msg.userId || msg.username;
       
+      // Check if user already answered this question BEFORE processing
+      const existingPlayer = players.get(oderId);
+      if (existingPlayer?.answeredCurrent) return;
+      
+      // Only accept EXACT single character answers (no "1 2 3 4" or "1234")
+      // Must be exactly one character: 1, 2, 3, 4, a, b, c, or d
       let answerIndex = -1;
-      if (['1', 'a'].includes(msgLower)) answerIndex = 0;
-      else if (['2', 'b'].includes(msgLower)) answerIndex = 1;
-      else if (['3', 'c'].includes(msgLower)) answerIndex = 2;
-      else if (['4', 'd'].includes(msgLower)) answerIndex = 3;
+      if (msgLower.length === 1) {
+        if (msgLower === '1' || msgLower === 'a') answerIndex = 0;
+        else if (msgLower === '2' || msgLower === 'b') answerIndex = 1;
+        else if (msgLower === '3' || msgLower === 'c') answerIndex = 2;
+        else if (msgLower === '4' || msgLower === 'd') answerIndex = 3;
+      }
       
       if (answerIndex >= 0 && answerIndex < currentQuestion.options.length) {
         setPlayers((prev: Map<string, PlayerScore>) => {
           const newPlayers = new Map<string, PlayerScore>(prev);
           const existing = newPlayers.get(oderId);
           
+          // Double-check in case of race condition
           if (existing?.answeredCurrent) return prev;
           
           const isCorrect = answerIndex === currentQuestion.correctIndex;
@@ -356,7 +599,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
         });
       }
     });
-  }, [chatMessages, isConnected, gameState, currentQuestion, timeLeft]);
+  }, [chatMessages, isConnected, gameState, currentQuestion, timeLeft, players]);
 
   // Question timer
   useEffect(() => {
@@ -377,19 +620,22 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameState]);
+  }, [gameState, pausedTimeLeft]);
 
-  // Generate questions from categories (including custom)
-  const generateFromCategories = () => {
+  // Generate questions from categories (including custom) - Prioriza las menos usadas
+  const generateFromCategories = async () => {
+    setIsLoadingQuestions(true);
+    setLoadError(null);
+    
     const allQuestions: Question[] = [];
     
-    // Default categories
+    // Default categories - preguntas locales en español
     selectedCategories.forEach((catId: string) => {
       const category = QUESTION_BANK.find(c => c.id === catId);
       if (category) {
-        const shuffled = [...category.questions].sort(() => Math.random() - 0.5);
-        // Aplicar el tiempo configurado a cada pregunta
-        const questionsWithTime = shuffled.slice(0, questionsPerCategory).map(q => ({
+        // Ordenar por uso (menos usadas primero)
+        const sortedByUsage = sortByUsage(category.questions);
+        const questionsWithTime = sortedByUsage.slice(0, questionsPerCategory).map(q => ({
           ...q,
           timeLimit: questionTime
         }));
@@ -397,20 +643,46 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       }
     });
     
-    // Custom categories
+    // Custom categories (IA generadas)
     selectedCustomCategories.forEach((catId: string) => {
       const category = customCategories.find(c => c.id === catId);
       if (category) {
-        const shuffled = [...category.questions].sort(() => Math.random() - 0.5);
-        const questionsWithTime = shuffled.slice(0, questionsPerCategory).map(q => ({
+        const sortedByUsage = sortByUsage(category.questions);
+        const questionsWithTime = sortedByUsage.slice(0, questionsPerCategory).map(q => ({
           ...q,
-          timeLimit: questionTime
+          timeLimit: questionTime,
+          source: 'ai' as const
         }));
         allQuestions.push(...questionsWithTime);
       }
     });
     
-    setQuestions(allQuestions.sort(() => Math.random() - 0.5));
+    // Enriquecer con API si está activado (preguntas en inglés)
+    if (enrichWithApi) {
+      try {
+        // Obtener preguntas de API para las categorías seleccionadas que tengan apiCategoryId
+        const apiPromises = selectedCategories
+          .map(catId => QUESTION_BANK.find(c => c.id === catId))
+          .filter(cat => cat?.apiCategoryId)
+          .map(cat => fetchOpenTDBQuestions(cat!.apiCategoryId!, Math.min(questionsPerCategory, 5), 'any', questionTime));
+        
+        if (apiPromises.length > 0) {
+          const apiResults = await Promise.allSettled(apiPromises);
+          apiResults.forEach(result => {
+            if (result.status === 'fulfilled') {
+              allQuestions.push(...result.value);
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Error loading API questions, using local only:', error);
+      }
+    }
+    
+    // Mezclar todas las preguntas priorizando las menos usadas
+    const finalQuestions = sortByUsage(allQuestions);
+    setQuestions(finalQuestions);
+    setIsLoadingQuestions(false);
   };
 
   // Generate questions with AI
@@ -526,6 +798,10 @@ IMPORTANTE:
 
   const startGame = () => {
     if (questions.length === 0) return;
+    
+    // Incrementar contador de uso de las preguntas que se van a usar
+    incrementQuestionUsage(questions.map(q => q.id));
+    
     setCurrentQuestionIndex(0);
     setPlayers(new Map<string, PlayerScore>()); // Clear players for new game
     setTimeLeft(questions[0].timeLimit);
@@ -581,15 +857,39 @@ IMPORTANTE:
     setQuestions((prev: Question[]) => prev.filter((q: Question) => q.id !== id));
   };
 
+  const pauseGame = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setPausedTimeLeft(timeLeft);
+    setGameState('paused');
+  };
+
+  const resumeGame = () => {
+    setTimeLeft(pausedTimeLeft);
+    setGameState('question');
+  };
+
   const resetGame = () => {
     setGameState('setup');
     setCurrentQuestionIndex(0);
     setPlayers(new Map<string, PlayerScore>());
     setTimeLeft(0);
+    setPausedTimeLeft(0);
     setAnswerCounts([0, 0, 0, 0]);
     setShowCorrect(false);
     if (timerRef.current) clearInterval(timerRef.current);
     triggerGameEnd();
+  };
+
+  const clearPlayers = () => {
+    setPlayers(new Map<string, PlayerScore>());
+  };
+
+  const removePlayer = (oderId: string) => {
+    setPlayers(prev => {
+      const newPlayers = new Map<string, PlayerScore>(prev);
+      newPlayers.delete(oderId);
+      return newPlayers;
+    });
   };
 
   const toggleCategory = (catId: string) => {
@@ -628,31 +928,31 @@ IMPORTANTE:
             <OBSOverlayUrl overlayParam="overlayTrivia" title="la trivia" />
           </div>
           
-          {/* Mode Selector */}
-          <div className="flex gap-2 bg-zinc-800 rounded-xl p-2">
+          {/* Mode Selector - Simplificado */}
+          <div className="flex gap-1 bg-zinc-800 rounded-xl p-1.5">
             <button
               onClick={() => setTriviaMode('category')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                triviaMode === 'category' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                triviaMode === 'category' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
               }`}
             >
-              <BookOpen size={16} /> Categorías
+              <BookOpen size={14} /> Categorías
             </button>
             <button
               onClick={() => setTriviaMode('ai')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                triviaMode === 'ai' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                triviaMode === 'ai' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
               }`}
             >
-              <Sparkles size={16} /> IA Personalizada
+              <Sparkles size={14} /> IA
             </button>
             <button
               onClick={() => setTriviaMode('manual')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all ${
-                triviaMode === 'manual' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white'
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                triviaMode === 'manual' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-700'
               }`}
             >
-              <Plus size={16} /> Manual
+              <Plus size={14} /> Manual
             </button>
           </div>
 
@@ -669,9 +969,9 @@ IMPORTANTE:
                       name="questionsPerCategory"
                       type="number"
                       min="1"
-                      max="5"
+                      max="10"
                       value={questionsPerCategory}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestionsPerCategory(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuestionsPerCategory(Math.max(1, Math.min(10, parseInt(e.target.value) || 3)))}
                       className="w-12 px-2 py-1 bg-zinc-700 rounded text-white text-center text-sm"
                     />
                   </div>
@@ -686,10 +986,11 @@ IMPORTANTE:
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
                       className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
                     >
-                      <option value={10}>10s</option>
                       <option value={15}>15s</option>
                       <option value={20}>20s</option>
+                      <option value={25}>25s</option>
                       <option value={30}>30s</option>
+                      <option value={35}>35s</option>
                       <option value={45}>45s</option>
                       <option value={60}>60s</option>
                     </select>
@@ -699,7 +1000,7 @@ IMPORTANTE:
               
               {/* Default Categories */}
               <div>
-                <span className="text-xs text-zinc-400 mb-2 block">Categorías predefinidas</span>
+                <span className="text-xs text-zinc-400 mb-2 block">Categorías (preguntas en español)</span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {QUESTION_BANK.map((cat: TriviaCategory) => (
                     <button
@@ -756,13 +1057,43 @@ IMPORTANTE:
                 </div>
               )}
               
+              {/* Opción para enriquecer con API */}
+              <div className="flex items-center gap-2 p-2 bg-zinc-700/50 rounded-lg">
+                <button
+                  onClick={() => setEnrichWithApi(!enrichWithApi)}
+                  className={`w-8 h-4 rounded-full transition-colors ${enrichWithApi ? 'bg-cyan-500' : 'bg-zinc-600'}`}
+                >
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${enrichWithApi ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+                <span className="text-xs text-zinc-300">Añadir preguntas online</span>
+                <span className="text-[10px] text-zinc-500">(en inglés)</span>
+              </div>
+              
+              {loadError && (
+                <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center gap-2">
+                  <AlertCircle size={14} className="text-red-400" />
+                  <span className="text-red-200 text-xs">{loadError}</span>
+                </div>
+              )}
+              
               <button
                 onClick={generateFromCategories}
-                disabled={selectedCategories.length === 0 && selectedCustomCategories.length === 0}
-                className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg"
+                disabled={(selectedCategories.length === 0 && selectedCustomCategories.length === 0) || isLoadingQuestions}
+                className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white font-bold rounded-lg flex items-center justify-center gap-2"
               >
-                Generar {(selectedCategories.length + selectedCustomCategories.length) * questionsPerCategory} preguntas
+                {isLoadingQuestions ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>Generar preguntas</>
+                )}
               </button>
+              
+              <p className="text-[10px] text-zinc-500 text-center">
+                💡 Las preguntas menos usadas se priorizan automáticamente
+              </p>
             </div>
           )}
 
@@ -829,10 +1160,11 @@ IMPORTANTE:
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setQuestionTime(parseInt(e.target.value))}
                         className="px-2 py-1 bg-zinc-700 rounded text-white text-sm"
                       >
-                        <option value={10}>10s</option>
                         <option value={15}>15s</option>
                         <option value={20}>20s</option>
+                        <option value={25}>25s</option>
                         <option value={30}>30s</option>
+                        <option value={35}>35s</option>
                         <option value={45}>45s</option>
                         <option value={60}>60s</option>
                       </select>
@@ -1004,6 +1336,44 @@ IMPORTANTE:
               </div>
             </div>
           )}
+
+          {/* Player List in Setup */}
+          {playersArray.length > 0 && (
+            <div className="bg-zinc-800/50 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <Users size={16} className="text-purple-400" />
+                  {playersArray.length} jugadores
+                </span>
+                <button
+                  onClick={clearPlayers}
+                  className="flex items-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg"
+                >
+                  <Trash2 size={12} /> Limpiar todos
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {sortedPlayers.map((player: PlayerScore, i: number) => (
+                  <div
+                    key={player.oderId}
+                    className="flex items-center gap-2 px-2 py-1 bg-zinc-700/50 rounded-lg"
+                  >
+                    <span className="text-xs" style={{ color: player.color }}>
+                      {i === 0 && player.score > 0 ? '👑 ' : ''}{player.username}
+                    </span>
+                    <span className="text-xs text-purple-400">{player.score}</span>
+                    <button
+                      onClick={() => removePlayer(player.oderId)}
+                      className="p-0.5 hover:bg-red-500/20 text-zinc-500 hover:text-red-400 rounded transition-colors"
+                      title="Eliminar jugador"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1014,11 +1384,19 @@ IMPORTANTE:
             <span className="text-zinc-400 text-sm">
               Pregunta {currentQuestionIndex + 1} de {questions.length}
             </span>
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
-              timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-purple-500'
-            }`}>
-              <Timer size={16} className="text-white" />
-              <span className="text-white font-bold">{timeLeft}s</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={pauseGame}
+                className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm hover:bg-yellow-500/30"
+              >
+                <Pause size={14} /> Pausar
+              </button>
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
+                timeLeft <= 5 ? 'bg-red-500 animate-pulse' : 'bg-purple-500'
+              }`}>
+                <Timer size={16} className="text-white" />
+                <span className="text-white font-bold">{timeLeft}s</span>
+              </div>
             </div>
           </div>
 
@@ -1085,6 +1463,32 @@ IMPORTANTE:
         </>
       )}
 
+      {/* Paused State */}
+      {gameState === 'paused' && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 text-center">
+          <div className="text-5xl mb-3">⏸️</div>
+          <h3 className="text-xl font-bold text-yellow-400 mb-2">Juego Pausado</h3>
+          <p className="text-zinc-400 mb-4">
+            Pregunta {currentQuestionIndex + 1} de {questions.length} • 
+            {sortedPlayers[0]?.username ? ` ${sortedPlayers[0].username} lidera con ${sortedPlayers[0].score} pts` : ' Sin jugadores aún'}
+          </p>
+          <div className="flex justify-center gap-3">
+            <button 
+              onClick={resumeGame} 
+              className="flex items-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition-colors"
+            >
+              <Play size={20} /> Continuar Jugando
+            </button>
+            <button 
+              onClick={resetGame} 
+              className="flex items-center gap-2 px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-medium rounded-xl transition-colors"
+            >
+              <RotateCcw size={20} /> Volver al Inicio
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Final Results */}
       {gameState === 'final' && (
         <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-4">
@@ -1122,22 +1526,41 @@ IMPORTANTE:
       )}
 
       {/* Live Leaderboard */}
-      {(gameState === 'question' || gameState === 'results') && sortedPlayers.length > 0 && (
+      {(gameState === 'question' || gameState === 'results' || gameState === 'paused') && sortedPlayers.length > 0 && (
         <div className="bg-zinc-800/50 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy size={14} className="text-yellow-400" />
-            <span className="text-xs font-medium text-zinc-400">Top 5</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Trophy size={14} className="text-yellow-400" />
+              <span className="text-xs font-medium text-zinc-400">Top 5</span>
+            </div>
+            {gameState === 'paused' && (
+              <button
+                onClick={clearPlayers}
+                className="flex items-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg"
+              >
+                <Trash2 size={10} /> Limpiar
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {sortedPlayers.slice(0, 5).map((player: PlayerScore, i: number) => (
-              <span
+              <div
                 key={player.oderId}
-                className="text-xs px-2 py-1 rounded"
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded"
                 style={{ backgroundColor: player.color + '30', color: player.color }}
               >
                 {i === 0 ? '👑' : ''} {player.username}: {player.score}
                 {player.streak > 1 && <span className="text-yellow-400"> 🔥{player.streak}</span>}
-              </span>
+                {gameState === 'paused' && (
+                  <button
+                    onClick={() => removePlayer(player.oderId)}
+                    className="ml-1 p-0.5 hover:bg-red-500/30 text-zinc-400 hover:text-red-400 rounded transition-colors"
+                    title="Eliminar jugador"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

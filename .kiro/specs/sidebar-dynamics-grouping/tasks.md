@@ -42,7 +42,7 @@ Este plan implementa la reorganización del sidebar agrupando Encuesta, Jurado y
     - _Requirements: 1.3, 2.1_
 
   - [x] 3.2 Implementar botón de retorno
-    - Añadir botón "← Volver" cuando view !== 'selector'
+    - Añadir botón "Volver" cuando view !== 'selector'
     - Estilizar consistente con el diseño existente
     - Conectar con callback `onBack`
     - _Requirements: 2.1, 2.2, 2.3_

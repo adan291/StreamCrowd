@@ -2173,7 +2173,7 @@ export const translations: Record<Locale, Translations> = {
     platforms: {
       // General
       comingSoon: 'Próximamente',
-      back: '← Volver',
+      back: 'Volver',
       backToPlatforms: 'Volver a plataformas',
       availableTools: 'Herramientas disponibles',
       connected: 'Conectado',

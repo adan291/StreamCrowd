@@ -30,9 +30,9 @@ stateDiagram-v2
     ActivitySelector --> PollPanel: Click "Encuesta"
     ActivitySelector --> JudgePanel: Click "Jurado"
     ActivitySelector --> GiveawayPanel: Click "Sorteos"
-    PollPanel --> ActivitySelector: Click "← Volver"
-    JudgePanel --> ActivitySelector: Click "← Volver"
-    GiveawayPanel --> ActivitySelector: Click "← Volver"
+    PollPanel --> ActivitySelector: Click "Volver"
+    JudgePanel --> ActivitySelector: Click "Volver"
+    GiveawayPanel --> ActivitySelector: Click "Volver"
     Dynamics --> Sidebar: Click otro tab
 ```
 

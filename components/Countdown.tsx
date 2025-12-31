@@ -21,6 +21,7 @@ import {
 import { TwitchMessage } from '../types';
 import { useI18n } from '../i18n';
 import { countdownSync } from '../src/infrastructure/sync/FirebaseSync';
+import { OBSOverlayUrl } from './OBSOverlayUrl';
 
 interface CountdownConfig {
   initialDays: number;
@@ -56,6 +57,12 @@ interface OverlayStyleConfig {
   showAddedTime: boolean;
   valuesPosition: 'bottom' | 'top' | 'hidden';
   valuesSize: 'sm' | 'md' | 'lg';
+  // Personalización visual
+  customTitle: string; // Título encima del timer (ej: "SUBATHON")
+  customEndText: string; // Texto cuando termina (ej: "¡TIEMPO!")
+  customImage: string; // URL o base64 de imagen/logo
+  imagePosition: 'top' | 'bottom' | 'left' | 'right' | 'background' | 'none';
+  imageSize: 'sm' | 'md' | 'lg';
 }
 
 const DEFAULT_OVERLAY_STYLE: OverlayStyleConfig = {
@@ -66,6 +73,12 @@ const DEFAULT_OVERLAY_STYLE: OverlayStyleConfig = {
   showAddedTime: true,
   valuesPosition: 'bottom',
   valuesSize: 'sm',
+  // Personalización
+  customTitle: '',
+  customEndText: '¡TIEMPO!',
+  customImage: '',
+  imagePosition: 'none',
+  imageSize: 'md',
 };
 
 interface CountdownProps {
@@ -128,6 +141,13 @@ const FONT_WEIGHTS = {
   black: 'font-black',
 };
 
+// Image sizes for overlay
+const IMAGE_SIZES = {
+  sm: { width: 60, height: 60 },
+  md: { width: 100, height: 100 },
+  lg: { width: 150, height: 150 },
+};
+
 // Text shadow styles
 const getTextShadow = (style: string, color: string) => {
   const isLight = color === '#FFFFFF' || color === '#FFD700' || color === '#00FFFF' || color === '#4ADE80';
@@ -166,14 +186,20 @@ export const Countdown: React.FC<CountdownProps> = ({
 }) => {
   const { t } = useI18n();
   
-  // Widget flotante - Estado minimizado/expandido (debe estar antes de cualquier return condicional)
+  // Widget flotante - Estado minimizado/expandido y resize
   const [isMinimized, setIsMinimized] = useState(false);
   const [position, setPosition] = useState(() => {
     const saved = localStorage.getItem('countdown_widget_position');
     return saved ? JSON.parse(saved) : { x: 20, y: 80 };
   });
+  const [widgetSize, setWidgetSize] = useState(() => {
+    const saved = localStorage.getItem('countdown_widget_size');
+    return saved ? JSON.parse(saved) : { width: 320, height: 450 };
+  });
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
   
   const [overlayBgColor, setOverlayBgColor] = useState('#00FF00');
@@ -456,6 +482,13 @@ export const Countdown: React.FC<CountdownProps> = ({
     }
   }, [position, isOverlayMode]);
 
+  // Guardar tamaño del widget en localStorage
+  useEffect(() => {
+    if (!isOverlayMode) {
+      localStorage.setItem('countdown_widget_size', JSON.stringify(widgetSize));
+    }
+  }, [widgetSize, isOverlayMode]);
+
   // Drag handlers para el widget
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
@@ -470,23 +503,50 @@ export const Countdown: React.FC<CountdownProps> = ({
     if (isOverlayMode) return;
     
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const newX = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffset.current.x));
-      const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
-      setPosition({ x: newX, y: newY });
+      if (isDragging) {
+        const newX = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffset.current.x));
+        const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
+        setPosition({ x: newX, y: newY });
+      }
+      if (isResizing) {
+        e.preventDefault();
+        const deltaX = e.clientX - resizeStart.current.x;
+        const deltaY = e.clientY - resizeStart.current.y;
+        const newWidth = Math.max(260, Math.min(450, resizeStart.current.width + deltaX));
+        const newHeight = Math.max(300, Math.min(600, resizeStart.current.height + deltaY));
+        setWidgetSize({ width: newWidth, height: newHeight });
+      }
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
 
-    if (isDragging) {
+    if (isDragging || isResizing) {
+      if (isResizing) {
+        document.body.style.cursor = 'se-resize';
+        document.body.style.userSelect = 'none';
+      }
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
-  }, [isDragging, isOverlayMode]);
+  }, [isDragging, isResizing, isOverlayMode]);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStart.current = { x: e.clientX, y: e.clientY, width: widgetSize.width, height: widgetSize.height };
+  };
 
   // Tamaños de texto para overlay
   const getOverlayTextSize = () => {
@@ -719,23 +779,79 @@ export const Countdown: React.FC<CountdownProps> = ({
           </div>
         ) : (
           <>
-            {/* Timer normal con estilos configurables */}
-            <div className={`text-center transition-all duration-300 ${isCritical ? 'animate-bounce' : ''} px-4`}>
+            {/* Imagen de fondo */}
+            {overlayStyle.customImage && overlayStyle.imagePosition === 'background' && (
               <div 
-                className={`${getOverlayFontClass()} drop-shadow-2xl transition-all duration-300 leading-tight ${
-                  isFinished ? 'text-red-500 animate-pulse scale-110' : 
-                  isCritical ? 'animate-pulse scale-110' : 
-                  isLowTime ? '' : ''
-                }`}
-                style={{ 
-                  color: isFinished ? '#ef4444' : isCritical ? '#f97316' : isLowTime ? '#fb923c' : overlayTextColor,
-                  textShadow: isCritical ? '0 0 40px rgba(249, 115, 22, 0.8), 0 0 80px rgba(249, 115, 22, 0.4)' : getOverlayTextShadowStyle()
+                className="absolute inset-0 opacity-30"
+                style={{
+                  backgroundImage: `url(${overlayStyle.customImage})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                 }}
-              >
-                {formatTime(timeLeft)}
+              />
+            )}
+
+            {/* Contenedor principal con flexbox para posicionar imagen */}
+            <div className={`flex items-center justify-center gap-4 sm:gap-8 ${
+              overlayStyle.imagePosition === 'left' || overlayStyle.imagePosition === 'right' ? 'flex-row' : 'flex-col'
+            }`}>
+              {/* Imagen arriba o izquierda */}
+              {overlayStyle.customImage && (overlayStyle.imagePosition === 'top' || overlayStyle.imagePosition === 'left') && (
+                <img 
+                  src={overlayStyle.customImage} 
+                  alt="" 
+                  style={{ 
+                    width: IMAGE_SIZES[overlayStyle.imageSize].width, 
+                    height: IMAGE_SIZES[overlayStyle.imageSize].height,
+                    objectFit: 'contain'
+                  }}
+                  className="drop-shadow-lg"
+                />
+              )}
+
+              {/* Timer y título */}
+              <div className={`text-center transition-all duration-300 ${isCritical ? 'animate-bounce' : ''} px-4`}>
+                {/* Título personalizado */}
+                {overlayStyle.customTitle && !isFinished && (
+                  <div 
+                    className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-4 drop-shadow-lg"
+                    style={{ color: overlayTextColor, textShadow: getOverlayTextShadowStyle() }}
+                  >
+                    {overlayStyle.customTitle}
+                  </div>
+                )}
+
+                {/* Timer o texto de fin */}
+                <div 
+                  className={`${getOverlayFontClass()} drop-shadow-2xl transition-all duration-300 leading-tight ${
+                    isFinished ? 'text-red-500 animate-pulse scale-110' : 
+                    isCritical ? 'animate-pulse scale-110' : 
+                    isLowTime ? '' : ''
+                  }`}
+                  style={{ 
+                    color: isFinished ? '#ef4444' : isCritical ? '#f97316' : isLowTime ? '#fb923c' : overlayTextColor,
+                    textShadow: isCritical ? '0 0 40px rgba(249, 115, 22, 0.8), 0 0 80px rgba(249, 115, 22, 0.4)' : getOverlayTextShadowStyle()
+                  }}
+                >
+                  {isFinished ? (overlayStyle.customEndText || '¡TIEMPO!') : formatTime(timeLeft)}
+                </div>
+                {overlayStyle.showAddedTime && totalAdded > 0 && !isFinished && (
+                  <p className="text-green-400 text-lg sm:text-xl md:text-2xl mt-2 sm:mt-4 font-bold drop-shadow-lg">+{formatTime(totalAdded)} añadido</p>
+                )}
               </div>
-              {overlayStyle.showAddedTime && totalAdded > 0 && (
-                <p className="text-green-400 text-lg sm:text-xl md:text-2xl mt-2 sm:mt-4 font-bold drop-shadow-lg">+{formatTime(totalAdded)} añadido</p>
+
+              {/* Imagen abajo o derecha */}
+              {overlayStyle.customImage && (overlayStyle.imagePosition === 'bottom' || overlayStyle.imagePosition === 'right') && (
+                <img 
+                  src={overlayStyle.customImage} 
+                  alt="" 
+                  style={{ 
+                    width: IMAGE_SIZES[overlayStyle.imageSize].width, 
+                    height: IMAGE_SIZES[overlayStyle.imageSize].height,
+                    objectFit: 'contain'
+                  }}
+                  className="drop-shadow-lg"
+                />
               )}
             </div>
 
@@ -817,13 +933,16 @@ export const Countdown: React.FC<CountdownProps> = ({
       className="fixed z-50 select-none"
       style={{ left: position.x, top: position.y }}
     >
-      <div className={`bg-zinc-900/95 backdrop-blur-sm rounded-2xl shadow-2xl border transition-all w-80 ${
-        isFinished ? 'border-red-500/50' : isLowTime ? 'border-orange-500/50' : 'border-zinc-700/50'
-      } ${isRunning ? 'ring-2 ring-green-500/30' : ''}`}>
+      <div 
+        className={`bg-zinc-900/95 backdrop-blur-sm rounded-2xl shadow-2xl border transition-colors overflow-hidden flex flex-col relative ${
+          isFinished ? 'border-red-500/50' : isLowTime ? 'border-orange-500/50' : 'border-zinc-700/50'
+        } ${isRunning ? 'ring-2 ring-green-500/30' : ''} ${isResizing ? 'ring-2 ring-cyan-500/50' : ''}`}
+        style={{ width: widgetSize.width, height: widgetSize.height }}
+      >
         {/* Header - Draggable */}
         <div
           onMouseDown={handleMouseDown}
-          className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 cursor-move"
+          className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 cursor-move shrink-0 bg-zinc-900/50"
         >
           <div className="flex items-center gap-2">
             <GripHorizontal size={14} className="text-zinc-500" />
@@ -832,9 +951,6 @@ export const Countdown: React.FC<CountdownProps> = ({
             {isRunning && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={openOverlayWindow} className="p-1.5 rounded-lg text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors" title="Abrir Overlay OBS">
-              <ExternalLink size={14} />
-            </button>
             <button onClick={() => setIsMinimized(true)} className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
               <Minimize2 size={14} />
             </button>
@@ -844,18 +960,20 @@ export const Countdown: React.FC<CountdownProps> = ({
           </div>
         </div>
 
-        {/* Timer Display */}
-        <div className="p-4">
-          <div className={`text-center p-4 rounded-xl mb-3 ${isFinished ? 'bg-red-500/20' : isLowTime ? 'bg-orange-500/20' : 'bg-zinc-800/50'}`}>
-            <div className={`text-4xl font-mono font-bold ${isFinished ? 'text-red-400 animate-pulse' : isLowTime ? 'text-orange-400 animate-pulse' : 'text-white'}`}>
+        {/* Timer Display - Scrollable content */}
+        <div className="p-3 overflow-y-auto flex-1 space-y-3">
+          {/* Timer principal */}
+          <div className={`text-center p-3 rounded-xl ${isFinished ? 'bg-red-500/20' : isLowTime ? 'bg-orange-500/20' : 'bg-zinc-800/50'}`}>
+            <div className={`font-mono font-bold transition-all ${
+              widgetSize.width < 300 ? 'text-3xl' : 'text-4xl'
+            } ${isFinished ? 'text-red-400 animate-pulse' : isLowTime ? 'text-orange-400 animate-pulse' : 'text-white'}`}>
               {formatTime(timeLeft)}
             </div>
             {totalAdded > 0 && <p className="text-green-400 text-xs mt-1">+{formatTime(totalAdded)} añadido</p>}
           </div>
 
-          {/* Quick Add/Remove Buttons */}
-          <div className="space-y-2 mb-3">
-            {/* Add time buttons */}
+          {/* Quick Add/Remove Buttons - Más compactos */}
+          <div className="space-y-1.5">
             <div className="flex gap-1 justify-center flex-wrap">
               {[
                 { secs: 30, label: '30s' },
@@ -865,12 +983,11 @@ export const Countdown: React.FC<CountdownProps> = ({
                 { secs: 1800, label: '30m' },
                 { secs: 3600, label: '1h' },
               ].map(({ secs, label }) => (
-                <button key={secs} onClick={() => manualAddTime(secs)} className="px-2 py-1 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded-lg text-[10px] font-medium transition-all flex items-center gap-0.5">
-                  <Plus size={10} /> {label}
+                <button key={secs} onClick={() => manualAddTime(secs)} className="px-1.5 py-1 bg-green-600/20 hover:bg-green-600/40 text-green-400 rounded text-[10px] font-medium transition-all flex items-center gap-0.5">
+                  <Plus size={9} /> {label}
                 </button>
               ))}
             </div>
-            {/* Remove time buttons */}
             <div className="flex gap-1 justify-center flex-wrap">
               {[
                 { secs: 30, label: '30s' },
@@ -880,32 +997,35 @@ export const Countdown: React.FC<CountdownProps> = ({
                 { secs: 1800, label: '30m' },
                 { secs: 3600, label: '1h' },
               ].map(({ secs, label }) => (
-                <button key={secs} onClick={() => manualRemoveTime(secs)} className="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-[10px] font-medium transition-all flex items-center gap-0.5">
-                  <Minus size={10} /> {label}
+                <button key={secs} onClick={() => manualRemoveTime(secs)} className="px-1.5 py-1 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded text-[10px] font-medium transition-all flex items-center gap-0.5">
+                  <Minus size={9} /> {label}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex gap-2 mb-3">
-            <button onClick={toggleRunning} className={`flex-1 flex items-center justify-center gap-2 py-2 font-bold rounded-lg transition-all text-sm ${isRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
-              {isRunning ? <Pause size={16} /> : <Play size={16} />} {isRunning ? 'Pausar' : 'Iniciar'}
+          <div className="flex gap-2">
+            <button onClick={toggleRunning} className={`flex-1 flex items-center justify-center gap-1.5 py-2 font-bold rounded-lg transition-all text-xs ${isRunning ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
+              {isRunning ? <Pause size={14} /> : <Play size={14} />} {isRunning ? 'Pausar' : 'Iniciar'}
             </button>
-            <button onClick={reset} className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-all">
-              <RotateCcw size={16} />
+            <button onClick={reset} className="px-2.5 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-all" title="Reiniciar">
+              <RotateCcw size={14} />
             </button>
-            <button onClick={() => setShowConfig(!showConfig)} className={`px-3 py-2 rounded-lg transition-all ${showConfig ? 'bg-twitch-brand text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`}>
-              <Settings size={16} />
+            <button onClick={() => setShowConfig(!showConfig)} className={`px-2.5 py-2 rounded-lg transition-all ${showConfig ? 'bg-twitch-brand text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`} title="Configuración">
+              <Settings size={14} />
             </button>
           </div>
 
+          {/* OBS Overlay URL */}
+          <OBSOverlayUrl overlayParam="overlayCountdown" title="el countdown" />
+
           {/* Recent Events */}
           {recentEvents.length > 0 && (
-            <div className="mb-3 space-y-1 max-h-24 overflow-y-auto">
+            <div className="space-y-1 max-h-20 overflow-y-auto">
               <p className="text-[10px] text-zinc-500 uppercase font-bold">Eventos</p>
               {recentEvents.slice(0, 3).map((event, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs bg-zinc-800/50 rounded-lg px-2 py-1.5">
+                <div key={i} className="flex items-center gap-2 text-xs bg-zinc-800/50 rounded px-2 py-1">
                   {getEventIcon(event.type)}
                   <span className="text-zinc-300 truncate flex-1">{event.user}</span>
                   <span className="text-green-400">+{event.amount}s</span>
@@ -1070,11 +1190,102 @@ export const Countdown: React.FC<CountdownProps> = ({
                 <span className="text-xs text-white flex-1">Mostrar valores en overlay</span>
               </div>
 
+              {/* Personalización visual del overlay */}
+              <div className="border-t border-zinc-600 pt-3 mt-2">
+                <p className="text-[10px] text-zinc-400 mb-2 font-bold uppercase">Personalización Overlay</p>
+                
+                {/* Título personalizado */}
+                <div className="mb-2">
+                  <label className="text-[10px] text-zinc-500 block mb-1">Título (encima del timer)</label>
+                  <input 
+                    type="text" 
+                    value={overlayStyle.customTitle} 
+                    onChange={(e) => updateOverlayStyle('customTitle', e.target.value)}
+                    placeholder="Ej: SUBATHON, EVENTO..."
+                    className="w-full bg-zinc-700 rounded px-2 py-1.5 text-white text-xs placeholder:text-zinc-500"
+                  />
+                </div>
+
+                {/* Texto al terminar */}
+                <div className="mb-2">
+                  <label className="text-[10px] text-zinc-500 block mb-1">Texto al terminar</label>
+                  <input 
+                    type="text" 
+                    value={overlayStyle.customEndText} 
+                    onChange={(e) => updateOverlayStyle('customEndText', e.target.value)}
+                    placeholder="Ej: ¡TIEMPO!, FIN..."
+                    className="w-full bg-zinc-700 rounded px-2 py-1.5 text-white text-xs placeholder:text-zinc-500"
+                  />
+                </div>
+
+                {/* Imagen/Logo */}
+                <div className="mb-2">
+                  <label className="text-[10px] text-zinc-500 block mb-1">Imagen/Logo (URL)</label>
+                  <input 
+                    type="text" 
+                    value={overlayStyle.customImage} 
+                    onChange={(e) => updateOverlayStyle('customImage', e.target.value)}
+                    placeholder="https://... o dejar vacío"
+                    className="w-full bg-zinc-700 rounded px-2 py-1.5 text-white text-xs placeholder:text-zinc-500"
+                  />
+                </div>
+
+                {/* Posición de imagen */}
+                {overlayStyle.customImage && (
+                  <div className="mb-2">
+                    <label className="text-[10px] text-zinc-500 block mb-1">Posición imagen</label>
+                    <div className="flex gap-1 flex-wrap">
+                      {(['top', 'bottom', 'left', 'right', 'background'] as const).map((pos) => (
+                        <button 
+                          key={pos} 
+                          onClick={() => updateOverlayStyle('imagePosition', pos)} 
+                          className={`px-2 py-1 rounded text-[10px] font-medium ${overlayStyle.imagePosition === pos ? 'bg-twitch-brand text-white' : 'bg-zinc-600 text-zinc-300'}`}
+                        >
+                          {pos === 'top' ? 'Arriba' : pos === 'bottom' ? 'Abajo' : pos === 'left' ? 'Izq' : pos === 'right' ? 'Der' : 'Fondo'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tamaño de imagen */}
+                {overlayStyle.customImage && overlayStyle.imagePosition !== 'background' && (
+                  <div className="mb-2">
+                    <label className="text-[10px] text-zinc-500 block mb-1">Tamaño imagen</label>
+                    <div className="flex gap-1">
+                      {(['sm', 'md', 'lg'] as const).map((size) => (
+                        <button 
+                          key={size} 
+                          onClick={() => updateOverlayStyle('imageSize', size)} 
+                          className={`flex-1 py-1 rounded text-[10px] font-medium ${overlayStyle.imageSize === size ? 'bg-twitch-brand text-white' : 'bg-zinc-600 text-zinc-300'}`}
+                        >
+                          {size === 'sm' ? 'Pequeño' : size === 'md' ? 'Medio' : 'Grande'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button onClick={() => { setTimeLeft(getInitialTime(config)); setShowConfig(false); }} className="w-full py-1.5 bg-twitch-brand hover:bg-twitch-brand/80 text-white font-medium rounded-lg text-xs">
                 Aplicar tiempo
               </button>
             </div>
           )}
+        </div>
+
+        {/* Resize handle - Más visible y fácil de usar */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize group z-10"
+          title="Redimensionar"
+        >
+          <div className="absolute bottom-1 right-1 w-3 h-3 flex items-end justify-end">
+            <svg width="10" height="10" viewBox="0 0 10 10" className="text-zinc-500 group-hover:text-cyan-400 transition-colors">
+              <path d="M9 1v8H1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M9 5v4H5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
         </div>
       </div>
     </div>

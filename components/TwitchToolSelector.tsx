@@ -136,7 +136,7 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
         aria-label={t.platforms?.backToPlatforms || 'Volver a plataformas'}
       >
         <ArrowLeft size={16} />
-        <span>{t.platforms?.back || '← Volver'}</span>
+        <span>{t.platforms?.back || 'Volver'}</span>
       </button>
 
       {/* Header */}
