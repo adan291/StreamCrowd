@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "./src/styles/tokens.css";
+@import "./src/styles/utilities.css";
+@import "./src/styles/responsive.css";
+@import "./src/styles/components.css";
 
 /* Configure dark mode to use class strategy */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -32,6 +36,19 @@
 .text-purple-light { color: var(--color-purple-light); }
 .placeholder-purple-light::placeholder { color: var(--color-purple-light) !important; opacity: 0.8; }
 input.placeholder-purple-light::placeholder { color: var(--color-purple-light) !important; opacity: 0.8; }
+
+/* Screen reader only - for accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Light theme input improvements */
 :root:not(.dark) input.light-input {
@@ -889,4 +906,336 @@ html.dark {
 
 .animate-slide-in-right {
   animation: slideInRight 0.3s ease-out forwards;
+}
+
+/* ============================================
+   Activity UI Animations
+   @requirements 8.1 - Fade-slide for new events (200ms)
+   @requirements 8.2 - Smooth filter content changes
+   @requirements 8.3 - Smooth expand/collapse groups (150ms ease-out)
+   @requirements 8.4 - Smooth auto-scroll indicator fade
+   @requirements 8.5 - Respect prefers-reduced-motion
+   ============================================ */
+
+/* Fade-slide animation for new events */
+@keyframes eventFadeSlide {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-event-enter {
+  animation: eventFadeSlide 200ms ease-out forwards;
+}
+
+/* Filter chip transitions */
+@keyframes filterFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-filter-enter {
+  animation: filterFadeIn 150ms ease-out forwards;
+}
+
+/* Filter content change animation */
+.filter-transition {
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+
+.filter-transition-enter {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.filter-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Group expand/collapse animation */
+@keyframes groupExpand {
+  0% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes groupCollapse {
+  0% {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.animate-group-expand {
+  animation: groupExpand 150ms ease-out forwards;
+  overflow: hidden;
+}
+
+.animate-group-collapse {
+  animation: groupCollapse 150ms ease-out forwards;
+  overflow: hidden;
+}
+
+/* Smooth group content transition */
+.group-content-transition {
+  transition: max-height 150ms ease-out, opacity 150ms ease-out, padding 150ms ease-out;
+  overflow: hidden;
+}
+
+.group-content-collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.group-content-expanded {
+  max-height: 500px;
+  opacity: 1;
+}
+
+/* Auto-scroll indicator smooth fade */
+@keyframes indicatorFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes indicatorFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.animate-indicator-enter {
+  animation: indicatorFadeIn 200ms ease-out forwards;
+}
+
+.animate-indicator-exit {
+  animation: indicatorFadeOut 200ms ease-out forwards;
+}
+
+/* Pause indicator smooth fade */
+@keyframes pauseIndicatorFade {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.animate-pause-indicator {
+  animation: pauseIndicatorFade 200ms ease-out forwards;
+}
+
+/* Stats bar show/hide animation */
+@keyframes statsSlideDown {
+  0% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    max-height: 48px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes statsSlideUp {
+  0% {
+    opacity: 1;
+    max-height: 48px;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.animate-stats-show {
+  animation: statsSlideDown 200ms ease-out forwards;
+}
+
+.animate-stats-hide {
+  animation: statsSlideUp 200ms ease-out forwards;
+}
+
+/* Tab underline transition */
+.tab-underline-transition {
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+
+/* Chevron rotation transition */
+.chevron-transition {
+  transition: transform 150ms ease-out;
+}
+
+/* Card hover transitions */
+.card-hover-transition {
+  transition: background-color 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+/* Badge dot pulse animation */
+@keyframes badgeDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.animate-badge-pulse {
+  animation: badgeDotPulse 1.5s ease-in-out infinite;
+}
+
+/* Viewer card enter animation */
+@keyframes viewerCardEnter {
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-viewer-enter {
+  animation: viewerCardEnter 150ms ease-out forwards;
+}
+
+/* Tooltip fade animation */
+@keyframes tooltipFade {
+  0% {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-tooltip {
+  animation: tooltipFade 150ms ease-out forwards;
+}
+
+/* ============================================
+   Reduced Motion Support
+   @requirements 8.5 - Respect prefers-reduced-motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all custom animations */
+  .animate-event-enter,
+  .animate-filter-enter,
+  .animate-group-expand,
+  .animate-group-collapse,
+  .animate-indicator-enter,
+  .animate-indicator-exit,
+  .animate-pause-indicator,
+  .animate-stats-show,
+  .animate-stats-hide,
+  .animate-badge-pulse,
+  .animate-viewer-enter,
+  .animate-tooltip,
+  .animate-slide-in-right,
+  .animate-fade-in,
+  .animate-scale-up,
+  .animate-slide-up {
+    animation: none !important;
+  }
+
+  /* Reduce transitions to instant */
+  .filter-transition,
+  .group-content-transition,
+  .tab-underline-transition,
+  .chevron-transition,
+  .card-hover-transition {
+    transition: none !important;
+  }
+}
+
+
+/* ============================================
+   Primary Color Utilities (Twitch Purple)
+   ============================================ */
+.bg-primary-500 {
+  background-color: var(--color-primary-500, #9146ff) !important;
+}
+
+.bg-primary-600 {
+  background-color: var(--color-primary-600, #772ce8) !important;
+}
+
+.hover\:bg-primary-600:hover {
+  background-color: var(--color-primary-600, #772ce8) !important;
+}
+
+.text-primary-400 {
+  color: var(--color-primary-400, #a970ff);
+}
+
+.text-primary-500 {
+  color: var(--color-primary-500, #9146ff);
+}
+
+.border-primary-500 {
+  border-color: var(--color-primary-500, #9146ff);
+}
+
+.ring-primary-500 {
+  --tw-ring-color: var(--color-primary-500, #9146ff);
+}
+
+.focus-visible\:ring-primary-500:focus-visible {
+  --tw-ring-color: var(--color-primary-500, #9146ff);
+}
+
+.hover\:bg-primary-500\/10:hover {
+  background-color: rgba(145, 70, 255, 0.1);
 }

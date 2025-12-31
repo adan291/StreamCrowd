@@ -42,6 +42,8 @@ import type { StreamEvent as DomainStreamEvent } from '../src/domain/entities/St
 import { giveawaySync } from '../src/infrastructure/sync/FirebaseSync';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
+import { useHistoryRecorder } from '../hooks/useHistoryRecorder';
+import { useStreamNotifications } from '../hooks/useStreamNotifications';
 
 interface GiveawayHubProps {
   chatMessages: TwitchMessage[];
@@ -132,8 +134,10 @@ const SubsConfigPanel: React.FC<{
             </h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 1</label>
+                <label htmlFor="subs-tier1-input" className="text-xs text-zinc-500 dark:text-zinc-400">Tier 1</label>
                 <input
+                  id="subs-tier1-input"
+                  name="tier1Value"
                   type="number"
                   min="0"
                   value={localConfig.tier1Value}
@@ -142,8 +146,10 @@ const SubsConfigPanel: React.FC<{
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 2</label>
+                <label htmlFor="subs-tier2-input" className="text-xs text-zinc-500 dark:text-zinc-400">Tier 2</label>
                 <input
+                  id="subs-tier2-input"
+                  name="tier2Value"
                   type="number"
                   min="0"
                   value={localConfig.tier2Value}
@@ -152,8 +158,10 @@ const SubsConfigPanel: React.FC<{
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Tier 3</label>
+                <label htmlFor="subs-tier3-input" className="text-xs text-zinc-500 dark:text-zinc-400">Tier 3</label>
                 <input
+                  id="subs-tier3-input"
+                  name="tier3Value"
                   type="number"
                   min="0"
                   value={localConfig.tier3Value}
@@ -162,8 +170,10 @@ const SubsConfigPanel: React.FC<{
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Prime</label>
+                <label htmlFor="subs-prime-input" className="text-xs text-zinc-500 dark:text-zinc-400">Prime</label>
                 <input
+                  id="subs-prime-input"
+                  name="primeValue"
                   type="number"
                   min="0"
                   value={localConfig.primeValue}
@@ -190,8 +200,10 @@ const SubsConfigPanel: React.FC<{
             {localConfig.resubEnabled && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por resub</label>
+                  <label htmlFor="resub-value-input" className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por resub</label>
                   <input
+                    id="resub-value-input"
+                    name="resubValue"
                     type="number"
                     min="0"
                     value={localConfig.resubValue}
@@ -200,8 +212,10 @@ const SubsConfigPanel: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Bonus por mes</label>
+                  <label htmlFor="resub-bonus-input" className="text-xs text-zinc-500 dark:text-zinc-400">Bonus por mes</label>
                   <input
+                    id="resub-bonus-input"
+                    name="resubBonusPerMonth"
                     type="number"
                     min="0"
                     step="0.1"
@@ -229,8 +243,10 @@ const SubsConfigPanel: React.FC<{
             </div>
             {localConfig.giftSubEnabled && (
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por sub regalada</label>
+                <label htmlFor="giftsub-value-input" className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por sub regalada</label>
                 <input
+                  id="giftsub-value-input"
+                  name="giftSubValue"
                   type="number"
                   min="0"
                   value={localConfig.giftSubValue}
@@ -257,8 +273,10 @@ const SubsConfigPanel: React.FC<{
             {localConfig.bitsEnabled && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Bits por entrada</label>
+                  <label htmlFor="bits-per-entry-input" className="text-xs text-zinc-500 dark:text-zinc-400">Bits por entrada</label>
                   <input
+                    id="bits-per-entry-input"
+                    name="bitsPerEntry"
                     type="number"
                     min="1"
                     value={localConfig.bitsPerEntry}
@@ -267,8 +285,10 @@ const SubsConfigPanel: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo bits</label>
+                  <label htmlFor="bits-minimum-input" className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo bits</label>
                   <input
+                    id="bits-minimum-input"
+                    name="bitsMinimum"
                     type="number"
                     min="0"
                     value={localConfig.bitsMinimum}
@@ -296,8 +316,10 @@ const SubsConfigPanel: React.FC<{
             {localConfig.donationsEnabled && (
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">€ por entrada</label>
+                  <label htmlFor="donation-per-entry-input" className="text-xs text-zinc-500 dark:text-zinc-400">€ por entrada</label>
                   <input
+                    id="donation-per-entry-input"
+                    name="donationPerEntry"
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -307,8 +329,10 @@ const SubsConfigPanel: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo</label>
+                  <label htmlFor="donation-minimum-input" className="text-xs text-zinc-500 dark:text-zinc-400">Mínimo</label>
                   <input
+                    id="donation-minimum-input"
+                    name="donationMinimum"
                     type="number"
                     min="0"
                     step="0.01"
@@ -318,8 +342,10 @@ const SubsConfigPanel: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-500 dark:text-zinc-400">Moneda</label>
+                  <label htmlFor="donation-currency-select" className="text-xs text-zinc-500 dark:text-zinc-400">Moneda</label>
                   <select
+                    id="donation-currency-select"
+                    name="donationCurrency"
                     value={localConfig.donationCurrency}
                     onChange={(e) => updateConfig('donationCurrency', e.target.value)}
                     className="w-full bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm"
@@ -348,8 +374,10 @@ const SubsConfigPanel: React.FC<{
             </div>
             {localConfig.channelGiftsEnabled && (
               <div>
-                <label className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por regalo</label>
+                <label htmlFor="channel-gift-value-input" className="text-xs text-zinc-500 dark:text-zinc-400">Entradas por regalo</label>
                 <input
+                  id="channel-gift-value-input"
+                  name="channelGiftValue"
                   type="number"
                   min="0"
                   value={localConfig.channelGiftValue}
@@ -389,6 +417,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 }) => {
   const { t } = useI18n();
   const { triggerGiveawayStart, triggerGiveawayWinner } = useOBSTriggers();
+  const { recordGiveaway } = useHistoryRecorder();
+  const { notifyGiveawayWinner } = useStreamNotifications();
   const [activeTab, setActiveTab] = useState<TabType>('raffle');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -947,6 +977,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         saveToHistory(winnerName, filteredCandidates.length);
         // OBS Trigger: Giveaway winner selected
         triggerGiveawayWinner();
+        // Send notification for giveaway winner
+        // @requirements 4.3 - Emit notifications for giveaway winner
+        notifyGiveawayWinner(winnerName);
       }
     }, 100);
   };
@@ -974,6 +1007,17 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     const history = JSON.parse(localStorage.getItem('giveaway_history') || '[]');
     history.unshift(finished);
     localStorage.setItem('giveaway_history', JSON.stringify(history.slice(0, 50)));
+    
+    // Record to unified history
+    recordGiveaway({
+      name: getName(),
+      mode: raffleMode,
+      keyword: raffleMode === 'keyword' ? keyword : undefined,
+      winner: winnerName,
+      participantCount,
+      subscribersOnly: raffleMode === 'subs' ? true : subsOnly,
+      duration: startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : undefined,
+    });
   };
 
   const resetRaffle = () => {
@@ -1677,8 +1721,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
             {/* Raffle title */}
             <div className="space-y-2">
-              <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Título del sorteo (opcional)</label>
+              <label htmlFor="raffle-title-input" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Título del sorteo (opcional)</label>
               <input 
+                id="raffle-title-input"
+                name="raffleTitle"
                 type="text" 
                 value={raffleTitle} 
                 onChange={(e) => setRaffleTitle(e.target.value)} 
@@ -1727,12 +1773,15 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 <div className="flex items-center gap-3">
                   <Clock size={16} className="text-zinc-400" />
                   <input 
+                    id="raffle-time-limit-input"
+                    name="timeLimit"
                     type="number" 
                     value={timeLimit} 
                     onChange={(e) => setTimeLimit(Math.max(10, parseInt(e.target.value) || 60))} 
                     min="10" 
                     max="300" 
-                    disabled={isRunning} 
+                    disabled={isRunning}
+                    aria-label="Tiempo límite en segundos"
                     className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50" 
                   />
                   <span className="text-zinc-500 text-sm">segundos</span>
@@ -1778,10 +1827,12 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             {/* Keyword input (only in keyword mode) */}
             {raffleMode === 'keyword' && (
               <div className="space-y-2">
-                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.randomWinner.keywordLabel}</label>
+                <label htmlFor="raffle-keyword-input" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.randomWinner.keywordLabel}</label>
                 <div className="relative">
                   <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input 
+                    id="raffle-keyword-input"
+                    name="keyword"
                     type="text" 
                     value={keyword} 
                     onChange={(e) => setKeyword(e.target.value.replace(/\s/g, ''))} 
@@ -1868,10 +1919,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               
               <div className="flex gap-2">
                 <input 
+                  id="manual-participant-input"
+                  name="manualParticipant"
                   type="text" 
                   value={manualParticipant} 
                   onChange={(e) => setManualParticipant(e.target.value.replace(/\s/g, ''))} 
-                  placeholder="Nombre de usuario" 
+                  placeholder="Nombre de usuario"
+                  aria-label="Nombre de usuario para añadir manualmente"
                   onKeyDown={(e) => e.key === 'Enter' && addManualParticipant()}
                   className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" 
                 />
@@ -2285,10 +2339,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                       </label>
                       <div className="flex gap-1">
                         <input 
+                          id={`thread-manual-participant-${thread.id}`}
+                          name="threadManualParticipant"
                           type="text" 
                           value={threadManualParticipant[thread.id] || ''} 
                           onChange={(e) => setThreadManualParticipant(prev => ({ ...prev, [thread.id]: e.target.value.replace(/\s/g, '') }))} 
-                          placeholder="Usuario" 
+                          placeholder="Usuario"
+                          aria-label="Nombre de usuario para añadir al hilo"
                           onKeyDown={(e) => e.key === 'Enter' && addManualParticipantToThread(thread.id)}
                           className="flex-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-800 dark:text-white rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-500" 
                         />
@@ -2435,10 +2492,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             {/* Add user input */}
             <div className="flex gap-2 mb-4">
               <input
+                id="blacklist-input"
+                name="blacklistInput"
                 type="text"
                 value={blacklistInput}
                 onChange={(e) => setBlacklistInput(e.target.value.replace(/\s/g, ''))}
                 placeholder="Nombre de usuario"
+                aria-label="Nombre de usuario para añadir a la lista de prohibidos"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && blacklistInput.trim()) {
                     addToBlacklist(blacklistInput);

@@ -45,6 +45,14 @@ export interface UseOBSTriggersReturn {
   triggerStreamStart: () => Promise<boolean>;
   triggerStreamEnd: () => Promise<boolean>;
   
+  // Predicciones
+  triggerPredictionStart: () => Promise<boolean>;
+  triggerPredictionLock: () => Promise<boolean>;
+  triggerPredictionResolve: () => Promise<boolean>;
+  
+  // Channel Points / Recompensas
+  triggerRewardRedeemed: () => Promise<boolean>;
+  
   // Custom
   triggerCustom: (name: string) => Promise<boolean>;
   
@@ -96,6 +104,14 @@ export function useOBSTriggers(): UseOBSTriggersReturn {
     // Stream
     triggerStreamStart: useCallback(() => trigger('stream_start'), [trigger]),
     triggerStreamEnd: useCallback(() => trigger('stream_end'), [trigger]),
+    
+    // Predicciones
+    triggerPredictionStart: useCallback(() => trigger('prediction_start'), [trigger]),
+    triggerPredictionLock: useCallback(() => trigger('prediction_lock'), [trigger]),
+    triggerPredictionResolve: useCallback(() => trigger('prediction_resolve'), [trigger]),
+    
+    // Channel Points / Recompensas
+    triggerRewardRedeemed: useCallback(() => trigger('reward_redeemed'), [trigger]),
     
     // Custom
     triggerCustom: useCallback((name: string) => trigger('custom', name), [trigger]),

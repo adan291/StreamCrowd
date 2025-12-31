@@ -3,11 +3,12 @@
  * 
  * Panel de configuración para comandos personalizados de chat.
  * Permite crear, editar y gestionar comandos.
+ * Incluye funcionalidad de import/export.
  * 
- * @requirements 2.3
+ * @requirements 2.3, 6.1, 6.2, 6.4, 6.6
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   Terminal, 
   Plus,
@@ -21,13 +22,19 @@ import {
   BarChart3,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Upload,
+  FileJson,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   useCommands, 
   CustomCommand, 
   UserLevel 
 } from '../src/application/hooks/useCommands';
+import { useCommandsExport } from '../src/application/hooks/useCommandsExport';
+import type { ImportMode, ImportResult, ImportValidationResult } from '../types/commandExport';
 
 // User level configuration
 const USER_LEVELS: { value: UserLevel; label: string; description: string }[] = [
@@ -360,6 +367,281 @@ const CommandItem: React.FC<CommandItemProps> = ({
 };
 
 /**
+ * Import Modal Component
+ * @requirements 6.2, 6.4, 6.6
+ */
+interface ImportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onImport: (file: File, mode: ImportMode) => Promise<ImportResult>;
+  validateImport: (data: unknown) => ImportValidationResult;
+  parseFile: (file: File) => Promise<unknown>;
+  existingCommandCount: number;
+}
+
+const ImportModal: React.FC<ImportModalProps> = ({
+  isOpen,
+  onClose,
+  onImport,
+  validateImport,
+  parseFile,
+  existingCommandCount,
+}) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [validation, setValidation] = useState<ImportValidationResult | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>('merge');
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    setResult(null);
+    setIsLoading(true);
+
+    try {
+      const data = await parseFile(file);
+      const validationResult = validateImport(data);
+      setValidation(validationResult);
+    } catch (error) {
+      setValidation({
+        valid: false,
+        errors: [error instanceof Error ? error.message : 'Error al leer el archivo'],
+        warnings: [],
+        commandCount: 0,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [parseFile, validateImport]);
+
+  const handleImport = useCallback(async () => {
+    if (!selectedFile || !validation?.valid) return;
+
+    setIsLoading(true);
+    try {
+      const importResult = await onImport(selectedFile, importMode);
+      setResult(importResult);
+      if (importResult.success) {
+        setTimeout(() => {
+          onClose();
+          setSelectedFile(null);
+          setValidation(null);
+          setResult(null);
+        }, 2000);
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        imported: 0,
+        skipped: 0,
+        replaced: 0,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedFile, validation, importMode, onImport, onClose]);
+
+  const handleClose = useCallback(() => {
+    setSelectedFile(null);
+    setValidation(null);
+    setResult(null);
+    onClose();
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-bold flex items-center gap-2">
+            <Upload size={20} className="text-purple-400" />
+            Importar Comandos
+          </h3>
+          <button
+            onClick={handleClose}
+            className="text-zinc-400 hover:text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* File Selection */}
+        <div className="mb-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full p-4 border-2 border-dashed border-zinc-700 rounded-xl hover:border-purple-500 transition-colors flex flex-col items-center gap-2"
+          >
+            <FileJson size={32} className="text-zinc-500" />
+            <span className="text-zinc-400 text-sm">
+              {selectedFile ? selectedFile.name : 'Seleccionar archivo JSON'}
+            </span>
+          </button>
+        </div>
+
+        {/* Validation Results */}
+        {validation && (
+          <div className="mb-4 space-y-2">
+            {validation.valid ? (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <Check size={16} />
+                  <span>Archivo válido: {validation.commandCount} comandos</span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="flex items-start gap-2 text-red-400 text-sm">
+                  <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold mb-1">Errores de validación:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {validation.errors.slice(0, 5).map((error, i) => (
+                        <li key={i}>{error}</li>
+                      ))}
+                      {validation.errors.length > 5 && (
+                        <li>...y {validation.errors.length - 5} más</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {validation.warnings.length > 0 && (
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <div className="flex items-start gap-2 text-yellow-400 text-sm">
+                  <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold mb-1">Advertencias:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {validation.warnings.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Import Mode Selection */}
+        {validation?.valid && !result && (
+          <div className="mb-4">
+            <label className="text-zinc-400 text-xs block mb-2">Modo de importación</label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 p-3 bg-zinc-800/50 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="merge"
+                  checked={importMode === 'merge'}
+                  onChange={() => setImportMode('merge')}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="text-white text-sm font-medium">Combinar</p>
+                  <p className="text-zinc-500 text-xs">
+                    Añade nuevos comandos, omite los que ya existen
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-3 bg-zinc-800/50 rounded-lg cursor-pointer hover:bg-zinc-800 transition-colors">
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="replace"
+                  checked={importMode === 'replace'}
+                  onChange={() => setImportMode('replace')}
+                  className="mt-1"
+                />
+                <div>
+                  <p className="text-white text-sm font-medium">Reemplazar</p>
+                  <p className="text-zinc-500 text-xs">
+                    Elimina los {existingCommandCount} comandos actuales y los reemplaza
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Import Result */}
+        {result && (
+          <div className={`mb-4 p-3 rounded-lg ${
+            result.success 
+              ? 'bg-green-500/10 border border-green-500/30' 
+              : 'bg-red-500/10 border border-red-500/30'
+          }`}>
+            {result.success ? (
+              <div className="text-green-400 text-sm">
+                <p className="font-bold flex items-center gap-2">
+                  <Check size={16} />
+                  Importación exitosa
+                </p>
+                <p className="mt-1">
+                  {result.imported} comandos importados
+                  {result.skipped > 0 && `, ${result.skipped} omitidos`}
+                  {result.replaced > 0 && `, ${result.replaced} reemplazados`}
+                </p>
+              </div>
+            ) : (
+              <div className="text-red-400 text-sm">
+                <p className="font-bold flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  Error en la importación
+                </p>
+                <p className="mt-1">{result.error}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 pt-4 border-t border-zinc-800">
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 text-zinc-400 hover:text-white transition-colors text-sm"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={!validation?.valid || isLoading || result?.success}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors text-sm"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <Upload size={16} />
+                Importar
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * Main CommandPanel component
  */
 export const CommandPanel: React.FC = () => {
@@ -367,6 +649,17 @@ export const CommandPanel: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCommand, setEditingCommand] = useState<CustomCommand | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Import/Export hook
+  const handleImportCommands = useCallback((newCommands: Omit<CustomCommand, 'id' | 'usageCount'>[]) => {
+    newCommands.forEach(cmd => addCommand(cmd));
+  }, [addCommand]);
+
+  const { exportCommands, importCommands, validateImport, parseFile } = useCommandsExport(
+    commands,
+    handleImportCommands
+  );
 
   const handleAddCommand = useCallback((data: CommandFormData) => {
     addCommand({
@@ -438,13 +731,37 @@ export const CommandPanel: React.FC = () => {
         </div>
         
         {!showForm && !editingCommand && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
-          >
-            <Plus size={16} />
-            Nuevo Comando
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export Button */}
+            <button
+              onClick={exportCommands}
+              disabled={commands.length === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-300 rounded-lg transition-colors text-sm"
+              title="Exportar comandos"
+            >
+              <Download size={16} />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
+            
+            {/* Import Button */}
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors text-sm"
+              title="Importar comandos"
+            >
+              <Upload size={16} />
+              <span className="hidden sm:inline">Importar</span>
+            </button>
+            
+            {/* New Command Button */}
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
+            >
+              <Plus size={16} />
+              Nuevo Comando
+            </button>
+          </div>
         )}
       </div>
 
@@ -554,6 +871,16 @@ export const CommandPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={importCommands}
+        validateImport={validateImport}
+        parseFile={parseFile}
+        existingCommandCount={commands.length}
+      />
     </div>
   );
 };

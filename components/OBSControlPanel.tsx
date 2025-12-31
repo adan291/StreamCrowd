@@ -31,7 +31,16 @@ import {
   Edit2,
   Command,
   GripVertical,
+  Layers,
+  HelpCircle,
+  Activity,
 } from 'lucide-react';
+import { OverlayURLGenerator } from './OverlayURLGenerator';
+import { OBSAutoDiscovery } from './OBSAutoDiscovery';
+import { OBSConnectionWizard } from './OBSConnectionWizard';
+import { OBSDiagnosticTool } from './OBSDiagnosticTool';
+import { ScenePresetsPanel } from './ScenePresetsPanel';
+import type { OBSInstance } from '../src/application/services/OBSDiscoveryService';
 import { useOBS, MAX_FAVORITE_SCENES } from '../src/application/hooks/useOBS';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
 import type { SceneAutomation, AutomationTrigger, QuickCommand, QuickCommandAction } from '../src/application/services/OBSService';
@@ -552,6 +561,10 @@ const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
   brb_end: '👋 Fin BRB',
   stream_start: '🔴 Inicio de stream',
   stream_end: '⏹️ Fin de stream',
+  prediction_start: '🔮 Inicio de predicción',
+  prediction_lock: '🔒 Predicción bloqueada',
+  prediction_resolve: '✅ Predicción resuelta',
+  reward_redeemed: '🎁 Recompensa canjeada',
   custom: '⚡ Personalizado',
 };
 
@@ -704,10 +717,16 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
   const [showPresets, setShowPresets] = useState(false);
   const [showPresetConfigModal, setShowPresetConfigModal] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<AutomationPreset | null>(null);
-  const [activeTab, setActiveTab] = useState<'scenes' | 'automations' | 'stream' | 'quick'>('scenes');
+  const [activeTab, setActiveTab] = useState<'scenes' | 'automations' | 'stream' | 'quick' | 'overlays' | 'presets'>('scenes');
   const [showFavoritesModal, setShowFavoritesModal] = useState(false);
   const [showQuickCommandModal, setShowQuickCommandModal] = useState(false);
   const [editingQuickCommand, setEditingQuickCommand] = useState<QuickCommand | undefined>(undefined);
+  const [showManualConnect, setShowManualConnect] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
+  
+  // Check if this is first visit (no saved connection)
+  const isFirstVisit = !savedConnection;
   const [executingCommandId, setExecutingCommandId] = useState<string | null>(null);
   
   // BRB state
@@ -750,6 +769,36 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
     } catch {
       // Error is handled by the hook
     }
+  };
+
+  // Handler for auto-discovery instance selection
+  const handleAutoDiscoverySelect = async (instance: OBSInstance) => {
+    setHost(instance.host);
+    setPort(String(instance.port));
+    
+    // If no password required, connect directly
+    if (!instance.requiresPassword) {
+      try {
+        await connect(undefined, instance.host, instance.port);
+        saveConnectionSettings(false);
+      } catch {
+        // Error is handled by the hook
+      }
+    } else {
+      // Show manual form for password entry
+      setShowManualConnect(true);
+    }
+  };
+
+  // Handler for wizard completion
+  const handleWizardComplete = async (wizardHost: string, wizardPort: number, wizardPassword?: string) => {
+    setHost(wizardHost);
+    setPort(String(wizardPort));
+    if (wizardPassword) setPassword(wizardPassword);
+    
+    await connect(wizardPassword, wizardHost, wizardPort);
+    saveConnectionSettings(!!wizardPassword);
+    setShowWizard(false);
   };
 
   const handleDisconnect = async () => {
@@ -1045,105 +1094,169 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
       {/* Connection Form */}
       {!isConnected && (
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-          {savedConnection && (
-            <div className="mb-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 p-2 rounded-lg">
-              <Check size={14} />
-              Configuración guardada cargada
-            </div>
-          )}
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Host</label>
-                <input
-                  type="text"
-                  value={host}
-                  onChange={(e) => setHost(e.target.value)}
-                  placeholder="localhost"
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Puerto</label>
-                <input
-                  type="text"
-                  value={port}
-                  onChange={(e) => setPort(e.target.value)}
-                  placeholder="4455"
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-xs text-zinc-500 mb-1 block">Contraseña (opcional)</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-            
-            {/* Remember settings checkbox */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberPassword}
-                  onChange={(e) => setRememberPassword(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
-                />
-                <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Recordar configuración
-                </span>
-              </label>
-              {savedConnection && (
-                <button
-                  type="button"
-                  onClick={clearSavedConnection}
-                  className="text-xs text-red-500 hover:text-red-600 hover:underline"
-                >
-                  Olvidar
-                </button>
-              )}
-            </div>
-            
-            {error && (
-              <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-500/10 p-2 rounded-lg">
-                <AlertCircle size={14} />
-                {error}
-              </div>
-            )}
-            
+          {/* Wizard button for first-time users */}
+          {isFirstVisit && !showManualConnect && (
             <button
-              onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              onClick={() => setShowWizard(true)}
+              className="w-full mb-3 py-2 px-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border border-purple-300 dark:border-purple-500/30 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm text-purple-600 dark:text-purple-400"
             >
-              {isConnecting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Conectando...
-                </>
-              ) : (
-                <>
-                  <Wifi size={16} />
-                  Conectar a OBS
-                </>
-              )}
+              <HelpCircle size={16} />
+              Asistente de configuración guiada
             </button>
-          </div>
+          )}
+          
+          {/* Auto-Discovery Mode */}
+          {!showManualConnect && !savedConnection && (
+            <OBSAutoDiscovery
+              onInstanceSelect={handleAutoDiscoverySelect}
+              onManualConnect={() => setShowManualConnect(true)}
+              isConnecting={isConnecting}
+            />
+          )}
+
+          {/* Manual Connection Form */}
+          {(showManualConnect || savedConnection) && (
+            <>
+              {savedConnection && !showManualConnect && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-500/10 p-2 rounded-lg">
+                  <Check size={14} />
+                  Configuración guardada cargada
+                </div>
+              )}
+              
+              {showManualConnect && !savedConnection && (
+                <div className="mb-3 flex items-center justify-between">
+                  <button
+                    onClick={() => setShowManualConnect(false)}
+                    className="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-600"
+                  >
+                    <ArrowLeft size={12} />
+                    Volver a auto-detección
+                  </button>
+                  <button
+                    onClick={() => setShowWizard(true)}
+                    className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                  >
+                    <HelpCircle size={12} />
+                    Asistente
+                  </button>
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Host</label>
+                    <input
+                      type="text"
+                      value={host}
+                      onChange={(e) => setHost(e.target.value)}
+                      placeholder="localhost"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Puerto</label>
+                    <input
+                      type="text"
+                      value={port}
+                      onChange={(e) => setPort(e.target.value)}
+                      placeholder="4455"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Contraseña (opcional)</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Remember settings checkbox */}
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberPassword}
+                      onChange={(e) => setRememberPassword(e.target.checked)}
+                      className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+                    />
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                      Recordar configuración
+                    </span>
+                  </label>
+                  {savedConnection && (
+                    <button
+                      type="button"
+                      onClick={clearSavedConnection}
+                      className="text-xs text-red-500 hover:text-red-600 hover:underline"
+                    >
+                      Olvidar
+                    </button>
+                  )}
+                </div>
+                
+                {error && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-500/10 p-2 rounded-lg">
+                      <AlertCircle size={14} />
+                      {error}
+                    </div>
+                    <button
+                      onClick={() => setShowDiagnostic(!showDiagnostic)}
+                      className="w-full py-1.5 text-xs bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Activity size={12} />
+                      {showDiagnostic ? 'Ocultar diagnóstico' : 'Diagnosticar problema'}
+                    </button>
+                    {showDiagnostic && (
+                      <div className="mt-2 p-3 border border-zinc-200 dark:border-zinc-700 rounded-lg">
+                        <OBSDiagnosticTool
+                          host={host}
+                          port={parseInt(port)}
+                          password={password || undefined}
+                          onNotification={showNotification}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <button
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                  className="w-full py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-400 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {isConnecting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    <>
+                      <Wifi size={16} />
+                      Conectar a OBS
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1151,19 +1264,21 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
       {isConnected && (
         <>
           {/* Tabs */}
-          <div className="flex border-b border-zinc-200 dark:border-zinc-800">
-            {(['quick', 'scenes', 'automations', 'stream'] as const).map((tab) => (
+          <div className="flex border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto">
+            {(['quick', 'scenes', 'overlays', 'presets', 'automations', 'stream'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                className={`flex-1 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
                   activeTab === tab
                     ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-500'
                     : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                 }`}
               >
-                {tab === 'quick' && '⚡ Rápido'}
+                {tab === 'quick' && '⚡'}
                 {tab === 'scenes' && 'Escenas'}
+                {tab === 'overlays' && 'URLs'}
+                {tab === 'presets' && 'Presets'}
                 {tab === 'automations' && 'Auto'}
                 {tab === 'stream' && 'Stream'}
               </button>
@@ -1524,6 +1639,20 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
             </div>
           )}
 
+          {/* Overlays Tab - URLs para OBS Browser Source */}
+          {activeTab === 'overlays' && (
+            <div className="p-4 max-h-96 overflow-y-auto">
+              <OverlayURLGenerator onNotification={showNotification} />
+            </div>
+          )}
+
+          {/* Presets Tab - Configuraciones recomendadas de escenas */}
+          {activeTab === 'presets' && (
+            <div className="p-4 max-h-96 overflow-y-auto">
+              <ScenePresetsPanel onNotification={showNotification} />
+            </div>
+          )}
+
           {/* Automations Tab */}
           {activeTab === 'automations' && (
             <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
@@ -1816,6 +1945,18 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
             setShowPresetConfigModal(false);
             setSelectedPreset(null);
           }}
+        />
+      )}
+
+      {/* Connection Wizard Modal */}
+      {showWizard && (
+        <OBSConnectionWizard
+          onComplete={handleWizardComplete}
+          onSkip={() => {
+            setShowWizard(false);
+            setShowManualConnect(true);
+          }}
+          onClose={() => setShowWizard(false)}
         />
       )}
     </div>

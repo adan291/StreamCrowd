@@ -17,39 +17,59 @@ import {
   LogIn,
   Trash2,
   Settings,
-  Megaphone
+  Megaphone,
+  RefreshCw,
+  TrendingUp,
+  Gift
 } from 'lucide-react';
 import { useAuth, AuthCapabilities, AuthMode } from '../src/application/hooks/useAuth';
+import { openTwitchOAuthPopup } from '../src/infrastructure/auth/TwitchOAuth';
+import { getTwitchService } from '../src/application/services/TwitchService';
 
 interface CapabilityItemProps {
   name: string;
   icon: React.ReactNode;
   enabled: boolean;
   description: string;
+  onRequestAuth?: () => void;
 }
 
-const CapabilityItem: React.FC<CapabilityItemProps> = ({ name, icon, enabled, description }) => (
-  <div 
-    className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-      enabled 
-        ? 'bg-green-50 dark:bg-green-500/10' 
-        : 'bg-zinc-100 dark:bg-zinc-800/50 opacity-60'
-    }`}
-    title={description}
-  >
-    <div className={`${enabled ? 'text-green-500' : 'text-zinc-400'}`}>
-      {icon}
+const CapabilityItem: React.FC<CapabilityItemProps> = ({ name, icon, enabled, description, onRequestAuth }) => {
+  const isClickable = !enabled && onRequestAuth;
+  
+  const content = (
+    <div 
+      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+        enabled 
+          ? 'bg-green-50 dark:bg-green-500/10' 
+          : isClickable
+            ? 'bg-zinc-100 dark:bg-zinc-800/50 opacity-80 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:opacity-100'
+            : 'bg-zinc-100 dark:bg-zinc-800/50 opacity-60'
+      }`}
+      title={enabled ? description : `${description} - Click para activar`}
+      onClick={isClickable ? onRequestAuth : undefined}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') onRequestAuth?.(); } : undefined}
+    >
+      <div className={`${enabled ? 'text-green-500' : isClickable ? 'text-blue-400' : 'text-zinc-400'}`}>
+        {icon}
+      </div>
+      <span className={`text-xs flex-1 ${enabled ? 'text-green-700 dark:text-green-300' : isClickable ? 'text-blue-600 dark:text-blue-300' : 'text-zinc-500'}`}>
+        {name}
+      </span>
+      {enabled ? (
+        <Check size={12} className="text-green-500" />
+      ) : isClickable ? (
+        <RefreshCw size={12} className="text-blue-400" />
+      ) : (
+        <X size={12} className="text-zinc-400" />
+      )}
     </div>
-    <span className={`text-xs flex-1 ${enabled ? 'text-green-700 dark:text-green-300' : 'text-zinc-500'}`}>
-      {name}
-    </span>
-    {enabled ? (
-      <Check size={12} className="text-green-500" />
-    ) : (
-      <X size={12} className="text-zinc-400" />
-    )}
-  </div>
-);
+  );
+  
+  return content;
+};
 
 const getModeLabel = (mode: AuthMode): { label: string; color: string; icon: React.ReactNode } => {
   switch (mode) {
@@ -91,11 +111,54 @@ export const AuthCapabilitiesIndicator: React.FC<AuthCapabilitiesIndicatorProps>
   compact = false,
   className = '' 
 }) => {
-  const { mode, capabilities, isAuthenticated, authState } = useAuth();
+  const { mode, capabilities, isAuthenticated, authState, setOAuthAuth } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isReauthenticating, setIsReauthenticating] = useState(false);
   
   const modeInfo = getModeLabel(mode);
   const capCount = getCapabilityCount(capabilities);
+
+  // Handler for re-authentication
+  const handleRequestAuth = async () => {
+    if (isReauthenticating) return;
+    
+    setIsReauthenticating(true);
+    try {
+      const result = await openTwitchOAuthPopup();
+      
+      // Update AuthService with new OAuth data
+      setOAuthAuth({
+        token: result.accessToken,
+        userId: result.userId,
+        channelName: result.username,
+        scopes: result.scopes,
+        expiresIn: result.expiresIn,
+      });
+      
+      // Also update the TwitchService connection with the new token
+      // This ensures the chat connection uses the new credentials
+      const twitchService = getTwitchService();
+      const currentChannel = authState.channelName || result.username;
+      
+      // Reconnect with new token to update the connection
+      if (currentChannel) {
+        twitchService.connect({
+          channel: currentChannel,
+          token: result.accessToken,
+        });
+      }
+    } catch (err: unknown) {
+      // User cancelled popup - this is expected behavior, don't log as warning
+      const error = err as { error?: string };
+      if (error?.error !== 'popup_closed') {
+        // Only log unexpected errors
+        console.error('OAuth re-auth error:', err);
+      }
+      // Silently ignore popup_closed - user just closed the window
+    } finally {
+      setIsReauthenticating(false);
+    }
+  };
 
   // Compact version - just a badge
   if (compact) {
@@ -164,74 +227,123 @@ export const AuthCapabilitiesIndicator: React.FC<AuthCapabilitiesIndicatorProps>
               icon={<MessageSquare size={14} />}
               enabled={capabilities.canReadChat}
               description="Leer mensajes del chat"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Enviar chat"
               icon={<MessageSquare size={14} />}
               enabled={capabilities.canSendChat}
               description="Enviar mensajes al chat (chat:edit)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="API Twitch"
               icon={<Shield size={14} />}
               enabled={capabilities.canAccessAPI}
               description="Acceso a la API de Twitch"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Chatters"
               icon={<Users size={14} />}
               enabled={capabilities.canReadChatters}
               description="Ver lista de usuarios en chat (moderator:read:chatters)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Suscriptores"
               icon={<Star size={14} />}
               enabled={capabilities.canReadSubscribers}
               description="Ver lista de suscriptores (channel:read:subscriptions)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="VIPs"
               icon={<Crown size={14} />}
               enabled={capabilities.canReadVIPs}
               description="Ver lista de VIPs (channel:read:vips)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Gestionar VIPs"
               icon={<Crown size={14} />}
               enabled={capabilities.canManageVIPs}
               description="Añadir/quitar VIPs (channel:manage:vips)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Ban/Timeout"
               icon={<Ban size={14} />}
               enabled={capabilities.canModerate}
               description="Banear/timeout usuarios (moderator:manage:banned_users)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Borrar mensajes"
               icon={<Trash2 size={14} />}
               enabled={capabilities.canDeleteMessages}
               description="Borrar mensajes del chat (moderator:manage:chat_messages)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Config chat"
               icon={<Settings size={14} />}
               enabled={capabilities.canManageChatSettings}
               description="Modo lento, solo subs, etc. (moderator:manage:chat_settings)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Anuncios"
               icon={<Megaphone size={14} />}
               enabled={capabilities.canSendAnnouncements}
               description="Enviar anuncios al chat (moderator:manage:announcements)"
+              onRequestAuth={handleRequestAuth}
             />
             <CapabilityItem
               name="Bits"
               icon={<Coins size={14} />}
               enabled={capabilities.canReadBits}
               description="Ver leaderboard de bits (bits:read)"
+              onRequestAuth={handleRequestAuth}
+            />
+            <CapabilityItem
+              name="Predicciones"
+              icon={<TrendingUp size={14} />}
+              enabled={capabilities.canManagePredictions}
+              description="Crear y gestionar predicciones (channel:manage:predictions)"
+              onRequestAuth={handleRequestAuth}
+            />
+            <CapabilityItem
+              name="Channel Points"
+              icon={<Gift size={14} />}
+              enabled={capabilities.canManageRedemptions}
+              description="Gestionar recompensas y canjes (channel:manage:redemptions)"
+              onRequestAuth={handleRequestAuth}
             />
           </div>
+
+          {/* Re-auth button when authenticated but missing scopes */}
+          {isAuthenticated && capCount.enabled < capCount.total && (
+            <button
+              onClick={handleRequestAuth}
+              disabled={isReauthenticating}
+              className="w-full mt-2 p-2 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+            >
+              <p className="text-[10px] text-blue-700 dark:text-blue-300 flex items-center justify-center gap-1">
+                {isReauthenticating ? (
+                  <>
+                    <RefreshCw size={12} className="animate-spin" />
+                    Re-autenticando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={12} />
+                    Re-autenticar para activar permisos faltantes
+                  </>
+                )}
+              </p>
+            </button>
+          )}
 
           {/* Help text */}
           {!isAuthenticated && (

@@ -1,4 +1,94 @@
 
+// ============================================
+// NAVIGATION TYPES (Sidebar Dynamics Grouping)
+// ============================================
+
+/**
+ * Main sidebar tab options
+ * @requirements 1.1 - Plataformas tab in sidebar
+ */
+export type LeftTab = 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | 'data' | 'macros';
+
+/**
+ * Sub-views within the Dynamics section
+ */
+export type DynamicsView = 'selector' | 'poll' | 'judge' | 'giveaway' | 'countdown';
+
+// ============================================
+// PLATFORMS NAVIGATION TYPES
+// ============================================
+
+/**
+ * Sub-views within the Platforms section
+ * 'selector' - Shows available platforms (Twitch, YouTube, etc.)
+ * 'twitch' - Shows Twitch-specific tools
+ * Expandable for future platforms: 'youtube', 'kick', etc.
+ * 
+ * @requirements 6.3 - Navigation state supports platform and tool selection independently
+ */
+export type PlatformsView = 'selector' | 'twitch';
+
+/**
+ * Tool selection within a platform
+ * 'none' - No tool selected (showing tool selector)
+ * 'commands' - Custom chat commands panel
+ * 'predictions' - Twitch predictions (coming soon)
+ * 'channelpoints' - Channel points rewards (coming soon)
+ * 
+ * @requirements 6.3 - Navigation state supports platform and tool selection independently
+ */
+export type PlatformsTool = 'none' | 'commands' | 'predictions' | 'channelpoints' | 'timers';
+
+/**
+ * Configuration for each activity card in the ActivitySelector
+ */
+export interface ActivityConfig {
+  id: Exclude<DynamicsView, 'selector'>;
+  icon: string;
+  title: string;
+  description: string;
+  color: string;
+}
+
+/**
+ * Activity configurations for the Dynamics section
+ * Used by ActivitySelector to render activity cards
+ */
+export const ACTIVITIES: ActivityConfig[] = [
+  {
+    id: 'poll',
+    icon: 'Vote',
+    title: 'Encuesta',
+    description: 'Crea votaciones interactivas para tu audiencia',
+    color: '#a970ff', // Twitch purple
+  },
+  {
+    id: 'judge',
+    icon: 'Trophy',
+    title: 'Jurado',
+    description: 'Panel de puntuación en vivo',
+    color: '#fbbf24', // Amber
+  },
+  {
+    id: 'giveaway',
+    icon: 'Gift',
+    title: 'Sorteos',
+    description: 'Sorteos y giveaways para tu comunidad',
+    color: '#f472b6', // Pink
+  },
+  {
+    id: 'countdown',
+    icon: 'Timer',
+    title: 'Countdown',
+    description: 'Temporizador con cuenta atrás para eventos',
+    color: '#3b82f6', // Blue
+  },
+];
+
+// ============================================
+// POLL TYPES
+// ============================================
+
 export interface PollOption {
   id: number;
   label: string;

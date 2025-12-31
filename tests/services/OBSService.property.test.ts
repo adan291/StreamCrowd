@@ -27,7 +27,11 @@ const automationTriggerArb: fc.Arbitrary<AutomationTrigger> = fc.constantFrom(
   'brb_start',
   'brb_end',
   'stream_start',
-  'stream_end'
+  'stream_end',
+  'prediction_start',
+  'prediction_lock',
+  'prediction_resolve',
+  'reward_redeemed'
 );
 
 const sceneNameArb = fc.constantFrom('Main', 'Game', 'BRB', 'Starting', 'Ending');

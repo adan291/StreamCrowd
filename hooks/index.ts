@@ -29,6 +29,95 @@ export type { default as UseViewerCountReturn } from './useViewerCount';
 
 export { useOverlayMode, OVERLAY_BG_COLORS } from './useOverlayMode';
 
+export { useHistoryManager } from './useHistoryManager';
+export type { UseHistoryManagerReturn } from './useHistoryManager';
+
+export { useHistoryRecorder } from './useHistoryRecorder';
+export type { 
+  UseHistoryRecorderReturn,
+  RecordPollParams,
+  RecordPredictionParams,
+  RecordGiveawayParams,
+  RecordCommandParams,
+  RecordTimerParams,
+} from './useHistoryRecorder';
+
+export { useOnboarding } from './useOnboarding';
+export type { UseOnboardingOptions } from './useOnboarding';
+
+export { useBackupService } from './useBackupService';
+export type { UseBackupServiceReturn } from './useBackupService';
+
+export { useAutoBackup } from './useAutoBackup';
+export type { UseAutoBackupOptions, UseAutoBackupReturn } from './useAutoBackup';
+
+export { usePlatformAdapter } from './usePlatformAdapter';
+export type { UsePlatformAdapterReturn } from './usePlatformAdapter';
+
+// ==================== Offline Mode Hooks ====================
+export { useOfflineStatus } from './useOfflineStatus';
+export type { UseOfflineStatusOptions, UseOfflineStatusReturn } from './useOfflineStatus';
+
+export { useIndexedDB } from './useIndexedDB';
+export type { UseIndexedDBOptions, UseIndexedDBReturn, AsyncState } from './useIndexedDB';
+
+export { useSyncQueue } from './useSyncQueue';
+export type { UseSyncQueueOptions, UseSyncQueueReturn } from './useSyncQueue';
+
+// ==================== Push Notifications Hooks ====================
+export { useNotifications } from './useNotifications';
+export type { 
+  UseNotificationsOptions, 
+  UseNotificationsReturn,
+  CreateNotificationParams,
+} from './useNotifications';
+
+export { useNotificationConfig } from './useNotificationConfig';
+export type { 
+  UseNotificationConfigOptions, 
+  UseNotificationConfigReturn,
+} from './useNotificationConfig';
+
+export { useNotificationHistory } from './useNotificationHistory';
+export type { 
+  UseNotificationHistoryOptions, 
+  UseNotificationHistoryReturn,
+  NotificationHistoryFilters,
+} from './useNotificationHistory';
+
+export { useStreamNotifications } from './useStreamNotifications';
+export type { 
+  UseStreamNotificationsOptions, 
+  UseStreamNotificationsReturn,
+} from './useStreamNotifications';
+
+// ==================== Macro System Hooks ====================
+export { useMacros } from './useMacros';
+export type { 
+  UseMacrosOptions, 
+  UseMacrosReturn,
+} from './useMacros';
+
+export { useMacroEditor } from './useMacroEditor';
+export type { 
+  UseMacroEditorOptions, 
+  UseMacroEditorReturn,
+  ValidationError,
+  ValidationResult,
+} from './useMacroEditor';
+
+export { useMacroExecution } from './useMacroExecution';
+export type { 
+  UseMacroExecutionOptions, 
+  UseMacroExecutionReturn,
+} from './useMacroExecution';
+
+export { useVariables } from './useVariables';
+export type { 
+  UseVariablesOptions, 
+  UseVariablesReturn,
+} from './useVariables';
+
 // ==================== Re-exports from Application Layer ====================
 // These provide backward compatibility with the legacy hook names
 

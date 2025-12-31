@@ -54,6 +54,10 @@ export interface AuthCapabilities {
   canManageChatSettings: boolean;
   /** Can send announcements */
   canSendAnnouncements: boolean;
+  /** Can manage predictions (create, lock, resolve, cancel) */
+  canManagePredictions: boolean;
+  /** Can manage channel point redemptions */
+  canManageRedemptions: boolean;
 }
 
 // Required scopes for each capability
@@ -68,6 +72,8 @@ const SCOPE_REQUIREMENTS: Record<keyof Omit<AuthCapabilities, 'canReadChat' | 'c
   canDeleteMessages: ['moderator:manage:chat_messages'],
   canManageChatSettings: ['moderator:manage:chat_settings'],
   canSendAnnouncements: ['moderator:manage:announcements'],
+  canManagePredictions: ['channel:manage:predictions'],
+  canManageRedemptions: ['channel:manage:redemptions'],
 };
 
 const DEFAULT_AUTH_STATE: AuthState = {
@@ -159,6 +165,8 @@ class AuthServiceImpl {
         canDeleteMessages: false,
         canManageChatSettings: false,
         canSendAnnouncements: false,
+        canManagePredictions: false,
+        canManageRedemptions: false,
       };
     }
 
@@ -177,6 +185,8 @@ class AuthServiceImpl {
         canDeleteMessages: false,
         canManageChatSettings: false,
         canSendAnnouncements: false,
+        canManagePredictions: false,
+        canManageRedemptions: false,
       };
     }
 
@@ -197,6 +207,8 @@ class AuthServiceImpl {
       canDeleteMessages: isValid && hasScope(SCOPE_REQUIREMENTS.canDeleteMessages),
       canManageChatSettings: isValid && hasScope(SCOPE_REQUIREMENTS.canManageChatSettings),
       canSendAnnouncements: isValid && hasScope(SCOPE_REQUIREMENTS.canSendAnnouncements),
+      canManagePredictions: isValid && hasScope(SCOPE_REQUIREMENTS.canManagePredictions),
+      canManageRedemptions: isValid && hasScope(SCOPE_REQUIREMENTS.canManageRedemptions),
     };
   }
 

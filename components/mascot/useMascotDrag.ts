@@ -100,13 +100,19 @@ export const useMascotDrag = ({
     }
   }, []);
 
-  // Update quadrant when position changes
+  // Update quadrant when position changes - use ref to avoid infinite loop
+  const lastQuadrantRef = useRef<string>('');
   useEffect(() => {
     if (containerRef.current && position.x !== -1) {
       const rect = containerRef.current.getBoundingClientRect();
-      setScreenQuadrant(getScreenQuadrant(position.x, position.y, rect.width, rect.height));
+      const newQuadrant = getScreenQuadrant(position.x, position.y, rect.width, rect.height);
+      // Only update if quadrant actually changed
+      if (newQuadrant !== lastQuadrantRef.current) {
+        lastQuadrantRef.current = newQuadrant;
+        setScreenQuadrant(newQuadrant);
+      }
     }
-  }, [position]);
+  }, [position.x, position.y]);
 
   // Handle window resize - keep mascot in bounds
   useEffect(() => {

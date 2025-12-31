@@ -1,49 +1,133 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  fullWidth?: boolean;
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
+  fullWidth?: boolean;
+  loading?: boolean;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   /** Accessible label for icon-only buttons */
   'aria-label'?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  fullWidth = false, 
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
+  children,
+  variant = 'primary',
   size = 'md',
-  className = '', 
+  fullWidth = false,
+  loading = false,
+  leftIcon,
+  rightIcon,
+  className = '',
   disabled,
   'aria-label': ariaLabel,
-  ...props 
-}) => {
-  const baseStyles = "rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95";
-  
+  type = 'button',
+  ...props
+}, ref) => {
+  const isDisabled = disabled || loading;
+
+  const baseStyles = `
+    inline-flex items-center justify-center gap-2
+    font-medium rounded-lg
+    transition-all duration-150 ease-in-out
+    focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
+    disabled:opacity-50 disabled:cursor-not-allowed
+    active:scale-[0.98]
+  `.trim().replace(/\s+/g, ' ');
+
   const sizeStyles = {
-    sm: "px-2 sm:px-3 py-1.5 text-xs sm:text-sm",
-    md: "px-3 sm:px-4 py-2 text-sm sm:text-base",
-    lg: "px-4 sm:px-6 py-2.5 sm:py-3 text-base sm:text-lg"
-  };
-  
-  const variants = {
-    primary: "bg-twitch-brand hover:bg-twitch-light text-white shadow-[0_0_15px_rgba(169,112,255,0.3)] hover:shadow-[0_0_25px_rgba(169,112,255,0.5)]",
-    secondary: "bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white border border-zinc-300 dark:border-zinc-700",
-    danger: "bg-red-600 hover:bg-red-500 text-white",
-    ghost: "bg-transparent hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+    sm: 'h-8 px-3 text-sm min-w-[44px]',
+    md: 'h-10 px-4 text-sm min-w-[44px]',
+    lg: 'h-12 px-6 text-base min-w-[44px]',
   };
 
-  const widthStyle = fullWidth ? "w-full" : "";
+  const variantStyles = {
+    primary: `
+      bg-[#9146ff] text-white
+      hover:bg-[#772ce8]
+      focus-visible:ring-[#9146ff]
+      shadow-sm hover:shadow-md
+    `,
+    secondary: `
+      bg-gray-800 text-gray-100
+      hover:bg-gray-700
+      focus-visible:ring-gray-500
+      border border-gray-700
+    `,
+    danger: `
+      bg-red-600 text-white
+      hover:bg-red-700
+      focus-visible:ring-red-500
+    `,
+    ghost: `
+      bg-transparent text-gray-300
+      hover:bg-gray-800 hover:text-white
+      focus-visible:ring-gray-500
+    `,
+    outline: `
+      bg-transparent text-[#a970ff]
+      border border-[#9146ff]
+      hover:bg-[#9146ff]/10
+      focus-visible:ring-[#9146ff]
+    `,
+  };
+
+  const widthStyle = fullWidth ? 'w-full' : '';
 
   return (
-    <button 
-      className={`${baseStyles} ${sizeStyles[size]} ${variants[variant]} ${widthStyle} ${className}`}
-      disabled={disabled}
+    <button
+      ref={ref}
+      type={type}
+      className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${widthStyle} ${className}`.trim().replace(/\s+/g, ' ')}
+      disabled={isDisabled}
       aria-label={ariaLabel}
-      aria-disabled={disabled}
+      aria-disabled={isDisabled}
+      aria-busy={loading}
       {...props}
     >
-      {children}
+      {loading ? (
+        <Spinner size={size as 'sm' | 'md' | 'lg'} />
+      ) : (
+        <>
+          {leftIcon && <span className="btn-icon-left">{leftIcon}</span>}
+          {children}
+          {rightIcon && <span className="btn-icon-right">{rightIcon}</span>}
+        </>
+      )}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
+
+// Inline Spinner component for loading state
+function Spinner({ size }: { size: 'sm' | 'md' | 'lg' }) {
+  const sizeMap = { sm: 'w-4 h-4', md: 'w-5 h-5', lg: 'w-6 h-6' };
+  
+  return (
+    <svg
+      className={`animate-spin ${sizeMap[size]}`}
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+export default Button;

@@ -647,7 +647,10 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
               <span className="text-sm text-white font-medium">Obtener emotes del canal</span>
             </div>
             <div className="flex gap-2">
+              <label htmlFor="carrera-channel-name" className="sr-only">Nombre del canal de Twitch</label>
               <input
+                id="carrera-channel-name"
+                name="channelName"
                 type="text"
                 value={channelName}
                 onChange={(e) => setChannelName(e.target.value)}
@@ -728,14 +731,20 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
 
           {/* Añadir corredor */}
           <div className="flex gap-2">
+            <label htmlFor="carrera-new-emote" className="sr-only">Emote del corredor</label>
             <input
+              id="carrera-new-emote"
+              name="newEmote"
               type="text"
               value={newEmote}
               onChange={(e) => setNewEmote(e.target.value)}
               placeholder="Emote 🎮"
               className="w-20 px-2 py-2 bg-zinc-700 rounded-lg text-white text-center text-xl"
             />
+            <label htmlFor="carrera-new-name" className="sr-only">Nombre del corredor</label>
             <input
+              id="carrera-new-name"
+              name="newName"
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -749,8 +758,10 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
 
           {/* Tiempo de apuestas */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-zinc-400">Tiempo para apostar:</span>
+            <label htmlFor="carrera-betting-time" className="text-sm text-zinc-400">Tiempo para apostar:</label>
             <select
+              id="carrera-betting-time"
+              name="bettingTime"
               value={bettingTime}
               onChange={(e) => setBettingTime(parseInt(e.target.value))}
               className="px-2 py-1 bg-zinc-700 rounded text-white"

@@ -82,6 +82,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const [countdownNumber, setCountdownNumber] = useState<number | null>(null);
   const [showTimeUpAnimation, setShowTimeUpAnimation] = useState(false);
   
+  // Store final poll state when poll ends (to preserve votes for winner display)
+  const [finalPollState, setFinalPollState] = useState<Poll | null>(null);
+  const wasActiveRef = React.useRef(poll.isActive);
+  
   // Simulation Mode State
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [simulatedPoll, setSimulatedPoll] = useState<Poll | null>(null);
@@ -228,11 +232,20 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Show winner overlay when poll ends
   // Auto-show winner overlay when poll ends (but user can toggle it manually anytime)
   useEffect(() => {
-      if (!isSimulationMode && !poll.isActive && poll.totalVotes > 0) {
+      // Detect poll end: was active, now inactive
+      if (wasActiveRef.current && !poll.isActive && poll.totalVotes > 0) {
+          // Save the final state with votes before anything else changes
+          setFinalPollState({ ...poll });
           // Auto-show winner when poll ends
           setShowWinnerOverlay(true);
       }
-  }, [poll.isActive, poll.totalVotes, isSimulationMode]);
+      // Reset final state when a new poll starts
+      if (!wasActiveRef.current && poll.isActive) {
+          setFinalPollState(null);
+          setShowWinnerOverlay(false);
+      }
+      wasActiveRef.current = poll.isActive;
+  }, [poll.isActive, poll.totalVotes, poll]);
 
   useEffect(() => {
       if (isEditing) {
@@ -274,9 +287,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
   const progressBarColor = displayPoll.progressBarColor || (progressPercent >= 100 ? '#ef4444' : progressPercent >= 90 ? '#eab308' : '#3b82f6');
   const limitIndicatorColor = displayPoll.limitIndicatorColor || (isAtLimit ? '#ef4444' : '#eab308');
 
-  // Find winner - also calculate when showWinnerOverlay is true (for timer end)
-  const winner = ((!displayPoll.isActive || showWinnerOverlay) && displayPoll.totalVotes > 0)
-    ? displayPoll.options.reduce((prev, current) => (prev.votes > current.votes) ? prev : current)
+  // Find winner - use finalPollState if available (preserves votes after poll ends)
+  const pollForWinner = finalPollState || displayPoll;
+  const winner = ((!displayPoll.isActive || showWinnerOverlay) && pollForWinner.totalVotes > 0)
+    ? pollForWinner.options.reduce((prev, current) => (prev.votes > current.votes) ? prev : current)
     : null;
     
   // Calculate weighted totals
@@ -472,7 +486,10 @@ export const LivePoll: React.FC<LivePollProps> = ({
              
              {isEditing && !isOverlay && (
                  <input 
-                    type="text" 
+                    type="text"
+                    id="poll-edit-title"
+                    name="poll-edit-title"
+                    aria-label="Editar título de la encuesta"
                     value={editTitle} 
                     onChange={e => setEditTitle(e.target.value)}
                     className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-0.5 text-xs font-bold text-twitch-brand dark:text-twitch-light uppercase w-32 sm:w-40"
@@ -492,6 +509,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
           {isEditing && !isOverlay ? (
               <input 
                  type="text"
+                 id="poll-edit-question"
+                 name="poll-edit-question"
+                 aria-label="Editar pregunta de la encuesta"
                  value={editQuestion}
                  onChange={e => setEditQuestion(e.target.value)}
                  className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-2 py-1 font-bold text-zinc-900 dark:text-white text-lg md:text-xl mt-1 focus:ring-2 focus:ring-twitch-brand focus:outline-none"
@@ -764,7 +784,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     <p className={`${isOverlay ? 'text-sm sm:text-lg md:text-xl mt-1 sm:mt-2' : 'text-[10px] sm:text-xs md:text-sm mt-1 sm:mt-2'} text-zinc-500 dark:text-zinc-400`}
                       style={isOverlay ? { color: overlayStyles.textColor, opacity: 0.6 } : {}}
                     >
-                      {((winner.votes / displayPoll.totalVotes) * 100).toFixed(1)}% {t.poll.ofTotal || 'del total'}
+                      {((winner.votes / pollForWinner.totalVotes) * 100).toFixed(1)}% {t.poll.ofTotal || 'del total'}
                     </p>
                 </div>
             </div>

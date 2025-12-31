@@ -686,11 +686,13 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
       <div className="bg-zinc-800 rounded-xl p-3">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <label className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
+            <label htmlFor="pium-shot-angle" className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
               <span>Ángulo</span>
               <span className="text-purple-400 font-mono">{shotAngle}°</span>
             </label>
             <input
+              id="pium-shot-angle"
+              name="shotAngle"
               type="range"
               min="0"
               max="360"
@@ -700,11 +702,13 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
             />
           </div>
           <div className="flex-1">
-            <label className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
+            <label htmlFor="pium-shot-power" className="text-xs text-zinc-400 mb-1 flex items-center justify-between">
               <span>Fuerza</span>
               <span className="text-orange-400 font-mono">{shotPower}</span>
             </label>
             <input
+              id="pium-shot-power"
+              name="shotPower"
               type="range"
               min="3"
               max="15"

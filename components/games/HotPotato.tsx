@@ -240,9 +240,11 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
         )}
         
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-zinc-400 text-sm">Tiempo:</span>
+          <label htmlFor="potato-bomb-time" className="text-zinc-400 text-sm">Tiempo:</label>
           <input
             type="number"
+            id="potato-bomb-time"
+            name="potato-bomb-time"
             min="15"
             max="120"
             value={bombTime}

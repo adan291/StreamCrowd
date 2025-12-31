@@ -31,10 +31,9 @@ interface PollCreatorProps {
   onAddCollaborator?: (channel: string) => void;
   onRemoveCollaborator?: (channel: string) => void;
   isConnected?: boolean;
-  onShowCountdown?: () => void;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true, onShowCountdown }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
   const { t } = useI18n();
   const { triggerPollStart } = useOBSTriggers();
   const [title, setTitle] = useState(t.poll.title);
@@ -661,7 +660,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                     </button>
                   </Tooltip>
                   <input 
-                    type="file" 
+                    type="file"
+                    id="template-import-file"
+                    name="template-import-file"
+                    aria-label="Importar plantillas"
                     ref={templateFileInputRef} 
                     accept=".json" 
                     onChange={handleImportTemplates} 
@@ -735,19 +737,16 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               <Tooltip text="Gira la ruleta con las opciones actuales">
                 <button type="button" onClick={() => setShowSpinner(true)} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-pink-500/10 to-purple-500/10 dark:from-pink-500/20 dark:to-purple-500/20 rounded-full text-xs font-medium text-pink-600 dark:text-pink-400 border border-pink-500/30 flex items-center gap-1 shadow-sm hover:from-pink-500/20 hover:to-purple-500/20 transition-colors"><Disc3 size={12} className="text-pink-500"/> {t.poll.spinnerWheel}</button>
               </Tooltip>
-              <Tooltip text="Countdown que suma tiempo con subs y bits">
-                <button type="button" onClick={onShowCountdown} className="whitespace-nowrap px-3 py-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/20 dark:to-blue-500/20 rounded-full text-xs font-medium text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center gap-1 shadow-sm hover:from-cyan-500/20 hover:to-blue-500/20 transition-colors"><Clock size={12} className="text-cyan-500"/> Countdown</button>
-              </Tooltip>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
              <div className="space-y-1 sm:col-span-1">
-                <label className="text-zinc-500 dark:text-zinc-500 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.sectionTitle} <Tooltip text={t.poll.sectionTitleTooltip}/></label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.poll.title} className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand select-text" />
+                <label htmlFor="poll-title" className="text-zinc-500 dark:text-zinc-500 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.sectionTitle} <Tooltip text={t.poll.sectionTitleTooltip}/></label>
+                <input id="poll-title" name="poll-title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.poll.title} className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand select-text" />
             </div>
              <div className="space-y-1 sm:col-span-2">
-                <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.questionLabel} <Tooltip text={t.poll.questionTooltip}/></label>
-                <input type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t.poll.questionPlaceholderFull} className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light shadow-sm select-text" />
+                <label htmlFor="poll-question" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.questionLabel} <Tooltip text={t.poll.questionTooltip}/></label>
+                <input id="poll-question" name="poll-question" type="text" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={t.poll.questionPlaceholderFull} className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light focus:ring-1 focus:ring-twitch-brand dark:focus:ring-twitch-light shadow-sm select-text" />
             </div>
           </div>
 
@@ -772,7 +771,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                     <GripVertical size={14} />
                   </div>
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-sm shadow-sm relative overflow-hidden cursor-pointer hover:scale-105 transition-transform ring-1 ring-black/5 dark:ring-white/5" style={{ backgroundColor: opt.color }} title="Color">
-                     <input type="color" value={opt.color} onChange={(e) => handleColorChange(index, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                     <input type="color" id={`option-color-${index}`} name={`option-color-${index}`} aria-label={`Color de opción ${index + 1}`} value={opt.color} onChange={(e) => handleColorChange(index, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                   </div>
                   <div className="relative w-[42px] h-9 shrink-0">
                      <div className={`w-full h-full bg-white dark:bg-zinc-900 border rounded-lg flex items-center justify-center overflow-hidden relative group/icon transition-all ${opt.image ? 'border-twitch-brand/50' : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-500'}`}>
@@ -780,7 +779,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                            <><img src={opt.image} alt="icon" className="w-full h-full object-cover" /><button type="button" onClick={() => removeImage(index)} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover/icon:opacity-100 transition-opacity"><X size={14} className="text-white" /></button></>
                         ) : (
                            <>
-                              <input type="text" value={opt.icon || ''} onChange={(e) => handleIconChange(index, e.target.value)} className="w-full h-full bg-transparent text-center text-lg text-zinc-900 dark:text-white focus:outline-none z-10 relative font-emoji" placeholder="😀" maxLength={2} />
+                              <input type="text" id={`option-icon-${index}`} name={`option-icon-${index}`} aria-label={`Emoji de opción ${index + 1}`} value={opt.icon || ''} onChange={(e) => handleIconChange(index, e.target.value)} className="w-full h-full bg-transparent text-center text-lg text-zinc-900 dark:text-white focus:outline-none z-10 relative font-emoji" placeholder="😀" maxLength={2} />
                               {!opt.icon && <Smile size={14} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-zinc-300 dark:text-zinc-700 pointer-events-none" />}
                               <div className="absolute bottom-0 right-0 left-0 flex h-full opacity-0 group-hover/icon:opacity-100 transition-opacity z-20 bg-white dark:bg-zinc-900">
                                 <button type="button" onClick={() => fileInputRefs.current[index]?.click()} className="flex-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-twitch-brand flex items-center justify-center border-r border-zinc-100 dark:border-zinc-800" title={t.poll.uploadImage}><Upload size={14} /></button>
@@ -789,10 +788,13 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                            </>
                         )}
                      </div>
-                     <input type="file" accept="image/*" className="hidden" ref={el => fileInputRefs.current[index] = el} onChange={(e) => handleImageUpload(index, e)} />
+                     <input type="file" id={`option-image-${index}`} name={`option-image-${index}`} accept="image/*" className="hidden" ref={el => fileInputRefs.current[index] = el} onChange={(e) => handleImageUpload(index, e)} />
                   </div>
                   <div className="flex-1 flex gap-1.5">
                      <input 
+                        id={`option-label-${index}`}
+                        name={`option-label-${index}`}
+                        aria-label={`Texto de opción ${index + 1}`}
                         type="text" 
                         value={opt.label} 
                         onChange={(e) => handleOptionChange(index, e.target.value)} 
@@ -802,6 +804,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                      <div className="relative w-28">
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-mono pointer-events-none">{votePrefix}</span>
                         <input 
+                           id={`option-votekey-${index}`}
+                           name={`option-votekey-${index}`}
+                           aria-label={`Clave de voto de opción ${index + 1}`}
                            type="text" 
                            value={opt.voteKey || ''} 
                            onChange={(e) => handleVoteKeyChange(index, e.target.value)} 
@@ -852,14 +857,14 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
              <div className="flex flex-col sm:flex-row gap-4 mb-4">
                  <div className="flex-1 grid grid-cols-2 gap-3">
                      <div className="space-y-1">
-                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.goal} <Tooltip text={t.poll.goalTooltip}/></label>
+                       <label htmlFor="poll-max-votes" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.goal} <Tooltip text={t.poll.goalTooltip}/></label>
                        <div className="relative">
                            <Target size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
-                           <input type="number" min="1" value={maxVotes} onChange={(e) => setMaxVotes(e.target.value)} placeholder="∞" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-9 pr-2 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light" />
+                           <input id="poll-max-votes" name="poll-max-votes" type="number" min="1" value={maxVotes} onChange={(e) => setMaxVotes(e.target.value)} placeholder="∞" className="w-full bg-white dark:bg-zinc-900/50 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg pl-9 pr-2 py-2 text-sm focus:outline-none focus:border-twitch-brand dark:focus:border-twitch-light" />
                        </div>
                      </div>
                      <div className="space-y-1">
-                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.timeSec}</label>
+                       <label htmlFor="poll-duration" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold ml-1 uppercase flex items-center">{t.poll.timeSec}</label>
                        <div className="relative">
                             {(duration === '' || duration === '0') ? (
                                 <InfinityIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"/>
@@ -867,6 +872,8 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                                 <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-twitch-brand dark:text-twitch-light"/>
                             )}
                             <input
+                                id="poll-duration"
+                                name="poll-duration"
                                 type="number"
                                 min="0" 
                                 value={duration} 
@@ -881,8 +888,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                  {/* Vote Prefix Config */}
                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                       <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">{t.poll.votePrefix}<Tooltip text={t.poll.votePrefixTooltip}/></label>
+                       <label htmlFor="poll-vote-prefix" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center">{t.poll.votePrefix}<Tooltip text={t.poll.votePrefixTooltip}/></label>
                        <input 
+                         id="poll-vote-prefix"
+                         name="poll-vote-prefix"
                          type="text" 
                          value={votePrefix} 
                          onChange={e => setVotePrefix(e.target.value.slice(0, 3))} 
@@ -1055,6 +1064,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               Pega una lista de opciones, una por línea (máx. {MAX_OPTIONS}):
             </p>
             <textarea
+              id="import-options-text"
+              name="import-options-text"
+              aria-label="Lista de opciones a importar"
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               placeholder={`Opción 1\nOpción 2\nOpción 3\n...`}
@@ -1073,7 +1085,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
         </div>
       )}
 
-      {/* Spinner Wheel Modal */}
+      {/* Spinner Wheel - Widget flotante */}
       {showSpinner && (
         <SpinnerWheel 
           options={options.map((opt, i) => ({
@@ -1094,6 +1106,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           onAddCollaborator={onAddCollaborator}
           onRemoveCollaborator={onRemoveCollaborator}
           isConnected={isConnected}
+          isFloatingWidget={true}
         />
       )}
 

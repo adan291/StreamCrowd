@@ -537,11 +537,14 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
       <div className="p-2 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
         <div className="flex gap-2">
           <input
+            id="chat-message-input"
+            name="chatMessage"
             type="text"
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isConnected && authToken ? "Escribe un mensaje..." : "Conecta con OAuth para chatear"}
+            aria-label={isConnected && authToken ? "Escribe un mensaje en el chat" : "Conecta con OAuth para chatear"}
             disabled={!isConnected || !authToken || sendingMessage}
             className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand disabled:opacity-50 disabled:cursor-not-allowed"
           />

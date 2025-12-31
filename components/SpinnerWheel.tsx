@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PollOption, TwitchMessage, CollaborationChannel } from '../types';
-import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, Settings, UserPlus, Trash2, Download, Upload } from 'lucide-react';
+import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, Settings, UserPlus, Trash2, Download, Upload, GripHorizontal, Minimize2, Maximize2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
@@ -35,6 +35,7 @@ interface SpinnerWheelProps {
   chatMessages?: TwitchMessage[];
   votePrefix?: string;
   isOverlayMode?: boolean;
+  isFloatingWidget?: boolean; // Widget flotante que no bloquea la pantalla
   userVoteMap?: Map<string, number>;
   collaborationChannels?: CollaborationChannel[];
   mainChannel?: string;
@@ -64,6 +65,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   chatMessages = [],
   votePrefix = '+',
   isOverlayMode = false,
+  isFloatingWidget = false,
   userVoteMap = new Map(),
   collaborationChannels = [],
   mainChannel,
@@ -73,6 +75,23 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 }) => {
   const { t } = useI18n();
   useOverlayMode(isOverlayMode); // Clean up body background for OBS
+  
+  // Widget flotante - Estado para drag, minimize y resize
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [widgetPosition, setWidgetPosition] = useState(() => {
+    const saved = localStorage.getItem('spinner_widget_position');
+    return saved ? JSON.parse(saved) : { x: 20, y: 80 };
+  });
+  const [widgetSize, setWidgetSize] = useState(() => {
+    const saved = localStorage.getItem('spinner_widget_size');
+    return saved ? JSON.parse(saved) : { width: 320, height: 480 };
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const resizeStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const widgetRef = useRef<HTMLDivElement>(null);
+  
   const [overlayBgColor, setOverlayBgColor] = useState('transparent');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
   const [overlayWheelSize, setOverlayWheelSize] = useState<'normal' | 'large'>('large');
@@ -326,6 +345,78 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     return () => clearInterval(timer);
   }, [isVotingActive, votingTimeLeft, isOverlayMode]);
 
+  // Widget flotante - Guardar posición y tamaño
+  useEffect(() => {
+    if (isFloatingWidget && !isOverlayMode) {
+      localStorage.setItem('spinner_widget_position', JSON.stringify(widgetPosition));
+    }
+  }, [widgetPosition, isFloatingWidget, isOverlayMode]);
+
+  useEffect(() => {
+    if (isFloatingWidget && !isOverlayMode) {
+      localStorage.setItem('spinner_widget_size', JSON.stringify(widgetSize));
+    }
+  }, [widgetSize, isFloatingWidget, isOverlayMode]);
+
+  // Widget flotante - Drag handlers
+  useEffect(() => {
+    if (!isFloatingWidget || isOverlayMode) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        const newX = Math.max(0, Math.min(window.innerWidth - 100, e.clientX - dragOffset.current.x));
+        const newY = Math.max(0, Math.min(window.innerHeight - 50, e.clientY - dragOffset.current.y));
+        setWidgetPosition({ x: newX, y: newY });
+      }
+      if (isResizing) {
+        e.preventDefault();
+        const deltaX = e.clientX - resizeStart.current.x;
+        const deltaY = e.clientY - resizeStart.current.y;
+        const newWidth = Math.max(280, Math.min(500, resizeStart.current.width + deltaX));
+        const newHeight = Math.max(350, Math.min(650, resizeStart.current.height + deltaY));
+        setWidgetSize({ width: newWidth, height: newHeight });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isDragging || isResizing) {
+      if (isResizing) {
+        document.body.style.cursor = 'se-resize';
+        document.body.style.userSelect = 'none';
+      }
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, isResizing, isFloatingWidget, isOverlayMode]);
+
+  const handleWidgetMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) return;
+    setIsDragging(true);
+    const rect = widgetRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStart.current = { x: e.clientX, y: e.clientY, width: widgetSize.width, height: widgetSize.height };
+  };
+
   // Draw the wheel
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -336,6 +427,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
     const radius = Math.min(centerX, centerY) - 10;
+    const currentTotalVotes = getTotalVotes();
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     let currentAngle = -90;
@@ -363,8 +455,14 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       ctx.font = 'bold 14px sans-serif';
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 4;
-      const label = option.label.length > 12 ? option.label.slice(0, 12) + '...' : option.label;
-      ctx.fillText(label, radius - 20, 5);
+      
+      // En modo voting, mostrar porcentaje junto al label
+      const votes = voteState[option.id]?.votes || 0;
+      const pct = currentTotalVotes > 0 ? Math.round((votes / currentTotalVotes) * 100) : 0;
+      const label = option.label.length > 10 ? option.label.slice(0, 10) + '..' : option.label;
+      const displayText = mode === 'voting' && currentTotalVotes > 0 ? `${label} ${pct}%` : label;
+      
+      ctx.fillText(displayText, radius - 15, 5);
       ctx.restore();
       currentAngle += segmentAngle;
     });
@@ -376,7 +474,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     ctx.strokeStyle = '#a970ff';
     ctx.lineWidth = 3;
     ctx.stroke();
-  }, [currentOptions, segmentAngles]);
+  }, [currentOptions, segmentAngles, mode, voteState, getTotalVotes]);
 
   const spin = () => {
     if (isSpinning || currentOptions.length === 0) return;
@@ -603,6 +701,256 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Widget flotante - Modo minimizado
+  if (isFloatingWidget && isMinimized) {
+    return (
+      <div
+        ref={widgetRef}
+        className="fixed z-50 select-none"
+        style={{ left: widgetPosition.x, top: widgetPosition.y }}
+      >
+        <div
+          onMouseDown={handleWidgetMouseDown}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-sm cursor-move transition-all ${
+            showWinner ? 'bg-green-900/90 border-green-500/50 ring-2 ring-green-500/50' : 
+            isSpinning ? 'bg-purple-900/90 border-purple-500/50 ring-2 ring-purple-500/50' : 
+            'bg-zinc-900/95 border-zinc-700/50'
+          }`}
+        >
+          <GripHorizontal size={14} className="text-zinc-500" />
+          <span className="text-lg">🎰</span>
+          <span className="font-bold text-white text-sm">
+            {showWinner && winner ? `🎉 ${winner.label}` : isSpinning ? 'Girando...' : 'Ruleta'}
+          </span>
+          {!isSpinning && !showWinner && (
+            <button
+              onClick={spin}
+              className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+            >
+              <Play size={14} />
+            </button>
+          )}
+          <button onClick={() => setIsMinimized(false)} className="p-1.5 rounded-lg bg-zinc-700/50 text-zinc-300 hover:bg-zinc-600/50 hover:text-white transition-colors">
+            <Maximize2 size={14} />
+          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Widget flotante - Modo expandido
+  if (isFloatingWidget) {
+    // Calcular tamaño de la ruleta basado en el ancho del widget
+    const wheelSizeWidget = Math.min(widgetSize.width - 80, widgetSize.height - 280, 250);
+    return (
+      <div
+        ref={widgetRef}
+        className="fixed z-50 select-none"
+        style={{ left: widgetPosition.x, top: widgetPosition.y }}
+      >
+        <div 
+          className={`bg-zinc-900/95 backdrop-blur-sm rounded-2xl shadow-2xl border transition-colors overflow-hidden flex flex-col relative ${
+            showWinner ? 'border-green-500/50 ring-2 ring-green-500/30' : 
+            isSpinning ? 'border-purple-500/50 ring-2 ring-purple-500/30' : 
+            isVotingActive ? 'border-green-500/50 ring-2 ring-green-500/30' :
+            'border-zinc-700/50'
+          } ${isResizing ? 'ring-2 ring-purple-500/50' : ''}`}
+          style={{ width: widgetSize.width, height: widgetSize.height }}
+        >
+          {/* Header - Draggable */}
+          <div
+            onMouseDown={handleWidgetMouseDown}
+            className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 cursor-move shrink-0 bg-zinc-900/50"
+          >
+            <div className="flex items-center gap-2">
+              <GripHorizontal size={14} className="text-zinc-500" />
+              <span className="text-lg">🎰</span>
+              <span className="text-sm font-bold text-white">Ruleta</span>
+              {isSpinning && <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />}
+              {isVotingActive && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setIsMinimized(true)} className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
+                <Minimize2 size={14} />
+              </button>
+              <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Content - Scrollable */}
+          <div className="p-4 overflow-y-auto flex-1">
+            {/* Mode selector */}
+            <div className="flex gap-2 mb-3">
+              <button 
+                onClick={() => setMode('classic')} 
+                disabled={isSpinning || isVotingActive} 
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${mode === 'classic' ? 'bg-twitch-brand text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} disabled:opacity-50`}
+              >
+                <Equal size={12} /> Clásico
+              </button>
+              <button 
+                onClick={() => setMode('voting')} 
+                disabled={isSpinning || isVotingActive} 
+                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${mode === 'voting' ? 'bg-twitch-brand text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'} disabled:opacity-50`}
+              >
+                <BarChart3 size={12} /> Por Votos
+              </button>
+            </div>
+
+            {/* Voting mode controls */}
+            {mode === 'voting' && (
+              <div className="bg-zinc-800/50 rounded-xl p-3 mb-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-400">Duración:</span>
+                  <div className="flex items-center gap-1">
+                    <input 
+                      type="number" 
+                      min="10" 
+                      max="300" 
+                      value={votingDuration} 
+                      onChange={(e) => setVotingDuration(Math.max(10, Math.min(300, parseInt(e.target.value) || 30)))} 
+                      disabled={isVotingActive} 
+                      className="w-14 px-2 py-1 bg-zinc-700 rounded text-white text-center text-xs disabled:opacity-50" 
+                    />
+                    <span className="text-zinc-400 text-xs">seg</span>
+                  </div>
+                </div>
+                
+                {isVotingActive ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-green-400">
+                        <Timer size={12} className="animate-pulse" />
+                        <span className="font-bold text-xs">{votingTimeLeft}s</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-zinc-300">
+                        <Users size={12} />
+                        <span className="text-xs">{totalVotes} votos</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-zinc-700 rounded-full h-1.5">
+                      <div className="bg-green-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${(votingTimeLeft / votingDuration) * 100}%` }} />
+                    </div>
+                    <p className="text-[10px] text-zinc-500 text-center">
+                      Vota: {currentOptions.map((_, i) => `${votePrefix}${i + 1}`).join(', ')}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-zinc-500 text-center">
+                    {totalVotes > 0 ? `${totalVotes} votos - Los % se muestran en la ruleta` : 'Los votos determinarán el tamaño de cada sección'}
+                  </p>
+                )}
+
+                {/* Voting controls */}
+                <div className="flex gap-2">
+                  {!isVotingActive ? (
+                    <>
+                      <button 
+                        onClick={startVoting} 
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg text-xs"
+                      >
+                        <Play size={12} /> Iniciar Votación
+                      </button>
+                      {totalVotes > 0 && (
+                        <button 
+                          onClick={resetVotes} 
+                          className="px-2 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg"
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button 
+                      onClick={stopVoting} 
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs"
+                    >
+                      <Pause size={12} /> Detener
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wheel */}
+            <div className="relative flex justify-center mb-3">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10">
+                <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[15px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
+              </div>
+              <div style={{ transform: `rotate(${rotation}deg)`, transition: isSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none' }}>
+                <canvas ref={canvasRef} width={wheelSizeWidget} height={wheelSizeWidget} className="drop-shadow-xl" />
+              </div>
+            </div>
+
+            {/* Winner display */}
+            {showWinner && winner && (
+              <div className="text-center mb-3 animate-bounce">
+                <div className="inline-block px-4 py-2 rounded-xl shadow-lg" style={{ backgroundColor: winner.color }}>
+                  <span className="text-white font-bold text-sm drop-shadow">🎉 {winner.label} 🎉</span>
+                </div>
+              </div>
+            )}
+
+            {/* Spin Controls */}
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={spin}
+                disabled={isSpinning || currentOptions.length < 2 || (mode === 'voting' && isVotingActive)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 font-bold rounded-lg transition-all text-sm ${
+                  isSpinning ? 'bg-purple-500 text-white cursor-not-allowed' : 'bg-twitch-brand hover:bg-twitch-brand/80 text-white'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {isSpinning ? <><RotateCcw size={14} className="animate-spin" /> Girando...</> : <><Play size={14} /> Girar</>}
+              </button>
+              <button
+                onClick={reset}
+                disabled={isSpinning}
+                className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-all disabled:opacity-50"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+
+            {/* OBS Overlay URL */}
+            <div className="mb-3">
+              <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
+            </div>
+
+            {/* Options list */}
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              <p className="text-[10px] text-zinc-500 uppercase font-bold">Opciones ({currentOptions.length})</p>
+              {currentOptions.map((opt) => (
+                <div key={opt.id} className="flex items-center gap-2 text-xs bg-zinc-800/50 rounded-lg px-2 py-1">
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                  <span className="text-zinc-300 truncate">{opt.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resize handle - Más visible y fácil de usar */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize group z-10"
+            title="Redimensionar"
+          >
+            <div className="absolute bottom-1 right-1 w-3 h-3 flex items-end justify-end">
+              <svg width="10" height="10" viewBox="0 0 10 10" className="text-zinc-500 group-hover:text-purple-400 transition-colors">
+                <path d="M9 1v8H1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M9 5v4H5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

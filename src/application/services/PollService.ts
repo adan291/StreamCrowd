@@ -54,6 +54,10 @@ export interface CreatePollParams {
   votePrefix?: string;
   voteMatchMode?: 'exact' | 'partial';
   moderationConfig?: ModerationConfig;
+  /** Color de la barra de progreso */
+  progressBarColor?: string;
+  /** Color del indicador de límite */
+  limitIndicatorColor?: string;
 }
 
 export interface ProcessVoteParams {

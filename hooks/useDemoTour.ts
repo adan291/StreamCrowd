@@ -9,7 +9,8 @@ import { useState, useCallback } from 'react';
 
 export interface TourStepAction {
   type: 'navigate';
-  leftTab?: 'panel' | 'gallery' | 'data';
+  leftTab?: 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | 'data';
+  dynamicsView?: 'selector' | 'poll' | 'judge' | 'giveaway';
   dataSubTab?: 'activity' | 'analytics';
   rightTab?: 'chat' | 'stream';
   showModeration?: boolean;
@@ -58,7 +59,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Diseña encuestas con colores, iconos e imágenes. Usa presets rápidos como "Sí/No" o crea opciones personalizadas con claves de voto únicas.',
       position: 'bottom',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'spinner',
@@ -67,7 +68,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: '¡Haz sorteos épicos! Busca el botón de ruleta 🎡 en el creador de encuestas. Usa las opciones para elegir un ganador al azar.',
       position: 'bottom',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'live-poll',
@@ -76,7 +77,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Votos en tiempo real con gráficos animados. Los viewers votan con +1, +2 o claves personalizadas como +pizza. ¡Puedes cambiar tu voto!',
       position: 'bottom',
       mascotEmotion: 'happy',
-      action: { type: 'navigate', leftTab: 'panel', createDemoPoll: true },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll', createDemoPoll: true },
     },
     {
       id: 'moderation',
@@ -85,7 +86,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Protege tus encuestas: cooldowns entre votos, pesos especiales para subs/followers, y logs detallados de cada voto procesado.',
       position: 'top',
       mascotEmotion: 'thinking',
-      action: { type: 'navigate', leftTab: 'panel', showModeration: true },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll', showModeration: true },
     },
     {
       id: 'overlay',
@@ -94,7 +95,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Ventana especial para capturar en OBS. Personaliza colores, fuentes y usa Chroma Key. ¡También funciona con comandos del chat!',
       position: 'top',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'soundboard',
@@ -139,7 +140,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: '¡Ya conoces TwitchVote! Conecta tu canal de Twitch y empieza a crear encuestas interactivas. Estaré aquí si necesitas ayuda.',
       position: 'center',
       mascotEmotion: 'waving',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
   ],
   en: [
@@ -158,7 +159,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Design polls with colors, icons and images. Use quick presets like "Yes/No" or create custom options with unique vote keys.',
       position: 'bottom',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'spinner',
@@ -167,7 +168,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Run epic giveaways! Look for the wheel button 🎡 in the poll creator. Use your options to pick a random winner.',
       position: 'bottom',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'live-poll',
@@ -176,7 +177,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Real-time votes with animated charts. Viewers vote with +1, +2 or custom keys like +pizza. Vote changes allowed!',
       position: 'bottom',
       mascotEmotion: 'happy',
-      action: { type: 'navigate', leftTab: 'panel', createDemoPoll: true },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll', createDemoPoll: true },
     },
     {
       id: 'moderation',
@@ -185,7 +186,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Protect your polls: vote cooldowns, special weights for subs/followers, and detailed logs of every processed vote.',
       position: 'top',
       mascotEmotion: 'thinking',
-      action: { type: 'navigate', leftTab: 'panel', showModeration: true },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll', showModeration: true },
     },
     {
       id: 'overlay',
@@ -194,7 +195,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: 'Special window for OBS capture. Customize colors, fonts and use Chroma Key. Also works with chat commands!',
       position: 'top',
       mascotEmotion: 'excited',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
     {
       id: 'soundboard',
@@ -239,7 +240,7 @@ const TOUR_STEPS: Record<'es' | 'en', TourStep[]> = {
       message: "You now know TwitchVote! Connect your Twitch channel and start creating interactive polls. I'll be here if you need help.",
       position: 'center',
       mascotEmotion: 'waving',
-      action: { type: 'navigate', leftTab: 'panel' },
+      action: { type: 'navigate', leftTab: 'dynamics', dynamicsView: 'poll' },
     },
   ],
 };

@@ -27,6 +27,11 @@ const OAUTH_SCOPES = [
   'moderator:manage:chat_settings',
   'moderator:manage:announcements',
   'channel:manage:vips',
+  // Twitch Predictions and Channel Points scopes
+  'channel:manage:predictions',
+  'channel:read:predictions',
+  'channel:manage:redemptions',
+  'channel:read:redemptions',
 ].join(' ');
 
 // Callback path - can be root or specific path, must match Twitch Dev Console
@@ -39,6 +44,7 @@ export interface TwitchOAuthResult {
   username: string;
   userId: string;
   expiresIn?: number;
+  scopes: string[];
 }
 
 export interface TwitchOAuthError {
@@ -84,7 +90,7 @@ function buildAuthUrl(state: string): string {
 /**
  * Validate the token and get user info from Twitch
  */
-async function validateToken(accessToken: string): Promise<{ username: string; userId: string; expiresIn: number }> {
+async function validateToken(accessToken: string): Promise<{ username: string; userId: string; expiresIn: number; scopes: string[] }> {
   const response = await fetch('https://id.twitch.tv/oauth2/validate', {
     headers: {
       'Authorization': `OAuth ${accessToken}`,
@@ -100,6 +106,7 @@ async function validateToken(accessToken: string): Promise<{ username: string; u
     username: data.login,
     userId: data.user_id,
     expiresIn: data.expires_in,
+    scopes: data.scopes || [],
   };
 }
 
@@ -178,6 +185,7 @@ export function openTwitchOAuthPopup(): Promise<TwitchOAuthResult> {
           username: userInfo.username,
           userId: userInfo.userId,
           expiresIn: userInfo.expiresIn,
+          scopes: userInfo.scopes,
         });
       } catch (err) {
         reject({ error: 'validation_failed', errorDescription: 'Failed to validate token' });

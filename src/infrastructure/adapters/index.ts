@@ -14,3 +14,5 @@ export * from './OBSWebSocketAdapter';
 export * from './StreamElementsAdapter';
 export * from './StreamlabsAdapter';
 export * from './TwitchAdapter';
+export * from './YouTubeAdapter';
+export * from './KickAdapter';

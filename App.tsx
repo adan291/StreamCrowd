@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
@@ -14,7 +14,10 @@ import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
 import { AuthCapabilitiesIndicator } from './components/AuthCapabilitiesIndicator';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { getTwitchService } from './src/application/services/TwitchService';
+import { getIndexedDBService } from './src/application/services/IndexedDBService';
+import { getMigrationService } from './src/application/services/MigrationService';
 import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
@@ -29,8 +32,13 @@ import {
   UserVoteState,
   createLogEntry,
   updateStats,
+  LeftTab,
+  DynamicsView,
+  PlatformsView,
+  PlatformsTool,
 } from './types';
 import { STORAGE_KEYS } from './constants/storageKeys';
+import { PLATFORMS, TWITCH_TOOLS } from './config/platforms';
 import { useTheme } from './context';
 import { useI18n } from './i18n';
 import { 
@@ -44,13 +52,16 @@ import {
   getPollConfigFromUrl,
   TourStep,
 } from './hooks';
+import { useStreamNotifications } from './hooks/useStreamNotifications';
+import { useMacroTriggers, type TwitchMessageWithRoles } from './hooks/useMacroTriggers';
 import { 
   useTwitchService as useTwitchConnection,
   useStreamEventService as useStreamEvents,
   useAnalyticsService as useAIAnalytics,
+  useAuth,
 } from './src/application/hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2 } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2, Sparkles, Layers, Zap } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
@@ -59,8 +70,11 @@ import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
 import { JudgePanel } from './components/JudgePanel';
 import { GiveawayHub } from './components/GiveawayHub';
 import { StreamGames } from './components/StreamGames';
+import { DynamicsPanel } from './components/DynamicsPanel';
+import { PlatformsPanel } from './components/PlatformsPanel';
 import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
+import { MacroManager } from './components/macros/MacroManager';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -192,9 +206,52 @@ const App: React.FC = () => {
     return <OverlayRouter type={OVERLAY_TYPE} />;
   }
   
+  // Offline mode services initialization state
+  // @requirements 5.1, 5.2, 5.3, 5.4, 5.5
+  const [servicesInitialized, setServicesInitialized] = useState(false);
+  const [migrationComplete, setMigrationComplete] = useState(false);
+  
+  // Initialize offline mode services on app startup
+  useEffect(() => {
+    const initializeServices = async () => {
+      try {
+        // Initialize IndexedDB service
+        const indexedDBService = getIndexedDBService();
+        await indexedDBService.init();
+        
+        // Check and run migration if needed
+        const migrationService = getMigrationService();
+        const needsMigration = await migrationService.checkMigrationNeeded();
+        
+        if (needsMigration) {
+          console.log('Running data migration from localStorage to IndexedDB...');
+          const result = await migrationService.migrate();
+          if (result.success) {
+            console.log(`Migration complete: ${result.totalItemsMigrated} items migrated`);
+          } else {
+            console.warn('Migration completed with errors:', result.errors);
+          }
+        }
+        
+        setMigrationComplete(true);
+        setServicesInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize offline services:', error);
+        // Continue anyway - the app should work with localStorage fallback
+        setServicesInitialized(true);
+        setMigrationComplete(true);
+      }
+    };
+    
+    initializeServices();
+  }, []);
+  
   const { theme, toggleTheme, setTheme } = useTheme();
   const { t, locale, setLocale } = useI18n();
   const { triggerPollEnd, triggerPollResults } = useOBSTriggers();
+  
+  // Auth capabilities for Twitch API features
+  const { capabilities: authCapabilities } = useAuth();
 
   // Use custom hooks for state management
   const { 
@@ -260,6 +317,21 @@ const App: React.FC = () => {
   const streamEventsHook = useStreamEvents();
   const { triggerRaidIncoming } = useOBSTriggers();
   
+  // Stream notifications hook - connects stream events to notification system
+  // @requirements 4.3 - Emit notifications for stream events
+  const streamNotifications = useStreamNotifications({
+    enabled: status === ConnectionStatus.CONNECTED && !isOverlayMode,
+  });
+  
+  // Macro triggers hook - connects macro system with app events
+  // @requirements 2.1, 2.2, 2.3, 2.4 - Macro trigger types
+  const macroTriggers = useMacroTriggers({
+    enabled: status === ConnectionStatus.CONNECTED && !isOverlayMode,
+    onError: (error) => {
+      console.error('Macro trigger error:', error);
+    },
+  });
+  
   // Sync channel name with stream events hook
   useEffect(() => {
     if (channelName) {
@@ -282,11 +354,27 @@ const App: React.FC = () => {
     }
   }, [streamEventsHook.events, triggerRaidIncoming]);
 
+  // Process stream events for macro triggers
+  // @requirements 2.4 - Event triggers (follower, raid, subscription, bits, etc.)
+  const lastProcessedEventRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (streamEventsHook.events.length === 0) return;
+    
+    const latestEvent = streamEventsHook.events[streamEventsHook.events.length - 1];
+    if (latestEvent.id !== lastProcessedEventRef.current) {
+      lastProcessedEventRef.current = latestEvent.id;
+      macroTriggers.processStreamEvent(latestEvent);
+    }
+  }, [streamEventsHook.events, macroTriggers]);
+
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream' | 'collab'>('chat');
-  const [leftTab, setLeftTab] = useState<'poll' | 'judge' | 'giveaway' | 'games' | 'obs' | 'gallery' | 'data'>('poll');
+  const [leftTab, setLeftTab] = useState<LeftTab>('dynamics');
+  const [dynamicsView, setDynamicsView] = useState<DynamicsView>('selector');
+  const [platformsView, setPlatformsView] = useState<PlatformsView>('selector');
+  const [platformsTool, setPlatformsTool] = useState<PlatformsTool>('none');
   const [dataSubTab, setDataSubTab] = useState<'activity' | 'analytics'>('analytics');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
@@ -305,6 +393,78 @@ const App: React.FC = () => {
   const [isDraggingMiniBar, setIsDraggingMiniBar] = useState(false);
   const miniBarDragOffset = useRef({ x: 0, y: 0 });
 
+  // Handler for dynamics navigation
+  const handleDynamicsNavigation = useCallback((view: DynamicsView) => {
+    const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway', 'countdown', 'spinner'];
+    if (validViews.includes(view)) {
+      setDynamicsView(view);
+    } else {
+      console.warn(`Invalid dynamics view: ${view}, defaulting to selector`);
+      setDynamicsView('selector');
+    }
+  }, []);
+
+  // Reset dynamicsView to selector when navigating away from dynamics tab
+  // This ensures users always see the selector when returning to dynamics
+  useEffect(() => {
+    if (leftTab !== 'dynamics') {
+      // Optionally reset to selector when leaving dynamics
+      // Comment out if you want to preserve the last view
+      setDynamicsView('selector');
+    }
+  }, [leftTab]);
+
+  // Handler for platform navigation - changes platformsView
+  // @requirements 5.2, 5.3
+  const handlePlatformNavigation = useCallback((platformId: string) => {
+    const platform = PLATFORMS.find(p => p.id === platformId);
+    if (!platform || !platform.enabled) {
+      console.warn(`Invalid or disabled platform: ${platformId}`);
+      return;
+    }
+    setPlatformsView(platformId as PlatformsView);
+  }, []);
+
+  // Handler for tool navigation - changes platformsTool
+  // @requirements 5.2, 5.3
+  const handleToolNavigation = useCallback((toolId: string) => {
+    const tool = TWITCH_TOOLS.find(t => t.id === toolId);
+    if (!tool || !tool.enabled || tool.comingSoon) {
+      console.warn(`Invalid or disabled tool: ${toolId}`);
+      return;
+    }
+    setPlatformsTool(toolId as PlatformsTool);
+  }, []);
+
+  // Handler for platforms back navigation
+  // From tool panel → tool selector, from tool selector → platform selector
+  // @requirements 5.2, 5.3
+  const handlePlatformsBack = useCallback(() => {
+    if (platformsTool !== 'none') {
+      // From tool panel, go back to tool selector
+      setPlatformsTool('none');
+    } else if (platformsView !== 'selector') {
+      // From tool selector, go back to platform selector
+      setPlatformsView('selector');
+    }
+  }, [platformsTool, platformsView]);
+
+  // Combined handler for PlatformsPanel navigation
+  // @requirements 5.1, 5.2, 5.3
+  const handlePlatformsPanelNavigate = useCallback((view: PlatformsView, tool?: PlatformsTool) => {
+    setPlatformsView(view);
+    setPlatformsTool(tool || 'none');
+  }, []);
+
+  // Reset platforms state when navigating away from platforms tab
+  useEffect(() => {
+    if (leftTab !== 'platforms') {
+      // Reset to selector when leaving platforms
+      setPlatformsView('selector');
+      setPlatformsTool('none');
+    }
+  }, [leftTab]);
+
   // Keyboard shortcuts actions
   const shortcutActions = useMemo(() => ({
     createPoll: () => {
@@ -318,9 +478,33 @@ const App: React.FC = () => {
     resetPoll: () => {
       poll.resetPoll();
     },
-    navPanel: () => setLeftTab('poll'),
+    // Navigation to Dynamics selector
+    navDynamics: () => {
+      setLeftTab('dynamics');
+      setDynamicsView('selector');
+    },
+    // Direct navigation to specific activities
+    navPoll: () => {
+      setLeftTab('dynamics');
+      setDynamicsView('poll');
+    },
+    navJudge: () => {
+      setLeftTab('dynamics');
+      setDynamicsView('judge');
+    },
+    navGiveaway: () => {
+      setLeftTab('dynamics');
+      setDynamicsView('giveaway');
+    },
+    // Other navigation
+    navGames: () => setLeftTab('games'),
     navGallery: () => setLeftTab('gallery'),
     navData: () => setLeftTab('data'),
+    // Legacy action for backward compatibility
+    navPanel: () => {
+      setLeftTab('dynamics');
+      setDynamicsView('selector');
+    },
     closeModal: () => {
       setShowHistory(false);
       setShowTools(false);
@@ -344,9 +528,11 @@ const App: React.FC = () => {
     onStepChange: (step: TourStep) => {
       // Execute navigation actions for each step
       if (step.action) {
-        const { leftTab: newLeftTab, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll, showSoundBoard: showSoundBoardAction } = step.action;
+        const { leftTab: newLeftTab, dynamicsView: newDynamicsView, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll, showSoundBoard: showSoundBoardAction } = step.action;
         
+        // First set leftTab, then dynamicsView for proper navigation
         if (newLeftTab) setLeftTab(newLeftTab);
+        if (newDynamicsView) setDynamicsView(newDynamicsView);
         if (newDataSubTab) setDataSubTab(newDataSubTab);
         if (rightTab) setActiveRightTab(rightTab);
         if (showModeration !== undefined) setDemoForceModeration(showModeration);
@@ -372,7 +558,8 @@ const App: React.FC = () => {
       // Reset demo state when tour ends
       setDemoForceModeration(false);
       setShowSoundBoard(false);
-      setLeftTab('poll');
+      setLeftTab('dynamics');
+      setDynamicsView('poll');
     },
   });
   
@@ -506,9 +693,9 @@ const App: React.FC = () => {
     });
   };
 
-  const removeNotification = (id: string) => {
+  const removeNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
 
   const handleAddAsset = (asset: MediaAsset) => {
     const updated = [asset, ...mediaLibrary];
@@ -563,33 +750,35 @@ const App: React.FC = () => {
     }
     moderation.reset();
     
-    // Announce in chat and sync with overlay
+    // Announce in chat and sync with overlay - single compact message
     if (authToken) {
       const optLabels = newPoll.options.map(o => o.label).join('|');
       getTwitchService().sendMessage(`!pollsync ${question}|${optLabels}`);
-      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question}`);
-      const opts = newPoll.options.map(o => `${prefix}${o.id} ${o.label}`).join(' | ');
-      getTwitchService().sendMessage(`${t.chat.options}: ${opts}`);
-      getTwitchService().sendMessage(t.chat.voteHint.replace('+', prefix));
+      // Single compact message: "📊 Encuesta: pregunta | +1 Op1 | +2 Op2 | Vota con +1, +2..."
+      const opts = newPoll.options.map((o, idx) => `${prefix}${idx + 1} ${o.label}`).join(' | ');
+      const voteHint = t.chat.voteHint.replace('+', prefix);
+      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question} | ${opts} | ${voteHint}`);
     }
   };
 
   const handleStopPoll = (auto = false) => {
-    const finishedPoll = poll.stopPoll(auto);
-    if (!finishedPoll) return;
+    const result = poll.stopPoll(auto);
+    if (!result) return;
     
     // OBS Trigger: Poll end
     triggerPollEnd();
     
     // Save poll results to current session for analytics
+    const totalVotes = result.poll.options.reduce((acc, o) => acc + o.votes, 0);
+    const winner = result.poll.options.reduce((a, b) => a.votes > b.votes ? a : b);
+    
     if (aiAnalytics.currentSession) {
-      const totalVotes = finishedPoll.options.reduce((acc, o) => acc + o.votes, 0);
       const pollSummary = {
-        question: finishedPoll.question,
-        winner: finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b).label,
+        question: result.poll.question,
+        winner: winner.label,
         totalVotes,
         timestamp: Date.now(),
-        options: finishedPoll.options.map(o => ({
+        options: result.poll.options.map(o => ({
           label: o.label,
           votes: o.votes,
           percentage: totalVotes > 0 ? (o.votes / totalVotes) * 100 : 0,
@@ -598,11 +787,14 @@ const App: React.FC = () => {
       aiAnalytics.addPollResultToSession(pollSummary);
     }
     
+    // Send notification for poll ended
+    // @requirements 4.3 - Emit notifications for poll ended
+    streamNotifications.notifyPollEnded(result.poll.question, winner.label, totalVotes);
+    
     if (authToken) {
       getTwitchService().sendMessage(`!pollend`);
-      const winner = finishedPoll.options.reduce((a, b) => a.votes > b.votes ? a : b);
-      getTwitchService().sendMessage(`${t.chat.pollEnded}: ${finishedPoll.question}`);
-      getTwitchService().sendMessage(`${t.chat.winner}: ${winner.label} ${t.chat.withVotes.replace('{votes}', String(winner.votes))}`);
+      // Single compact message: "📊 Encuesta Finalizada: {nombre} | 🏆 Ganador: {opción} ({votos} votos)"
+      getTwitchService().sendMessage(`📊 ${t.chat.pollEnded}: ${result.poll.question} | 🏆 ${t.chat.winner}: ${winner.label} (${winner.votes} ${t.poll.votesLabel || 'votos'})`);
     }
     
     // OBS Trigger: Poll results (after a short delay)
@@ -635,6 +827,15 @@ const App: React.FC = () => {
       };
       
       setChatMessages(prev => [...prev.slice(-199), msg]);
+      
+      // Process chat message for macro triggers
+      // @requirements 2.1, 2.2 - Chat command and keyword triggers
+      const macroMsg: TwitchMessageWithRoles = {
+        ...msg,
+        isBroadcaster: chatMessage.isBroadcaster,
+        isModerator: chatMessage.isModerator,
+      };
+      macroTriggers.processChatMessage(macroMsg);
       
       // Store message in current session for analytics
       // Always try to add - the function handles null session internally
@@ -786,11 +987,13 @@ const App: React.FC = () => {
               poll.updateVote(userId, result.previousOptionId, optionId, result.previousWeight, result.weight);
             } else {
               // Add new vote
-              const newVote: VoteRecord = {
+              const newVote = {
+                oderId: userId,
                 userId,
                 username: msg.username,
                 optionId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                weight: result.weight,
               };
               poll.addVote(newVote, result.weight);
             }
@@ -861,6 +1064,9 @@ const App: React.FC = () => {
             theme={theme}
           />
         )}
+        
+        {/* Offline Indicator - Requirements 3.1, 3.2, 3.3, 3.4 */}
+        <OfflineIndicator />
         
         <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 left-1/2 -translate-x-1/2 z-[100]" />
         
@@ -1009,10 +1215,10 @@ const App: React.FC = () => {
 
         {/* Navigation */}
         <div className="flex flex-col gap-3 w-full px-2">
-          <NavButton active={leftTab === 'poll'} onClick={() => setLeftTab('poll')} icon={<VoteIcon size={20} />} label={t.nav.poll || 'Encuesta'} dataTour="nav-poll" />
-          <NavButton active={leftTab === 'judge'} onClick={() => setLeftTab('judge')} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} dataTour="nav-judge" />
-          <NavButton active={leftTab === 'giveaway'} onClick={() => setLeftTab('giveaway')} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} dataTour="nav-giveaway" />
+          <NavButton active={leftTab === 'dynamics'} onClick={() => setLeftTab('dynamics')} icon={<Sparkles size={20} />} label={t.nav?.dynamics || 'Dinámicas'} dataTour="nav-dynamics" />
           <NavButton active={leftTab === 'games'} onClick={() => setLeftTab('games')} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} dataTour="nav-games" />
+          <NavButton active={leftTab === 'macros'} onClick={() => setLeftTab('macros')} icon={<Zap size={20} />} label={t.macros?.title || 'Macros'} dataTour="nav-macros" />
+          <NavButton active={leftTab === 'platforms'} onClick={() => setLeftTab('platforms')} icon={<Layers size={20} />} label={t.nav?.platforms || 'Plataformas'} dataTour="nav-platforms" />
           <NavButton active={leftTab === 'obs'} onClick={() => setLeftTab('obs')} icon={<Monitor size={20} />} label="OBS" dataTour="nav-obs" />
           <div className="relative">
             <NavButton active={leftTab === 'data'} onClick={() => setLeftTab('data')} icon={<BarChart3 size={20} />} label={t.nav.data} />
@@ -1064,10 +1270,10 @@ const App: React.FC = () => {
       
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around py-2 px-4 z-40 safe-area-bottom">
-        <MobileNavButton active={leftTab === 'poll'} onClick={() => { setLeftTab('poll'); setShowMobileSidebar(false); }} icon={<VoteIcon size={20} />} label={t.nav.poll || 'Encuesta'} />
-        <MobileNavButton active={leftTab === 'judge'} onClick={() => { setLeftTab('judge'); setShowMobileSidebar(false); }} icon={<Trophy size={20} />} label={t.nav.judge || 'Jurado'} />
-        <MobileNavButton active={leftTab === 'giveaway'} onClick={() => { setLeftTab('giveaway'); setShowMobileSidebar(false); }} icon={<Gift size={20} />} label={t.nav.giveaway || 'Sorteos'} />
+        <MobileNavButton active={leftTab === 'dynamics'} onClick={() => { setLeftTab('dynamics'); setShowMobileSidebar(false); }} icon={<Sparkles size={20} />} label={t.nav?.dynamics || 'Dinámicas'} />
         <MobileNavButton active={leftTab === 'games'} onClick={() => { setLeftTab('games'); setShowMobileSidebar(false); }} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} />
+        <MobileNavButton active={leftTab === 'macros'} onClick={() => { setLeftTab('macros'); setShowMobileSidebar(false); }} icon={<Zap size={20} />} label={t.macros?.title || 'Macros'} />
+        <MobileNavButton active={leftTab === 'platforms'} onClick={() => { setLeftTab('platforms'); setShowMobileSidebar(false); }} icon={<Layers size={20} />} label={t.nav?.platforms || 'Plataformas'} />
         <MobileNavButton active={leftTab === 'obs'} onClick={() => { setLeftTab('obs'); setShowMobileSidebar(false); }} icon={<Monitor size={20} />} label="OBS" />
         <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
         <MobileNavButton active={leftTab === 'data'} onClick={() => { setLeftTab('data'); setShowMobileSidebar(false); }} icon={<BarChart3 size={20} />} label={t.nav.data} />
@@ -1120,7 +1326,7 @@ const App: React.FC = () => {
           
           {/* Left Column Content */}
           <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
-            {leftTab === 'poll' && (
+            {leftTab === 'dynamics' && (
               poll.currentPoll ? (
                 <div data-tour="live-poll" className="h-full">
                   <LivePoll 
@@ -1138,59 +1344,32 @@ const App: React.FC = () => {
                   />
                 </div>
               ) : (
-                <div data-tour="poll-creator" className="h-full">
-                  <PollCreator 
-                    onCreate={handleCreatePoll} 
-                    onNotification={addNotification}
-                    mediaLibrary={mediaLibrary}
-                    onAddAsset={handleAddAsset}
-                    moderationConfig={moderation.config}
-                    onModerationConfigChange={moderation.setConfig}
+                <div data-tour="dynamics-panel" className="h-full">
+                  <DynamicsPanel
+                    view={dynamicsView}
+                    onViewChange={handleDynamicsNavigation}
                     chatMessages={chatMessages}
-                    onShowHistory={() => setShowHistory(true)}
-                    sidebarHidden={leftSidebarHidden}
-                    onClearChatMessages={() => setChatMessages([])}
+                    isConnected={status === ConnectionStatus.CONNECTED}
                     userVoteMap={poll.userVoteMap}
                     collaborationChannels={collaborationChannels}
                     mainChannel={channelName}
                     onAddCollaborator={addCollaborator}
                     onRemoveCollaborator={removeCollaborator}
-                    isConnected={status === ConnectionStatus.CONNECTED}
+                    onCreatePoll={handleCreatePoll}
+                    onNotification={addNotification}
+                    mediaLibrary={mediaLibrary}
+                    onAddAsset={handleAddAsset}
+                    moderationConfig={moderation.config}
+                    onModerationConfigChange={moderation.setConfig}
+                    onShowHistory={() => setShowHistory(true)}
+                    sidebarHidden={leftSidebarHidden}
+                    onClearChatMessages={() => setChatMessages([])}
                     onShowCountdown={() => setShowCountdown(true)}
+                    authToken={authToken}
+                    userId={userId}
                   />
                 </div>
               )
-            )}
-            {leftTab === 'judge' && (
-              <div data-tour="judge-panel" className="h-full">
-                <JudgePanel 
-                  chatMessages={chatMessages}
-                  onClose={() => setLeftTab('poll')}
-                  userVoteMap={poll.userVoteMap}
-                  collaborationChannels={collaborationChannels}
-                  mainChannel={channelName}
-                  onAddCollaborator={addCollaborator}
-                  onRemoveCollaborator={removeCollaborator}
-                  isConnected={status === ConnectionStatus.CONNECTED}
-                  isEmbedded={true}
-                  mediaLibrary={mediaLibrary}
-                  onAddAsset={handleAddAsset}
-                />
-              </div>
-            )}
-            {leftTab === 'giveaway' && (
-              <div data-tour="giveaway-hub" className="h-full">
-                <GiveawayHub 
-                  chatMessages={chatMessages}
-                  isConnected={status === ConnectionStatus.CONNECTED}
-                  onClearChatMessages={() => setChatMessages([])}
-                  userVoteMap={poll.userVoteMap}
-                  collaborationChannels={collaborationChannels}
-                  mainChannel={channelName}
-                  authToken={authToken}
-                  userId={userId}
-                />
-              </div>
             )}
             {leftTab === 'games' && (
               <div data-tour="stream-games" className="h-full">
@@ -1204,6 +1383,31 @@ const App: React.FC = () => {
                   onAddCollaborator={addCollaborator}
                   onRemoveCollaborator={removeCollaborator}
                   authToken={authToken}
+                />
+              </div>
+            )}
+            {leftTab === 'macros' && (
+              <div data-tour="macros-panel" className="h-full">
+                <MacroManager />
+              </div>
+            )}
+            {leftTab === 'platforms' && (
+              <div data-tour="platforms-panel" className="h-full">
+                <PlatformsPanel
+                  view={platformsView}
+                  tool={platformsTool}
+                  onNavigate={handlePlatformsPanelNavigate}
+                  onBack={handlePlatformsBack}
+                  chatMessages={chatMessages}
+                  isConnected={status === ConnectionStatus.CONNECTED}
+                  sendMessage={(msg) => getTwitchService().sendMessage(msg)}
+                  channel={channelName}
+                  channelId={userId}
+                  authToken={authToken}
+                  isPartnerOrAffiliate={true}
+                  hasPredictionsScope={authCapabilities.canManagePredictions}
+                  hasRewardsScope={authCapabilities.canManageRedemptions}
+                  onNotification={addNotification}
                 />
               </div>
             )}
@@ -1565,6 +1769,9 @@ const App: React.FC = () => {
           onDownloadPoll={() => addNotification('success', 'Encuesta descargada')}
         />
       )}
+
+      {/* Offline Indicator - Requirements 3.1, 3.2, 3.3, 3.4 */}
+      <OfflineIndicator />
 
       <NotificationContainer notifications={notifications} onRemove={removeNotification} className="fixed top-16 md:top-4 left-1/2 -translate-x-1/2 z-[100]" />
       
