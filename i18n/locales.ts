@@ -2971,7 +2971,7 @@ export const translations: Record<Locale, Translations> = {
       subtitle: 'Enter the channel name to start',
       channelLabel: 'Channel / URL',
       channelPlaceholder: 'Ex: name o chanel twitch',
-      channelTooltip: 'The username or Twitch link (e.g. name o chanel twitch).',
+      channelTooltip: 'The username or Twitch link (e.g. name o chanel     twitch).',
       tokenLabel: 'Access Token (Optional)',
       tokenPlaceholder: 'Ex: uo6dgg01...',
       tokenTooltip: 'Required for the bot to write in chat (announce polls). Without this, it will work in read-only mode.',
