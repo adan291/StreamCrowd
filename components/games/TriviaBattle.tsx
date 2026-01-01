@@ -149,27 +149,68 @@ interface CachedQuestion extends Question {
   categoryId: number;
 }
 
+// Detectar si un texto está en inglés
+const isEnglishText = (text: string): boolean => {
+  const lowerText = text.toLowerCase();
+  // Palabras muy comunes en inglés que raramente aparecen en español
+  const englishWords = [
+    'which', 'what', 'who', 'where', 'when', 'how', 'the', 'is', 'are', 'was', 
+    'were', 'has', 'have', 'had', 'did', 'does', 'do', 'been', 'being', 'would',
+    'could', 'should', 'will', 'shall', 'may', 'might', 'must', 'can', 'this',
+    'that', 'these', 'those', 'there', 'their', 'they', 'them', 'with', 'from',
+    'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+    'between', 'under', 'again', 'further', 'then', 'once', 'here',
+    'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only',
+    'same', 'than', 'too', 'very', 'just', 'also', 'now', 'called', 'known',
+    'following', 'according', 'however', 'although', 'because', 'since'
+  ];
+  
+  // Contar cuántas palabras inglesas hay
+  let englishCount = 0;
+  for (const word of englishWords) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    const matches = lowerText.match(regex);
+    if (matches) englishCount += matches.length;
+  }
+  
+  // Si hay 2 o más palabras inglesas comunes, probablemente está en inglés
+  return englishCount >= 2;
+};
+
 const loadCachedApiQuestions = (): CachedQuestion[] => {
   try {
     const saved = localStorage.getItem(API_QUESTIONS_CACHE_KEY);
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    const cached: CachedQuestion[] = JSON.parse(saved);
+    // Filtrar preguntas que no se tradujeron correctamente (siguen en inglés)
+    return cached.filter(q => {
+      // Si la pregunta es igual a la original, no está traducida
+      if (q.question === q.originalQuestion) return false;
+      // Usar la función de detección de inglés
+      if (isEnglishText(q.question)) return false;
+      return true;
+    });
   } catch {
     return [];
   }
 };
 
 const saveCachedApiQuestion = (question: CachedQuestion): void => {
+  // Solo guardar si la pregunta está realmente traducida
+  if (question.question === question.originalQuestion) return;
+  if (isEnglishText(question.question)) return;
+  
   const cached = loadCachedApiQuestions();
-  // Evitar duplicados por ID
-  if (!cached.find(q => q.id === question.id)) {
+  // Evitar duplicados por pregunta original
+  if (!cached.find(q => q.originalQuestion === question.originalQuestion)) {
     cached.push(question);
     localStorage.setItem(API_QUESTIONS_CACHE_KEY, JSON.stringify(cached));
   }
 };
 
-// Traducir texto usando la API de IA configurada
-const translateText = async (text: string, apiKey: string, provider: string): Promise<string> => {
-  const prompt = `Traduce el siguiente texto del inglés al español. Solo responde con la traducción, sin explicaciones ni comillas:\n\n${text}`;
+// Traducir texto simple usando la API de IA configurada
+const translateSimpleText = async (text: string, apiKey: string, provider: string): Promise<string> => {
+  const prompt = `Traduce este texto del inglés al español. Responde SOLO con la traducción, nada más:\n${text}`;
   
   try {
     if (provider === 'gemini') {
@@ -181,12 +222,13 @@ const translateText = async (text: string, apiKey: string, provider: string): Pr
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 500 },
+            generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
           }),
         }
       );
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || text;
+      const result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (result && result.length > 0) return result;
     } else if (provider === 'openai') {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -194,16 +236,105 @@ const translateText = async (text: string, apiKey: string, provider: string): Pr
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.3,
+          temperature: 0.1,
         }),
       });
       const data = await response.json();
-      return data.choices?.[0]?.message?.content?.trim() || text;
+      const result = data.choices?.[0]?.message?.content?.trim();
+      if (result && result.length > 0) return result;
     }
   } catch (error) {
-    console.warn('Translation failed, using original:', error);
+    console.warn('Simple translation failed:', error);
   }
   return text;
+};
+
+// Traducir una pregunta completa (pregunta + opciones) con fallback robusto
+const translateQuestion = async (
+  questionText: string,
+  options: string[],
+  apiKey: string,
+  provider: string
+): Promise<{ question: string; options: string[] }> => {
+  // Primero intentar traducción estructurada con JSON
+  const prompt = `Traduce esta pregunta de trivia del inglés al español de España. 
+IMPORTANTE: Responde ÚNICAMENTE con el JSON, sin explicaciones ni texto adicional.
+
+Formato de respuesta (JSON puro):
+{"question": "pregunta en español", "options": ["opción A", "opción B", "opción C", "opción D"]}
+
+Pregunta a traducir: ${questionText}
+Opciones a traducir: ${options.join(' | ')}`;
+
+  try {
+    let text = '';
+    if (provider === 'gemini') {
+      const model = localStorage.getItem('gemini_working_model') || 'gemini-2.0-flash-exp';
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 500 },
+          }),
+        }
+      );
+      const data = await response.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    } else if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+        }),
+      });
+      const data = await response.json();
+      text = data.choices?.[0]?.message?.content?.trim() || '';
+    }
+
+    if (text) {
+      // Intentar extraer JSON de la respuesta
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.question && parsed.options && parsed.options.length === options.length) {
+            // Verificar que realmente se tradujo (no es igual al original)
+            if (parsed.question !== questionText) {
+              return { question: parsed.question, options: parsed.options };
+            }
+          }
+        } catch (parseError) {
+          console.warn('JSON parse failed, trying fallback:', parseError);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('Structured translation failed:', error);
+  }
+
+  // FALLBACK: Traducir cada elemento por separado
+  console.log('Using fallback translation for:', questionText.substring(0, 50));
+  try {
+    const translatedQuestion = await translateSimpleText(questionText, apiKey, provider);
+    const translatedOptions = await Promise.all(
+      options.map(opt => translateSimpleText(opt, apiKey, provider))
+    );
+    
+    // Verificar que al menos la pregunta se tradujo
+    if (translatedQuestion !== questionText) {
+      return { question: translatedQuestion, options: translatedOptions };
+    }
+  } catch (fallbackError) {
+    console.warn('Fallback translation also failed:', fallbackError);
+  }
+
+  return { question: questionText, options };
 };
 
 // Función para cargar preguntas de Open Trivia DB con traducción
@@ -265,29 +396,36 @@ const fetchOpenTDBQuestions = async (
     const q = data.results[i];
     let questionText = decodeHTML(q.question);
     let options = [...q.incorrect_answers, q.correct_answer].map(decodeHTML);
-    const correctAnswer = decodeHTML(q.correct_answer);
+    const originalQuestion = decodeHTML(q.question);
     
     // Traducir si tenemos IA configurada
     if (translateToSpanish && aiProvider && aiApiKey) {
       try {
-        // Traducir pregunta y opciones juntas para eficiencia
-        const toTranslate = [questionText, ...options].join('\n---\n');
-        const translated = await translateText(toTranslate, aiApiKey, aiProvider);
-        const parts = translated.split(/\n-+\n/);
-        if (parts.length >= options.length + 1) {
-          questionText = parts[0].trim();
-          options = parts.slice(1, options.length + 1).map(o => o.trim());
-        }
+        // Usar la función de traducción estructurada
+        const translated = await translateQuestion(questionText, options, aiApiKey, aiProvider);
+        questionText = translated.question;
+        // Mantener el orden de las opciones traducidas igual que el original
+        // La última opción es la correcta (correct_answer)
+        options = translated.options;
       } catch (error) {
         console.warn('Translation failed for question:', error);
+        // Si falla la traducción, saltar esta pregunta
+        continue;
       }
     }
     
+    // VERIFICACIÓN FINAL: Si la pregunta sigue en inglés, saltarla
+    if (isEnglishText(questionText)) {
+      console.warn('Question still in English, skipping:', questionText.substring(0, 50));
+      continue;
+    }
+    
+    // La respuesta correcta está en la última posición del array options
+    const correctAnswerTranslated = options[options.length - 1];
+    
     // Mezclar opciones
-    const shuffledOptions = options.sort(() => Math.random() - 0.5);
-    const correctIndex = shuffledOptions.indexOf(
-      translateToSpanish && aiProvider ? options[options.length - 1] : correctAnswer
-    );
+    const shuffledOptions = [...options].sort(() => Math.random() - 0.5);
+    const correctIndex = shuffledOptions.indexOf(correctAnswerTranslated);
     
     const question: Question = {
       id: `opentdb_${categoryId || 'any'}_${Date.now()}_${i}`,
@@ -300,10 +438,10 @@ const fetchOpenTDBQuestions = async (
     
     questions.push(question);
     
-    // Guardar en cache
+    // Guardar en cache solo si está traducida
     saveCachedApiQuestion({
       ...question,
-      originalQuestion: decodeHTML(q.question),
+      originalQuestion,
       categoryId: categoryId || 0
     });
   }
@@ -556,14 +694,13 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       const existingPlayer = players.get(oderId);
       if (existingPlayer?.answeredCurrent) return;
       
-      // Only accept EXACT single character answers (no "1 2 3 4" or "1234")
-      // Must be exactly one character: 1, 2, 3, 4, a, b, c, or d
+      // Only accept EXACT single character answers: a, b, c, or d (letters only)
       let answerIndex = -1;
       if (msgLower.length === 1) {
-        if (msgLower === '1' || msgLower === 'a') answerIndex = 0;
-        else if (msgLower === '2' || msgLower === 'b') answerIndex = 1;
-        else if (msgLower === '3' || msgLower === 'c') answerIndex = 2;
-        else if (msgLower === '4' || msgLower === 'd') answerIndex = 3;
+        if (msgLower === 'a') answerIndex = 0;
+        else if (msgLower === 'b') answerIndex = 1;
+        else if (msgLower === 'c') answerIndex = 2;
+        else if (msgLower === 'd') answerIndex = 3;
       }
       
       if (answerIndex >= 0 && answerIndex < currentQuestion.options.length) {
@@ -657,7 +794,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
       }
     });
     
-    // Enriquecer con API si está activado (preguntas en inglés)
+    // Enriquecer con API si está activado (preguntas traducidas al español)
     if (enrichWithApi) {
       try {
         // Obtener preguntas de API para las categorías seleccionadas que tengan apiCategoryId
@@ -1066,7 +1203,7 @@ IMPORTANTE:
                   <div className={`w-3 h-3 rounded-full bg-white transition-transform ${enrichWithApi ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
                 <span className="text-xs text-zinc-300">Añadir preguntas online</span>
-                <span className="text-[10px] text-zinc-500">(en inglés)</span>
+                <span className="text-[10px] text-zinc-500">(se traducen automáticamente)</span>
               </div>
               
               {loadError && (
@@ -1409,6 +1546,7 @@ IMPORTANTE:
               {currentQuestion.options.map((option: string, i: number) => {
                 const isCorrect = i === currentQuestion.correctIndex;
                 const percentage = totalAnswers > 0 ? Math.round((answerCounts[i] / totalAnswers) * 100) : 0;
+                const optionLetter = ['A', 'B', 'C', 'D'][i];
                 
                 return (
                   <div
@@ -1425,7 +1563,7 @@ IMPORTANTE:
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                         showCorrect && isCorrect ? 'bg-green-500' : 'bg-zinc-600'
                       } text-white`}>
-                        {showCorrect && isCorrect ? <Check size={14} /> : i + 1}
+                        {showCorrect && isCorrect ? <Check size={14} /> : optionLetter}
                       </span>
                       <span className="text-white text-sm flex-1">{option}</span>
                       {showCorrect && (
@@ -1446,7 +1584,7 @@ IMPORTANTE:
             </div>
             
             <p className="text-center text-zinc-400 text-xs mt-3">
-              Responde con <code className="bg-zinc-700 px-1 rounded">1</code> <code className="bg-zinc-700 px-1 rounded">2</code> <code className="bg-zinc-700 px-1 rounded">3</code> <code className="bg-zinc-700 px-1 rounded">4</code>
+              Responde con <code className="bg-zinc-700 px-1 rounded">A</code> <code className="bg-zinc-700 px-1 rounded">B</code> <code className="bg-zinc-700 px-1 rounded">C</code> <code className="bg-zinc-700 px-1 rounded">D</code>
             </p>
           </div>
 

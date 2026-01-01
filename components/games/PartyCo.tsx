@@ -10,7 +10,7 @@ import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
-// Tipos de pruebas del Party & Co (sin Cultura - redundante con Trivia)
+// Tipos de pruebas del Party & Co
 type ChallengeType = 'trivia' | 'mimica' | 'dibujo' | 'tabu' | 'rapidez';
 
 interface TabuChallenge {
@@ -66,7 +66,7 @@ const CHALLENGE_COLORS: Record<ChallengeType, string> = {
 };
 
 const CHALLENGE_NAMES: Record<ChallengeType, string> = {
-  trivia: 'Trivia',
+  trivia: 'Memoria',
   mimica: 'Mímica',
   dibujo: 'Dibujo',
   tabu: 'Tabú',
@@ -112,7 +112,7 @@ const sortChallengesByUsage = (challenges: Challenge[]): Challenge[] => {
 
 // ========== BANCO DE PRUEBAS MEJORADO ==========
 
-// TRIVIA - Preguntas variadas (40)
+// MEMORIA - Preguntas variadas (30)
 const TRIVIA_CHALLENGES: Challenge[] = [
   { id: 'tr1', type: 'trivia', title: '¿Cuál es el planeta más cercano al Sol?', description: 'Responde en el chat', answer: 'mercurio', timeLimit: 20, points: 10 },
   { id: 'tr2', type: 'trivia', title: '¿En qué año cayó el Muro de Berlín?', description: 'Responde en el chat', answer: '1989', timeLimit: 20, points: 10 },
@@ -1806,7 +1806,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
     const { provider, apiKey } = providerInfo;
     
     const prompt = `Genera 5 pruebas variadas para un juego tipo Party & Co sobre "${aiTopic}".
-Incluye diferentes tipos: trivia (preguntas), mimica (cosas para actuar), dibujo (cosas para dibujar), tabu (palabras con 5 palabras prohibidas).
+Incluye diferentes tipos: memoria (preguntas de conocimiento), mimica (cosas para actuar), dibujo (cosas para dibujar), tabu (palabras con 5 palabras prohibidas).
 Responde SOLO con JSON:
 {
   "challenges": [
