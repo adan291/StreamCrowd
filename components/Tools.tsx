@@ -78,7 +78,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
             </div>
             <div>
               <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t.tools.title}</h2>
-              <p className="text-zinc-500 text-xs">{t.tools.subtitle}</p>
+              <p className="text-zinc-500 dark:text-zinc-400 text-xs">{t.tools.subtitle}</p>
             </div>
           </div>
           <button
@@ -99,7 +99,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-zinc-900 dark:text-white">{t.common.language}</h3>
-                <p className="text-xs text-zinc-500">{t.tools.selectLanguage}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.tools.selectLanguage}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -129,7 +129,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-zinc-900 dark:text-white">{t.common.theme}</h3>
-                <p className="text-xs text-zinc-500">{t.tools.switchTheme}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.tools.switchTheme}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -170,7 +170,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
             </div>
             <div className="flex-1 text-left">
               <h3 className="font-bold text-zinc-900 dark:text-white">{t.tools.keyboardShortcuts}</h3>
-              <p className="text-xs text-zinc-500">{t.tools.keyboardShortcutsDesc}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.tools.keyboardShortcutsDesc}</p>
             </div>
             <ChevronRight size={20} className="text-zinc-400 group-hover:text-purple-500 transition-colors" />
           </button>
@@ -185,7 +185,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
             </div>
             <div className="flex-1 text-left">
               <h3 className="font-bold text-zinc-900 dark:text-white">{t.pushNotifications?.title || 'Notificaciones'}</h3>
-              <p className="text-xs text-zinc-500">{t.pushNotifications?.subtitle || 'Configura alertas externas para tu stream'}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.pushNotifications?.subtitle || 'Configura alertas externas para tu stream'}</p>
             </div>
             <ChevronRight size={20} className="text-zinc-400 group-hover:text-purple-500 transition-colors" />
           </button>
@@ -199,7 +199,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
                 </div>
                 <div className="flex-1">
                   <h3 className="font-bold text-zinc-900 dark:text-white">{t.onboarding?.restartTutorial || 'Tutorial'}</h3>
-                  <p className="text-xs text-zinc-500">{t.onboarding?.restartTutorialDesc || 'Reinicia el tutorial interactivo'}</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{t.onboarding?.restartTutorialDesc || 'Reinicia el tutorial interactivo'}</p>
                 </div>
               </div>
               
@@ -234,7 +234,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
 
         {/* Footer */}
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 rounded-b-2xl shrink-0">
-          <p className="text-xs text-zinc-500 text-center">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
             {t.tools.quickAccess} <kbd className="px-1.5 py-0.5 bg-zinc-200 dark:bg-zinc-800 rounded text-[10px] font-mono">Ctrl+,</kbd>
           </p>
         </div>

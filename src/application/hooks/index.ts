@@ -14,6 +14,7 @@ export * from './useChatService';
 export * from './useCommands';
 export * from './useGameService';
 export * from './useModerationService';
+export * from './useModeratedChannels';
 export * from './useOBS';
 export * from './useOBSTriggers';
 export * from './usePollService';

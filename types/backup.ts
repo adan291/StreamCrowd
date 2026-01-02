@@ -153,7 +153,7 @@ export interface BackupData {
   /** Timestamp when backup was created */
   timestamp: number;
   /** Application identifier */
-  application: 'twitchvote';
+  application: 'streamcrowd';
   /** Backed up data */
   data: {
     /** Custom chat commands */
@@ -246,7 +246,7 @@ export const BACKUP_DATA_VERSION = 1;
 /**
  * localStorage key for backup configuration
  */
-export const BACKUP_STORAGE_KEY = 'twitchvote_backup_config';
+export const BACKUP_STORAGE_KEY = 'streamcrowd_backup_config';
 
 /**
  * Auto-backup debounce delay in milliseconds (5 minutes)
@@ -321,7 +321,7 @@ export function isValidBackupData(obj: unknown): obj is BackupData {
   return (
     typeof data.version === 'number' &&
     typeof data.timestamp === 'number' &&
-    data.application === 'twitchvote' &&
+    data.application === 'streamcrowd' &&
     typeof data.data === 'object' &&
     data.data !== null &&
     typeof data.checksum === 'string'

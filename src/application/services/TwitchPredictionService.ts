@@ -64,7 +64,7 @@ const ERROR_MESSAGES: Record<string, Omit<TwitchPredictionError, 'status'>> = {
   missing_scope: {
     code: 'missing_scope',
     message: 'Sin permiso para gestionar predicciones',
-    solution: 'Necesitas el scope channel:manage:predictions. Reconecta tu cuenta.',
+    solution: 'Tu token no tiene los permisos necesarios. Desconecta y vuelve a conectar con Twitch para obtener un nuevo token con los permisos correctos.',
     retryable: false,
   },
   not_partner_affiliate: {
@@ -178,8 +178,12 @@ export class TwitchPredictionService {
    * @requirements 8.2, 8.4 - User-friendly error messages
    */
   parseError(status: number, body?: string): TwitchPredictionError {
-    // Authentication errors
+    // Authentication errors - check for missing scope first
     if (status === 401) {
+      // Check if it's specifically a missing scope error
+      if (body?.includes('scope') || body?.includes('Missing scope')) {
+        return { ...ERROR_MESSAGES['missing_scope'], status };
+      }
       return { ...ERROR_MESSAGES['invalid_token'], status };
     }
 

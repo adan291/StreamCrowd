@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface TooltipProps {
@@ -14,7 +14,7 @@ export function Tooltip({
   children,
   content,
   position = 'top',
-  delay = 200,
+  delay = 500,
   disabled = false,
   className = '',
 }: TooltipProps) {
@@ -23,6 +23,7 @@ export function Tooltip({
   const triggerRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const tooltipId = useId();
 
   const showTooltip = () => {
     if (disabled) return;
@@ -83,6 +84,7 @@ export function Tooltip({
 
   const childWithRef = React.cloneElement(children, {
     ref: triggerRef,
+    'aria-describedby': isVisible ? tooltipId : undefined,
     onMouseEnter: (e: React.MouseEvent) => {
       showTooltip();
       children.props.onMouseEnter?.(e);
@@ -108,12 +110,14 @@ export function Tooltip({
         createPortal(
           <div
             ref={tooltipRef}
+            id={tooltipId}
             role="tooltip"
             className={`
               fixed z-50 px-2 py-1 text-xs font-medium
               bg-gray-800 text-gray-100 rounded shadow-lg
               border border-gray-700
               animate-fade-in pointer-events-none
+              max-w-xs
               ${className}
             `}
             style={{

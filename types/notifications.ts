@@ -281,9 +281,9 @@ export interface IAlertConfigService {
  * Storage keys for notification data
  */
 export const NOTIFICATION_STORAGE_KEYS = {
-  ALERT_CONFIG: 'twitchvote_alert_config',
-  NOTIFICATION_HISTORY: 'twitchvote_notification_history',
-  NOTIFICATION_QUEUE: 'twitchvote_notification_queue',
+  ALERT_CONFIG: 'streamcrowd_alert_config',
+  NOTIFICATION_HISTORY: 'streamcrowd_notification_history',
+  NOTIFICATION_QUEUE: 'streamcrowd_notification_queue',
 } as const;
 
 // ============================================================================

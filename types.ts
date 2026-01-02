@@ -7,7 +7,7 @@
  * Main sidebar tab options
  * @requirements 1.1 - Plataformas tab in sidebar
  */
-export type LeftTab = 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | 'data' | 'macros';
+export type LeftTab = 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | 'data';
 
 /**
  * Sub-views within the Dynamics section
@@ -37,7 +37,7 @@ export type PlatformsView = 'selector' | 'twitch';
  * 
  * @requirements 6.3 - Navigation state supports platform and tool selection independently
  */
-export type PlatformsTool = 'none' | 'commands' | 'predictions' | 'channelpoints' | 'timers';
+export type PlatformsTool = 'none' | 'commands' | 'macros' | 'predictions' | 'channelpoints' | 'timers';
 
 /**
  * Configuration for each activity card in the ActivitySelector

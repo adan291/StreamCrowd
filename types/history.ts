@@ -191,7 +191,7 @@ export interface HistoryExport {
   /** Export timestamp */
   exportedAt: number;
   /** Application identifier */
-  application: 'twitchvote';
+  application: 'streamcrowd';
   /** All history items */
   items: HistoryItem[];
   /** Export metadata */
@@ -214,7 +214,7 @@ export const HISTORY_MAX_ITEMS_PER_CATEGORY = 100;
 /**
  * localStorage key for history data
  */
-export const HISTORY_STORAGE_KEY = 'twitchvote_unified_history';
+export const HISTORY_STORAGE_KEY = 'streamcrowd_unified_history';
 
 /**
  * Default empty history storage

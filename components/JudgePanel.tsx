@@ -24,7 +24,21 @@ import {
   Sparkles,
   AlertCircle,
   Grid,
+  Vote,
+  Sliders,
+  Wand2,
 } from 'lucide-react';
+import { CollapsibleSection } from './ui/CollapsibleSection';
+import { PresetSelector } from './ui/PresetSelector';
+import { ViewModeToggle, useViewMode } from './ui/ViewModeToggle';
+import { WizardStepper, useWizard } from './ui/WizardStepper';
+import { Tooltip } from './ui/Tooltip';
+import { 
+  JUDGE_PRESETS, 
+  JudgePanelPresetValues, 
+  createCriteriaFromPreset, 
+  isJudgeConfigCustomized 
+} from '../config/judgePresets';
 import {
   JudgePanelConfig,
   JudgePanelState,
@@ -121,6 +135,16 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
   const [isFinished, setIsFinished] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   
+  // UI Mode state - @requirements 7.1, 7.4
+  const [viewMode, setViewMode] = useViewMode('judge-panel-view-mode', 'expanded');
+  
+  // Wizard Mode state - @requirements 4.1, 4.2
+  const [wizardMode, setWizardMode] = useState(false);
+  const wizard = useWizard(4);
+  
+  // Preset confirmation message - @requirements 6.4
+  const [presetMessage, setPresetMessage] = useState<string | null>(null);
+  
   // Overlay settings
   const [overlayBgColor, setOverlayBgColor] = useState('transparent');
   const [overlayTextColor, setOverlayTextColor] = useState('#FFFFFF');
@@ -135,6 +159,64 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
   const channelRef = useRef<BroadcastChannel | null>(null);
   const stateRef = useRef(state);
   const processedVotesRef = useRef<Set<string>>(new Set());
+  
+  // Check if config is customized - @requirements 6.6
+  const isCustomized = useMemo(() => {
+    return isJudgeConfigCustomized({
+      criteria: state.config.criteria,
+      publicVotingEnabled: state.config.publicVotingEnabled,
+      publicVoteWeight: state.config.publicVoteWeight,
+    });
+  }, [state.config.criteria, state.config.publicVotingEnabled, state.config.publicVoteWeight]);
+  
+  // Wizard steps configuration - @requirements 4.2
+  const wizardSteps = useMemo(() => [
+    { id: 'config', title: 'Configuración General', icon: <Settings size={16} /> },
+    { id: 'criteria', title: 'Criterios de Evaluación', icon: <Target size={16} /> },
+    { id: 'contestants', title: 'Concursantes', icon: <Users size={16} /> },
+    { id: 'judges', title: 'Jueces', icon: <Gavel size={16} /> },
+  ], []);
+
+  // Check if wizard can proceed to next step - validates required fields
+  const canWizardProceed = useMemo(() => {
+    if (wizard.currentStep === 0) return true; // Config step always valid
+    if (wizard.currentStep === 1) {
+      // Criteria step - need at least 1 criterion
+      return state.config.criteria.length > 0;
+    }
+    if (wizard.currentStep === 2) {
+      // Contestants step - need at least 1 contestant
+      return state.config.contestants.length > 0;
+    }
+    if (wizard.currentStep === 3) {
+      // Final step - need both criteria and contestants
+      return state.config.criteria.length > 0 && state.config.contestants.length > 0;
+    }
+    return true;
+  }, [wizard.currentStep, state.config.criteria.length, state.config.contestants.length]);
+  
+  // Handle preset selection - @requirements 6.3, 6.4
+  const handlePresetSelect = useCallback((preset: typeof JUDGE_PRESETS[0]) => {
+    const newCriteria = createCriteriaFromPreset(preset.values.criteria);
+    
+    setState(prev => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        criteria: newCriteria,
+        publicVotingEnabled: preset.values.publicVotingEnabled,
+        publicVoteWeight: preset.values.publicVoteWeight ?? prev.config.publicVoteWeight,
+        defaultMinScore: preset.values.defaultMinScore,
+        defaultMaxScore: preset.values.defaultMaxScore,
+      }
+    }));
+    
+    // Show confirmation message
+    setPresetMessage(`Preset "${preset.name}" aplicado`);
+    setTimeout(() => setPresetMessage(null), 2000);
+    
+    syncState();
+  }, []);
   
   // Sync ref with state
   useEffect(() => {
@@ -791,6 +873,443 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
     updateContestantImage(contestantId, '');
   };
 
+  // ============================================
+  // RENDER FUNCTIONS FOR COLLAPSIBLE SECTIONS
+  // ============================================
+
+  // Render Criteria Section
+  const renderCriteriaSection = () => (
+    <div className="space-y-3">
+      <p className="text-zinc-400 text-xs">(ej: dificultad, imaginación, originalidad...)</p>
+      <div className="space-y-2">
+        {state.config.criteria.map(criterion => (
+          <div key={criterion.id} className="bg-zinc-700/50 rounded-lg p-2">
+            {editingCriterionId === criterion.id ? (
+              <div className="space-y-2">
+                <input
+                  id={`criterion-name-${criterion.id}`}
+                  name="criterionName"
+                  type="text"
+                  value={criterion.name}
+                  onChange={(e) => updateCriterion(criterion.id, { name: e.target.value })}
+                  className="w-full bg-zinc-600 border border-zinc-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  placeholder="Nombre del criterio"
+                  aria-label="Nombre del criterio"
+                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label htmlFor={`criterion-min-${criterion.id}`} className="text-[10px] text-zinc-400">Mín</label>
+                    <input
+                      id={`criterion-min-${criterion.id}`}
+                      name="criterionMinScore"
+                      type="number"
+                      value={criterion.minScore}
+                      onChange={(e) => updateCriterion(criterion.id, { minScore: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-zinc-600 border border-zinc-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      min="0"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor={`criterion-max-${criterion.id}`} className="text-[10px] text-zinc-400">Máx</label>
+                    <input
+                      id={`criterion-max-${criterion.id}`}
+                      name="criterionMaxScore"
+                      type="number"
+                      value={criterion.maxScore}
+                      onChange={(e) => updateCriterion(criterion.id, { maxScore: parseInt(e.target.value) || 10 })}
+                      className="w-full bg-zinc-600 border border-zinc-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      min="1"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Tooltip content={t.judgePanel.criteriaWeightTooltip} position="top">
+                      <label htmlFor={`criterion-weight-${criterion.id}`} className="text-[10px] text-zinc-400 cursor-help">Peso</label>
+                    </Tooltip>
+                    <input
+                      id={`criterion-weight-${criterion.id}`}
+                      name="criterionWeight"
+                      type="number"
+                      value={criterion.weight}
+                      onChange={(e) => updateCriterion(criterion.id, { weight: parseFloat(e.target.value) || 1 })}
+                      className="w-full bg-zinc-600 border border-zinc-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                      min="0.1"
+                      max="10"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setEditingCriterionId(null)} className="px-2 py-1 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded focus:outline-none focus:ring-2 focus:ring-violet-400">
+                    <Check size={12} />
+                  </button>
+                  <button onClick={() => removeCriterion(criterion.id)} className="px-2 py-1 text-xs bg-red-600/50 hover:bg-red-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-violet-400">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Star size={14} className="text-yellow-400" />
+                <span className="flex-1 text-white text-sm">{criterion.name}</span>
+                <span className="text-zinc-400 text-xs">{criterion.minScore}-{criterion.maxScore}</span>
+                <span className="text-zinc-400 text-xs">x{criterion.weight}</span>
+                <button onClick={() => setEditingCriterionId(criterion.id)} className="p-1 text-zinc-400 hover:text-twitch-brand focus:outline-none focus:ring-2 focus:ring-violet-400 rounded">
+                  <Settings size={14} />
+                </button>
+                <button onClick={() => removeCriterion(criterion.id)} className="p-1 text-zinc-400 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          id="new-criterion-input"
+          name="newCriterionName"
+          type="text"
+          value={newCriterionName}
+          onChange={(e) => setNewCriterionName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addCriterion()}
+          className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+          placeholder="Nuevo criterio..."
+          aria-label="Nombre del nuevo criterio"
+        />
+        <button onClick={addCriterion} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+
+  // Render Contestants Section
+  const renderContestantsSection = () => (
+    <div className="space-y-3">
+      {/* Vote prefix config */}
+      <div className="flex items-center gap-2 p-2 bg-zinc-700/30 rounded-lg">
+        <Tooltip content={t.judgePanel.votePrefixTooltip} position="right">
+          <label htmlFor="vote-prefix-input" className="text-xs text-zinc-400 cursor-help">Prefijo de voto:</label>
+        </Tooltip>
+        <input
+          id="vote-prefix-input"
+          name="publicVotePrefix"
+          type="text"
+          value={state.config.publicVotePrefix}
+          onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotePrefix: e.target.value } }))}
+          className="w-12 bg-zinc-700 border border-zinc-600 text-white rounded px-2 py-1 text-xs text-center font-mono"
+          maxLength={3}
+          placeholder="+"
+        />
+        <span className="text-[10px] text-zinc-400">(ej: +1, #1, !1)</span>
+      </div>
+      
+      <div className="space-y-2">
+        {state.config.contestants.map((contestant, index) => (
+          <div key={contestant.id} className="flex items-center gap-2 bg-zinc-700/50 rounded-lg p-2">
+            <div className="relative w-10 h-10 shrink-0 group/img">
+              {contestant.image ? (
+                <>
+                  <img src={contestant.image} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                  <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                    <button onClick={() => removeContestantImage(contestant.id)} className="p-1 text-white hover:text-red-400">
+                      <X size={14} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold relative overflow-hidden" style={{ backgroundColor: contestant.color }}>
+                  <span className="group-hover/img:opacity-0 transition-opacity">{contestant.name.charAt(0)}</span>
+                  <div className="absolute inset-0 flex opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-800/90 rounded-lg">
+                    <button 
+                      onClick={() => fileInputRefs.current[contestant.id]?.click()} 
+                      className="flex-1 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-700/50"
+                      title="Subir imagen"
+                    >
+                      <Upload size={12} />
+                    </button>
+                    <button 
+                      onClick={() => setShowAssetPicker(contestant.id)} 
+                      className="flex-1 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-700/50 border-l border-zinc-600"
+                      title="Elegir de galería"
+                    >
+                      <Grid size={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              <input 
+                type="file"
+                id={`contestant-image-${contestant.id}`}
+                name="contestant-image"
+                aria-label="Subir imagen del concursante"
+                accept="image/*" 
+                className="hidden" 
+                ref={el => fileInputRefs.current[contestant.id] = el}
+                onChange={(e) => handleImageUpload(contestant.id, e)} 
+              />
+            </div>
+            <input
+              id={`contestant-name-${contestant.id}`}
+              name="contestantName"
+              type="text"
+              value={contestant.name}
+              onChange={(e) => updateContestant(contestant.id, { name: e.target.value })}
+              className="flex-1 bg-zinc-600/50 border border-zinc-600 text-white rounded px-2 py-1 text-sm"
+              placeholder="Nombre"
+              aria-label="Nombre del concursante"
+            />
+            <div className="relative w-16">
+              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-zinc-400 text-xs font-mono">{state.config.publicVotePrefix}</span>
+              <input
+                id={`contestant-votekey-${contestant.id}`}
+                name="contestantVoteKey"
+                type="text"
+                value={contestant.voteKey || ''}
+                onChange={(e) => updateContestant(contestant.id, { voteKey: e.target.value })}
+                className="w-full bg-zinc-600/50 border border-zinc-600 text-white rounded pl-5 pr-1 py-1 text-xs font-mono"
+                placeholder={String(index + 1)}
+                title="Clave de voto"
+                aria-label="Clave de voto del concursante"
+              />
+            </div>
+            <button 
+              onClick={() => fileInputRefs.current[contestant.id]?.click()} 
+              className="p-1 text-zinc-400 hover:text-twitch-brand focus:outline-none focus:ring-2 focus:ring-violet-400 rounded"
+              title="Subir imagen"
+            >
+              <Upload size={14} />
+            </button>
+            <button 
+              onClick={() => setShowAssetPicker(contestant.id)} 
+              className="p-1 text-zinc-400 hover:text-twitch-brand focus:outline-none focus:ring-2 focus:ring-violet-400 rounded"
+              title="Elegir de galería"
+            >
+              <Grid size={14} />
+            </button>
+            <button onClick={() => removeContestant(contestant.id)} className="p-1 text-zinc-400 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded">
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Vote preview */}
+      {state.config.contestants.length > 0 && (
+        <div className="p-2 bg-zinc-700/30 rounded-lg">
+          <p className="text-[10px] text-zinc-400 uppercase font-bold mb-1">El público votará con:</p>
+          <div className="flex flex-wrap gap-1">
+            {state.config.contestants.map((c, i) => (
+              <span key={c.id} className="px-2 py-0.5 bg-zinc-800 rounded text-xs font-mono text-twitch-light border border-zinc-600">
+                {state.config.publicVotePrefix}{c.voteKey || (i + 1)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      <div className="flex gap-2">
+        <input
+          id="new-contestant-input"
+          name="newContestantName"
+          type="text"
+          value={newContestantName}
+          onChange={(e) => setNewContestantName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addContestant()}
+          className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+          placeholder="Nuevo concursante..."
+          aria-label="Nombre del nuevo concursante"
+        />
+        <button onClick={addContestant} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+
+  // Render Judges Section
+  const renderJudgesSection = () => (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        {state.config.judges.map((judge) => (
+          <div key={judge.id} className="bg-zinc-700/50 rounded-lg p-2">
+            {editingJudgeId === judge.id ? (
+              <div className="space-y-2">
+                <input
+                  id={`judge-name-${judge.id}`}
+                  name="judgeName"
+                  type="text"
+                  value={judge.username}
+                  onChange={(e) => updateJudge(judge.id, { username: e.target.value, channelName: e.target.value })}
+                  className="w-full bg-zinc-600 border border-zinc-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  placeholder="Nombre del juez"
+                  aria-label="Nombre del juez"
+                />
+                <div className="flex gap-2 items-center">
+                  <label className="text-[10px] text-zinc-400">Color:</label>
+                  <div className="flex gap-1">
+                    {DEFAULT_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => updateJudge(judge.id, { color })}
+                        className={`w-5 h-5 rounded-full border-2 ${judge.color === color ? 'border-white' : 'border-transparent'} focus:outline-none focus:ring-2 focus:ring-violet-400`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <label htmlFor={`judge-host-${judge.id}`} className="text-[10px] text-zinc-400 ml-2 flex items-center gap-1">
+                    <input
+                      id={`judge-host-${judge.id}`}
+                      name="judgeIsHost"
+                      type="checkbox"
+                      checked={judge.isHost}
+                      onChange={(e) => updateJudge(judge.id, { isHost: e.target.checked })}
+                      className="w-3 h-3"
+                    />
+                    Host
+                  </label>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setEditingJudgeId(null)} className="px-2 py-1 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded focus:outline-none focus:ring-2 focus:ring-violet-400">
+                    <Check size={12} />
+                  </button>
+                  <button onClick={() => removeJudge(judge.id)} className="px-2 py-1 text-xs bg-red-600/50 hover:bg-red-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-violet-400">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: judge.color }} />
+                {judge.isHost && <Crown size={12} className="text-yellow-400" />}
+                <span className="flex-1 text-white text-sm">{judge.username}</span>
+                <button onClick={() => setEditingJudgeId(judge.id)} className="p-1 text-zinc-400 hover:text-twitch-brand focus:outline-none focus:ring-2 focus:ring-violet-400 rounded">
+                  <Settings size={14} />
+                </button>
+                <button onClick={() => removeJudge(judge.id)} className="p-1 text-zinc-400 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-violet-400 rounded">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          id="new-judge-input"
+          name="newJudgeName"
+          type="text"
+          value={newJudgeName}
+          onChange={(e) => setNewJudgeName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addJudge()}
+          className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+          placeholder="Nombre del juez..."
+          aria-label="Nombre del nuevo juez"
+        />
+        <button onClick={addJudge} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
+          <Plus size={16} />
+        </button>
+      </div>
+      
+      {/* Quick add from collaborators */}
+      {collaborationChannels.length > 0 && (
+        <div className="mt-3 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+          <p className="text-[10px] text-cyan-400 uppercase font-bold mb-2 flex items-center gap-1">
+            <Users size={10} /> Añadir colaboradores como jueces:
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {collaborationChannels
+              .filter(collab => !state.config.judges.some(j => j.channelName.toLowerCase() === collab.name.toLowerCase()))
+              .map((collab) => (
+                <button
+                  key={collab.name}
+                  onClick={() => {
+                    const newJudge: Judge = {
+                      id: generateId(),
+                      username: collab.name,
+                      channelName: collab.name,
+                      color: collab.color || DEFAULT_COLORS[(state.config.judges.length) % DEFAULT_COLORS.length],
+                      isHost: false,
+                    };
+                    setState(prev => ({
+                      ...prev,
+                      config: { ...prev.config, judges: [...prev.config.judges, newJudge] }
+                    }));
+                    syncState();
+                  }}
+                  className="px-2 py-1 text-xs rounded-full border transition-colors flex items-center gap-1"
+                  style={{ 
+                    borderColor: collab.color || '#00f0f0',
+                    color: collab.color || '#00f0f0',
+                    backgroundColor: `${collab.color || '#00f0f0'}15`
+                  }}
+                >
+                  <Plus size={10} /> {collab.name}
+                </button>
+              ))}
+            {collaborationChannels.every(collab => 
+              state.config.judges.some(j => j.channelName.toLowerCase() === collab.name.toLowerCase())
+            ) && (
+              <span className="text-xs text-zinc-500 italic">Todos los colaboradores ya son jueces</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render Public Voting Section
+  const renderPublicVotingSection = () => (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="text-sm text-white flex items-center gap-2">
+          <Users size={14} className="text-cyan-400" /> Habilitar Votación Pública
+        </label>
+        <button
+          onClick={() => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingEnabled: !prev.config.publicVotingEnabled } }))}
+          className={`w-10 h-5 rounded-full transition-colors ${state.config.publicVotingEnabled ? 'bg-cyan-500' : 'bg-zinc-600'}`}
+        >
+          <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state.config.publicVotingEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+      
+      {state.config.publicVotingEnabled && (
+        <>
+          <div className="flex items-center gap-3">
+            <label htmlFor="public-voting-duration" className="text-xs text-zinc-400">Duración (seg):</label>
+            <input
+              id="public-voting-duration"
+              name="publicVotingDuration"
+              type="number"
+              value={state.config.publicVotingDuration || ''}
+              onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingDuration: e.target.value ? parseInt(e.target.value) : undefined } }))}
+              className="w-20 bg-zinc-700 border border-zinc-600 text-white rounded px-2 py-1 text-sm"
+              placeholder="∞"
+              min="10"
+            />
+            <span className="text-zinc-500 text-xs">(vacío = manual)</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Tooltip content={t.judgePanel.publicVoteWeightTooltip} position="right">
+              <label htmlFor="public-vote-weight" className="text-xs text-zinc-400 cursor-help">Peso del voto público:</label>
+            </Tooltip>
+            <input
+              id="public-vote-weight"
+              name="publicVoteWeight"
+              type="range"
+              min="0"
+              max="100"
+              value={state.config.publicVoteWeight * 100}
+              onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVoteWeight: parseInt(e.target.value) / 100 } }))}
+              className="flex-1"
+            />
+            <span className="text-white text-sm font-mono w-12">{(state.config.publicVoteWeight * 100).toFixed(0)}%</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   // Overlay Mode - Solo visualización
   if (isOverlayMode) {
     // Clean body background for true transparency in OBS
@@ -1111,500 +1630,331 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
         {showConfig ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
-        {/* Configuration Panel */}
-        {showConfig && (
-          <div className="space-y-4 mb-6 p-4 bg-zinc-800/50 rounded-xl">
-            {/* Title */}
-            <div>
-              <label htmlFor="judge-panel-title" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Título del Torneo</label>
-              <input
-                id="judge-panel-title"
-                name="title"
-                type="text"
-                value={state.config.title}
-                onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, title: e.target.value } }))}
-                className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                placeholder="Panel de Jueces"
-              />
-            </div>
-
-            {/* Score Range */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="judge-min-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Mínima</label>
-                <input
-                  id="judge-min-score"
-                  name="defaultMinScore"
-                  type="number"
-                  value={state.config.defaultMinScore}
-                  onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMinScore: parseInt(e.target.value) || 1 } }))}
-                  className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label htmlFor="judge-max-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Máxima</label>
-                <input
-                  id="judge-max-score"
-                  name="defaultMaxScore"
-                  type="number"
-                  value={state.config.defaultMaxScore}
-                  onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMaxScore: parseInt(e.target.value) || 10 } }))}
-                  className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                  min="1"
-                />
-              </div>
-            </div>
-
-            {/* Criteria */}
-            <div>
-              <label className="text-xs text-zinc-400 font-bold uppercase mb-2 block flex items-center gap-2">
-                <Target size={14} /> Criterios de Evaluación
-                <span className="text-zinc-500 font-normal normal-case text-[10px]">(ej: dificultad, imaginación, originalidad...)</span>
-              </label>
-              <div className="space-y-2 mb-2">
-                {state.config.criteria.map(criterion => (
-                  <div key={criterion.id} className="bg-zinc-700/50 rounded-lg p-2">
-                    {editingCriterionId === criterion.id ? (
-                      <div className="space-y-2">
-                        <input
-                          id={`criterion-name-${criterion.id}`}
-                          name="criterionName"
-                          type="text"
-                          value={criterion.name}
-                          onChange={(e) => updateCriterion(criterion.id, { name: e.target.value })}
-                          className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
-                          placeholder="Nombre del criterio"
-                          aria-label="Nombre del criterio"
-                        />
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <label htmlFor={`criterion-min-${criterion.id}`} className="text-[10px] text-zinc-500">Mín</label>
-                            <input
-                              id={`criterion-min-${criterion.id}`}
-                              name="criterionMinScore"
-                              type="number"
-                              value={criterion.minScore}
-                              onChange={(e) => updateCriterion(criterion.id, { minScore: parseInt(e.target.value) || 0 })}
-                              className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
-                              min="0"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label htmlFor={`criterion-max-${criterion.id}`} className="text-[10px] text-zinc-500">Máx</label>
-                            <input
-                              id={`criterion-max-${criterion.id}`}
-                              name="criterionMaxScore"
-                              type="number"
-                              value={criterion.maxScore}
-                              onChange={(e) => updateCriterion(criterion.id, { maxScore: parseInt(e.target.value) || 10 })}
-                              className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
-                              min="1"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label htmlFor={`criterion-weight-${criterion.id}`} className="text-[10px] text-zinc-500">Peso</label>
-                            <input
-                              id={`criterion-weight-${criterion.id}`}
-                              name="criterionWeight"
-                              type="number"
-                              value={criterion.weight}
-                              onChange={(e) => updateCriterion(criterion.id, { weight: parseFloat(e.target.value) || 1 })}
-                              className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
-                              min="0.1"
-                              max="10"
-                              step="0.1"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setEditingCriterionId(null)} className="px-2 py-1 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded">
-                            <Check size={12} />
-                          </button>
-                          <button onClick={() => removeCriterion(criterion.id)} className="px-2 py-1 text-xs bg-red-600/50 hover:bg-red-600 text-white rounded">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Star size={14} className="text-yellow-400" />
-                        <span className="flex-1 text-white text-sm">{criterion.name}</span>
-                        <span className="text-zinc-400 text-xs">{criterion.minScore}-{criterion.maxScore}</span>
-                        <span className="text-zinc-500 text-xs">x{criterion.weight}</span>
-                        <button onClick={() => setEditingCriterionId(criterion.id)} className="p-1 text-zinc-500 hover:text-twitch-brand">
-                          <Settings size={14} />
-                        </button>
-                        <button onClick={() => removeCriterion(criterion.id)} className="p-1 text-zinc-500 hover:text-red-400">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  id="new-criterion-input"
-                  name="newCriterionName"
-                  type="text"
-                  value={newCriterionName}
-                  onChange={(e) => setNewCriterionName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addCriterion()}
-                  className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                  placeholder="Nuevo criterio..."
-                  aria-label="Nombre del nuevo criterio"
-                />
-                <button onClick={addCriterion} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
-                  <Plus size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Contestants */}
-            <div>
-              <label className="text-xs text-zinc-400 font-bold uppercase mb-2 block flex items-center gap-2">
-                <Users size={14} /> Concursantes
-              </label>
-              
-              {/* Vote prefix config */}
-              <div className="flex items-center gap-2 mb-3 p-2 bg-zinc-700/30 rounded-lg">
-                <label htmlFor="vote-prefix-input" className="text-xs text-zinc-400">Prefijo de voto:</label>
-                <input
-                  id="vote-prefix-input"
-                  name="publicVotePrefix"
-                  type="text"
-                  value={state.config.publicVotePrefix}
-                  onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotePrefix: e.target.value } }))}
-                  className="w-12 bg-zinc-700 border border-zinc-600 text-white rounded px-2 py-1 text-xs text-center font-mono"
-                  maxLength={3}
-                  placeholder="+"
-                />
-                <span className="text-[10px] text-zinc-500">(ej: +1, #1, !1)</span>
-              </div>
-              
-              <div className="space-y-2 mb-2">
-                {state.config.contestants.map((contestant, index) => (
-                  <div key={contestant.id} className="flex items-center gap-2 bg-zinc-700/50 rounded-lg p-2">
-                    <div className="relative w-10 h-10 shrink-0 group/img">
-                      {contestant.image ? (
-                        <>
-                          <img src={contestant.image} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                          <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
-                            <button onClick={() => removeContestantImage(contestant.id)} className="p-1 text-white hover:text-red-400">
-                              <X size={14} />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-sm font-bold relative overflow-hidden" style={{ backgroundColor: contestant.color }}>
-                          <span className="group-hover/img:opacity-0 transition-opacity">{contestant.name.charAt(0)}</span>
-                          <div className="absolute inset-0 flex opacity-0 group-hover/img:opacity-100 transition-opacity bg-zinc-800/90 rounded-lg">
-                            <button 
-                              onClick={() => fileInputRefs.current[contestant.id]?.click()} 
-                              className="flex-1 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-700/50"
-                              title="Subir imagen"
-                            >
-                              <Upload size={12} />
-                            </button>
-                            <button 
-                              onClick={() => setShowAssetPicker(contestant.id)} 
-                              className="flex-1 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-700/50 border-l border-zinc-600"
-                              title="Elegir de galería"
-                            >
-                              <Grid size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      <input 
-                        type="file"
-                        id={`contestant-image-${contestant.id}`}
-                        name="contestant-image"
-                        aria-label="Subir imagen del concursante"
-                        accept="image/*" 
-                        className="hidden" 
-                        ref={el => fileInputRefs.current[contestant.id] = el}
-                        onChange={(e) => handleImageUpload(contestant.id, e)} 
-                      />
-                    </div>
-                    <input
-                      id={`contestant-name-${contestant.id}`}
-                      name="contestantName"
-                      type="text"
-                      value={contestant.name}
-                      onChange={(e) => updateContestant(contestant.id, { name: e.target.value })}
-                      className="flex-1 bg-zinc-600/50 border border-zinc-600 text-white rounded px-2 py-1 text-sm"
-                      placeholder="Nombre"
-                      aria-label="Nombre del concursante"
-                    />
-                    <div className="relative w-16">
-                      <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs font-mono">{state.config.publicVotePrefix}</span>
-                      <input
-                        id={`contestant-votekey-${contestant.id}`}
-                        name="contestantVoteKey"
-                        type="text"
-                        value={contestant.voteKey || ''}
-                        onChange={(e) => updateContestant(contestant.id, { voteKey: e.target.value })}
-                        className="w-full bg-zinc-600/50 border border-zinc-600 text-white rounded pl-5 pr-1 py-1 text-xs font-mono"
-                        placeholder={String(index + 1)}
-                        title="Clave de voto"
-                        aria-label="Clave de voto del concursante"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => fileInputRefs.current[contestant.id]?.click()} 
-                      className="p-1 text-zinc-500 hover:text-twitch-brand"
-                      title="Subir imagen"
-                    >
-                      <Upload size={14} />
-                    </button>
-                    <button 
-                      onClick={() => setShowAssetPicker(contestant.id)} 
-                      className="p-1 text-zinc-500 hover:text-twitch-brand"
-                      title="Elegir de galería"
-                    >
-                      <Grid size={14} />
-                    </button>
-                    <button onClick={() => removeContestant(contestant.id)} className="p-1 text-zinc-500 hover:text-red-400">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Vote preview */}
-              {state.config.contestants.length > 0 && (
-                <div className="mb-3 p-2 bg-zinc-700/30 rounded-lg">
-                  <p className="text-[10px] text-zinc-500 uppercase font-bold mb-1">El público votará con:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {state.config.contestants.map((c, i) => (
-                      <span key={c.id} className="px-2 py-0.5 bg-zinc-800 rounded text-xs font-mono text-twitch-light border border-zinc-600">
-                        {state.config.publicVotePrefix}{c.voteKey || (i + 1)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <input
-                  id="new-contestant-input"
-                  name="newContestantName"
-                  type="text"
-                  value={newContestantName}
-                  onChange={(e) => setNewContestantName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addContestant()}
-                  className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                  placeholder="Nuevo concursante..."
-                  aria-label="Nombre del nuevo concursante"
-                />
-                <button onClick={addContestant} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
-                  <Plus size={16} />
-                </button>
-              </div>
-            </div>
-
-            {/* Judges */}
-            <div>
-              <label className="text-xs text-zinc-400 font-bold uppercase mb-2 block flex items-center gap-2">
-                <Gavel size={14} /> Jueces ({state.config.judges.length})
-              </label>
-              <div className="space-y-2 mb-2">
-                {state.config.judges.map((judge, index) => (
-                  <div key={judge.id} className="bg-zinc-700/50 rounded-lg p-2">
-                    {editingJudgeId === judge.id ? (
-                      <div className="space-y-2">
-                        <input
-                          id={`judge-name-${judge.id}`}
-                          name="judgeName"
-                          type="text"
-                          value={judge.username}
-                          onChange={(e) => updateJudge(judge.id, { username: e.target.value, channelName: e.target.value })}
-                          className="w-full bg-zinc-600 border border-zinc-500 text-white rounded px-2 py-1 text-sm"
-                          placeholder="Nombre del juez"
-                          aria-label="Nombre del juez"
-                        />
-                        <div className="flex gap-2 items-center">
-                          <label className="text-[10px] text-zinc-500">Color:</label>
-                          <div className="flex gap-1">
-                            {DEFAULT_COLORS.map(color => (
-                              <button
-                                key={color}
-                                onClick={() => updateJudge(judge.id, { color })}
-                                className={`w-5 h-5 rounded-full border-2 ${judge.color === color ? 'border-white' : 'border-transparent'}`}
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                          </div>
-                          <label htmlFor={`judge-host-${judge.id}`} className="text-[10px] text-zinc-500 ml-2 flex items-center gap-1">
-                            <input
-                              id={`judge-host-${judge.id}`}
-                              name="judgeIsHost"
-                              type="checkbox"
-                              checked={judge.isHost}
-                              onChange={(e) => updateJudge(judge.id, { isHost: e.target.checked })}
-                              className="w-3 h-3"
-                            />
-                            Host
-                          </label>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setEditingJudgeId(null)} className="px-2 py-1 text-xs bg-zinc-600 hover:bg-zinc-500 text-white rounded">
-                            <Check size={12} />
-                          </button>
-                          <button onClick={() => removeJudge(judge.id)} className="px-2 py-1 text-xs bg-red-600/50 hover:bg-red-600 text-white rounded">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: judge.color }} />
-                        {judge.isHost && <Crown size={12} className="text-yellow-400" />}
-                        <span className="flex-1 text-white text-sm">{judge.username}</span>
-                        <button onClick={() => setEditingJudgeId(judge.id)} className="p-1 text-zinc-500 hover:text-twitch-brand">
-                          <Settings size={14} />
-                        </button>
-                        <button onClick={() => removeJudge(judge.id)} className="p-1 text-zinc-500 hover:text-red-400">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  id="new-judge-input"
-                  name="newJudgeName"
-                  type="text"
-                  value={newJudgeName}
-                  onChange={(e) => setNewJudgeName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addJudge()}
-                  className="flex-1 bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
-                  placeholder="Nombre del juez..."
-                  aria-label="Nombre del nuevo juez"
-                />
-                <button onClick={addJudge} className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg">
-                  <Plus size={16} />
-                </button>
-              </div>
-              
-              {/* Quick add from collaborators */}
-              {collaborationChannels.length > 0 && (
-                <div className="mt-3 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-                  <p className="text-[10px] text-cyan-400 uppercase font-bold mb-2 flex items-center gap-1">
-                    <Users size={10} /> Añadir colaboradores como jueces:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {collaborationChannels
-                      .filter(collab => !state.config.judges.some(j => j.channelName.toLowerCase() === collab.name.toLowerCase()))
-                      .map((collab, index) => (
-                        <button
-                          key={collab.name}
-                          onClick={() => {
-                            const newJudge: Judge = {
-                              id: generateId(),
-                              username: collab.name,
-                              channelName: collab.name,
-                              color: collab.color || DEFAULT_COLORS[(state.config.judges.length) % DEFAULT_COLORS.length],
-                              isHost: false,
-                            };
-                            setState(prev => ({
-                              ...prev,
-                              config: { ...prev.config, judges: [...prev.config.judges, newJudge] }
-                            }));
-                            syncState();
-                          }}
-                          className="px-2 py-1 text-xs rounded-full border transition-colors flex items-center gap-1"
-                          style={{ 
-                            borderColor: collab.color || '#00f0f0',
-                            color: collab.color || '#00f0f0',
-                            backgroundColor: `${collab.color || '#00f0f0'}15`
-                          }}
-                        >
-                          <Plus size={10} /> {collab.name}
-                        </button>
-                      ))}
-                    {collaborationChannels.every(collab => 
-                      state.config.judges.some(j => j.channelName.toLowerCase() === collab.name.toLowerCase())
-                    ) && (
-                      <span className="text-xs text-zinc-500 italic">Todos los colaboradores ya son jueces</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Public Voting Options */}
-            <div className="space-y-3 p-3 bg-zinc-700/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <label className="text-sm text-white flex items-center gap-2">
-                  <Users size={14} className="text-cyan-400" /> Votación Pública
-                </label>
-                <button
-                  onClick={() => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingEnabled: !prev.config.publicVotingEnabled } }))}
-                  className={`w-10 h-5 rounded-full transition-colors ${state.config.publicVotingEnabled ? 'bg-cyan-500' : 'bg-zinc-600'}`}
-                >
-                  <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state.config.publicVotingEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-              
-              {state.config.publicVotingEnabled && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <label htmlFor="public-voting-duration" className="text-xs text-zinc-400">Duración (seg):</label>
-                    <input
-                      id="public-voting-duration"
-                      name="publicVotingDuration"
-                      type="number"
-                      value={state.config.publicVotingDuration || ''}
-                      onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingDuration: e.target.value ? parseInt(e.target.value) : undefined } }))}
-                      className="w-20 bg-zinc-700 border border-zinc-600 text-white rounded px-2 py-1 text-sm"
-                      placeholder="∞"
-                      min="10"
-                    />
-                    <span className="text-zinc-500 text-xs">(vacío = manual)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label htmlFor="public-vote-weight" className="text-xs text-zinc-400">Peso del voto público:</label>
-                    <input
-                      id="public-vote-weight"
-                      name="publicVoteWeight"
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={state.config.publicVoteWeight * 100}
-                      onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, publicVoteWeight: parseInt(e.target.value) / 100 } }))}
-                      className="flex-1"
-                    />
-                    <span className="text-white text-sm font-mono w-12">{(state.config.publicVoteWeight * 100).toFixed(0)}%</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Display Options */}
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-white flex items-center gap-2">
-                {state.config.revealScoresLive ? <Eye size={14} /> : <EyeOff size={14} />}
-                Mostrar puntuaciones en overlay
-              </label>
-              <button
-                onClick={() => {
-                  setState(prev => ({ ...prev, config: { ...prev.config, revealScoresLive: !prev.config.revealScoresLive } }));
-                  setTimeout(() => syncState(), 50);
-                }}
-                className={`w-10 h-5 rounded-full transition-colors ${state.config.revealScoresLive ? 'bg-green-500' : 'bg-zinc-600'}`}
-              >
-                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state.config.revealScoresLive ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
+        {/* Preset confirmation message - @requirements 6.4 */}
+        {presetMessage && (
+          <div className="mb-4 p-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm text-center animate-fade-in">
+            <Check size={14} className="inline mr-2" />
+            {presetMessage}
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Configuration Panel */}
+        {showConfig && (
+          <div className="space-y-4 mb-6">
+            {/* Header with Preset Selector, View Mode Toggle, and Wizard Toggle */}
+            {/* @requirements 6.1, 7.1, 4.1 */}
+            <div className="flex flex-wrap items-center gap-3 p-3 bg-zinc-800/50 rounded-xl">
+              <div className="flex-1 min-w-[200px]">
+                <PresetSelector
+                  presets={JUDGE_PRESETS}
+                  currentValues={{
+                    criteria: state.config.criteria,
+                    publicVotingEnabled: state.config.publicVotingEnabled,
+                    publicVoteWeight: state.config.publicVoteWeight,
+                    defaultMinScore: state.config.defaultMinScore,
+                    defaultMaxScore: state.config.defaultMaxScore,
+                  }}
+                  onSelect={handlePresetSelect}
+                  isCustomized={isCustomized}
+                  label="Preset"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <ViewModeToggle
+                  mode={viewMode}
+                  onChange={setViewMode}
+                  storageKey="judge-panel-view-mode"
+                  disabled={wizardMode}
+                />
+                <button
+                  onClick={() => setWizardMode(!wizardMode)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    wizardMode 
+                      ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' 
+                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
+                  }`}
+                  title="Modo Asistente"
+                >
+                  <Wand2 size={14} />
+                  <span>Asistente</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Wizard Mode takes priority - @requirements 4.2 */}
+            {wizardMode ? (
+              /* Wizard Mode - @requirements 4.2, 4.3, 4.4, 4.5, 4.6 */
+              <div className="p-4 bg-zinc-800/50 rounded-xl">
+                <WizardStepper
+                  steps={wizardSteps}
+                  currentStep={wizard.currentStep}
+                  onStepChange={wizard.goToStep}
+                  showNavigation={true}
+                  canProceed={canWizardProceed}
+                  finishLabel="Iniciar Torneo"
+                  onFinish={() => {
+                    if (state.config.contestants.length > 0 && state.config.criteria.length > 0) {
+                      startTournament();
+                      setWizardMode(false);
+                    }
+                  }}
+                />
+                
+                {/* Wizard Step Content */}
+                <div className="mt-6">
+                  {/* Step 1: General Config */}
+                  {wizard.currentStep === 0 && (
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="wizard-title" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Título del Torneo</label>
+                        <input
+                          id="wizard-title"
+                          type="text"
+                          value={state.config.title}
+                          onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, title: e.target.value } }))}
+                          className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+                          placeholder="Ej: Torneo de Arte"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="wizard-min-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Mínima</label>
+                          <input
+                            id="wizard-min-score"
+                            type="number"
+                            value={state.config.defaultMinScore}
+                            onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMinScore: parseInt(e.target.value) || 0 } }))}
+                            className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="wizard-max-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Máxima</label>
+                          <input
+                            id="wizard-max-score"
+                            type="number"
+                            value={state.config.defaultMaxScore}
+                            onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMaxScore: parseInt(e.target.value) || 10 } }))}
+                            className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                      </div>
+                      {/* Public voting toggle */}
+                      <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Vote className="text-cyan-400" size={16} />
+                          <span className="text-zinc-300 text-sm">Votación Pública</span>
+                        </div>
+                        <button
+                          onClick={() => setState(prev => ({ ...prev, config: { ...prev.config, publicVotingEnabled: !prev.config.publicVotingEnabled } }))}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${state.config.publicVotingEnabled ? 'bg-cyan-500' : 'bg-zinc-600'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${state.config.publicVotingEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Step 2: Criteria */}
+                  {wizard.currentStep === 1 && (
+                    <div className="space-y-4">
+                      {renderCriteriaSection()}
+                      {state.config.criteria.length === 0 && (
+                        <p className="text-yellow-500 text-xs flex items-center gap-1">
+                          <AlertCircle size={12} /> Debes añadir al menos un criterio para continuar
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Step 3: Contestants */}
+                  {wizard.currentStep === 2 && (
+                    <div className="space-y-4">
+                      {renderContestantsSection()}
+                      {state.config.contestants.length === 0 && (
+                        <p className="text-yellow-500 text-xs flex items-center gap-1">
+                          <AlertCircle size={12} /> Debes añadir al menos un concursante para continuar
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Step 4: Judges - Summary */}
+                  {wizard.currentStep === 3 && (
+                    <div className="space-y-4">
+                      {renderJudgesSection()}
+                      {/* Summary */}
+                      <div className="p-4 bg-zinc-900/50 rounded-xl space-y-2">
+                        <p className="text-zinc-400 text-xs font-bold uppercase">Resumen</p>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-2xl font-bold text-violet-400">{state.config.criteria.length}</p>
+                            <p className="text-zinc-500 text-xs">Criterios</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-yellow-400">{state.config.contestants.length}</p>
+                            <p className="text-zinc-500 text-xs">Concursantes</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-cyan-400">{state.config.judges.length}</p>
+                            <p className="text-zinc-500 text-xs">Jueces</p>
+                          </div>
+                        </div>
+                      </div>
+                      {(state.config.contestants.length === 0 || state.config.criteria.length === 0) && (
+                        <p className="text-red-500 text-xs flex items-center gap-1">
+                          <AlertCircle size={12} /> Necesitas al menos 1 criterio y 1 concursante para iniciar
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : viewMode === 'compact' ? (
+              /* Compact View - @requirements 7.2 */
+              <div className="p-4 bg-zinc-800/50 rounded-xl space-y-4">
+                {/* Mode summary */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Trophy className="text-yellow-400" size={20} />
+                    <div>
+                      <p className="text-white font-medium">{state.config.title || 'Panel de Jueces'}</p>
+                      <p className="text-zinc-400 text-xs">
+                        {state.config.criteria.length} criterios • {state.config.contestants.length} concursantes • {state.config.judges.length} jueces
+                      </p>
+                    </div>
+                  </div>
+                  {state.config.publicVotingEnabled && (
+                    <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">
+                      Votación pública {(state.config.publicVoteWeight * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+                
+                {/* Quick start button */}
+                <button
+                  onClick={startTournament}
+                  disabled={state.config.contestants.length === 0 || state.config.criteria.length === 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-green-600 hover:bg-green-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all"
+                >
+                  <Play size={20} /> Iniciar Torneo
+                </button>
+              </div>
+            ) : (
+              /* Expanded View with Collapsible Sections - @requirements 3.1, 3.2, 3.3, 3.4, 3.5 */
+              <div className="space-y-3">
+                {/* Configuración General - expanded by default - @requirements 3.2 */}
+                <CollapsibleSection
+                  title="Configuración General"
+                  icon={<Settings size={16} />}
+                  defaultExpanded={true}
+                >
+                  <div className="space-y-4">
+                    {/* Title */}
+                    <div>
+                      <label htmlFor="judge-panel-title" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Título del Torneo</label>
+                      <input
+                        id="judge-panel-title"
+                        name="title"
+                        type="text"
+                        value={state.config.title}
+                        onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, title: e.target.value } }))}
+                        className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+                        placeholder="Panel de Jueces"
+                      />
+                    </div>
+
+                    {/* Score Range */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="judge-min-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Mínima</label>
+                        <input
+                          id="judge-min-score"
+                          name="defaultMinScore"
+                          type="number"
+                          value={state.config.defaultMinScore}
+                          onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMinScore: parseInt(e.target.value) || 1 } }))}
+                          className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="judge-max-score" className="text-xs text-zinc-400 font-bold uppercase mb-1 block">Puntuación Máxima</label>
+                        <input
+                          id="judge-max-score"
+                          name="defaultMaxScore"
+                          type="number"
+                          value={state.config.defaultMaxScore}
+                          onChange={(e) => setState(prev => ({ ...prev, config: { ...prev.config, defaultMaxScore: parseInt(e.target.value) || 10 } }))}
+                          className="w-full bg-zinc-700 border border-zinc-600 text-white rounded-lg px-3 py-2 text-sm"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Display Options */}
+                    <div className="flex items-center justify-between p-3 bg-zinc-700/30 rounded-lg">
+                      <label className="text-sm text-white flex items-center gap-2">
+                        {state.config.revealScoresLive ? <Eye size={14} /> : <EyeOff size={14} />}
+                        Mostrar puntuaciones en overlay
+                      </label>
+                      <button
+                        onClick={() => {
+                          setState(prev => ({ ...prev, config: { ...prev.config, revealScoresLive: !prev.config.revealScoresLive } }));
+                          setTimeout(() => syncState(), 50);
+                        }}
+                        className={`w-10 h-5 rounded-full transition-colors ${state.config.revealScoresLive ? 'bg-green-500' : 'bg-zinc-600'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state.config.revealScoresLive ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                  </div>
+                </CollapsibleSection>
+
+                {/* Criterios de Evaluación - with badge - @requirements 3.3 */}
+                <CollapsibleSection
+                  title="Criterios de Evaluación"
+                  icon={<Target size={16} />}
+                  badge={state.config.criteria.length}
+                  defaultExpanded={false}
+                >
+                  {renderCriteriaSection()}
+                </CollapsibleSection>
+
+                {/* Concursantes - with badge - @requirements 3.4 */}
+                <CollapsibleSection
+                  title="Concursantes"
+                  icon={<Users size={16} />}
+                  badge={state.config.contestants.length}
+                  defaultExpanded={false}
+                >
+                  {renderContestantsSection()}
+                </CollapsibleSection>
+
+                {/* Jueces - with badge - @requirements 3.5 */}
+                <CollapsibleSection
+                  title="Jueces"
+                  icon={<Gavel size={16} />}
+                  badge={state.config.judges.length}
+                  defaultExpanded={false}
+                >
+                  {renderJudgesSection()}
+                </CollapsibleSection>
+
+                {/* Votación Pública - collapsed by default */}
+                <CollapsibleSection
+                  title="Votación Pública"
+                  icon={<Vote size={16} />}
+                  defaultExpanded={false}
+                >
+                  {renderPublicVotingSection()}
+                </CollapsibleSection>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons - Start button hidden in compact mode (already shown there), but show when tournament is active */}
+        {(viewMode !== 'compact' || state.config.isActive) && (
         <div className="flex gap-2 mb-6">
           {!state.config.isActive ? (
             <div className="flex-1 relative group">
@@ -1645,6 +1995,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
             <RotateCcw size={20} />
           </button>
         </div>
+        )}
 
         {/* Public Voting Status */}
         {state.publicVotingActive && (

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * E2E Tests for TwitchVote App
+ * E2E Tests for StreamCrowd App
  * Tests main user flows and UI interactions
  */
 
@@ -403,14 +403,14 @@ test.describe('LocalStorage Persistence', () => {
     
     // Check if poll-related localStorage keys exist or can be set
     await page.evaluate(() => {
-      localStorage.setItem('twitchvote_poll_test', JSON.stringify({ test: true }));
+      localStorage.setItem('streamcrowd_poll_test', JSON.stringify({ test: true }));
     });
     
     await page.reload();
     await page.waitForLoadState('networkidle');
     
     const pollData = await page.evaluate(() => 
-      localStorage.getItem('twitchvote_poll_test')
+      localStorage.getItem('streamcrowd_poll_test')
     );
     
     expect(pollData).toBeTruthy();
@@ -418,7 +418,7 @@ test.describe('LocalStorage Persistence', () => {
     
     // Cleanup
     await page.evaluate(() => {
-      localStorage.removeItem('twitchvote_poll_test');
+      localStorage.removeItem('streamcrowd_poll_test');
     });
   });
 });

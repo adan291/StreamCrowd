@@ -1,11 +1,22 @@
-import React from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { DynamicsView, TwitchMessage, CollaborationChannel, MediaAsset, ModerationConfig } from '../types';
 import { ActivitySelector } from './ActivitySelector';
 import { PollCreator } from './PollCreator';
-import { JudgePanel } from './JudgePanel';
-import { GiveawayHub } from './GiveawayHub';
+import { JudgePanelSkeleton, GiveawayHubSkeleton } from './ui/Skeleton';
 import { useI18n } from '../i18n';
+
+/**
+ * Lazy load JudgePanel component
+ * @requirements 7.1 - Lazy load JudgePanel when first accessed
+ */
+const LazyJudgePanel = React.lazy(() => import('./JudgePanel'));
+
+/**
+ * Lazy load GiveawayHub component
+ * @requirements 7.2 - Lazy load GiveawayHub when first accessed
+ */
+const LazyGiveawayHub = React.lazy(() => import('./GiveawayHub'));
 
 export interface DynamicsPanelProps {
   // Navigation state
@@ -74,6 +85,25 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
 }) => {
   const { t } = useI18n();
 
+  /**
+   * Preload lazy components after initial page load
+   * @requirements 7.5 - Preload components after initial page load is complete
+   */
+  useEffect(() => {
+    const preloadTimer = setTimeout(() => {
+      // Preload JudgePanel
+      import('./JudgePanel').catch(() => {
+        // Silently ignore preload errors - component will load on demand
+      });
+      // Preload GiveawayHub
+      import('./GiveawayHub').catch(() => {
+        // Silently ignore preload errors - component will load on demand
+      });
+    }, 2000); // 2 seconds after mount
+
+    return () => clearTimeout(preloadTimer);
+  }, []);
+
   const handleBack = () => {
     onViewChange('selector');
   };
@@ -115,7 +145,7 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
 
       case 'poll':
         return (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col" data-tour="poll-creator">
             <div className="px-4 pt-4">
               {renderBackButton()}
             </div>
@@ -144,45 +174,49 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
 
       case 'judge':
         return (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col" data-tour="judge-panel">
             <div className="px-4 pt-4">
               {renderBackButton()}
             </div>
             <div className="flex-1 min-h-0">
-              <JudgePanel
-                chatMessages={chatMessages}
-                onClose={handleBack}
-                userVoteMap={userVoteMap}
-                collaborationChannels={collaborationChannels}
-                mainChannel={mainChannel}
-                onAddCollaborator={onAddCollaborator}
-                onRemoveCollaborator={onRemoveCollaborator}
-                isConnected={isConnected}
-                isEmbedded={true}
-                mediaLibrary={mediaLibrary}
-                onAddAsset={onAddAsset}
-              />
+              <Suspense fallback={<JudgePanelSkeleton />}>
+                <LazyJudgePanel
+                  chatMessages={chatMessages}
+                  onClose={handleBack}
+                  userVoteMap={userVoteMap}
+                  collaborationChannels={collaborationChannels}
+                  mainChannel={mainChannel}
+                  onAddCollaborator={onAddCollaborator}
+                  onRemoveCollaborator={onRemoveCollaborator}
+                  isConnected={isConnected}
+                  isEmbedded={true}
+                  mediaLibrary={mediaLibrary}
+                  onAddAsset={onAddAsset}
+                />
+              </Suspense>
             </div>
           </div>
         );
 
       case 'giveaway':
         return (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col" data-tour="giveaway">
             <div className="px-4 pt-4">
               {renderBackButton()}
             </div>
             <div className="flex-1 min-h-0">
-              <GiveawayHub
-                chatMessages={chatMessages}
-                isConnected={isConnected}
-                onClearChatMessages={onClearChatMessages}
-                userVoteMap={userVoteMap}
-                collaborationChannels={collaborationChannels}
-                mainChannel={mainChannel}
-                authToken={authToken}
-                userId={userId}
-              />
+              <Suspense fallback={<GiveawayHubSkeleton />}>
+                <LazyGiveawayHub
+                  chatMessages={chatMessages}
+                  isConnected={isConnected}
+                  onClearChatMessages={onClearChatMessages}
+                  userVoteMap={userVoteMap}
+                  collaborationChannels={collaborationChannels}
+                  mainChannel={mainChannel}
+                  authToken={authToken}
+                  userId={userId}
+                />
+              </Suspense>
             </div>
           </div>
         );

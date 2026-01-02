@@ -12,12 +12,12 @@ export interface BadgeProps {
 }
 
 const variantStyles = {
-  default: 'bg-gray-800 text-gray-300',
-  primary: 'bg-primary-500/20 text-primary-400',
-  success: 'bg-green-500/20 text-green-400',
-  warning: 'bg-yellow-500/20 text-yellow-400',
-  error: 'bg-red-500/20 text-red-400',
-  info: 'bg-blue-500/20 text-blue-400',
+  default: 'bg-gray-800 text-gray-200',
+  primary: 'bg-primary-500/20 text-primary-300',
+  success: 'bg-green-500/20 text-green-300',
+  warning: 'bg-yellow-500/20 text-yellow-300',
+  error: 'bg-red-500/20 text-red-300',
+  info: 'bg-blue-500/20 text-blue-300',
 };
 
 const sizeStyles = {
@@ -27,12 +27,12 @@ const sizeStyles = {
 };
 
 const dotColors = {
-  default: 'bg-gray-400',
-  primary: 'bg-primary-400',
-  success: 'bg-green-400',
-  warning: 'bg-yellow-400',
-  error: 'bg-red-400',
-  info: 'bg-blue-400',
+  default: 'bg-gray-300',
+  primary: 'bg-primary-300',
+  success: 'bg-green-300',
+  warning: 'bg-yellow-300',
+  error: 'bg-red-300',
+  info: 'bg-blue-300',
 };
 
 export function Badge({

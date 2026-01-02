@@ -32,6 +32,8 @@ const OAUTH_SCOPES = [
   'channel:read:predictions',
   'channel:manage:redemptions',
   'channel:read:redemptions',
+  // Moderator channel access
+  'user:read:moderated_channels',
 ].join(' ');
 
 // Callback path - can be root or specific path, must match Twitch Dev Console

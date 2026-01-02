@@ -105,11 +105,14 @@ const getCapabilityCount = (capabilities: AuthCapabilities): { enabled: number; 
 interface AuthCapabilitiesIndicatorProps {
   compact?: boolean;
   className?: string;
+  /** Callback when user successfully re-authenticates with new token */
+  onReconnect?: (channel: string, token: string, userId: string) => void;
 }
 
 export const AuthCapabilitiesIndicator: React.FC<AuthCapabilitiesIndicatorProps> = ({ 
   compact = false,
-  className = '' 
+  className = '',
+  onReconnect,
 }) => {
   const { mode, capabilities, isAuthenticated, authState, setOAuthAuth } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -135,17 +138,22 @@ export const AuthCapabilitiesIndicator: React.FC<AuthCapabilitiesIndicatorProps>
         expiresIn: result.expiresIn,
       });
       
-      // Also update the TwitchService connection with the new token
-      // This ensures the chat connection uses the new credentials
-      const twitchService = getTwitchService();
       const currentChannel = authState.channelName || result.username;
       
-      // Reconnect with new token to update the connection
-      if (currentChannel) {
-        twitchService.connect({
-          channel: currentChannel,
-          token: result.accessToken,
-        });
+      // If we have a callback, use it to update the hook state properly
+      // This ensures the authToken in useTwitchService is updated
+      if (onReconnect && currentChannel) {
+        onReconnect(currentChannel, result.accessToken, result.userId);
+      } else {
+        // Fallback: directly update the TwitchService connection
+        // Note: This won't update the hook state, which may cause issues
+        const twitchService = getTwitchService();
+        if (currentChannel) {
+          twitchService.connect({
+            channel: currentChannel,
+            token: result.accessToken,
+          });
+        }
       }
     } catch (err: unknown) {
       // User cancelled popup - this is expected behavior, don't log as warning

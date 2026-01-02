@@ -129,7 +129,7 @@ export function VirtualList<T>({
 
   if (items.length === 0) {
     return (
-      <div className={`flex items-center justify-center p-8 text-zinc-500 ${className}`}>
+      <div className={`flex items-center justify-center p-8 text-zinc-400 ${className}`}>
         {emptyMessage}
       </div>
     );

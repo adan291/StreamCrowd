@@ -227,7 +227,7 @@ const HistoryItemDetails: React.FC<{ item: HistoryItem }> = ({ item }) => {
                 {opt.icon && <span className="mr-1">{opt.icon}</span>}
                 {opt.label}
               </span>
-              <span className="text-zinc-500 shrink-0">{opt.votes} ({opt.percentage.toFixed(0)}%)</span>
+              <span className="text-zinc-500 dark:text-zinc-400 shrink-0">{opt.votes} ({opt.percentage.toFixed(0)}%)</span>
             </div>
           </div>
         ))}
@@ -248,9 +248,9 @@ const HistoryItemDetails: React.FC<{ item: HistoryItem }> = ({ item }) => {
           <div key={idx} className={`p-2 rounded-lg ${outcome.id === data.winningOutcomeId ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-zinc-700 dark:text-zinc-300">{outcome.title}</span>
-              <span className="text-zinc-500">{outcome.percentage.toFixed(0)}%</span>
+              <span className="text-zinc-500 dark:text-zinc-400">{outcome.percentage.toFixed(0)}%</span>
             </div>
-            <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500">
+            <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
               <span><Users size={10} className="inline mr-0.5" />{outcome.users}</span>
               <span>{outcome.channelPoints.toLocaleString()} pts</span>
             </div>
@@ -297,7 +297,7 @@ const HistoryItemDetails: React.FC<{ item: HistoryItem }> = ({ item }) => {
           <p className="text-blue-500">!{data.trigger}</p>
           <p className="text-zinc-600 dark:text-zinc-400 mt-1">{data.response}</p>
         </div>
-        <div className="flex items-center gap-2 text-zinc-500">
+        <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
           <span>Ejecutado por: {data.executedBy}</span>
           <span>•</span>
           <span>Canal: {data.channel}</span>
@@ -525,7 +525,7 @@ export const UnifiedHistory: React.FC<UnifiedHistoryProps> = ({
           {showFilters && (
             <div className="flex gap-2 animate-fade-in">
               <div className="flex-1">
-                <label className="text-[10px] text-zinc-500 mb-1 block">Desde</label>
+                <label className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 block">Desde</label>
                 <input
                   type="date"
                   value={dateFrom}
@@ -534,7 +534,7 @@ export const UnifiedHistory: React.FC<UnifiedHistoryProps> = ({
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-zinc-500 mb-1 block">Hasta</label>
+                <label className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-1 block">Hasta</label>
                 <input
                   type="date"
                   value={dateTo}
@@ -571,7 +571,7 @@ export const UnifiedHistory: React.FC<UnifiedHistoryProps> = ({
           {filteredItems.length === 0 ? (
             <div className="text-center py-10">
               <Calendar size={40} className="mx-auto mb-3 text-zinc-300 dark:text-zinc-600" />
-              <p className="text-zinc-500">No hay items en el historial</p>
+              <p className="text-zinc-500 dark:text-zinc-400">No hay items en el historial</p>
               {(searchQuery || dateFrom || dateTo) && (
                 <p className="text-xs text-zinc-400 mt-1">Prueba ajustando los filtros</p>
               )}

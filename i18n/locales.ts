@@ -734,6 +734,37 @@ export interface Translations {
     viewersHint: string;
     keywordHint: string;
     waitingRaffle: string;
+    // Tooltips
+    subsOnlyTooltip: string;
+    useTimerTooltip: string;
+    keywordTooltip: string;
+    timeLimitTooltip: string;
+    // Error messages
+    errors: {
+      noValidParticipants: string;
+      userAlreadyParticipating: string;
+      userAlreadyInChat: string;
+      usersAddedToBlacklist: string;
+      participantsAdded: string;
+      needOAuthChatters: string;
+      needOAuthConnection: string;
+      couldNotGetChannelId: string;
+      tokenMissingChattersScope: string;
+      errorLoadingChatters: string;
+      needOAuthSubscribers: string;
+      tokenMissingSubsScope: string;
+      errorLoadingSubscribers: string;
+      incompatibleFileVersion: string;
+    };
+    // Presets
+    presets: {
+      quick: string;
+      quickDescription: string;
+      keyword: string;
+      keywordDescription: string;
+      subs: string;
+      subsDescription: string;
+    };
   };
   spinner: {
     winnerTextColor: string;
@@ -821,6 +852,31 @@ export interface Translations {
     ducks: string;
     shoot: string;
     accuracy: string;
+  };
+  judgePanel: {
+    // Tooltips
+    criteriaWeightTooltip: string;
+    publicVoteWeightTooltip: string;
+    votePrefixTooltip: string;
+    // Error messages
+    errors: {
+      missingCriteriaAndContestants: string;
+      missingCriteria: string;
+      missingContestants: string;
+    };
+    // Presets
+    presets: {
+      basic: string;
+      basicDescription: string;
+      public: string;
+      publicDescription: string;
+      // Criteria names
+      criteria: {
+        creativity: string;
+        execution: string;
+        originality: string;
+      };
+    };
   };
   platforms: {
     // General
@@ -2082,6 +2138,37 @@ export const translations: Record<Locale, Translations> = {
       viewersHint: 'Selecciona un ganador de los usuarios que han escrito en el chat',
       keywordHint: 'Los usuarios deben escribir la palabra clave para participar',
       waitingRaffle: 'Esperando sorteo...',
+      // Tooltips
+      subsOnlyTooltip: 'Solo usuarios suscritos al canal pueden participar en el sorteo',
+      useTimerTooltip: 'Limita el tiempo de participación. Sin timer, el sorteo permanece abierto indefinidamente',
+      keywordTooltip: 'Los usuarios deben escribir esta palabra en el chat para participar',
+      timeLimitTooltip: 'Duración en segundos del período de participación',
+      // Error messages
+      errors: {
+        noValidParticipants: 'No hay participantes válidos (todos están en la lista de prohibidos)',
+        userAlreadyParticipating: 'Este usuario ya está participando',
+        userAlreadyInChat: 'Este usuario ya está en el chat',
+        usersAddedToBlacklist: '{count} usuarios añadidos a la lista de prohibidos',
+        participantsAdded: 'Añadidos: {added}{duplicates}',
+        needOAuthChatters: 'Necesitas conectarte con OAuth y el permiso moderator:read:chatters',
+        needOAuthConnection: 'Necesitas estar conectado con un token OAuth',
+        couldNotGetChannelId: 'No se pudo obtener el ID del canal',
+        tokenMissingChattersScope: 'Token sin permiso. Genera uno nuevo con scope: moderator:read:chatters',
+        errorLoadingChatters: 'Error al cargar chatters',
+        needOAuthSubscribers: 'Necesitas conectarte con OAuth y el permiso channel:read:subscriptions',
+        tokenMissingSubsScope: 'Token sin permiso. Genera uno nuevo con scope: channel:read:subscriptions',
+        errorLoadingSubscribers: 'Error al cargar suscriptores',
+        incompatibleFileVersion: 'Versión de archivo no compatible',
+      },
+      // Presets
+      presets: {
+        quick: 'Sorteo Rápido',
+        quickDescription: 'Viewers del chat, sin timer',
+        keyword: 'Sorteo por Keyword',
+        keywordDescription: 'Palabra clave, 60 segundos',
+        subs: 'Sorteo de Subs',
+        subsDescription: 'Solo suscriptores',
+      },
     },
     spinner: {
       winnerTextColor: 'Color de texto ganador',
@@ -2169,6 +2256,31 @@ export const translations: Record<Locale, Translations> = {
       ducks: 'patos',
       shoot: 'Disparar',
       accuracy: 'Precisión',
+    },
+    judgePanel: {
+      // Tooltips
+      criteriaWeightTooltip: 'Multiplicador de importancia. Mayor peso = más impacto en puntuación final',
+      publicVoteWeightTooltip: 'Porcentaje del voto público en la puntuación final (0-100%)',
+      votePrefixTooltip: 'Carácter que los usuarios escriben antes de su voto (ej: +1, #1)',
+      // Error messages
+      errors: {
+        missingCriteriaAndContestants: 'Falta añadir: criterios y concursantes',
+        missingCriteria: 'Falta añadir: criterios',
+        missingContestants: 'Falta añadir: concursantes',
+      },
+      // Presets
+      presets: {
+        basic: 'Torneo Básico',
+        basicDescription: '3 criterios estándar',
+        public: 'Torneo con Público',
+        publicDescription: '3 criterios + votación pública 30%',
+        // Criteria names
+        criteria: {
+          creativity: 'Creatividad',
+          execution: 'Ejecución',
+          originality: 'Originalidad',
+        },
+      },
     },
     platforms: {
       // General
@@ -3426,6 +3538,37 @@ export const translations: Record<Locale, Translations> = {
       viewersHint: 'Select a winner from users who have written in chat',
       keywordHint: 'Users must type the keyword to participate',
       waitingRaffle: 'Waiting for raffle...',
+      // Tooltips
+      subsOnlyTooltip: 'Only channel subscribers can participate in the raffle',
+      useTimerTooltip: 'Limits participation time. Without timer, the raffle stays open indefinitely',
+      keywordTooltip: 'Users must type this word in chat to participate',
+      timeLimitTooltip: 'Duration in seconds of the participation period',
+      // Error messages
+      errors: {
+        noValidParticipants: 'No valid participants (all are in the blacklist)',
+        userAlreadyParticipating: 'This user is already participating',
+        userAlreadyInChat: 'This user is already in chat',
+        usersAddedToBlacklist: '{count} users added to blacklist',
+        participantsAdded: 'Added: {added}{duplicates}',
+        needOAuthChatters: 'You need to connect with OAuth and the moderator:read:chatters permission',
+        needOAuthConnection: 'You need to be connected with an OAuth token',
+        couldNotGetChannelId: 'Could not get channel ID',
+        tokenMissingChattersScope: 'Token missing permission. Generate a new one with scope: moderator:read:chatters',
+        errorLoadingChatters: 'Error loading chatters',
+        needOAuthSubscribers: 'You need to connect with OAuth and the channel:read:subscriptions permission',
+        tokenMissingSubsScope: 'Token missing permission. Generate a new one with scope: channel:read:subscriptions',
+        errorLoadingSubscribers: 'Error loading subscribers',
+        incompatibleFileVersion: 'Incompatible file version',
+      },
+      // Presets
+      presets: {
+        quick: 'Quick Raffle',
+        quickDescription: 'Chat viewers, no timer',
+        keyword: 'Keyword Raffle',
+        keywordDescription: 'Keyword, 60 seconds',
+        subs: 'Subs Raffle',
+        subsDescription: 'Subscribers only',
+      },
     },
     spinner: {
       winnerTextColor: 'Winner text color',
@@ -3513,6 +3656,31 @@ export const translations: Record<Locale, Translations> = {
       ducks: 'ducks',
       shoot: 'Shoot',
       accuracy: 'Accuracy',
+    },
+    judgePanel: {
+      // Tooltips
+      criteriaWeightTooltip: 'Importance multiplier. Higher weight = more impact on final score',
+      publicVoteWeightTooltip: 'Percentage of public vote in the final score (0-100%)',
+      votePrefixTooltip: 'Character users type before their vote (e.g: +1, #1)',
+      // Error messages
+      errors: {
+        missingCriteriaAndContestants: 'Missing: criteria and contestants',
+        missingCriteria: 'Missing: criteria',
+        missingContestants: 'Missing: contestants',
+      },
+      // Presets
+      presets: {
+        basic: 'Basic Tournament',
+        basicDescription: '3 standard criteria',
+        public: 'Public Tournament',
+        publicDescription: '3 criteria + 30% public voting',
+        // Criteria names
+        criteria: {
+          creativity: 'Creativity',
+          execution: 'Execution',
+          originality: 'Originality',
+        },
+      },
     },
     platforms: {
       // General

@@ -251,7 +251,7 @@ describe('PluginManagerService Property Tests', () => {
         }
       ];
       
-      localStorageMock.setItem('twitchvote_plugins', JSON.stringify(plugins));
+      localStorageMock.setItem('streamcrowd_plugins', JSON.stringify(plugins));
       
       // Create new registry (should load from localStorage)
       const newRegistry = new PluginRegistryService();

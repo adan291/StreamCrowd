@@ -99,6 +99,14 @@ export const TWITCH_TOOLS: ToolConfig[] = [
     enabled: true,
   },
   {
+    id: 'macros',
+    icon: 'Workflow',
+    title: 'Macros',
+    description: 'Automatizaciones y acciones rápidas',
+    color: '#f472b6',
+    enabled: true,
+  },
+  {
     id: 'predictions',
     icon: 'TrendingUp',
     title: 'Predicciones',

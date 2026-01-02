@@ -170,4 +170,4 @@ export const DEFAULT_ONBOARDING_STORAGE: OnboardingStorage = {
 /**
  * Storage key for onboarding data
  */
-export const ONBOARDING_STORAGE_KEY = 'twitchvote_onboarding';
+export const ONBOARDING_STORAGE_KEY = 'streamcrowd_onboarding';

@@ -180,13 +180,25 @@ export function usePredictions(
   // Refs for polling
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousStatusRef = useRef<string | null>(null);
+  
+  // Track current token to detect changes
+  const currentTokenRef = useRef<string>(authToken);
 
-  // Initialize service when token changes
+  // Initialize or update service when token changes
   useEffect(() => {
     if (authToken) {
-      serviceRef.current = createTwitchPredictionService(authToken);
+      // Create new service or update existing one
+      if (serviceRef.current && currentTokenRef.current !== authToken) {
+        // Token changed - update existing service
+        serviceRef.current.setToken(authToken);
+      } else if (!serviceRef.current) {
+        // No service yet - create new one
+        serviceRef.current = createTwitchPredictionService(authToken);
+      }
+      currentTokenRef.current = authToken;
     } else {
       serviceRef.current = null;
+      currentTokenRef.current = '';
     }
   }, [authToken]);
 
@@ -311,10 +323,20 @@ export function usePredictions(
     return () => stopPolling();
   }, [currentPrediction, enablePolling, broadcasterId, authToken, startPolling, stopPolling]);
 
-  // Initial fetch when credentials are available
+  // Initial fetch when credentials are available or change
+  // This effect handles reconnection scenarios where the token changes
   useEffect(() => {
     if (broadcasterId && authToken) {
-      refreshPrediction();
+      // Clear any previous error when credentials change (reconnection)
+      setError(null);
+      
+      // Small delay to ensure service is updated with new token
+      // This handles the race condition between service update and fetch
+      const timeoutId = setTimeout(() => {
+        refreshPrediction();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [broadcasterId, authToken]); // eslint-disable-line react-hooks/exhaustive-deps
 

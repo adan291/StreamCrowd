@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Shield } from 'lucide-react';
 import { PlatformsView, PlatformsTool, TwitchMessage } from '../types';
 import { PLATFORMS, TWITCH_TOOLS } from '../config/platforms';
 import { PlatformSelector } from './PlatformSelector';
@@ -17,8 +17,11 @@ import { EnhancedCommandPanel } from './commands/EnhancedCommandPanel';
 import { PredictionPanel } from './PredictionPanel';
 import { RewardsPanel } from './RewardsPanel';
 import { TimersPanel } from './timers';
+import { ChannelSelector } from './ChannelSelector';
+import { MacroManager } from './macros/MacroManager';
 import { useI18n } from '../i18n';
 import type { NotificationType } from './Notification';
+import type { ChannelContext } from '../src/application/services/ModeratedChannelsService';
 
 export interface PlatformsPanelProps {
   // Navigation state
@@ -43,6 +46,17 @@ export interface PlatformsPanelProps {
   hasRewardsScope?: boolean;
   onNotification?: (type: NotificationType, message: string) => void;
   onReauthenticate?: () => void;
+  
+  // Channel selector props
+  moderatedChannels?: ChannelContext[];
+  selectedChannel?: ChannelContext | null;
+  onSelectChannel?: (channelId: string) => void;
+  isLoadingChannels?: boolean;
+  onRefreshChannels?: () => void;
+  hasModeratedChannels?: boolean;
+  isViewingModeratedChannel?: boolean;
+  /** Error message from moderated channels fetch */
+  moderatedChannelsError?: string | null;
 }
 
 export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
@@ -61,6 +75,15 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
   hasRewardsScope = true,
   onNotification,
   onReauthenticate,
+  // Channel selector
+  moderatedChannels = [],
+  selectedChannel = null,
+  onSelectChannel,
+  isLoadingChannels = false,
+  onRefreshChannels,
+  hasModeratedChannels = false,
+  isViewingModeratedChannel = false,
+  moderatedChannelsError = null,
 }) => {
   const { t } = useI18n();
 
@@ -129,12 +152,53 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
 
     // Level 2: Twitch Tool Selector (when no tool is selected)
     if (view === 'twitch' && tool === 'none') {
+      // Only show reconnect banner if there's an error AND user might want the feature
+      // For now, we'll make it a small, dismissible hint rather than a prominent banner
+      const showModeratorHint = moderatedChannelsError && onReauthenticate;
+      
       return (
-        <TwitchToolSelector
-          tools={TWITCH_TOOLS}
-          onSelectTool={handleSelectTool}
-          onBack={handleBack}
-        />
+        <div className="h-full flex flex-col">
+          {/* Channel Selector - only show if user has moderated channels */}
+          {hasModeratedChannels && moderatedChannels.length > 1 && (
+            <div className="px-4 pt-4 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <ChannelSelector
+                channels={moderatedChannels}
+                selectedChannel={selectedChannel}
+                onSelectChannel={onSelectChannel || (() => {})}
+                isLoading={isLoadingChannels}
+                onRefresh={onRefreshChannels}
+              />
+              {isViewingModeratedChannel && (
+                <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <Shield size={14} className="text-green-500" />
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    Gestionando como moderador. Algunas funciones pueden estar limitadas.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            <TwitchToolSelector
+              tools={TWITCH_TOOLS}
+              onSelectTool={handleSelectTool}
+              onBack={handleBack}
+            />
+          </div>
+          
+          {/* Small hint for moderator feature - only show if scope is missing */}
+          {showModeratorHint && (
+            <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+              <button
+                onClick={onReauthenticate}
+                className="w-full flex items-center justify-center gap-2 text-xs text-zinc-500 hover:text-purple-500 transition-colors"
+              >
+                <Shield size={12} />
+                <span>¿Eres moderador en otros canales? Reconecta para habilitarlo</span>
+              </button>
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -152,10 +216,27 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
       );
     }
 
+    // Macros Panel
+    if (view === 'twitch' && tool === 'macros') {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            {renderToolBackButton()}
+          </div>
+          <div className="flex-1 min-h-0">
+            <MacroManager 
+              isModeratorView={isViewingModeratedChannel}
+              platform="twitch"
+            />
+          </div>
+        </div>
+      );
+    }
+
     // Predictions Panel
     if (view === 'twitch' && tool === 'predictions') {
       return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col" data-tour="predictions">
           <div className="px-4 pt-4">
             {renderToolBackButton()}
           </div>
@@ -176,7 +257,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
     // Channel Points (Rewards) Panel
     if (view === 'twitch' && tool === 'channelpoints') {
       return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col" data-tour="rewards">
           <div className="px-4 pt-4">
             {renderToolBackButton()}
           </div>
