@@ -16,7 +16,7 @@ import type { AIProvider } from '../../src/domain/ports/IAnalyticsProvider';
 
 const STORAGE_KEY = 'twitch_ai_config_v2';
 const LEGACY_STORAGE_KEY = 'twitch_ai_config';
-const ENCRYPTION_KEY = 'TwitchVoteLive2024';
+const ENCRYPTION_KEY = 'StreamCrowdLive2024';
 
 // ============ HELPERS ============
 

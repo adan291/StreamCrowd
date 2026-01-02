@@ -23,13 +23,16 @@ import {
   Play,
   Download,
   Upload,
+  Sparkles,
 } from 'lucide-react';
 import { useMacros } from '../../hooks/useMacros';
 import { useMacroExecution } from '../../hooks/useMacroExecution';
 import { MacroCard } from './MacroCard';
 import { MacroEditor } from './MacroEditor';
 import { MacroImportExport } from './MacroImportExport';
+import { MacroPresets } from './MacroPresets';
 import type { Macro, TriggerType, MacroFormData } from '../../types/macros';
+import type { MacroPreset } from '../../config/macroPresets';
 
 // ============================================
 // Types
@@ -38,9 +41,14 @@ import type { Macro, TriggerType, MacroFormData } from '../../types/macros';
 export interface MacroManagerProps {
   /** Callback when a macro is selected for execution */
   onExecute?: (macroId: string) => void;
+  /** Whether viewing as moderator (not broadcaster) */
+  isModeratorView?: boolean;
+  /** Current platform */
+  platform?: 'twitch' | 'youtube' | 'kick';
 }
 
 type FilterType = 'all' | 'enabled' | 'disabled' | TriggerType;
+type ViewMode = 'list' | 'presets';
 
 interface DeleteConfirmation {
   macroId: string;
@@ -66,7 +74,11 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
 // Component
 // ============================================
 
-export const MacroManager: React.FC<MacroManagerProps> = ({ onExecute }) => {
+export const MacroManager: React.FC<MacroManagerProps> = ({ 
+  onExecute,
+  isModeratorView = false,
+  platform = 'twitch',
+}) => {
   const {
     macros,
     isLoading,
@@ -90,6 +102,7 @@ export const MacroManager: React.FC<MacroManagerProps> = ({ onExecute }) => {
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('presets');
   const [showEditor, setShowEditor] = useState(false);
   const [editingMacro, setEditingMacro] = useState<Macro | undefined>();
   const [isSaving, setIsSaving] = useState(false);
@@ -161,6 +174,14 @@ export const MacroManager: React.FC<MacroManagerProps> = ({ onExecute }) => {
       setIsSaving(false);
     }
   }, [editingMacro, createMacro, updateMacro]);
+
+  /**
+   * Handle adding a preset as a new macro
+   */
+  const handleAddPreset = useCallback(async (preset: MacroPreset) => {
+    await createMacro(preset.macro);
+    setViewMode('list'); // Switch back to list view
+  }, [createMacro]);
 
   /**
    * Handle toggling macro enabled state
@@ -274,51 +295,81 @@ export const MacroManager: React.FC<MacroManagerProps> = ({ onExecute }) => {
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar macros..."
-              className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-            />
-          </div>
-
-          {/* Filter Toggle */}
+        {/* View Mode Tabs */}
+        <div className="flex gap-2 mb-4">
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`p-2 rounded-lg transition-colors ${
-              filter !== 'all'
-                ? 'bg-purple-500/20 text-purple-400'
+            onClick={() => setViewMode('presets')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'presets'
+                ? 'bg-pink-500 text-white'
                 : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
             }`}
-            title="Filtros"
           >
-            <Filter size={18} />
+            <Sparkles size={16} />
+            Presets
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-purple-500 text-white'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+            }`}
+          >
+            <Zap size={16} />
+            Mis Macros
           </button>
         </div>
 
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {FILTER_OPTIONS.map((option) => (
+        {/* Search and Filters - only show in list view */}
+        {viewMode === 'list' && (
+          <>
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar macros..."
+                  className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              {/* Filter Toggle */}
               <button
-                key={option.value}
-                onClick={() => setFilter(option.value)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  filter === option.value
-                    ? 'bg-purple-500 text-white'
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 rounded-lg transition-colors ${
+                  filter !== 'all'
+                    ? 'bg-purple-500/20 text-purple-400'
                     : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
                 }`}
+                title="Filtros"
               >
-                {option.label}
+                <Filter size={18} />
               </button>
-            ))}
-          </div>
+            </div>
+
+            {/* Filter Options */}
+            {showFilters && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {FILTER_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFilter(option.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      filter === option.value
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -356,57 +407,77 @@ export const MacroManager: React.FC<MacroManagerProps> = ({ onExecute }) => {
         </div>
       )}
 
-      {/* Macro List */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {isLoading && macros.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <RefreshCw size={32} className="mx-auto mb-2 text-zinc-500 animate-spin" />
-              <p className="text-sm text-zinc-500">Cargando macros...</p>
-            </div>
-          </div>
-        ) : filteredMacros.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Zap size={48} className="mx-auto mb-3 text-zinc-600" />
-              {macros.length === 0 ? (
-                <>
-                  <p className="text-zinc-400 mb-1">No hay macros configuradas</p>
-                  <p className="text-sm text-zinc-500 mb-4">
-                    Crea tu primera macro para automatizar acciones
-                  </p>
-                  <button
-                    onClick={handleNewMacro}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors mx-auto"
-                  >
-                    <Plus size={18} />
-                    <span>Crear macro</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-zinc-400 mb-1">No se encontraron macros</p>
-                  <p className="text-sm text-zinc-500">
-                    Intenta con otros términos de búsqueda o filtros
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
+      {/* Content Area - Single scroll container */}
+      <div className="flex-1 overflow-y-auto">
+        {viewMode === 'presets' ? (
+          <MacroPresets
+            onAddPreset={handleAddPreset}
+            isModeratorView={isModeratorView}
+            platform={platform}
+          />
         ) : (
-          <div className="grid gap-3">
-            {filteredMacros.map((macro) => (
-              <MacroCard
-                key={macro.id}
-                macro={macro}
-                onToggle={() => handleToggle(macro.id)}
-                onEdit={() => handleEdit(macro)}
-                onDuplicate={() => handleDuplicate(macro.id)}
-                onDelete={() => handleDeleteRequest(macro)}
-                onExecute={() => handleExecute(macro.id)}
-                isPaused={isPaused}
-              />
-            ))}
+          /* Macro List */
+          <div className="p-4">
+            {isLoading && macros.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <RefreshCw size={32} className="mx-auto mb-2 text-zinc-500 animate-spin" />
+                  <p className="text-sm text-zinc-500">Cargando macros...</p>
+                </div>
+              </div>
+            ) : filteredMacros.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Zap size={48} className="mx-auto mb-3 text-zinc-600" />
+                  {macros.length === 0 ? (
+                    <>
+                      <p className="text-zinc-400 mb-1">No hay macros configuradas</p>
+                      <p className="text-sm text-zinc-500 mb-4">
+                        Crea tu primera macro o añade un preset
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => setViewMode('presets')}
+                          className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors"
+                        >
+                          <Sparkles size={18} />
+                          <span>Ver presets</span>
+                        </button>
+                        <button
+                          onClick={handleNewMacro}
+                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                        >
+                          <Plus size={18} />
+                          <span>Crear macro</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-zinc-400 mb-1">No se encontraron macros</p>
+                      <p className="text-sm text-zinc-500">
+                        Intenta con otros términos de búsqueda o filtros
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {filteredMacros.map((macro) => (
+                  <MacroCard
+                    key={macro.id}
+                    macro={macro}
+                    onToggle={() => handleToggle(macro.id)}
+                    onEdit={() => handleEdit(macro)}
+                    onDuplicate={() => handleDuplicate(macro.id)}
+                    onDelete={() => handleDeleteRequest(macro)}
+                    onExecute={() => handleExecute(macro.id)}
+                    isPaused={isPaused}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

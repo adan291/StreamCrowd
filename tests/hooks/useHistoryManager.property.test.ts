@@ -514,7 +514,7 @@ describe('useHistoryManager Property Tests', () => {
       const exportData = {
         version: 1 as const,
         exportedAt: Date.now(),
-        application: 'twitchvote' as const,
+        application: 'streamcrowd' as const,
         items: items,
         metadata: {
           totalItems: items.length,

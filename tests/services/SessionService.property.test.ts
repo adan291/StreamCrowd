@@ -370,7 +370,7 @@ describe('SessionService Property Tests', () => {
       if (stored) {
         stored.expiresAt = Date.now() - 1000;
         // Force save
-        localStorage.setItem('twitchvote_collab_sessions', JSON.stringify([stored]));
+        localStorage.setItem('streamcrowd_collab_sessions', JSON.stringify([stored]));
       }
       
       // Create new service instance

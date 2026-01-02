@@ -18,6 +18,9 @@ const sizeStyles = {
   lg: 'h-12 text-base px-4',
 };
 
+// Focus ring color for consistency (violet-400 for WCAG AA compliance)
+const focusRingColor = 'focus:ring-violet-400/40 focus:border-violet-400';
+
 export const Input = forwardRef<HTMLInputElement, InputProps>(({
   label,
   error,
@@ -41,12 +44,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
     text-gray-100 placeholder-gray-500
     transition-all duration-150
     focus:outline-none focus:ring-2 focus:ring-offset-0
-    disabled:opacity-50 disabled:cursor-not-allowed
+    disabled:opacity-60 disabled:cursor-not-allowed
   `.trim().replace(/\s+/g, ' ');
 
   const stateStyles = hasError
     ? 'border-red-500 focus:ring-red-500/40 focus:border-red-500'
-    : 'border-gray-700 focus:ring-primary-500/40 focus:border-primary-500';
+    : `border-zinc-600 ${focusRingColor}`;
 
   const paddingLeft = leftIcon || leftElement ? 'pl-10' : '';
   const paddingRight = rightIcon || rightElement ? 'pr-10' : '';
@@ -130,12 +133,12 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
     text-gray-100 placeholder-gray-500 text-sm
     transition-all duration-150 resize-y
     focus:outline-none focus:ring-2 focus:ring-offset-0
-    disabled:opacity-50 disabled:cursor-not-allowed
+    disabled:opacity-60 disabled:cursor-not-allowed
   `.trim().replace(/\s+/g, ' ');
 
   const stateStyles = hasError
     ? 'border-red-500 focus:ring-red-500/40 focus:border-red-500'
-    : 'border-gray-700 focus:ring-primary-500/40 focus:border-primary-500';
+    : `border-zinc-600 ${focusRingColor}`;
 
   return (
     <div className={`${fullWidth ? 'w-full' : ''} ${className}`}>

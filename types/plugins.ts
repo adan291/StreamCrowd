@@ -15,7 +15,7 @@ export interface PluginManifest {
   license?: string;
   
   // Requisitos
-  minAppVersion: string;         // Versión mínima de TwitchVote
+  minAppVersion: string;         // Versión mínima de StreamCrowd
   permissions: PluginPermission[];
   
   // Entry points

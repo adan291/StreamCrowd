@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Download, FolderUp, History } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Download, FolderUp, History, Wand2, Settings, ListChecks } from 'lucide-react';
 import { SpinnerWheel } from './SpinnerWheel';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
@@ -13,6 +13,9 @@ import { useI18n } from '../i18n';
 import { TwitchMessage } from '../types';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
+import { CollapsibleSection } from './ui/CollapsibleSection';
+import { ViewModeToggle, useViewMode } from './ui/ViewModeToggle';
+import { WizardStepper, useWizard } from './ui/WizardStepper';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
@@ -69,6 +72,13 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   const [showSpinner, setShowSpinner] = useState(false);
   const [quickMode, setQuickMode] = useState(true); // Toggle para modo rápido
   
+  // Wizard/Assistant mode state
+  const [wizardMode, setWizardMode] = useState(false);
+  const wizard = useWizard(3); // 3 steps: Question, Options, Settings
+  
+  // View mode state (compact/expanded)
+  const [viewMode, setViewMode] = useViewMode('poll_view_mode', 'expanded');
+  
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   
   // Check for duplicate voteKeys
@@ -83,11 +93,47 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     return duplicates;
   }, [options]);
 
+  // Wizard steps configuration
+  const wizardSteps = useMemo(() => [
+    { id: 'question', title: 'Pregunta', icon: <FileText size={16} /> },
+    { id: 'options', title: 'Opciones', icon: <ListChecks size={16} /> },
+    { id: 'settings', title: 'Configuración', icon: <Settings size={16} /> },
+  ], []);
+
+  // Check if wizard can proceed to next step
+  const canWizardProceed = useMemo(() => {
+    if (wizard.currentStep === 0) {
+      // Question step - need question
+      return question.trim().length > 0;
+    }
+    if (wizard.currentStep === 1) {
+      // Options step - need at least 2 options with labels
+      return options.length >= 2 && options.every(opt => opt.label.trim());
+    }
+    if (wizard.currentStep === 2) {
+      // Settings step - always valid
+      return true;
+    }
+    return true;
+  }, [wizard.currentStep, question, options]);
+
   useEffect(() => {
     const saved = localStorage.getItem('twitch_vote_templates');
     if (saved) {
       try {
-        setSavedPolls(JSON.parse(saved));
+        const parsed = JSON.parse(saved) as SavedPoll[];
+        // Deduplicate by id to prevent React key errors
+        const seen = new Set<string>();
+        const deduplicated = parsed.filter(p => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setSavedPolls(deduplicated);
+        // Save deduplicated version back to localStorage
+        if (deduplicated.length !== parsed.length) {
+          localStorage.setItem('twitch_vote_templates', JSON.stringify(deduplicated));
+        }
       } catch (e) {
         console.error('Error loading templates', e);
       }
@@ -554,7 +600,11 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   };
 
   const sortedTemplates = [...savedPolls]
-    .filter(t => !filterFavorites || t.isFavorite)
+    .filter((t, index, self) => 
+      // Filter duplicates by id and apply favorites filter
+      self.findIndex(p => p.id === t.id) === index && 
+      (!filterFavorites || t.isFavorite)
+    )
     .sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
@@ -595,7 +645,26 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             <span className="hidden xs:inline">{t.poll.createTitle}</span>
             <span className="xs:hidden">{t.poll.create}</span>
           </h3>
-          <div className="flex gap-1.5 sm:gap-2">
+          <div className="flex gap-1.5 sm:gap-2 items-center">
+            {/* View Mode Toggle and Wizard Toggle */}
+            <ViewModeToggle
+              mode={viewMode}
+              onChange={setViewMode}
+              disabled={wizardMode}
+            />
+            <button
+              onClick={() => setWizardMode(!wizardMode)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                wizardMode 
+                  ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30' 
+                  : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-700'
+              }`}
+              title="Modo Asistente"
+            >
+              <Wand2 size={14} />
+              <span className="hidden sm:inline">Asistente</span>
+            </button>
+            <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700" />
             <button 
               type="button"
               onClick={() => {
@@ -604,6 +673,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                 setOptions([ { label: `${t.poll.option} 1`, color: CHART_COLORS[0], icon: '1️⃣', image: '' }, { label: `${t.poll.option} 2`, color: CHART_COLORS[1], icon: '2️⃣', image: '' } ]);
                 setMaxVotes('');
                 setDuration('');
+                wizard.reset();
               }}
               className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white p-1.5 sm:p-2 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
               title={t.poll.clearForm}
@@ -690,7 +760,316 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
           </div>
         )}
         
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-4 flex-1 flex flex-col">
+        {/* Content: Wizard Mode > Compact Mode > Expanded Mode */}
+        {wizardMode ? (
+          // ============================================
+          // WIZARD/ASSISTANT MODE - Step by step guide
+          // ============================================
+          <div className="space-y-4 flex-1 flex flex-col">
+            <WizardStepper
+              steps={wizardSteps}
+              currentStep={wizard.currentStep}
+              onStepChange={wizard.goToStep}
+              showNavigation={true}
+              canProceed={canWizardProceed}
+              finishLabel="Crear Encuesta"
+              onFinish={() => {
+                if (canWizardProceed) {
+                  handlePreSubmit();
+                  setWizardMode(false);
+                  wizard.reset();
+                }
+              }}
+            />
+            
+            {/* Wizard Step Content */}
+            <div className="flex-1 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+              {/* Step 1: Question */}
+              {wizard.currentStep === 0 && (
+                <div className="space-y-4">
+                  <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">Escribe la pregunta para tu encuesta:</p>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="wizard-poll-title" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.poll.sectionTitle}</label>
+                    <input 
+                      id="wizard-poll-title" 
+                      name="wizard-poll-title" 
+                      type="text" 
+                      value={title} 
+                      onChange={(e) => setTitle(e.target.value)} 
+                      placeholder={t.poll.title} 
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl px-4 py-3 focus:outline-none focus:border-twitch-brand" 
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="wizard-poll-question" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.poll.questionLabel} *</label>
+                    <input 
+                      id="wizard-poll-question" 
+                      name="wizard-poll-question" 
+                      type="text" 
+                      value={question} 
+                      onChange={(e) => setQuestion(e.target.value)} 
+                      placeholder={t.poll.questionPlaceholderFull} 
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl px-4 py-3 text-lg font-medium focus:outline-none focus:border-twitch-brand" 
+                    />
+                    {!question.trim() && (
+                      <p className="text-yellow-500 text-xs flex items-center gap-1">
+                        <AlertCircle size={12} /> Debes escribir una pregunta para continuar
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Quick presets */}
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                    <p className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2">O usa una plantilla rápida:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <button type="button" onClick={() => { setQuestion('¿Sí o No?'); applyPreset('yesno'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20 flex items-center gap-1">
+                        <Check size={12} /> Sí/No
+                      </button>
+                      <button type="button" onClick={() => { setQuestion('¿Qué puntuación le das?'); applyPreset('rating'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20 flex items-center gap-1">
+                        <Star size={12} /> Puntuación 1-5
+                      </button>
+                      <button type="button" onClick={() => { setQuestion('¿Cuál prefieres?'); applyPreset('abc'); }} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/20 flex items-center gap-1">
+                        <Grid size={12} /> A/B/C
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Step 2: Options */}
+              {wizard.currentStep === 1 && (
+                <div className="space-y-4">
+                  <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">Añade las opciones de respuesta (mínimo 2):</p>
+                  
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    {options.map((opt, index) => (
+                      <div key={index} className="flex gap-2 items-center group animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm shadow-sm relative overflow-hidden cursor-pointer hover:scale-105 transition-transform" style={{ backgroundColor: opt.color }}>
+                          <input type="color" value={opt.color} onChange={(e) => handleColorChange(index, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                        </div>
+                        <input 
+                          type="text" 
+                          value={opt.icon || ''} 
+                          onChange={(e) => handleIconChange(index, e.target.value)} 
+                          className="w-10 h-8 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-center text-lg focus:outline-none focus:border-twitch-brand" 
+                          placeholder="😀" 
+                          maxLength={2} 
+                        />
+                        <input 
+                          type="text" 
+                          value={opt.label} 
+                          onChange={(e) => handleOptionChange(index, e.target.value)} 
+                          className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand" 
+                          placeholder={`${t.poll.option} ${index + 1}`} 
+                        />
+                        {options.length > MIN_OPTIONS && (
+                          <button type="button" onClick={() => removeOption(index)} className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {options.length < MAX_OPTIONS && (
+                    <button type="button" onClick={addOption} className="w-full py-2.5 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500 rounded-lg hover:border-twitch-brand hover:text-twitch-brand transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase">
+                      <Plus size={14} /> {t.poll.addOptionBtn}
+                    </button>
+                  )}
+                  
+                  {options.length < 2 && (
+                    <p className="text-yellow-500 text-xs flex items-center gap-1">
+                      <AlertCircle size={12} /> Necesitas al menos 2 opciones para continuar
+                    </p>
+                  )}
+                  {options.some(opt => !opt.label.trim()) && options.length >= 2 && (
+                    <p className="text-yellow-500 text-xs flex items-center gap-1">
+                      <AlertCircle size={12} /> Todas las opciones deben tener texto
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {/* Step 3: Settings */}
+              {wizard.currentStep === 2 && (
+                <div className="space-y-4">
+                  <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">Configura las opciones adicionales (opcional):</p>
+                  
+                  {/* Summary */}
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl space-y-2 mb-4">
+                    <p className="text-zinc-500 text-xs font-bold uppercase">Resumen</p>
+                    <p className="text-zinc-900 dark:text-white font-bold">{question || 'Sin pregunta'}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {options.map((opt, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: opt.color + '30', color: opt.color }}>
+                          {opt.icon} {opt.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label htmlFor="wizard-max-votes" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-1">
+                        <Target size={12} /> {t.poll.goal}
+                      </label>
+                      <input 
+                        id="wizard-max-votes" 
+                        name="wizard-max-votes" 
+                        type="number" 
+                        min="1" 
+                        value={maxVotes} 
+                        onChange={(e) => setMaxVotes(e.target.value)} 
+                        placeholder="∞" 
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="wizard-duration" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase flex items-center gap-1">
+                        <Clock size={12} /> {t.poll.timeSec}
+                      </label>
+                      <input 
+                        id="wizard-duration" 
+                        name="wizard-duration" 
+                        type="number" 
+                        min="0" 
+                        value={duration} 
+                        onChange={(e) => setDuration(e.target.value)} 
+                        placeholder={`0 = ${t.poll.unlimited}`} 
+                        className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-twitch-brand" 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="wizard-vote-prefix" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.poll.votePrefix}</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        id="wizard-vote-prefix" 
+                        name="wizard-vote-prefix" 
+                        type="text" 
+                        value={votePrefix} 
+                        onChange={e => setVotePrefix(e.target.value.slice(0, 3))} 
+                        placeholder="+" 
+                        maxLength={3} 
+                        className="w-16 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-mono text-center focus:outline-none focus:border-twitch-brand" 
+                      />
+                      <span className="text-zinc-500 text-sm">Los viewers votarán con: {votePrefix}1, {votePrefix}2, etc.</span>
+                    </div>
+                  </div>
+                  
+                  {/* Moderation Toggle Button - Wizard */}
+                  <button 
+                    type="button" 
+                    onClick={() => setShowModerationPanel(!showModerationPanel)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all text-sm ${
+                      showModerationPanel 
+                        ? 'bg-twitch-brand/10 border-twitch-brand/30 text-twitch-brand dark:text-twitch-light' 
+                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-twitch-brand/50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <Shield size={14} />
+                      {t.moderation.title}
+                    </span>
+                    <span className="text-xs">{showModerationPanel ? '▲' : '▼'}</span>
+                  </button>
+                  
+                  {showModerationPanel && (
+                    <div className="animate-fade-in">
+                      <ModerationConfigForm
+                        config={localModerationConfig}
+                        onChange={handleModerationConfigChange}
+                        onNotification={onNotification}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : viewMode === 'compact' ? (
+          // ============================================
+          // COMPACT VIEW - Minimal form
+          // ============================================
+          <div className="space-y-4 flex-1 flex flex-col">
+            {/* Quick presets */}
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" onClick={() => handlePresetClick('yesno')} className="flex-1 min-w-[80px] px-3 py-2 rounded-lg text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/30 hover:bg-green-500/20 flex items-center justify-center gap-1">
+                <Check size={14} /> Sí/No
+              </button>
+              <button type="button" onClick={() => handlePresetClick('rating')} className="flex-1 min-w-[80px] px-3 py-2 rounded-lg text-xs font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/20 flex items-center justify-center gap-1">
+                <Star size={14} /> 1-5
+              </button>
+              <button type="button" onClick={() => handlePresetClick('abc')} className="flex-1 min-w-[80px] px-3 py-2 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 hover:bg-blue-500/20 flex items-center justify-center gap-1">
+                <Grid size={14} /> A/B/C
+              </button>
+            </div>
+            
+            {/* Question input */}
+            <input 
+              type="text" 
+              value={question} 
+              onChange={(e) => setQuestion(e.target.value)} 
+              placeholder={t.poll.questionPlaceholderFull} 
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-twitch-brand" 
+            />
+            
+            {/* Options summary */}
+            <div className="flex flex-wrap gap-1 p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
+              <span className="text-zinc-500 text-xs mr-2">{options.length} opciones:</span>
+              {options.map((opt, i) => (
+                <span key={i} className="px-2 py-0.5 rounded text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700">
+                  {opt.icon || `${i+1}`} {opt.label.slice(0, 15)}{opt.label.length > 15 ? '...' : ''}
+                </span>
+              ))}
+            </div>
+            
+            {/* Moderation Toggle Button - Compact */}
+            <button 
+              type="button" 
+              onClick={() => setShowModerationPanel(!showModerationPanel)}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all text-sm ${
+                showModerationPanel 
+                  ? 'bg-twitch-brand/10 border-twitch-brand/30 text-twitch-brand dark:text-twitch-light' 
+                  : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-twitch-brand/50'
+              }`}
+            >
+              <span className="flex items-center gap-2 font-medium">
+                <Shield size={14} />
+                {t.moderation.title}
+              </span>
+              <span className="text-xs">{showModerationPanel ? '▲' : '▼'}</span>
+            </button>
+            
+            {showModerationPanel && (
+              <div className="animate-fade-in">
+                <ModerationConfigForm
+                  config={localModerationConfig}
+                  onChange={handleModerationConfigChange}
+                  onNotification={onNotification}
+                />
+              </div>
+            )}
+            
+            {/* Create button */}
+            <Button 
+              fullWidth 
+              type="button" 
+              onClick={handlePreSubmit} 
+              disabled={!question.trim() || options.some(o => !o.label.trim())} 
+              className="shadow-lg shadow-twitch-brand/20 hover:shadow-twitch-brand/40"
+            >
+              <Zap size={18} className="fill-current" /> {t.poll.create}
+            </Button>
+          </div>
+        ) : (
+          // ============================================
+          // EXPANDED VIEW - Full form
+          // ============================================
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4 flex-1 flex flex-col">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center">
               {/* Toggle Modo Rápido */}
               <Tooltip text={quickMode ? 'Modo Rápido: Los presets crean la encuesta directamente' : 'Modo Normal: Los presets solo rellenan el formulario'}>
@@ -950,6 +1329,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
              </Tooltip>
           </div>
         </form>
+        )}
       </div>
 
       {showPreview && (

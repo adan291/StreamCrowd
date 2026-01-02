@@ -411,7 +411,7 @@ describe('QuickExportService Property Tests', () => {
       await service.addOverlayToOBS('prediction');
       
       // Manually delete source from mock (simulating external deletion)
-      mockOBS.sources.delete('TwitchVote Poll');
+      mockOBS.sources.delete('StreamCrowd Poll');
       
       const exported = await service.listExportedOverlays();
       

@@ -76,19 +76,19 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
             {panelMode === 'tabs' ? (
               <>
                 <button 
-                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'chat' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                   onClick={() => setActiveTab('chat')}
                 >
                   <MessageSquare size={16} /> {t.nav.chat}
                 </button>
                 <button 
-                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'stream' ? 'text-twitch-brand border-b-2 border-twitch-brand' : 'text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                   onClick={() => setActiveTab('stream')}
                 >
                   <Tv size={16} /> {t.nav.stream}
                 </button>
                 <button 
-                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'collab' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
+                  className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'collab' ? 'text-cyan-500 border-b-2 border-cyan-500' : 'text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300'}`}
                   onClick={() => setActiveTab('collab')}
                 >
                   <Users size={16} /> 
@@ -101,7 +101,7 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
               </>
             ) : (
               <div className="flex-1 py-2 px-3 flex items-center justify-between">
-                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                <div className="flex items-center gap-3 text-xs text-zinc-400 dark:text-zinc-400">
                   <span className="flex items-center gap-1"><MessageSquare size={12} /> Chat</span>
                   <span className="text-zinc-300 dark:text-zinc-700">|</span>
                   <span className="flex items-center gap-1"><Tv size={12} /> Stream</span>
@@ -162,7 +162,7 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
               <>
                 {/* Collab toggle in split mode */}
                 <div className="flex items-center justify-between px-2 py-1 bg-zinc-100 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700 shrink-0">
-                  <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <div className="flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-400">
                     <MessageSquare size={12} /> Chat + <Tv size={12} /> Stream
                   </div>
                   <button
@@ -170,7 +170,7 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
                     className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
                       showCollabInSplit 
                         ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400' 
-                        : 'text-zinc-500 hover:text-cyan-500 hover:bg-cyan-500/10'
+                        : 'text-zinc-400 hover:text-cyan-500 hover:bg-cyan-500/10'
                     }`}
                     title="Mostrar/ocultar colaboración"
                   >

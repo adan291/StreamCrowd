@@ -1,4 +1,4 @@
-// Metrics Types for TwitchVote Dashboard
+// Metrics Types for StreamCrowd Dashboard
 
 // Metric point with timestamp and value
 export interface MetricPoint {
@@ -151,7 +151,7 @@ export interface ExportOptions {
 
 // Storage configuration
 export const METRICS_STORAGE_CONFIG = {
-  DB_NAME: 'twitchvote_metrics',
+  DB_NAME: 'streamcrowd_metrics',
   DB_VERSION: 1,
   MAX_TOTAL_SIZE: 50 * 1024 * 1024, // 50MB
   MAX_SESSIONS: 100,
@@ -169,6 +169,6 @@ export const AGGREGATION_CONFIG = {
 
 // Storage keys
 export const METRICS_STORAGE_KEYS = {
-  CURRENT_SESSION: 'twitchvote_current_session',
-  DASHBOARD_LAYOUT: 'twitchvote_dashboard_layout',
+  CURRENT_SESSION: 'streamcrowd_current_session',
+  DASHBOARD_LAYOUT: 'streamcrowd_dashboard_layout',
 };

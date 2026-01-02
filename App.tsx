@@ -59,6 +59,7 @@ import {
   useStreamEventService as useStreamEvents,
   useAnalyticsService as useAIAnalytics,
   useAuth,
+  useModeratedChannels,
 } from './src/application/hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
 import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2, Sparkles, Layers, Zap } from 'lucide-react';
@@ -74,7 +75,7 @@ import { DynamicsPanel } from './components/DynamicsPanel';
 import { PlatformsPanel } from './components/PlatformsPanel';
 import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
-import { MacroManager } from './components/macros/MacroManager';
+import { ChannelSelector } from './components/ChannelSelector';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -298,6 +299,29 @@ const App: React.FC = () => {
     skipConnection: isOverlayMode,
   });
 
+  // Moderated channels hook - allows switching between own channel and moderated channels
+  const {
+    channels: moderatedChannels,
+    selectedChannel,
+    selectChannel: selectModeratedChannel,
+    isLoading: isLoadingChannels,
+    refresh: refreshModeratedChannels,
+    hasModeratedChannels,
+    isViewingModeratedChannel,
+    error: moderatedChannelsError,
+  } = useModeratedChannels(
+    userId,
+    channelName,
+    channelName, // displayName same as login for now
+    authToken,
+    { autoFetch: status === ConnectionStatus.CONNECTED }
+  );
+
+  // Active channel context - use selected moderated channel or own channel
+  const activeChannelId = selectedChannel?.channelId || userId;
+  const activeChannelName = selectedChannel?.channelName || channelName;
+  const isActiveChannelOwn = selectedChannel?.isOwnChannel ?? true;
+
   const poll = usePoll({
     syncToStorage: !isOverlayMode,
     isOverlayMode,
@@ -456,6 +480,18 @@ const App: React.FC = () => {
     setPlatformsTool(tool || 'none');
   }, []);
 
+  // Handler for reauthentication - disconnects and reconnects to get new scopes
+  const handleReauthenticate = useCallback(() => {
+    // Clear saved credentials to force new auth flow
+    clearSavedCredentials();
+    // Disconnect current session
+    twitchDisconnect();
+    // Start new connection (will trigger OAuth flow)
+    setTimeout(() => {
+      twitchConnect();
+    }, 100);
+  }, [clearSavedCredentials, twitchDisconnect, twitchConnect]);
+
   // Reset platforms state when navigating away from platforms tab
   useEffect(() => {
     if (leftTab !== 'platforms') {
@@ -528,7 +564,7 @@ const App: React.FC = () => {
     onStepChange: (step: TourStep) => {
       // Execute navigation actions for each step
       if (step.action) {
-        const { leftTab: newLeftTab, dynamicsView: newDynamicsView, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll, showSoundBoard: showSoundBoardAction } = step.action;
+        const { leftTab: newLeftTab, dynamicsView: newDynamicsView, dataSubTab: newDataSubTab, rightTab, showModeration, createDemoPoll, showSoundBoard: showSoundBoardAction, showPredictions, showRewards } = step.action;
         
         // First set leftTab, then dynamicsView for proper navigation
         if (newLeftTab) setLeftTab(newLeftTab);
@@ -536,6 +572,15 @@ const App: React.FC = () => {
         if (newDataSubTab) setDataSubTab(newDataSubTab);
         if (rightTab) setActiveRightTab(rightTab);
         if (showModeration !== undefined) setDemoForceModeration(showModeration);
+        
+        // Handle Platforms navigation for Predictions and Rewards
+        if (showPredictions) {
+          setPlatformsView('twitch');
+          setPlatformsTool('predictions');
+        } else if (showRewards) {
+          setPlatformsView('twitch');
+          setPlatformsTool('channelpoints');
+        }
         
         // Handle SoundBoard - close it when moving to other steps
         setShowSoundBoard(showSoundBoardAction === true);
@@ -1109,7 +1154,7 @@ const App: React.FC = () => {
             )}
           </div>
           <span className="font-bold text-sm text-zinc-900 dark:text-white">{channelName}</span>
-          <AuthCapabilitiesIndicator compact />
+          <AuthCapabilitiesIndicator compact onReconnect={twitchConnect} />
           {isCollaborationActive && (
             <span className="text-[10px] bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded-full font-medium">
               Collab
@@ -1217,7 +1262,6 @@ const App: React.FC = () => {
         <div className="flex flex-col gap-3 w-full px-2">
           <NavButton active={leftTab === 'dynamics'} onClick={() => setLeftTab('dynamics')} icon={<Sparkles size={20} />} label={t.nav?.dynamics || 'Dinámicas'} dataTour="nav-dynamics" />
           <NavButton active={leftTab === 'games'} onClick={() => setLeftTab('games')} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} dataTour="nav-games" />
-          <NavButton active={leftTab === 'macros'} onClick={() => setLeftTab('macros')} icon={<Zap size={20} />} label={t.macros?.title || 'Macros'} dataTour="nav-macros" />
           <NavButton active={leftTab === 'platforms'} onClick={() => setLeftTab('platforms')} icon={<Layers size={20} />} label={t.nav?.platforms || 'Plataformas'} dataTour="nav-platforms" />
           <NavButton active={leftTab === 'obs'} onClick={() => setLeftTab('obs')} icon={<Monitor size={20} />} label="OBS" dataTour="nav-obs" />
           <div className="relative">
@@ -1272,7 +1316,6 @@ const App: React.FC = () => {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-around py-2 px-4 z-40 safe-area-bottom">
         <MobileNavButton active={leftTab === 'dynamics'} onClick={() => { setLeftTab('dynamics'); setShowMobileSidebar(false); }} icon={<Sparkles size={20} />} label={t.nav?.dynamics || 'Dinámicas'} />
         <MobileNavButton active={leftTab === 'games'} onClick={() => { setLeftTab('games'); setShowMobileSidebar(false); }} icon={<Gamepad2 size={20} />} label={t.nav?.games || 'Juegos'} />
-        <MobileNavButton active={leftTab === 'macros'} onClick={() => { setLeftTab('macros'); setShowMobileSidebar(false); }} icon={<Zap size={20} />} label={t.macros?.title || 'Macros'} />
         <MobileNavButton active={leftTab === 'platforms'} onClick={() => { setLeftTab('platforms'); setShowMobileSidebar(false); }} icon={<Layers size={20} />} label={t.nav?.platforms || 'Plataformas'} />
         <MobileNavButton active={leftTab === 'obs'} onClick={() => { setLeftTab('obs'); setShowMobileSidebar(false); }} icon={<Monitor size={20} />} label="OBS" />
         <MobileNavButton active={leftTab === 'gallery'} onClick={() => { setLeftTab('gallery'); setShowMobileSidebar(false); }} icon={<ImageIcon size={20} />} label={t.nav.gallery} />
@@ -1386,11 +1429,6 @@ const App: React.FC = () => {
                 />
               </div>
             )}
-            {leftTab === 'macros' && (
-              <div data-tour="macros-panel" className="h-full">
-                <MacroManager />
-              </div>
-            )}
             {leftTab === 'platforms' && (
               <div data-tour="platforms-panel" className="h-full">
                 <PlatformsPanel
@@ -1401,13 +1439,23 @@ const App: React.FC = () => {
                   chatMessages={chatMessages}
                   isConnected={status === ConnectionStatus.CONNECTED}
                   sendMessage={(msg) => getTwitchService().sendMessage(msg)}
-                  channel={channelName}
-                  channelId={userId}
+                  channel={activeChannelName}
+                  channelId={activeChannelId}
                   authToken={authToken}
                   isPartnerOrAffiliate={true}
-                  hasPredictionsScope={authCapabilities.canManagePredictions}
-                  hasRewardsScope={authCapabilities.canManageRedemptions}
+                  hasPredictionsScope={authCapabilities.canManagePredictions && isActiveChannelOwn}
+                  hasRewardsScope={authCapabilities.canManageRedemptions && isActiveChannelOwn}
                   onNotification={addNotification}
+                  onReauthenticate={handleReauthenticate}
+                  // Channel selector props
+                  moderatedChannels={moderatedChannels}
+                  selectedChannel={selectedChannel}
+                  onSelectChannel={selectModeratedChannel}
+                  isLoadingChannels={isLoadingChannels}
+                  onRefreshChannels={refreshModeratedChannels}
+                  hasModeratedChannels={hasModeratedChannels}
+                  isViewingModeratedChannel={isViewingModeratedChannel}
+                  moderatedChannelsError={moderatedChannelsError}
                 />
               </div>
             )}
@@ -1455,7 +1503,7 @@ const App: React.FC = () => {
                     <Suspense fallback={<LoadingFallback message="Cargando actividad..." />}>
                       {/* Auth Capabilities Indicator */}
                       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800">
-                        <AuthCapabilitiesIndicator />
+                        <AuthCapabilitiesIndicator onReconnect={twitchConnect} />
                       </div>
                       <StreamActivity 
                         events={streamEventsHook.events}

@@ -1239,3 +1239,118 @@ html.dark {
 .hover\:bg-primary-500\/10:hover {
   background-color: rgba(145, 70, 255, 0.1);
 }
+
+
+/* ============================================
+   Skeleton Shimmer Animation
+   @requirements 7.3 - Loading skeleton with shimmer effect
+   ============================================ */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: skeleton-shimmer 2s ease-in-out infinite;
+}
+
+/* Disable shimmer animation when reduced motion is preferred */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
+    animation: none !important;
+    background-position: 0 0 !important;
+  }
+}
+
+
+/* ============================================
+   FeedbackIndicator Animations
+   @requirements 6.2 - Brief confirmation indicator
+   @requirements 6.4 - Subtle animations (max 300ms)
+   @requirements 6.5 - Respect prefers-reduced-motion
+   ============================================ */
+
+@keyframes feedback-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) translateX(-50%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(-50%);
+  }
+}
+
+@keyframes feedback-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) translateX(-50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) translateX(-50%);
+  }
+}
+
+@keyframes feedback-inline {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  40% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-feedback-enter {
+  animation: feedback-enter 200ms ease-out forwards;
+}
+
+.animate-feedback-exit {
+  animation: feedback-exit 150ms ease-out forwards;
+}
+
+.animate-feedback-inline {
+  animation: feedback-inline 300ms ease-out forwards;
+}
+
+/* Position-specific animations for non-centered positions */
+.top-right .animate-feedback-enter,
+.bottom-right .animate-feedback-enter {
+  animation: feedback-enter-right 200ms ease-out forwards;
+}
+
+@keyframes feedback-enter-right {
+  0% {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Disable feedback animations when reduced motion is preferred */
+@media (prefers-reduced-motion: reduce) {
+  .animate-feedback-enter,
+  .animate-feedback-exit,
+  .animate-feedback-inline {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

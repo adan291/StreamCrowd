@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     font-medium rounded-lg
     transition-all duration-150 ease-in-out
     focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
-    disabled:opacity-50 disabled:cursor-not-allowed
+    disabled:opacity-60 disabled:cursor-not-allowed
     active:scale-[0.98]
   `.trim().replace(/\s+/g, ' ');
 
@@ -46,13 +46,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     primary: `
       bg-[#9146ff] text-white
       hover:bg-[#772ce8]
-      focus-visible:ring-[#9146ff]
+      focus-visible:ring-violet-400
       shadow-sm hover:shadow-md
     `,
     secondary: `
       bg-gray-800 text-gray-100
       hover:bg-gray-700
-      focus-visible:ring-gray-500
+      focus-visible:ring-violet-400
       border border-gray-700
     `,
     danger: `
@@ -63,13 +63,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     ghost: `
       bg-transparent text-gray-300
       hover:bg-gray-800 hover:text-white
-      focus-visible:ring-gray-500
+      focus-visible:ring-violet-400
     `,
     outline: `
       bg-transparent text-[#a970ff]
       border border-[#9146ff]
       hover:bg-[#9146ff]/10
-      focus-visible:ring-[#9146ff]
+      focus-visible:ring-violet-400
     `,
   };
 

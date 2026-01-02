@@ -64,9 +64,9 @@ export default defineConfig(({ mode }) => {
           ]
         },
         manifest: {
-          name: 'TwitchVote Live',
-          short_name: 'TwitchVote',
-          description: 'Encuestas interactivas en vivo para Twitch con análisis de chat y herramientas para streamers',
+          name: 'StreamCrowd',
+          short_name: 'StreamCrowd',
+          description: 'Suite de herramientas interactivas para streamers: encuestas, sorteos, juegos, panel de jueces y más',
           theme_color: '#9146FF',
           background_color: '#0e0e10',
           display: 'standalone',

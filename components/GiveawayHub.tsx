@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Plus,
   Trash2,
@@ -33,7 +33,14 @@ import {
   Coins,
   DollarSign,
   Zap,
+  Sliders,
+  Wand2,
+  Target,
 } from 'lucide-react';
+import { CollapsibleSection } from './ui/CollapsibleSection';
+import { ViewModeToggle, useViewMode } from './ui/ViewModeToggle';
+import { WizardStepper, useWizard } from './ui/WizardStepper';
+import { Tooltip } from './ui/Tooltip';
 import { GiveawayThread, GiveawayParticipant, TwitchMessage, CollaborationChannel, SubsGiveawayConfig, SubsGiveawayEntry, DEFAULT_SUBS_CONFIG } from '../types';
 import { useI18n } from '../i18n';
 import { getTwitchService } from '../src/application/services/TwitchService';
@@ -436,6 +443,14 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   
+  // Wizard/Assistant mode state
+  const [wizardMode, setWizardMode] = useState(false);
+  const wizard = useWizard(3); // 3 steps: Mode, Config, Participants
+  
+  // View mode state (compact/expanded)
+  // @requirements 7.1, 7.5
+  const [viewMode, setViewMode] = useViewMode('giveaway_view_mode', 'expanded');
+  
   // Separate participants for each mode
   const [viewersParticipants, setViewersParticipants] = useState<Set<string>>(new Set());
   const [keywordParticipants, setKeywordParticipants] = useState<Set<string>>(new Set());
@@ -635,6 +650,43 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   };
 
   const viewerCount = getViewers().length;
+
+  // Wizard steps configuration
+  const wizardSteps = useMemo(() => [
+    { id: 'mode', title: 'Tipo de Sorteo', icon: <Gift size={16} /> },
+    { id: 'config', title: 'Configuración', icon: <Settings size={16} /> },
+    { id: 'participants', title: 'Participantes', icon: <Users size={16} /> },
+  ], []);
+
+  // Check if wizard can proceed to next step
+  const canWizardProceed = useMemo(() => {
+    if (wizard.currentStep === 0) return true; // Mode selection always valid
+    if (wizard.currentStep === 1) {
+      // Config step - keyword mode needs keyword
+      if (raffleMode === 'keyword' && !keyword.trim()) return false;
+      return true;
+    }
+    if (wizard.currentStep === 2) {
+      // Participants step - need at least some way to get participants
+      if (raffleMode === 'viewers' && !useTimer && getAllParticipants().length === 0) return false;
+      return true;
+    }
+    return true;
+  }, [wizard.currentStep, raffleMode, keyword, useTimer]);
+
+  // Apply a preset to the current configuration
+  const applyPreset = (preset: { values: { mode?: RaffleMode; useTimer?: boolean; timeLimit?: number; subsOnly?: boolean } }) => {
+    const values = preset.values;
+    
+    // Apply all preset values
+    if (values.mode !== undefined) setRaffleMode(values.mode);
+    if (values.useTimer !== undefined) setUseTimer(values.useTimer);
+    if (values.timeLimit !== undefined) setTimeLimit(values.timeLimit);
+    if (values.subsOnly !== undefined) setSubsOnly(values.subsOnly);
+    
+    // Reset raffle state when applying preset
+    softResetRaffle();
+  };
 
   // ============================================
   // EFFECTS
@@ -1688,6 +1740,31 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             )}
           </button>
         </div>
+
+        {/* View Mode Toggle and Wizard Toggle - only show in raffle tab */}
+        {activeTab === 'raffle' && (
+          <div className="mt-3 flex items-center justify-end gap-2">
+            {/* @requirements 7.1, 7.4 */}
+            <ViewModeToggle
+              mode={viewMode}
+              onChange={setViewMode}
+              disabled={wizardMode}
+            />
+            <button
+              onClick={() => setWizardMode(!wizardMode)}
+              disabled={isRunning}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                wizardMode 
+                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' 
+                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
+              } disabled:opacity-50`}
+              title="Modo Asistente"
+            >
+              <Wand2 size={14} />
+              <span>Asistente</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -1696,30 +1773,377 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           // ============================================
           // RAFFLE TAB
           // ============================================
-          <div className="p-4 space-y-4">
-            {/* Mode selector */}
-            <div className="flex gap-2">
-              <button 
-                onClick={() => { setRaffleMode('viewers'); softResetRaffle(); }} 
-                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'viewers' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
-              >
-                <Users size={18} /> {t.randomWinner.viewers}
-              </button>
-              <button 
-                onClick={() => { setRaffleMode('keyword'); softResetRaffle(); }} 
-                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'keyword' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
-              >
-                <MessageSquare size={18} /> {t.randomWinner.keyword}
-              </button>
-              <button 
-                onClick={() => { setRaffleMode('subs'); softResetRaffle(); }} 
-                className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'subs' ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
-              >
-                <Heart size={18} /> Subs
-              </button>
+          wizardMode ? (
+            // ============================================
+            // WIZARD/ASSISTANT MODE - Step by step guide
+            // Takes priority over compact/expanded
+            // ============================================
+            <div className="p-4 space-y-4">
+              <WizardStepper
+                steps={wizardSteps}
+                currentStep={wizard.currentStep}
+                onStepChange={wizard.goToStep}
+                showNavigation={true}
+                canProceed={canWizardProceed}
+                finishLabel="Iniciar Sorteo"
+                onFinish={() => {
+                  if (canWizardProceed) {
+                    startRaffle();
+                    setWizardMode(false);
+                  }
+                }}
+              />
+              
+              {/* Wizard Step Content */}
+              <div className="mt-6">
+                {/* Step 1: Mode Selection */}
+                {wizard.currentStep === 0 && (
+                  <div className="space-y-4">
+                    <p className="text-zinc-400 text-sm mb-4">Selecciona el tipo de sorteo que quieres realizar:</p>
+                    <div className="grid gap-3">
+                      <button 
+                        onClick={() => { setRaffleMode('viewers'); softResetRaffle(); }} 
+                        className={`p-4 rounded-xl font-medium transition-all flex items-center gap-3 text-left ${raffleMode === 'viewers' ? 'bg-purple-500 text-white ring-2 ring-purple-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                      >
+                        <Users size={24} />
+                        <div>
+                          <p className="font-bold">{t.randomWinner.viewers}</p>
+                          <p className="text-xs opacity-70">Sortea entre los viewers del chat</p>
+                        </div>
+                      </button>
+                      <button 
+                        onClick={() => { setRaffleMode('keyword'); softResetRaffle(); }} 
+                        className={`p-4 rounded-xl font-medium transition-all flex items-center gap-3 text-left ${raffleMode === 'keyword' ? 'bg-purple-500 text-white ring-2 ring-purple-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                      >
+                        <MessageSquare size={24} />
+                        <div>
+                          <p className="font-bold">{t.randomWinner.keyword}</p>
+                          <p className="text-xs opacity-70">Los viewers escriben una palabra clave para participar</p>
+                        </div>
+                      </button>
+                      <button 
+                        onClick={() => { setRaffleMode('subs'); softResetRaffle(); }} 
+                        className={`p-4 rounded-xl font-medium transition-all flex items-center gap-3 text-left ${raffleMode === 'subs' ? 'bg-pink-500 text-white ring-2 ring-pink-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                      >
+                        <Heart size={24} />
+                        <div>
+                          <p className="font-bold">Subs</p>
+                          <p className="text-xs opacity-70">Sortea entre suscriptores con entradas ponderadas</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Step 2: Configuration */}
+                {wizard.currentStep === 1 && (
+                  <div className="space-y-4">
+                    <p className="text-zinc-400 text-sm mb-4">Configura las opciones del sorteo:</p>
+                    
+                    {/* Keyword input for keyword mode */}
+                    {raffleMode === 'keyword' && (
+                      <div className="space-y-2">
+                        <label className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.randomWinner.keywordLabel} *</label>
+                        <div className="relative">
+                          <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                          <input 
+                            type="text" 
+                            value={keyword} 
+                            onChange={(e) => setKeyword(e.target.value.replace(/\s/g, ''))} 
+                            placeholder={t.randomWinner.keywordPlaceholder} 
+                            className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-purple-500" 
+                          />
+                        </div>
+                        {!keyword.trim() && (
+                          <p className="text-yellow-500 text-xs flex items-center gap-1">
+                            <AlertTriangle size={12} /> Debes ingresar una palabra clave para continuar
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Subs config for subs mode */}
+                    {raffleMode === 'subs' && (
+                      <div className="p-3 bg-pink-500/10 border border-pink-500/20 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-pink-600 dark:text-pink-400 text-sm font-medium flex items-center gap-2">
+                            <Heart size={14} />
+                            Configuración de Subs
+                          </p>
+                          <button
+                            onClick={() => setShowSubsConfig(true)}
+                            className="p-1.5 text-pink-500 hover:bg-pink-500/20 rounded-lg transition-colors"
+                            title="Configurar valores"
+                          >
+                            <Settings size={16} />
+                          </button>
+                        </div>
+                        <p className="text-pink-600/70 dark:text-pink-400/70 text-xs">
+                          T1: {subsConfig.tier1Value} | T2: {subsConfig.tier2Value} | T3: {subsConfig.tier3Value} | Prime: {subsConfig.primeValue}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Timer toggle */}
+                    <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        {useTimer ? <Timer className="text-cyan-500" size={16} /> : <TimerOff className="text-zinc-400" size={16} />}
+                        <span className="text-zinc-700 dark:text-zinc-300 text-sm">Usar tiempo límite</span>
+                      </div>
+                      <button 
+                        onClick={() => setUseTimer(!useTimer)} 
+                        className={`relative w-11 h-6 rounded-full transition-colors ${useTimer ? 'bg-cyan-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                      >
+                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${useTimer ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    
+                    {/* Time limit */}
+                    {useTimer && (
+                      <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
+                        <Clock size={16} className="text-zinc-400" />
+                        <input 
+                          type="number" 
+                          value={timeLimit} 
+                          onChange={(e) => setTimeLimit(Math.max(10, parseInt(e.target.value) || 60))} 
+                          min="10" 
+                          max="300" 
+                          className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500" 
+                        />
+                        <span className="text-zinc-500 text-sm">segundos</span>
+                      </div>
+                    )}
+                    
+                    {/* Subs only toggle - not in subs mode */}
+                    {raffleMode !== 'subs' && (
+                      <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <Star className="text-yellow-400" size={16} />
+                          <span className="text-zinc-700 dark:text-zinc-300 text-sm">{t.randomWinner.subsOnly}</span>
+                        </div>
+                        <button 
+                          onClick={() => setSubsOnly(!subsOnly)} 
+                          className={`relative w-11 h-6 rounded-full transition-colors ${subsOnly ? 'bg-yellow-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${subsOnly ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Step 3: Participants Preview */}
+                {wizard.currentStep === 2 && (
+                  <div className="space-y-4">
+                    <p className="text-zinc-400 text-sm mb-4">Revisa los participantes antes de iniciar:</p>
+                    
+                    {/* Summary */}
+                    <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-500 text-sm">Modo:</span>
+                        <span className="text-white font-medium flex items-center gap-2">
+                          {raffleMode === 'viewers' && <><Users size={14} /> Viewers</>}
+                          {raffleMode === 'keyword' && <><MessageSquare size={14} /> Keyword: {keyword}</>}
+                          {raffleMode === 'subs' && <><Heart size={14} /> Subs</>}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-500 text-sm">Tiempo:</span>
+                        <span className="text-white font-medium">
+                          {useTimer ? `${timeLimit} segundos` : 'Sin límite'}
+                        </span>
+                      </div>
+                      {raffleMode !== 'subs' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-500 text-sm">Solo subs:</span>
+                          <span className="text-white font-medium">{subsOnly ? 'Sí' : 'No'}</span>
+                        </div>
+                      )}
+                      {raffleMode === 'viewers' && !useTimer && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-500 text-sm">Participantes actuales:</span>
+                          <span className="text-white font-medium">{getAllParticipants().length}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Warning if no participants in instant mode */}
+                    {raffleMode === 'viewers' && !useTimer && getAllParticipants().length === 0 && (
+                      <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-center gap-2 text-yellow-500 text-sm">
+                        <AlertTriangle size={16} />
+                        <span>No hay participantes. Añade participantes manualmente o activa el timer.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+          ) : viewMode === 'compact' ? (
+            // ============================================
+            // COMPACT VIEW - Only mode, start button, count
+            // @requirements 7.2, 7.3
+            // ============================================
+            <div className="p-4 space-y-4">
+              {/* Mode selector - compact */}
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setRaffleMode('viewers'); softResetRaffle(); }} 
+                  className={`flex-1 py-2 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm ${raffleMode === 'viewers' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <Users size={16} /> {t.randomWinner.viewers}
+                </button>
+                <button 
+                  onClick={() => { setRaffleMode('keyword'); softResetRaffle(); }} 
+                  className={`flex-1 py-2 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm ${raffleMode === 'keyword' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <MessageSquare size={16} /> {t.randomWinner.keyword}
+                </button>
+                <button 
+                  onClick={() => { setRaffleMode('subs'); softResetRaffle(); }} 
+                  className={`flex-1 py-2 px-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 text-sm ${raffleMode === 'subs' ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <Heart size={16} /> Subs
+                </button>
+              </div>
 
-            {/* Raffle title */}
+              {/* Keyword input - only in keyword mode */}
+              {raffleMode === 'keyword' && (
+                <input 
+                  type="text" 
+                  value={keyword} 
+                  onChange={(e) => setKeyword(e.target.value)} 
+                  placeholder="Palabra clave..." 
+                  disabled={isRunning} 
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-purple-500 disabled:opacity-50" 
+                />
+              )}
+
+              {/* Participant count */}
+              <div className="flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
+                <Users size={16} />
+                <span>
+                  {raffleMode === 'subs' 
+                    ? `${subsParticipants.length} entradas`
+                    : raffleMode === 'viewers'
+                      ? `${getAllParticipants().length} participantes`
+                      : `${participants.size} participantes`
+                  }
+                </span>
+              </div>
+
+              {/* Running stats - time only */}
+              {isRunning && useTimer && (
+                <div className="text-center p-2 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
+                  <p className={`text-xl font-bold ${timeLeft <= 10 ? 'text-red-400' : 'text-zinc-800 dark:text-white'}`}>{timeLeft}s</p>
+                </div>
+              )}
+
+              {/* Winner display - compact */}
+              {(winner || isSelecting) && (
+                <div className="text-center">
+                  <div className={`inline-block px-6 py-3 rounded-xl ${winner && !isSelecting ? 'bg-gradient-to-r from-yellow-500 to-orange-500 animate-pulse' : 'bg-zinc-100 dark:bg-zinc-800'}`}>
+                    {winner && !isSelecting && <Crown className="text-white mx-auto mb-1" size={16} />}
+                    <span className={`font-bold text-lg ${winner && !isSelecting ? 'text-white' : 'text-purple-500'}`}>{displayName || '...'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons - compact */}
+              <div className="space-y-2">
+                {!isRunning && !winner && !(raffleMode === 'subs' && !useTimer) && !(raffleMode === 'keyword' && !useTimer) && (
+                  <button 
+                    onClick={startRaffle} 
+                    disabled={(raffleMode === 'keyword' && !keyword.trim()) || (raffleMode === 'viewers' && !useTimer && getAllParticipants().length === 0) || isSelecting} 
+                    className={`w-full flex items-center justify-center gap-2 py-2 ${raffleMode === 'subs' ? 'bg-pink-500 hover:bg-pink-600' : 'bg-purple-500 hover:bg-purple-600'} disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all text-sm`}
+                  >
+                    {useTimer ? <Play size={16} /> : <Sparkles size={16} />}
+                    {useTimer ? 'Iniciar' : 'Sortear'}
+                  </button>
+                )}
+                
+                {!isRunning && !winner && raffleMode === 'viewers' && !useTimer && (
+                  <button 
+                    onClick={startRaffle} 
+                    disabled={getAllParticipants().length === 0 || isSelecting} 
+                    className="w-full flex items-center justify-center gap-2 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all text-sm"
+                  >
+                    <Sparkles size={16} />
+                    Sortear ({getAllParticipants().length})
+                  </button>
+                )}
+
+                {isRunning && (
+                  <button 
+                    onClick={finishAndSelectWinner} 
+                    disabled={raffleMode === 'subs' ? subsParticipants.length === 0 : participants.size === 0}
+                    className="w-full flex items-center justify-center gap-2 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 text-white font-bold rounded-xl transition-all animate-pulse text-sm"
+                  >
+                    <Trophy size={16} /> Elegir ({raffleMode === 'subs' ? subsParticipants.length : participants.size})
+                  </button>
+                )}
+
+                {winner && !isSelecting && (
+                  <button 
+                    onClick={resetRaffle} 
+                    className="w-full flex items-center justify-center gap-2 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-white font-bold rounded-xl transition-all text-sm"
+                  >
+                    <RotateCcw size={16} /> Nuevo
+                  </button>
+                )}
+
+                {(raffleMode === 'keyword' || raffleMode === 'subs') && !useTimer && !isRunning && !winner && (
+                  <button 
+                    onClick={raffleMode === 'subs' ? createSubsThread : createThreadFromRaffle} 
+                    disabled={raffleMode === 'keyword' && !keyword.trim()}
+                    className={`w-full flex items-center justify-center gap-2 py-2 ${
+                      raffleMode === 'subs' 
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400'
+                    } disabled:from-zinc-400 disabled:to-zinc-500 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all text-sm`}
+                  >
+                    <Plus size={16} />
+                    Crear Hilo
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+          // ============================================
+          // EXPANDED VIEW - Full form with all options
+          // ============================================
+          <div className="p-4 space-y-4">
+            {/* ============================================ */}
+            {/* CONFIGURACIÓN BÁSICA - Expanded by default */}
+            {/* @requirements 2.1, 2.2 */}
+            {/* ============================================ */}
+            <CollapsibleSection
+              title="Configuración Básica"
+              icon={<Settings size={16} />}
+              defaultExpanded={true}
+            >
+              {/* Mode selector */}
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => { setRaffleMode('viewers'); softResetRaffle(); }} 
+                  className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'viewers' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <Users size={18} /> {t.randomWinner.viewers}
+                </button>
+                <button 
+                  onClick={() => { setRaffleMode('keyword'); softResetRaffle(); }} 
+                  className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'keyword' ? 'bg-purple-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <MessageSquare size={18} /> {t.randomWinner.keyword}
+                </button>
+                <button 
+                  onClick={() => { setRaffleMode('subs'); softResetRaffle(); }} 
+                  className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${raffleMode === 'subs' ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}
+                >
+                  <Heart size={18} /> Subs
+                </button>
+              </div>
+
+              {/* Raffle title */}
             <div className="space-y-2">
               <label htmlFor="raffle-title-input" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">Título del sorteo (opcional)</label>
               <input 
@@ -1739,10 +2163,12 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               {/* Subs only toggle - not shown in subs mode */}
               {raffleMode !== 'subs' && (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Star className="text-yellow-400" size={16} />
-                    <span className="text-zinc-700 dark:text-zinc-300 text-sm">{t.randomWinner.subsOnly}</span>
-                  </div>
+                  <Tooltip content={t.randomWinner.subsOnlyTooltip} position="right">
+                    <div className="flex items-center gap-2 cursor-help">
+                      <Star className="text-yellow-400" size={16} />
+                      <span className="text-zinc-700 dark:text-zinc-300 text-sm">{t.randomWinner.subsOnly}</span>
+                    </div>
+                  </Tooltip>
                   <button 
                     onClick={() => setSubsOnly(!subsOnly)} 
                     disabled={isRunning}
@@ -1755,10 +2181,12 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
               {/* Timer toggle */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {useTimer ? <Timer className="text-cyan-500" size={16} /> : <TimerOff className="text-zinc-400" size={16} />}
-                  <span className="text-zinc-700 dark:text-zinc-300 text-sm">Usar tiempo</span>
-                </div>
+                <Tooltip content={t.randomWinner.useTimerTooltip} position="right">
+                  <div className="flex items-center gap-2 cursor-help">
+                    {useTimer ? <Timer className="text-cyan-500" size={16} /> : <TimerOff className="text-zinc-400" size={16} />}
+                    <span className="text-zinc-700 dark:text-zinc-300 text-sm">Usar tiempo</span>
+                  </div>
+                </Tooltip>
                 <button 
                   onClick={() => setUseTimer(!useTimer)} 
                   disabled={isRunning}
@@ -1771,7 +2199,11 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               {/* Time limit input */}
               {useTimer && (
                 <div className="flex items-center gap-3">
-                  <Clock size={16} className="text-zinc-400" />
+                  <Tooltip content={t.randomWinner.timeLimitTooltip} position="right">
+                    <div className="cursor-help">
+                      <Clock size={16} className="text-zinc-400" />
+                    </div>
+                  </Tooltip>
                   <input 
                     id="raffle-time-limit-input"
                     name="timeLimit"
@@ -1788,7 +2220,19 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 </div>
               )}
             </div>
+            </CollapsibleSection>
 
+            {/* ============================================ */}
+            {/* OPCIONES AVANZADAS - Collapsed by default */}
+            {/* Only shown when there's content (subs or keyword mode) */}
+            {/* @requirements 2.3 */}
+            {/* ============================================ */}
+            {(raffleMode === 'subs' || raffleMode === 'keyword') && (
+            <CollapsibleSection
+              title="Opciones Avanzadas"
+              icon={<Sliders size={16} />}
+              defaultExpanded={false}
+            >
             {/* Subs mode info */}
             {raffleMode === 'subs' && (
               <div className="space-y-3">
@@ -1827,7 +2271,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             {/* Keyword input (only in keyword mode) */}
             {raffleMode === 'keyword' && (
               <div className="space-y-2">
-                <label htmlFor="raffle-keyword-input" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase">{t.randomWinner.keywordLabel}</label>
+                <Tooltip content={t.randomWinner.keywordTooltip} position="right">
+                  <label htmlFor="raffle-keyword-input" className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase cursor-help inline-block">{t.randomWinner.keywordLabel}</label>
+                </Tooltip>
                 <div className="relative">
                   <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input 
@@ -1843,7 +2289,21 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 </div>
               </div>
             )}
+            </CollapsibleSection>
+            )}
 
+            {/* ============================================ */}
+            {/* PARTICIPANTES - Collapsed by default, with badge */}
+            {/* @requirements 2.4 */}
+            {/* ============================================ */}
+            <CollapsibleSection
+              title="Participantes"
+              icon={<Users size={16} />}
+              badge={raffleMode === 'subs' 
+                ? subsParticipants.length 
+                : (raffleMode === 'viewers' && !useTimer ? getAllParticipants().length : participants.size)}
+              defaultExpanded={false}
+            >
             {/* Manual participant input - not shown in subs mode */}
             {raffleMode !== 'subs' && (
             <div className="space-y-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-600">
@@ -2090,6 +2550,31 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               </p>
             </div>
             )}
+            </CollapsibleSection>
+
+            {/* ============================================ */}
+            {/* LISTA NEGRA - Collapsed by default, with badge */}
+            {/* @requirements 2.5 */}
+            {/* ============================================ */}
+            <CollapsibleSection
+              title="Lista Negra"
+              icon={<Ban size={16} />}
+              badge={blacklist.size > 0 ? blacklist.size : undefined}
+              defaultExpanded={false}
+            >
+              <div className="space-y-3">
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+                  Los usuarios en esta lista nunca podrán ganar sorteos.
+                </p>
+                <button
+                  onClick={() => setShowBlacklistModal(true)}
+                  className="w-full py-2 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-600 dark:text-red-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Shield size={16} />
+                  Gestionar Lista de Prohibidos {blacklist.size > 0 && `(${blacklist.size})`}
+                </button>
+              </div>
+            </CollapsibleSection>
 
             {/* Running stats - time only */}
             {isRunning && useTimer && (
@@ -2218,7 +2703,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
               }
             </p>
           </div>
-        ) : (
+        )) : (
           // ============================================
           // ACTIVE THREADS TAB
           // ============================================

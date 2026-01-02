@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 /**
- * Accessibility Tests - TwitchVote Live
+ * Accessibility Tests - StreamCrowd
  * @requirements Task 11 - Tests de accesibilidad
  * @requirements Task 11.2 - Test: Contraste cumple WCAG AA
  * @requirements Task 11.3 - Test: Navegación por teclado funciona

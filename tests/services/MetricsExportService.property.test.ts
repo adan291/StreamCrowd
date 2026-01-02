@@ -133,7 +133,7 @@ describe('MetricsExportService Property Tests', () => {
             
             expect(html).toContain('Summary');
             expect(html).toContain('Session Details');
-            expect(html).toContain('TwitchVote');
+            expect(html).toContain('StreamCrowd');
             
             return true;
           }

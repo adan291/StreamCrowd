@@ -1,4 +1,4 @@
-// Webhook Types for TwitchVote
+// Webhook Types for StreamCrowd
 
 // Event types that can trigger outgoing webhooks
 export type WebhookEventType =
@@ -137,7 +137,7 @@ export const RATE_LIMIT_CONFIG = {
 
 // Storage keys
 export const WEBHOOK_STORAGE_KEYS = {
-  WEBHOOKS: 'twitchvote_webhooks',
-  INCOMING_CONFIG: 'twitchvote_incoming_webhook_config',
-  WEBHOOK_SECRETS: 'twitchvote_webhook_secrets',
+  WEBHOOKS: 'streamcrowd_webhooks',
+  INCOMING_CONFIG: 'streamcrowd_incoming_webhook_config',
+  WEBHOOK_SECRETS: 'streamcrowd_webhook_secrets',
 };

@@ -3,3 +3,4 @@
  */
 
 export * from './platforms';
+export * from './giveawayPresets';

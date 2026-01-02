@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="public/ai-vision-icon.png" alt="TwitchVote Logo" width="120" />
+  <img src="public/ai-vision-icon.png" alt="StreamCrowd Logo" width="120" />
   
-  # TwitchVote Live
+  # StreamCrowd
   
-  **Suite completa de herramientas interactivas para streamers de Twitch**
+  **La suite definitiva de herramientas interactivas para streamers**
   
   [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
@@ -11,105 +11,125 @@
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss)](https://tailwindcss.com/)
   [![Electron](https://img.shields.io/badge/Electron-39-47848F?logo=electron)](https://www.electronjs.org/)
   
-  [Demo](#demo) • [Características](#-características) • [Instalación](#-instalación) • [Juegos](#-juegos-interactivos) • [Documentación](#-documentación)
+  [Características](#-características) • [Instalación](#-instalación) • [OBS](#-integración-obs) • [Documentación](#-documentación)
 </div>
 
 ---
 
-## 🎯 ¿Qué es TwitchVote?
+## 🎯 ¿Qué es StreamCrowd?
 
-TwitchVote es una aplicación todo-en-uno para streamers que quieren aumentar la interacción con su audiencia. Incluye encuestas en tiempo real, **+13 juegos interactivos** controlados por chat, sorteos, panel de jueces, analytics avanzados, y herramientas de moderación.
+StreamCrowd es una aplicación todo-en-uno diseñada para streamers que quieren llevar la interacción con su audiencia al siguiente nivel. 
 
-Disponible como **aplicación web** (PWA) y **aplicación de escritorio** (Electron).
+Combina **encuestas en tiempo real**, **sorteos avanzados**, **panel de jueces**, **+13 minijuegos**, **predicciones**, **recompensas de canal**, **analytics con IA**, y mucho más en una sola herramienta.
+
+Compatible con **Twitch**, **YouTube** y **Kick**. Disponible como **app web** (PWA) y **escritorio** (Electron).
 
 ---
 
 ## ✨ Características
 
-### 📊 Encuestas en Vivo
-- Creación de encuestas con opciones personalizables
-- Votación por chat con prefijos configurables (`+1`, `#opcion`, etc.)
-- Modo de coincidencia exacta o parcial para votos
-- Límite de votos y duración opcional
-- Historial de encuestas con exportación a Excel
-- Modo overlay transparente para OBS/Streamlabs
-- Ruleta/Spinner para selección aleatoria de opciones
+### 📊 Encuestas Interactivas
+- Presets rápidos (Sí/No, Rating 1-5, ABC)
+- Colores, iconos e imágenes personalizables
+- Votación por chat con prefijos configurables (`+1`, `+pizza`, etc.)
+- Gráficos animados en tiempo real
+- Ruleta/Spinner integrada
+- Modo wizard paso a paso
+- Overlay transparente para OBS
 
-### 🎮 Juegos Interactivos (+13 minijuegos)
+### 🎁 Centro de Sorteos (GiveawayHub)
+| Modo | Descripción |
+|------|-------------|
+| **Viewers** | Sorteo entre usuarios activos en el chat |
+| **Keyword** | Participación con palabra clave específica |
+| **Subs** | Entradas ponderadas por tier, bits, donaciones |
 
-| Juego | Descripción | Comando Chat |
-|-------|-------------|--------------|
-| � ***Casino Roulette** | Ruleta de casino con apuestas del chat | `!bet`, `!spin` |
-| 🎣 **Chat Fishing** | Pesca competitiva con ranking | `!fish`, `!cast` |
-| 🔫 **Pium Game** | Duelos rápidos estilo western | `!pium @user` |
-| 🦆 **Duck Hunt** | Caza de patos clásica | `!shoot` |
-| 🚢 **Battleship** | Hundir la flota colaborativo | `!fire A1` |
-| 🥔 **Hot Potato** | Patata caliente entre usuarios | `!pass @user` |
-| ❓ **Trivia Battle** | Preguntas y respuestas con puntos | respuesta directa |
-| 👁️ **Veo Veo** | Adivina el objeto oculto | respuesta directa |
-| ✂️ **Piedra Papel Tijera** | Torneos de PPT | `!piedra`, `!papel`, `!tijera` |
-| 📝 **Ahorcado** | El clásico juego de palabras | letra directa |
-| 🏎️ **Carrera de Emotes** | Carreras con emotes del canal | emote para votar |
-| 🧠 **Memoria IRL** | Memory con imágenes personalizadas | `!flip 1`, `!flip 2` |
-| 🎉 **Party & Co** | Minijuegos variados estilo party | varios comandos |
-
-### 🎁 Sorteos y Giveaways
-- Sorteos por palabra clave
-- Filtros: solo subs, followers, antigüedad de cuenta
-- Ruleta visual con animación
-- Selección de ganador aleatorio con overlay
-- Historial de ganadores exportable
+- Configuración de entradas por Tier 1/2/3, Prime, resubs
+- Soporte para bits y donaciones
+- Blacklist de usuarios
+- Ruleta animada con ganador
+- Historial exportable
 
 ### ⚖️ Panel de Jueces
-- Sistema de puntuación multi-criterio personalizable
-- Múltiples jueces (streamers colaboradores)
-- Votación pública del chat combinada
+- Múltiples criterios de evaluación ponderados
+- Sistema multi-juez (streamers colaboradores)
+- Votación pública del chat combinada con puntuaciones
+- Presets: Talento, Cocina, Gaming, Arte, Cosplay
 - Revelación dramática de resultados
 - Overlay dedicado para OBS
 
-### 📈 Analytics Avanzados
-- Análisis de sentimiento del chat en tiempo real
-- Métricas: msgs/min, engagement, retención de usuarios
-- Gráficos de actividad y tendencia emocional
-- Top usuarios, palabras frecuentes y emotes populares
-- Mapa de calor de actividad
-- Índice de salud del chat
-- Detección de idioma dominante
-- Exportación de datos a CSV
-- Historial de sesiones guardadas
+### 🔮 Predicciones de Twitch
+- Integración nativa con la API de Twitch
+- Crear y gestionar predicciones desde la app
+- Los viewers apuestan puntos de canal
+- Resolución con un clic
 
-### 🎬 Stream Events
-- Captura de subs, resubs, gifts, bits, raids
-- Notificaciones visuales personalizables
-- Historial de eventos del stream
+### 🎖️ Recompensas de Canal
+- Gestión completa de channel points
+- Crear, editar y eliminar recompensas
+- Ver canjes en tiempo real
+- Marcar como completados
+
+### 🎮 Juegos Interactivos (+13 minijuegos)
+
+| Juego | Descripción | Comandos |
+|-------|-------------|----------|
+| 🎰 **Casino Roulette** | Ruleta con apuestas | `!bet`, `!spin` |
+| 🎣 **Chat Fishing** | Pesca competitiva | `!fish`, `!cast` |
+| 🔫 **Pium Game** | Duelos western | `!pium @user` |
+| 🦆 **Duck Hunt** | Caza de patos | `!shoot` |
+| 🚢 **Battleship** | Hundir la flota | `!fire A1` |
+| 🥔 **Hot Potato** | Patata caliente | `!pass @user` |
+| ❓ **Trivia Battle** | Preguntas y puntos | respuesta directa |
+| 👁️ **Veo Veo** | Adivina el objeto | respuesta directa |
+| ✂️ **Piedra Papel Tijera** | Torneos PPT | `!piedra/papel/tijera` |
+| 📝 **Ahorcado** | Juego de palabras | letra directa |
+| 🏎️ **Carrera de Emotes** | Carreras con emotes | emote para votar |
+| 🧠 **Memoria IRL** | Memory personalizado | `!flip 1` |
+| 🎉 **Party & Co** | Minijuegos variados | varios |
+
+### 📈 Analytics con IA
+- Análisis de sentimiento en tiempo real
+- Métricas: msgs/min, engagement, retención
+- Top usuarios, palabras y emotes
+- Mapa de calor de actividad
+- Integración opcional con OpenAI/Gemini
+- Exportación a CSV/Excel
+
+### 🔊 Panel de Sonidos
+- Efectos 8-bit generados al instante
+- Redobles, risas, buzzers, fanfarrias
+- Sube tus propios audios
+- Atajos de teclado
+
+### 🎬 Integración OBS
+- Conexión WebSocket automática
+- Control de escenas y fuentes
+- Overlays con Chroma Key
+- URLs dedicadas para cada componente
 
 ### 🛡️ Moderación Avanzada
-- Filtros de antigüedad de cuenta
 - Cooldown entre votos
 - Peso de votos (subs valen más)
+- Filtros de antigüedad de cuenta
 - Detección de spam
-- Logs exportables
-- Presets de configuración
+- Logs detallados exportables
 
-### 🤖 Mascota AI Interactiva
+### ⚡ Macros y Automatización
+- Presets de comandos para moderadores
+- Acciones automáticas por eventos
+- Temporizadores con mensajes al chat
+
+### 🤖 Mascota AI Vision
 - Asistente visual con expresiones dinámicas
-- Detecta dificultades del usuario y ofrece ayuda
+- Tour guiado de la aplicación
+- Detecta dificultades y ofrece ayuda
 - Arrastrable por la pantalla
-- Integración opcional con Gemini API
-- Animaciones y estados emocionales
 
-### 🎨 Personalización
-- Temas claro/oscuro
-- Colores personalizables para encuestas
-- Overlays transparentes para OBS
-- Soporte multi-idioma (ES/EN)
-- Atajos de teclado configurables
-- SoundBoard integrado
-
-### 🔗 Colaboración Multi-Canal
-- Conecta múltiples canales de Twitch
-- Votos combinados de diferentes chats
-- Ideal para colaboraciones entre streamers
+### 🌐 Multi-plataforma
+- **Twitch** - Soporte completo con API
+- **YouTube** - Chat en vivo (próximamente)
+- **Kick** - Chat en vivo (próximamente)
 
 ---
 
@@ -123,23 +143,22 @@ Disponible como **aplicación web** (PWA) y **aplicación de escritorio** (Elect
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tu-usuario/twitchvote-live.git
-cd twitchvote-live
+git clone https://github.com/tu-usuario/streamcrowd.git
+cd streamcrowd
 
 # Instalar dependencias
 npm install
 
 # Configurar variables de entorno
 cp .env.local.example .env.local
-# Editar .env.local con tus credenciales
 
 # Iniciar en modo desarrollo
 npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:5173`
+Abre `http://localhost:5173`
 
-### Aplicación de Escritorio (Electron)
+### Aplicación de Escritorio
 
 ```bash
 # Desarrollo con Electron
@@ -149,86 +168,38 @@ npm run electron:dev
 npm run electron:build
 ```
 
-### Despliegue Web
-
-```bash
-# Compilar para producción
-npm run build
-
-# Preview local
-npm run preview
-```
-
-Compatible con Vercel, Netlify, o cualquier hosting estático.
-
 ---
 
-## ⚙️ Configuración
+## 🎬 Integración OBS
 
-### Variables de Entorno
+### Configuración Rápida
 
-Crea un archivo `.env.local` en la raíz:
+1. En OBS: **Agregar → Fuente de navegador**
+2. Pega la URL del overlay deseado
+3. Tamaño recomendado: 400x600px
+4. Marca **"Fondo transparente"**
 
-```env
-# Twitch OAuth (opcional - para funciones avanzadas)
-VITE_TWITCH_CLIENT_ID=tu_client_id
-VITE_TWITCH_REDIRECT_URI=http://localhost:5173/auth/callback
-
-# Gemini API (opcional - para mascota AI)
-GEMINI_API_KEY=tu_api_key
-```
-
-### Conexión a Twitch
-
-1. Abre la aplicación
-2. Ingresa el nombre de tu canal
-3. (Opcional) Conecta con OAuth para funciones avanzadas:
-   - Enviar mensajes al chat
-   - Acceder a lista de subs
-   - Emotes personalizados del canal
-
----
-
-## 🎬 Uso con OBS
-
-### Overlay de Encuestas
-
-1. En TwitchVote, crea una encuesta
-2. Click en "Abrir Overlay"
-3. En OBS: Agregar → Fuente de navegador
-4. URL: `http://localhost:5173/?overlay=true&channel=TU_CANAL`
-5. Ancho: 400px, Alto: 600px
-6. Marcar "Fondo transparente"
-
-### Overlays Disponibles
-
-Cada componente tiene su propio overlay para OBS:
+### URLs de Overlays
 
 ```
-# Encuestas y Herramientas
-?overlay=true              # Encuesta principal
+# Herramientas principales
+?overlay=true              # Encuesta
 ?overlayCountdown=true     # Cuenta regresiva
-?overlaySpinner=true       # Ruleta/Spinner
-?overlayRandomWinner=true  # Ganador aleatorio
+?overlaySpinner=true       # Ruleta
+?overlayRandomWinner=true  # Ganador sorteo
 ?overlayJudgePanel=true    # Panel de jueces
 
 # Juegos
 ?overlayPium=true          # Pium Game
-?overlayRoulette=true      # Casino Roulette
-?overlayFishing=true       # Chat Fishing
-?overlayPotato=true        # Hot Potato
-?overlayTrivia=true        # Trivia Battle
+?overlayRoulette=true      # Casino
+?overlayFishing=true       # Pesca
+?overlayTrivia=true        # Trivia
 ?overlayBattleship=true    # Battleship
 ?overlayDuckHunt=true      # Duck Hunt
-?overlayVeoVeo=true        # Veo Veo
-?overlayPPT=true           # Piedra Papel Tijera
-?overlayAhorcado=true      # Ahorcado
-?overlayCarrera=true       # Carrera de Emotes
-?overlayMemoria=true       # Memoria IRL
-?overlayPartyCo=true       # Party & Co
+# ... y más
 ```
 
-Añade `&channel=TU_CANAL` a cualquier URL para conectar automáticamente.
+Añade `&channel=TU_CANAL` para conexión automática.
 
 ---
 
@@ -238,66 +209,55 @@ Añade `&channel=TU_CANAL` a cualquier URL para conectar automáticamente.
 |-------|--------|
 | `Ctrl + ,` | Abrir herramientas |
 | `Ctrl + H` | Ver historial |
-| `Ctrl + B` | Ocultar/mostrar sidebar |
-| `Ctrl + D` | Cambiar tema claro/oscuro |
-| `Escape` | Cerrar modal activo |
+| `Ctrl + B` | Ocultar sidebar |
+| `Ctrl + D` | Cambiar tema |
+| `Escape` | Cerrar modal |
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Tests unitarios
-npm run test
-
-# Tests E2E con Playwright
-npm run test:e2e
-
-# Tests E2E con UI
-npm run test:e2e:ui
-
-# Todos los tests
-npm run test:all
+npm run test        # Tests unitarios
+npm run test:e2e    # Tests E2E
+npm run test:all    # Todos
 ```
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura
 
 ```
-├── components/           # Componentes React
-│   ├── games/           # 13+ juegos interactivos
-│   └── mascot/          # Mascota AI
-├── hooks/               # Custom hooks (polls, moderation, analytics...)
-├── services/            # Servicios (Twitch, AI, chat analysis...)
-├── context/             # React Context providers
-├── i18n/                # Traducciones ES/EN
-├── constants/           # Constantes y storage keys
-├── electron/            # Código Electron para desktop
-├── tests/               # Tests unitarios y E2E
-└── public/              # Assets estáticos
+├── components/        # Componentes React
+│   ├── games/        # +13 minijuegos
+│   ├── macros/       # Sistema de macros
+│   └── mascot/       # Mascota AI
+├── hooks/            # Custom hooks
+├── src/
+│   ├── application/  # Servicios y lógica
+│   ├── domain/       # Entidades
+│   └── infrastructure/ # Sync, storage
+├── i18n/             # Traducciones ES/EN
+└── electron/         # App de escritorio
 ```
 
 ---
 
 ## 🤝 Contribuir
 
-¡Las contribuciones son bienvenidas! 
-
 1. Fork el repositorio
 2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -m 'Añade nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Abre un Pull Request
+3. Commit tus cambios
+4. Push y abre un Pull Request
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+MIT License - Ver [LICENSE](LICENSE)
 
 ---
 
 <div align="center">
-  <p>Hecho con 💜 para la comunidad de Twitch</p>
+  <p>Hecho con 💜 para la comunidad de streamers</p>
 </div>

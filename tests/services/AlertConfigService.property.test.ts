@@ -265,7 +265,7 @@ describe('AlertConfigService Property Tests', () => {
             }
           }),
           (corruptedData) => {
-            mockStorage.setItem('twitchvote_alert_config', corruptedData);
+            mockStorage.setItem('streamcrowd_alert_config', corruptedData);
             
             const service = new AlertConfigService(mockStorage);
             const config = service.loadConfig();

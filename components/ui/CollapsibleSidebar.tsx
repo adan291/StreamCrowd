@@ -99,7 +99,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   className="
                     w-full flex items-center justify-between
                     px-4 py-2 text-xs font-semibold uppercase tracking-wider
-                    text-zinc-500 hover:text-zinc-400 transition-colors
+                    text-zinc-400 hover:text-zinc-300 transition-colors
                   "
                   aria-expanded={isExpanded}
                 >

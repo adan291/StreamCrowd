@@ -1,5 +1,5 @@
 {
-  "name": "twitchvote-live",
+  "name": "streamcrowd",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -18,11 +18,11 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-builder"
   },
-  "description": "Aplicación de encuestas en vivo para Twitch",
-  "author": "TwitchVote Team",
+  "description": "Suite de herramientas interactivas para streamers - Encuestas, sorteos, juegos y más",
+  "author": "StreamCrowd Team",
   "build": {
-    "appId": "com.twitchvote.app",
-    "productName": "TwitchVote",
+    "appId": "com.streamcrowd.app",
+    "productName": "StreamCrowd",
     "directories": {
       "output": "release"
     },

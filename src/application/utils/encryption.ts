@@ -76,7 +76,7 @@ function getDevicePassword(): string {
     screen.width.toString(),
     screen.height.toString(),
     new Date().getTimezoneOffset().toString(),
-    'twitchvote-backup-key-v1', // Application-specific salt
+    'streamcrowd-backup-key-v1', // Application-specific salt
   ];
   
   return factors.join('|');
