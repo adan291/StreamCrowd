@@ -111,7 +111,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 500,
+      chunkSizeWarningLimit: 1000, // Silenciar warning en Vercel
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -122,27 +122,36 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: (id) => {
-            // Solo separar librerías pesadas que NO dependen de React
-            // Esto evita problemas de orden de inicialización
             if (id.includes('node_modules')) {
-              // Firebase - muy pesado, no depende de React
+              // Firebase - muy pesado
               if (id.includes('firebase')) {
                 return 'vendor-firebase';
               }
-              // Excel export - muy pesado, no depende de React
+              // Excel export - pesado
               if (id.includes('xlsx')) {
                 return 'vendor-xlsx';
               }
-              // D3 (sin recharts) - pesado, no depende de React
-              if (id.includes('d3-') && !id.includes('recharts')) {
-                return 'vendor-d3';
+              // Recharts y D3 - gráficos pesados
+              if (id.includes('recharts') || id.includes('d3-')) {
+                return 'vendor-charts';
               }
-              // Dejar que Vite maneje todo lo demás automáticamente
-              // Esto incluye React, recharts, lucide, framer-motion, etc.
-              // Vite resolverá el orden correcto de dependencias
-              return undefined;
+              // OBS WebSocket
+              if (id.includes('obs-websocket')) {
+                return 'vendor-obs';
+              }
+              // Socket.io
+              if (id.includes('socket.io')) {
+                return 'vendor-socket';
+              }
+              // Lucide icons - muchos iconos
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              // TMI.js - Twitch chat
+              if (id.includes('tmi.js')) {
+                return 'vendor-tmi';
+              }
             }
-            // No separar código de la app - dejar que Vite optimice
             return undefined;
           }
         }
