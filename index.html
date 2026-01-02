@@ -80,31 +80,67 @@
     <!-- Service Worker cleanup on version mismatch -->
     <script>
       (function() {
-        // Detectar errores de carga de módulos y limpiar SW
-        window.addEventListener('error', function(e) {
-          if (e.message && e.message.includes('MIME type')) {
-            console.warn('[SW] MIME type error detected, clearing service worker...');
-            if ('serviceWorker' in navigator) {
+        var hasReloaded = sessionStorage.getItem('streamcrowd_cache_cleared');
+        
+        // Función para limpiar cache y recargar
+        function clearCacheAndReload() {
+          if (hasReloaded) {
+            console.error('[Cache] Already tried clearing cache, not reloading again');
+            return;
+          }
+          
+          console.warn('[Cache] Clearing all caches and service workers...');
+          sessionStorage.setItem('streamcrowd_cache_cleared', 'true');
+          
+          var promises = [];
+          
+          // Limpiar Service Workers
+          if ('serviceWorker' in navigator) {
+            promises.push(
               navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                registrations.forEach(function(registration) {
-                  registration.unregister();
-                });
-                // Limpiar caches
-                if ('caches' in window) {
-                  caches.keys().then(function(names) {
-                    names.forEach(function(name) {
-                      caches.delete(name);
-                    });
-                  });
-                }
-                // Recargar después de limpiar
-                setTimeout(function() {
-                  window.location.reload(true);
-                }, 500);
-              });
-            }
+                return Promise.all(registrations.map(function(r) { return r.unregister(); }));
+              })
+            );
+          }
+          
+          // Limpiar todos los caches
+          if ('caches' in window) {
+            promises.push(
+              caches.keys().then(function(names) {
+                return Promise.all(names.map(function(name) { return caches.delete(name); }));
+              })
+            );
+          }
+          
+          Promise.all(promises).then(function() {
+            console.log('[Cache] Cleared, reloading...');
+            window.location.reload(true);
+          }).catch(function() {
+            window.location.reload(true);
+          });
+        }
+        
+        // Limpiar flag de reload después de carga exitosa
+        window.addEventListener('load', function() {
+          setTimeout(function() {
+            sessionStorage.removeItem('streamcrowd_cache_cleared');
+          }, 2000);
+        });
+        
+        // Detectar errores de carga de módulos
+        window.addEventListener('error', function(e) {
+          if (e.message && (e.message.includes('MIME type') || e.message.includes('module script'))) {
+            clearCacheAndReload();
           }
         }, true);
+        
+        // También detectar errores en la carga de scripts
+        document.addEventListener('DOMContentLoaded', function() {
+          var scripts = document.querySelectorAll('script[type="module"]');
+          scripts.forEach(function(script) {
+            script.addEventListener('error', clearCacheAndReload);
+          });
+        });
       })();
     </script>
     

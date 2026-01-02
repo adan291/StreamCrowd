@@ -32,32 +32,52 @@ export default defineConfig(({ mode }) => {
         workbox: {
           // Limpiar caches viejos automáticamente
           cleanupOutdatedCaches: true,
-          // No pre-cachear archivos JS para evitar problemas de versiones
+          // NO pre-cachear JS - evita problemas de versiones
           globPatterns: ['**/*.{css,html,ico,png,svg,woff2}'],
           // Saltar waiting y activar inmediatamente
           skipWaiting: true,
           clientsClaim: true,
+          // Navegación siempre va a la red
+          navigateFallback: null,
           runtimeCaching: [
             {
-              // JS files - Network first para siempre tener la última versión
+              // JS files - SIEMPRE red primero, cache solo como fallback
               urlPattern: /\.js$/,
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'js-cache',
+                networkTimeoutSeconds: 5,
                 expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 // 1 día
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 // 1 día máximo
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
                 }
               }
             },
             {
+              // CSS - Network first también
+              urlPattern: /\.css$/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'css-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 7
+                }
+              }
+            },
+            {
+              // Imágenes de Twitch - Cache first (estas no cambian)
               urlPattern: /^https:\/\/static-cdn\.jtvnw\.net\/.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'twitch-images',
                 expiration: {
                   maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+                  maxAgeSeconds: 60 * 60 * 24 * 7
                 }
               }
             }
@@ -111,7 +131,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      chunkSizeWarningLimit: 1000, // Silenciar warning en Vercel
+      chunkSizeWarningLimit: 2000, // Silenciar warning - app compleja con muchas features
       minify: 'terser',
       terserOptions: {
         compress: {
