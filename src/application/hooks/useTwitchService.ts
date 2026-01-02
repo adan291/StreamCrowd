@@ -70,7 +70,7 @@ export interface UseTwitchServiceReturn {
   /** User ID (broadcaster ID) for API calls */
   userId: string;
   /** Connect to a Twitch channel */
-  connect: (channel: string, token?: string, userId?: string) => void;
+  connect: (channel?: string, token?: string, userId?: string) => void;
   /** Disconnect from current channel */
   disconnect: () => void;
   /** Collaboration channels */
@@ -248,8 +248,8 @@ export function useTwitchService(
   /**
    * Connect to a Twitch channel
    */
-  const connect = useCallback(async (channel: string, token?: string, passedUserId?: string) => {
-    if (!channel.trim()) return;
+  const connect = useCallback(async (channel?: string, token?: string, passedUserId?: string) => {
+    if (!channel || !channel.trim()) return;
 
     setChannelName(channel);
     setStatus(ConnectionStatus.CONNECTING);
