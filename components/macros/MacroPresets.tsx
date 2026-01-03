@@ -22,6 +22,8 @@ import {
   Shield,
   Trophy,
   Sparkles,
+  Skull,
+  Flame,
 } from 'lucide-react';
 import {
   MACRO_PRESETS,
@@ -59,6 +61,8 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Droplet: <Droplet size={18} />,
   Trophy: <Trophy size={18} />,
   Sparkles: <Sparkles size={18} />,
+  Skull: <Skull size={18} />,
+  Flame: <Flame size={18} />,
 };
 
 const getIcon = (iconName: string) => ICON_MAP[iconName] || <Zap size={18} />;

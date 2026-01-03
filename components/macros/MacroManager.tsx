@@ -90,13 +90,14 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
   authToken = '',
 }) => {
   // Use predictions hook to check for active prediction
+  // Only enable if NOT moderator view (API doesn't work for mods)
   const { currentPrediction, cancelPrediction } = usePredictions(channelId, authToken, {
-    enablePolling: !!channelId && !!authToken,
+    enablePolling: !!channelId && !!authToken && !isModeratorView,
     pollingInterval: 10000, // Check every 10 seconds
   });
   
-  // Use prop if provided, otherwise use hook result
-  const hasPredictionActive = hasPredictionActiveProp ?? (currentPrediction !== null);
+  // Use prop if provided, otherwise use hook result (null for moderators)
+  const hasPredictionActive = hasPredictionActiveProp ?? (isModeratorView ? false : currentPrediction !== null);
   
   const {
     macros,

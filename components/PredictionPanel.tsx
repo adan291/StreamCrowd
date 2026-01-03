@@ -44,6 +44,8 @@ export interface PredictionPanelProps {
   authToken: string;
   isPartnerOrAffiliate: boolean;
   hasRequiredScope?: boolean;
+  /** Whether the user is viewing a moderated channel (not their own) */
+  isModeratorView?: boolean;
   onNotification?: (type: NotificationType, message: string) => void;
   onReauthenticate?: () => void;
 }
@@ -65,16 +67,18 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   authToken,
   isPartnerOrAffiliate,
   hasRequiredScope = true,
+  isModeratorView = false,
   onNotification,
   onReauthenticate,
 }) => {
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabType>('create');
+  const [modCreatedPrediction, setModCreatedPrediction] = useState(false);
   
   // Stream notifications hook for push notifications
   const { notifyPredictionResolved } = useStreamNotifications();
 
-  // Use predictions hook
+  // Use predictions hook - disable polling for moderators (API doesn't allow reading other's predictions)
   const {
     currentPrediction,
     history,
@@ -87,16 +91,23 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
     cancelPrediction,
     refreshPrediction,
     clearError,
-  } = usePredictions(channelId, authToken);
+  } = usePredictions(channelId, authToken, {
+    enablePolling: !isModeratorView, // Disable for mods - they can't read predictions
+  });
 
   // Auto-switch to active tab when prediction is created
   const handleCreatePrediction = useCallback(async (data: PredictionFormData) => {
     const success = await createPrediction(data);
     if (success) {
-      setActiveTab('active');
-      onNotification?.('success', 'Predicción creada correctamente');
+      if (isModeratorView) {
+        setModCreatedPrediction(true);
+        onNotification?.('success', 'Predicción creada correctamente. Gestiona desde Twitch.');
+      } else {
+        setActiveTab('active');
+        onNotification?.('success', 'Predicción creada correctamente');
+      }
     }
-  }, [createPrediction, onNotification]);
+  }, [createPrediction, onNotification, isModeratorView]);
 
   // Handle lock
   const handleLock = useCallback(async () => {
@@ -166,6 +177,100 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
           Más información sobre el programa de Afiliados
           <ExternalLink size={14} />
         </a>
+      </div>
+    );
+  }
+
+  // Moderator view - simplified UI (can only create, not view/manage)
+  if (isModeratorView) {
+    return (
+      <div className="h-full flex flex-col">
+        {/* Header */}
+        <div className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-twitch-brand/10 flex items-center justify-center">
+              <Zap size={18} className="text-twitch-brand" />
+            </div>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+              Predicciones
+            </h2>
+            <span className="px-2 py-0.5 bg-orange-500/20 text-orange-500 text-xs font-medium rounded">
+              Modo Moderador
+            </span>
+          </div>
+        </div>
+
+        {/* Moderator Info Banner */}
+        <div className="shrink-0 mx-4 mt-4 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <ShieldAlert size={16} className="text-orange-500 mt-0.5 shrink-0" />
+            <div className="text-sm text-orange-600 dark:text-orange-400">
+              <p className="font-medium">Funcionalidad limitada</p>
+              <p className="text-xs mt-1 opacity-80">
+                Como moderador puedes crear predicciones, pero no ver ni gestionar las existentes. 
+                Usa el panel de Twitch para bloquear/resolver.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="shrink-0 mx-4 mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={16} className="text-red-500 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+              <button
+                onClick={clearError}
+                className="text-red-400 hover:text-red-500 text-xs"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          {modCreatedPrediction ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Zap size={24} className="text-green-500" />
+              </div>
+              <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                ¡Predicción creada!
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                Gestiona la predicción desde el panel de Twitch
+              </p>
+              <div className="flex flex-col gap-2 items-center">
+                <a
+                  href="https://dashboard.twitch.tv/viewer-rewards/predictions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-twitch-brand text-white rounded-lg hover:bg-twitch-light transition-colors"
+                >
+                  Abrir Panel de Twitch
+                  <ExternalLink size={14} />
+                </a>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setModCreatedPrediction(false)}
+                >
+                  Crear otra predicción
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <PredictionForm
+              onSubmit={handleCreatePrediction}
+              isLoading={isLoading}
+              disabled={!channelId || !authToken}
+            />
+          )}
+        </div>
       </div>
     );
   }

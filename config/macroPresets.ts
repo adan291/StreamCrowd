@@ -77,16 +77,17 @@ export const PRESET_CATEGORIES: PresetCategoryInfo[] = [
 
 export const MACRO_PRESETS: MacroPreset[] = [
   // ========== PREDICTIONS (API) ==========
-  // Predicciones usan la API de Twitch directamente (requiere auth de streamer)
+  // Predicciones usan la API de Twitch directamente
+  // Los moderadores pueden crear predicciones pero no gestionarlas via API
   {
     id: 'prediction-api-win-lose',
     name: 'Predicción: ¿Ganará?',
-    description: 'Crea predicción de victoria/derrota (requiere auth de streamer)',
+    description: 'Crea predicción de victoria/derrota',
     icon: 'TrendingUp',
     color: '#00f0f0',
     category: 'predictions',
     platforms: ['twitch'],
-    worksForModerators: false,
+    worksForModerators: true,
     macro: {
       name: 'Predicción: ¿Ganará?',
       description: 'Crea una predicción de victoria/derrota via API',
@@ -115,12 +116,12 @@ export const MACRO_PRESETS: MacroPreset[] = [
   {
     id: 'prediction-api-custom',
     name: 'Predicción: Personalizada',
-    description: 'Plantilla de predicción editable (requiere auth de streamer)',
+    description: 'Plantilla de predicción editable',
     icon: 'TrendingUp',
     color: '#00f0f0',
     category: 'predictions',
     platforms: ['twitch'],
-    worksForModerators: false,
+    worksForModerators: true,
     macro: {
       name: 'Predicción personalizada',
       description: 'Edita para personalizar la predicción',
@@ -139,6 +140,108 @@ export const MACRO_PRESETS: MacroPreset[] = [
             title: 'Tu pregunta aquí',
             outcomes: ['Opción 1', 'Opción 2'],
             duration: 120,
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 30,
+    },
+  },
+  {
+    id: 'prediction-api-team',
+    name: 'Predicción: ¿Qué equipo?',
+    description: 'Predicción para elegir entre equipos',
+    icon: 'Users',
+    color: '#a855f7',
+    category: 'predictions',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Predicción: ¿Qué equipo?',
+      description: 'El chat predice qué equipo ganará',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'start_prediction',
+          config: {
+            title: '¿Qué equipo ganará?',
+            outcomes: ['Equipo Azul', 'Equipo Rojo'],
+            duration: 180,
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 30,
+    },
+  },
+  {
+    id: 'prediction-api-survive',
+    name: 'Predicción: ¿Sobrevivirá?',
+    description: 'Predicción de supervivencia',
+    icon: 'Skull',
+    color: '#ef4444',
+    category: 'predictions',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Predicción: ¿Sobrevivirá?',
+      description: 'El chat predice si sobrevivirá',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'start_prediction',
+          config: {
+            title: '¿Sobrevivirá?',
+            outcomes: ['Sobrevive', 'Muere'],
+            duration: 60,
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 30,
+    },
+  },
+  {
+    id: 'prediction-api-clutch',
+    name: 'Predicción: ¿Clutch?',
+    description: 'Predicción para momentos clutch',
+    icon: 'Flame',
+    color: '#f97316',
+    category: 'predictions',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Predicción: ¿Clutch?',
+      description: 'El chat predice si hará el clutch',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'start_prediction',
+          config: {
+            title: '¿Hará el CLUTCH?',
+            outcomes: ['¡CLUTCH!', 'No lo logra'],
+            duration: 30,
           },
           delay: 0,
         },

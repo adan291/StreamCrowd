@@ -248,6 +248,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
               authToken={authToken || ''}
               isPartnerOrAffiliate={isPartnerOrAffiliate}
               hasRequiredScope={hasPredictionsScope}
+              isModeratorView={isViewingModeratedChannel}
               onNotification={onNotification}
               onReauthenticate={onReauthenticate}
             />

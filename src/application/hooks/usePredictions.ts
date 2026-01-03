@@ -338,8 +338,9 @@ export function usePredictions(
 
   // Initial fetch when credentials are available or change
   // This effect handles reconnection scenarios where the token changes
+  // Skip initial fetch if polling is disabled (moderator view)
   useEffect(() => {
-    if (broadcasterId && authToken) {
+    if (broadcasterId && authToken && enablePolling) {
       // Clear any previous error when credentials change (reconnection)
       setError(null);
       
@@ -351,7 +352,7 @@ export function usePredictions(
       
       return () => clearTimeout(timeoutId);
     }
-  }, [broadcasterId, authToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [broadcasterId, authToken, enablePolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Create a new prediction

@@ -166,6 +166,13 @@ export class TwitchPredictionService {
    * Get authorization headers for API requests
    */
   private getHeaders(): HeadersInit {
+    console.log('[TwitchPredictionService] getHeaders called', {
+      hasToken: !!this.token,
+      tokenLength: this.token?.length,
+      tokenPreview: this.token ? `${this.token.substring(0, 10)}...` : 'none',
+      clientId: this.clientId,
+    });
+    
     return {
       'Authorization': `Bearer ${this.token}`,
       'Client-Id': this.clientId,
@@ -284,22 +291,28 @@ export class TwitchPredictionService {
    * @requirements 1.3 - Display current active prediction
    */
   async getPredictions(broadcasterId: string): Promise<TwitchPrediction[] | TwitchPredictionError> {
+    console.log('[TwitchPredictionService] getPredictions called', { broadcasterId });
+    
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
-          `${TWITCH_API_BASE}/predictions?broadcaster_id=${broadcasterId}`,
-          { headers: this.getHeaders() }
-        );
+        const url = `${TWITCH_API_BASE}/predictions?broadcaster_id=${broadcasterId}`;
+        console.log('[TwitchPredictionService] Fetching:', url);
+        
+        const response = await fetch(url, { headers: this.getHeaders() });
+
+        console.log('[TwitchPredictionService] getPredictions response status:', response.status);
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
+          console.log('[TwitchPredictionService] getPredictions error body:', errorBody);
           return this.parseError(response.status, errorBody);
         }
 
         const data: TwitchApiResponse<TwitchPrediction> = await response.json();
+        console.log('[TwitchPredictionService] getPredictions success, count:', data.data?.length);
         return data.data || [];
       } catch (err) {
-        console.error('Error fetching predictions:', err);
+        console.error('[TwitchPredictionService] getPredictions exception:', err);
         return this.parseError(0, String(err));
       }
     });
