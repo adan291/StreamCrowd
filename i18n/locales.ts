@@ -892,6 +892,11 @@ export interface Translations {
     platformsConnected: string;
     platformsDescriptionMulti: string;
     selectPlatforms: string;
+    // Broadcaster Auth
+    broadcasterAuthorized: string;
+    broadcasterNotAuthorized: string;
+    authorizeApp: string;
+    streamerAuthorized: string;
     // Twitch
     twitchTitle: string;
     twitchDescription: string;
@@ -987,6 +992,50 @@ export interface Translations {
     outcomesRequired: string;
     durationRange: string;
     uniqueOutcomes: string;
+    // Broadcaster Auth (for moderators)
+    broadcasterAuthRequired: string;
+    broadcasterAuthRequiredDesc: string;
+    broadcasterAuthSuccess: string;
+    moderatorCanCreate: string;
+    moderatorCannotCreate: string;
+  };
+  // Twitch Polls (API-based)
+  twitchPolls: {
+    title: string;
+    createTitle: string;
+    activeTitle: string;
+    historyTitle: string;
+    question: string;
+    questionPlaceholder: string;
+    choices: string;
+    choicePlaceholder: string;
+    addChoice: string;
+    removeChoice: string;
+    duration: string;
+    durationSeconds: string;
+    create: string;
+    creating: string;
+    terminate: string;
+    archive: string;
+    statusActive: string;
+    statusCompleted: string;
+    statusTerminated: string;
+    statusArchived: string;
+    votes: string;
+    totalVotes: string;
+    winner: string;
+    noHistory: string;
+    noPoll: string;
+    createHint: string;
+    pollCreated: string;
+    pollTerminated: string;
+    pollArchived: string;
+    errorCreating: string;
+    errorTerminating: string;
+    errorArchiving: string;
+    broadcasterAuthRequired: string;
+    broadcasterAuthRequiredDesc: string;
+    moderatorCanCreate: string;
   };
   // Channel Points / Rewards
   rewards: {
@@ -2296,6 +2345,11 @@ export const translations: Record<Locale, Translations> = {
       platformsConnected: '{count} plataformas conectadas',
       platformsDescriptionMulti: 'Conecta múltiples plataformas de streaming',
       selectPlatforms: 'Seleccionar plataformas',
+      // Broadcaster Auth
+      broadcasterAuthorized: 'Autorizado',
+      broadcasterNotAuthorized: 'Streamer no autorizado',
+      authorizeApp: 'Autorizar app',
+      streamerAuthorized: '{name} autorizado',
       // Twitch
       twitchTitle: 'Twitch',
       twitchDescription: 'Comandos, predicciones y más',
@@ -2391,6 +2445,50 @@ export const translations: Record<Locale, Translations> = {
       outcomesRequired: 'Se requieren al menos 2 opciones',
       durationRange: 'La duración debe ser entre 30 y 1800 segundos',
       uniqueOutcomes: 'Las opciones deben ser únicas',
+      // Broadcaster Auth (for moderators)
+      broadcasterAuthRequired: 'Autorización del streamer requerida',
+      broadcasterAuthRequiredDesc: 'Para crear predicciones, el streamer debe autorizar la app primero',
+      broadcasterAuthSuccess: 'El streamer ha autorizado la app',
+      moderatorCanCreate: 'Puedes crear predicciones en este canal',
+      moderatorCannotCreate: 'Pídele al streamer que autorice la app para crear predicciones',
+    },
+    // Twitch Polls (API-based)
+    twitchPolls: {
+      title: 'Encuestas Twitch',
+      createTitle: 'Crear Encuesta',
+      activeTitle: 'Encuesta Activa',
+      historyTitle: 'Historial',
+      question: 'Pregunta',
+      questionPlaceholder: '¿Qué prefieres?',
+      choices: 'Opciones',
+      choicePlaceholder: 'Opción',
+      addChoice: 'Añadir opción',
+      removeChoice: 'Eliminar opción',
+      duration: 'Duración',
+      durationSeconds: 'segundos',
+      create: 'Crear Encuesta',
+      creating: 'Creando...',
+      terminate: 'Terminar',
+      archive: 'Archivar',
+      statusActive: 'Activa',
+      statusCompleted: 'Completada',
+      statusTerminated: 'Terminada',
+      statusArchived: 'Archivada',
+      votes: 'votos',
+      totalVotes: 'Total de votos',
+      winner: 'Ganador',
+      noHistory: 'No hay encuestas anteriores',
+      noPoll: 'No hay encuesta activa',
+      createHint: 'Crea una encuesta para tu audiencia',
+      pollCreated: 'Encuesta creada correctamente',
+      pollTerminated: 'Encuesta terminada',
+      pollArchived: 'Encuesta archivada',
+      errorCreating: 'Error al crear encuesta',
+      errorTerminating: 'Error al terminar encuesta',
+      errorArchiving: 'Error al archivar encuesta',
+      broadcasterAuthRequired: 'Autorización del streamer requerida',
+      broadcasterAuthRequiredDesc: 'Para crear encuestas, el streamer debe autorizar la app',
+      moderatorCanCreate: 'Puedes crear encuestas en este canal',
     },
     // Channel Points / Rewards
     rewards: {
@@ -3696,6 +3794,11 @@ export const translations: Record<Locale, Translations> = {
       platformsConnected: '{count} platforms connected',
       platformsDescriptionMulti: 'Connect multiple streaming platforms',
       selectPlatforms: 'Select platforms',
+      // Broadcaster Auth
+      broadcasterAuthorized: 'Authorized',
+      broadcasterNotAuthorized: 'Streamer not authorized',
+      authorizeApp: 'Authorize app',
+      streamerAuthorized: '{name} authorized',
       // Twitch
       twitchTitle: 'Twitch',
       twitchDescription: 'Commands, predictions and more',
@@ -3791,6 +3894,50 @@ export const translations: Record<Locale, Translations> = {
       outcomesRequired: 'At least 2 outcomes are required',
       durationRange: 'Duration must be between 30 and 1800 seconds',
       uniqueOutcomes: 'Outcomes must be unique',
+      // Broadcaster Auth (for moderators)
+      broadcasterAuthRequired: 'Broadcaster authorization required',
+      broadcasterAuthRequiredDesc: 'To create predictions, the streamer must authorize the app first',
+      broadcasterAuthSuccess: 'The streamer has authorized the app',
+      moderatorCanCreate: 'You can create predictions on this channel',
+      moderatorCannotCreate: 'Ask the streamer to authorize the app to create predictions',
+    },
+    // Twitch Polls (API-based)
+    twitchPolls: {
+      title: 'Twitch Polls',
+      createTitle: 'Create Poll',
+      activeTitle: 'Active Poll',
+      historyTitle: 'History',
+      question: 'Question',
+      questionPlaceholder: 'What do you prefer?',
+      choices: 'Choices',
+      choicePlaceholder: 'Choice',
+      addChoice: 'Add choice',
+      removeChoice: 'Remove choice',
+      duration: 'Duration',
+      durationSeconds: 'seconds',
+      create: 'Create Poll',
+      creating: 'Creating...',
+      terminate: 'Terminate',
+      archive: 'Archive',
+      statusActive: 'Active',
+      statusCompleted: 'Completed',
+      statusTerminated: 'Terminated',
+      statusArchived: 'Archived',
+      votes: 'votes',
+      totalVotes: 'Total votes',
+      winner: 'Winner',
+      noHistory: 'No previous polls',
+      noPoll: 'No active poll',
+      createHint: 'Create a poll for your audience',
+      pollCreated: 'Poll created successfully',
+      pollTerminated: 'Poll terminated',
+      pollArchived: 'Poll archived',
+      errorCreating: 'Error creating poll',
+      errorTerminating: 'Error terminating poll',
+      errorArchiving: 'Error archiving poll',
+      broadcasterAuthRequired: 'Broadcaster authorization required',
+      broadcasterAuthRequiredDesc: 'To create polls, the streamer must authorize the app',
+      moderatorCanCreate: 'You can create polls on this channel',
     },
     // Channel Points / Rewards
     rewards: {

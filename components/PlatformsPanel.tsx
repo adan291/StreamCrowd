@@ -11,7 +11,7 @@ import React from 'react';
 import { ArrowLeft, Shield } from 'lucide-react';
 import { PlatformsView, PlatformsTool, TwitchMessage } from '../types';
 import { PLATFORMS, TWITCH_TOOLS } from '../config/platforms';
-import { PlatformSelector } from './PlatformSelector';
+import { PlatformSelector, BroadcasterAuthStatus } from './PlatformSelector';
 import { TwitchToolSelector } from './TwitchToolSelector';
 import { EnhancedCommandPanel } from './commands/EnhancedCommandPanel';
 import { PredictionPanel } from './PredictionPanel';
@@ -20,6 +20,7 @@ import { TimersPanel } from './timers';
 import { ChannelSelector } from './ChannelSelector';
 import { MacroManager } from './macros/MacroManager';
 import { useI18n } from '../i18n';
+import { useBroadcasterToken } from '../src/application/hooks/useBroadcasterToken';
 import type { NotificationType } from './Notification';
 import type { ChannelContext } from '../src/application/services/ModeratedChannelsService';
 
@@ -41,6 +42,8 @@ export interface PlatformsPanelProps {
   // Props for Twitch API tools (Predictions, Channel Points)
   channelId?: string;
   authToken?: string;
+  /** User ID of the logged-in user (may differ from channelId when viewing moderated channel) */
+  loggedInUserId?: string;
   isPartnerOrAffiliate?: boolean;
   hasPredictionsScope?: boolean;
   hasRewardsScope?: boolean;
@@ -57,6 +60,8 @@ export interface PlatformsPanelProps {
   isViewingModeratedChannel?: boolean;
   /** Error message from moderated channels fetch */
   moderatedChannelsError?: string | null;
+  /** User's OAuth scopes */
+  userScopes?: string[];
 }
 
 export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
@@ -70,6 +75,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
   channel,
   channelId,
   authToken,
+  loggedInUserId,
   isPartnerOrAffiliate = true,
   hasPredictionsScope = true,
   hasRewardsScope = true,
@@ -84,8 +90,29 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
   hasModeratedChannels = false,
   isViewingModeratedChannel = false,
   moderatedChannelsError = null,
+  userScopes = [],
 }) => {
   const { t } = useI18n();
+
+  // Hook para obtener estado de autorización del broadcaster
+  const {
+    hasBroadcasterToken,
+    isOwnChannel,
+    isLoading: isBroadcasterTokenLoading,
+  } = useBroadcasterToken(
+    selectedChannel?.id || channelId || null,
+    selectedChannel?.login || channel || null,
+    selectedChannel?.displayName || channel || null,
+    loggedInUserId || null
+  );
+
+  // Estado de autorización del broadcaster para mostrar en PlatformSelector
+  const twitchBroadcasterAuth: BroadcasterAuthStatus | undefined = channelId ? {
+    isAuthorized: hasBroadcasterToken,
+    isOwnChannel,
+    broadcasterName: selectedChannel?.displayName || channel,
+    isLoading: isBroadcasterTokenLoading,
+  } : undefined;
 
   /**
    * Handle platform selection from PlatformSelector
@@ -146,6 +173,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
         <PlatformSelector
           platforms={PLATFORMS}
           onSelectPlatform={handleSelectPlatform}
+          twitchBroadcasterAuth={twitchBroadcasterAuth}
         />
       );
     }
@@ -156,10 +184,13 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
       // For now, we'll make it a small, dismissible hint rather than a prominent banner
       const showModeratorHint = moderatedChannelsError && onReauthenticate;
       
+      // Show channel selector if there are multiple channels (own + moderated)
+      const showChannelSelector = moderatedChannels.length > 1;
+      
       return (
         <div className="h-full flex flex-col">
-          {/* Channel Selector - only show if user has moderated channels */}
-          {hasModeratedChannels && moderatedChannels.length > 1 && (
+          {/* Channel Selector - show if user has multiple channels available */}
+          {showChannelSelector && (
             <div className="px-4 pt-4 pb-2 border-b border-zinc-200 dark:border-zinc-800">
               <ChannelSelector
                 channels={moderatedChannels}
@@ -183,6 +214,18 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
               tools={TWITCH_TOOLS}
               onSelectTool={handleSelectTool}
               onBack={handleBack}
+              broadcasterAuth={channelId ? {
+                channelId: selectedChannel?.id || channelId,
+                channelLogin: selectedChannel?.login || channel || '',
+                channelName: selectedChannel?.displayName || channel || '',
+                currentUserId: loggedInUserId || '',
+                currentUserToken: authToken || '',
+                currentUserScopes: userScopes,
+                hasBroadcasterToken,
+                isOwnChannel,
+                isLoading: isBroadcasterTokenLoading,
+              } : undefined}
+              onNotification={onNotification}
             />
           </div>
           
@@ -229,6 +272,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
               platform="twitch"
               channelId={channelId}
               authToken={authToken}
+              loggedInUserId={loggedInUserId}
             />
           </div>
         </div>
@@ -246,6 +290,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
             <PredictionPanel
               channelId={channelId || ''}
               authToken={authToken || ''}
+              userId={loggedInUserId || ''}
               isPartnerOrAffiliate={isPartnerOrAffiliate}
               hasRequiredScope={hasPredictionsScope}
               isModeratorView={isViewingModeratedChannel}
@@ -302,6 +347,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
       <PlatformSelector
         platforms={PLATFORMS}
         onSelectPlatform={handleSelectPlatform}
+        twitchBroadcasterAuth={twitchBroadcasterAuth}
       />
     );
   };

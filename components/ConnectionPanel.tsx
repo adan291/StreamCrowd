@@ -11,7 +11,7 @@ interface ConnectionPanelProps {
   status: ConnectionStatus;
   onConnect: (channel: string, token?: string, userId?: string) => void;
   errorMessage?: string | null;
-  savedCredentials?: { channel: string; token: string } | null;
+  savedCredentials?: { channel: string; token: string; userName?: string } | null;
   onClearSavedCredentials?: () => void;
   tokenExpiresIn?: number | null;
   tokenExpiringSoon?: boolean;
@@ -174,7 +174,12 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
       {savedCredentials && (
         <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-lg">
           <p className="text-sm text-green-800 dark:text-green-200 mb-2">
-            💾 Sesión guardada: <strong>{savedCredentials.channel}</strong>
+            💾 Sesión guardada: <strong>{savedCredentials.userName || savedCredentials.channel}</strong>
+            {savedCredentials.userName && savedCredentials.userName !== savedCredentials.channel && (
+              <span className="text-xs text-green-600 dark:text-green-400 ml-1">
+                → {savedCredentials.channel}
+              </span>
+            )}
           </p>
           <div className="flex gap-2">
             <button

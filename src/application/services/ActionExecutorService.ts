@@ -38,6 +38,11 @@ import type {
   SendNotificationConfig,
   SetVariableConfig,
   DelayConfig,
+  SendAnnouncementConfig,
+  UpdateChatSettingsConfig,
+  SendShoutoutConfig,
+  StartRaidConfig,
+  CreateClipConfig,
 } from '../../../types/macros';
 import type { IVariableResolver } from './VariableResolverService';
 import { VariableResolverService } from './VariableResolverService';
@@ -55,6 +60,7 @@ export interface ActionExecutorDependencies {
   pollService?: IPollServiceAdapter;
   predictionService?: IPredictionServiceAdapter;
   notificationService?: INotificationServiceAdapter;
+  twitchApiService?: ITwitchApiServiceAdapter;
   variableResolver?: IVariableResolver;
   conditionEvaluator?: IConditionEvaluator;
 }
@@ -123,6 +129,47 @@ export interface INotificationServiceAdapter {
 }
 
 /**
+ * Adapter interface for Twitch API Service
+ * Handles announcements, chat settings, shoutouts, raids, clips
+ */
+export interface ITwitchApiServiceAdapter {
+  getToken(): string | null;
+  getBroadcasterId(): string | null;
+  getModeratorId(): string | null;
+  
+  // Announcements
+  sendAnnouncement(message: string, color?: 'blue' | 'green' | 'orange' | 'purple' | 'primary'): Promise<{ success: boolean; error?: string }>;
+  
+  // Chat settings
+  updateChatSettings(settings: {
+    slowMode?: boolean;
+    slowModeWaitTime?: number;
+    emoteMode?: boolean;
+    subscriberMode?: boolean;
+    followerMode?: boolean;
+    followerModeDuration?: number;
+  }): Promise<{ success: boolean; error?: string }>;
+  
+  // Shoutout
+  sendShoutout(targetUsername: string): Promise<{ success: boolean; error?: string }>;
+  
+  // Raid (requires broadcaster token)
+  startRaid(targetUsername: string): Promise<{ success: boolean; error?: string }>;
+  
+  // Clip
+  createClip(hasDelay?: boolean): Promise<{ success: boolean; clipId?: string; editUrl?: string; error?: string }>;
+  
+  // Poll (requires broadcaster token)
+  createPoll(data: {
+    title: string;
+    choices: string[];
+    duration: number;
+    channelPointsVotingEnabled?: boolean;
+    channelPointsPerVote?: number;
+  }): Promise<{ success: boolean; pollId?: string; error?: string }>;
+}
+
+/**
  * Interface for the ActionExecutor service
  */
 export interface IActionExecutor {
@@ -158,6 +205,7 @@ export class ActionExecutorService implements IActionExecutor {
   private pollService?: IPollServiceAdapter;
   private predictionService?: IPredictionServiceAdapter;
   private notificationService?: INotificationServiceAdapter;
+  private twitchApiService?: ITwitchApiServiceAdapter;
   private variableResolver: IVariableResolver;
   private conditionEvaluator: IConditionEvaluator;
 
@@ -168,6 +216,7 @@ export class ActionExecutorService implements IActionExecutor {
     this.pollService = dependencies.pollService;
     this.predictionService = dependencies.predictionService;
     this.notificationService = dependencies.notificationService;
+    this.twitchApiService = dependencies.twitchApiService;
     this.variableResolver = dependencies.variableResolver || new VariableResolverService();
     this.conditionEvaluator = dependencies.conditionEvaluator || new ConditionEvaluatorService(this.variableResolver);
   }
@@ -274,6 +323,22 @@ export class ActionExecutorService implements IActionExecutor {
         break;
       case 'delay':
         await this.executeDelay(action.config as DelayConfig);
+        break;
+      // New Twitch API actions
+      case 'send_announcement':
+        await this.executeSendAnnouncement(action.config as SendAnnouncementConfig, context);
+        break;
+      case 'update_chat_settings':
+        await this.executeUpdateChatSettings(action.config as UpdateChatSettingsConfig);
+        break;
+      case 'send_shoutout':
+        await this.executeSendShoutout(action.config as SendShoutoutConfig, context);
+        break;
+      case 'start_raid':
+        await this.executeStartRaid(action.config as StartRaidConfig, context);
+        break;
+      case 'create_clip':
+        await this.executeCreateClip(action.config as CreateClipConfig);
         break;
       default:
         throw new Error(`Unknown action type: ${action.type}`);
@@ -383,21 +448,43 @@ export class ActionExecutorService implements IActionExecutor {
     config: StartPollConfig,
     context: ExecutionContext
   ): Promise<void> {
+    // Resolve variables in title and options
+    const resolvedTitle = this.variableResolver.resolve(config.title, context);
+    const resolvedOptions = config.options.map(option => 
+      this.variableResolver.resolve(option, context)
+    );
+
+    // Try Twitch API first if available (for Twitch polls)
+    if (this.twitchApiService) {
+      const result = await this.twitchApiService.createPoll({
+        title: resolvedTitle,
+        choices: resolvedOptions,
+        duration: config.duration,
+      });
+
+      if (result.success) {
+        console.log('[Macro] Twitch poll created:', result.pollId);
+        return;
+      }
+      
+      // If Twitch API fails, fall back to internal poll service
+      console.warn('[Macro] Twitch poll failed, trying internal poll:', result.error);
+    }
+
+    // Fall back to internal poll service
     if (!this.pollService) {
       throw new Error('Poll service not available');
     }
 
-    // Resolve variables in title and options
-    const resolvedTitle = this.variableResolver.resolve(config.title, context);
-    const resolvedOptions = config.options.map((option, index) => ({
-      label: this.variableResolver.resolve(option, context),
+    const resolvedOptionsWithColors = resolvedOptions.map((label, index) => ({
+      label,
       color: DEFAULT_POLL_COLORS[index % DEFAULT_POLL_COLORS.length],
     }));
 
     await this.pollService.createPoll({
       title: resolvedTitle,
       question: resolvedTitle,
-      options: resolvedOptions,
+      options: resolvedOptionsWithColors,
       duration: config.duration,
     });
   }
@@ -535,6 +622,102 @@ export class ActionExecutorService implements IActionExecutor {
     }
   }
 
+  // ==================== New Twitch API Actions ====================
+
+  /**
+   * Sends an announcement to chat via Twitch API
+   */
+  private async executeSendAnnouncement(
+    config: SendAnnouncementConfig,
+    context: ExecutionContext
+  ): Promise<void> {
+    if (!this.twitchApiService) {
+      throw new Error('Servicio de Twitch API no disponible');
+    }
+
+    const resolvedMessage = this.variableResolver.resolve(config.message, context);
+    const result = await this.twitchApiService.sendAnnouncement(resolvedMessage, config.color);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error al enviar anuncio');
+    }
+  }
+
+  /**
+   * Updates chat settings via Twitch API
+   */
+  private async executeUpdateChatSettings(config: UpdateChatSettingsConfig): Promise<void> {
+    if (!this.twitchApiService) {
+      throw new Error('Servicio de Twitch API no disponible');
+    }
+
+    const result = await this.twitchApiService.updateChatSettings({
+      slowMode: config.slowMode,
+      slowModeWaitTime: config.slowModeWaitTime,
+      emoteMode: config.emoteMode,
+      subscriberMode: config.subscriberMode,
+      followerMode: config.followerMode,
+      followerModeDuration: config.followerModeDuration,
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error al actualizar configuración del chat');
+    }
+  }
+
+  /**
+   * Sends a shoutout via Twitch API
+   */
+  private async executeSendShoutout(
+    config: SendShoutoutConfig,
+    context: ExecutionContext
+  ): Promise<void> {
+    if (!this.twitchApiService) {
+      throw new Error('Servicio de Twitch API no disponible');
+    }
+
+    const resolvedUsername = this.variableResolver.resolve(config.targetUsername, context);
+    const result = await this.twitchApiService.sendShoutout(resolvedUsername);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error al enviar shoutout');
+    }
+  }
+
+  /**
+   * Starts a raid via Twitch API (broadcaster only)
+   */
+  private async executeStartRaid(
+    config: StartRaidConfig,
+    context: ExecutionContext
+  ): Promise<void> {
+    if (!this.twitchApiService) {
+      throw new Error('Servicio de Twitch API no disponible');
+    }
+
+    const resolvedUsername = this.variableResolver.resolve(config.targetUsername, context);
+    const result = await this.twitchApiService.startRaid(resolvedUsername);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error al iniciar raid');
+    }
+  }
+
+  /**
+   * Creates a clip via Twitch API
+   */
+  private async executeCreateClip(config: CreateClipConfig): Promise<void> {
+    if (!this.twitchApiService) {
+      throw new Error('Servicio de Twitch API no disponible');
+    }
+
+    const result = await this.twitchApiService.createClip(config.hasDelay);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Error al crear clip');
+    }
+  }
+
   // ==================== Service Setters ====================
 
   /**
@@ -577,6 +760,13 @@ export class ActionExecutorService implements IActionExecutor {
    */
   setNotificationService(service: INotificationServiceAdapter): void {
     this.notificationService = service;
+  }
+
+  /**
+   * Sets the Twitch API service adapter
+   */
+  setTwitchApiService(service: ITwitchApiServiceAdapter): void {
+    this.twitchApiService = service;
   }
 }
 

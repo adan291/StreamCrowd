@@ -680,6 +680,9 @@ export class MacroService implements IMacroService {
     if (services.notificationService && executor.setNotificationService) {
       executor.setNotificationService(services.notificationService);
     }
+    if (services.twitchApiService && executor.setTwitchApiService) {
+      executor.setTwitchApiService(services.twitchApiService);
+    }
   }
 }
 

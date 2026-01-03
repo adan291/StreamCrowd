@@ -77,6 +77,7 @@ import { PlatformsPanel } from './components/PlatformsPanel';
 import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ChannelSelector } from './components/ChannelSelector';
+import { ChannelOrbit } from './components/ChannelOrbit';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -256,7 +257,7 @@ const App: React.FC = () => {
   const { triggerPollEnd, triggerPollResults } = useOBSTriggers();
   
   // Auth capabilities for Twitch API features
-  const { capabilities: authCapabilities } = useAuth();
+  const { capabilities: authCapabilities, authState } = useAuth();
 
   // Use custom hooks for state management
   const { 
@@ -284,6 +285,7 @@ const App: React.FC = () => {
     savedCredentials,
     clearSavedCredentials,
     userId,
+    userLogin,
   } = useTwitchConnection({
     onStatusChange: (newStatus, err) => {
       if (err) {
@@ -303,6 +305,26 @@ const App: React.FC = () => {
     skipConnection: isOverlayMode,
   });
 
+  // Store the original user's avatar (the logged-in user, not the active channel)
+  const [userOriginalAvatar, setUserOriginalAvatar] = useState<string | null>(null);
+  
+  // Save the avatar when first connected (before any channel switch)
+  // Only save once and never reset it while we have a valid userId
+  useEffect(() => {
+    if (channelAvatar && !userOriginalAvatar && userId) {
+      console.log('[App] Saving original user avatar:', channelAvatar);
+      setUserOriginalAvatar(channelAvatar);
+    }
+  }, [channelAvatar, userOriginalAvatar, userId]);
+
+  // Only reset when fully logged out (no userId)
+  useEffect(() => {
+    if (!userId && !authToken) {
+      console.log('[App] Resetting original user avatar (logged out)');
+      setUserOriginalAvatar(null);
+    }
+  }, [userId, authToken]);
+
   // Moderated channels hook - allows switching between own channel and moderated channels
   const {
     channels: moderatedChannels,
@@ -315,10 +337,13 @@ const App: React.FC = () => {
     error: moderatedChannelsError,
   } = useModeratedChannels(
     userId,
-    channelName,
-    channelName, // displayName same as login for now
+    userLogin || channelName, // Use userLogin if available, fallback to channelName
+    userLogin || channelName, // displayName same as login for now
     authToken,
-    { autoFetch: status === ConnectionStatus.CONNECTED }
+    { 
+      autoFetch: status === ConnectionStatus.CONNECTED,
+      connectedChannelName: channelName, // The channel we're actually connected to
+    }
   );
 
   // Active channel context - use selected moderated channel or own channel
@@ -389,6 +414,48 @@ const App: React.FC = () => {
       streamEventsHook.setChannelName(channelName);
     }
   }, [channelName]);
+
+  // Reconnect to chat when selected channel changes (for moderators)
+  // This allows moderators to switch to the channel they're moderating
+  const previousSelectedChannelRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Skip if not connected or no selected channel
+    if (status !== ConnectionStatus.CONNECTED || !selectedChannel || !authToken) {
+      return;
+    }
+
+    const newChannelName = selectedChannel.channelLogin || selectedChannel.channelName;
+    
+    // Skip if this is the first render or same channel
+    if (previousSelectedChannelRef.current === null) {
+      previousSelectedChannelRef.current = newChannelName;
+      return;
+    }
+    
+    if (previousSelectedChannelRef.current === newChannelName) {
+      return;
+    }
+
+    // Channel changed - switch to the new channel's chat silently
+    console.log(`[App] Switching chat to channel: ${newChannelName} (silent switch, avatar should NOT change)`);
+    console.log(`[App] userOriginalAvatar: ${userOriginalAvatar}, channelAvatar: ${channelAvatar}`);
+    previousSelectedChannelRef.current = newChannelName;
+    
+    // Clear chat messages from previous channel
+    setChatMessages([]);
+    
+    // Switch channel using the TwitchService directly (silent switch, no UI change)
+    const twitchService = getTwitchService();
+    twitchService.switchChannel(newChannelName, authToken);
+    
+    // Reset poll and moderation state for new channel
+    poll.resetPoll();
+    moderation.reset();
+    
+    // Update stream events channel
+    streamEventsHook.setChannelName(newChannelName);
+    
+  }, [selectedChannel, status, authToken, poll, moderation, streamEventsHook, userOriginalAvatar, channelAvatar]);
 
   // Detect raids and trigger OBS automation
   const lastRaidRef = useRef<string | null>(null);
@@ -1166,21 +1233,32 @@ const App: React.FC = () => {
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0 z-30">
         <div className="flex items-center gap-3">
           <div className="relative">
-            {channelAvatar ? (
-              <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
+            {(userOriginalAvatar || channelAvatar) ? (
+              <img src={userOriginalAvatar || channelAvatar || ''} alt={activeChannelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
-                {channelName.charAt(0).toUpperCase()}
+                {activeChannelName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            {/* Moderator indicator */}
+            {isViewingModeratedChannel && (
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold border-2 border-white dark:border-zinc-900" title="Moderando">
+                M
               </div>
             )}
             {/* Collaboration indicator */}
-            {isCollaborationActive && (
+            {isCollaborationActive && !isViewingModeratedChannel && (
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-cyan-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold border-2 border-white dark:border-zinc-900">
                 +{collaborationChannels.length}
               </div>
             )}
           </div>
-          <span className="font-bold text-sm text-zinc-900 dark:text-white">{channelName}</span>
+          <div className="flex flex-col">
+            <span className="font-bold text-sm text-zinc-900 dark:text-white">{activeChannelName}</span>
+            {isViewingModeratedChannel && (
+              <span className="text-[9px] text-green-500">Moderando</span>
+            )}
+          </div>
           <AuthCapabilitiesIndicator compact onReconnect={twitchConnect} />
           {isCollaborationActive && (
             <span className="text-[10px] bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-1.5 py-0.5 rounded-full font-medium">
@@ -1234,11 +1312,11 @@ const App: React.FC = () => {
               window.addEventListener('mouseup', handleMouseUp);
             }}
           >
-            {channelAvatar ? (
-              <img src={channelAvatar} alt={channelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
+            {(userOriginalAvatar || channelAvatar) ? (
+              <img src={userOriginalAvatar || channelAvatar || ''} alt={activeChannelName} className="w-8 h-8 rounded-full border-2 border-twitch-brand" />
             ) : (
               <div className="w-8 h-8 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-sm">
-                {channelName.charAt(0).toUpperCase()}
+                {activeChannelName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -1264,14 +1342,23 @@ const App: React.FC = () => {
       )}
       
       {/* Full Sidebar - Hidden when collapsed */}
-      <div className={`hidden md:flex bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20 transition-all duration-300 ${leftSidebarHidden ? 'w-0 border-r-0 p-0 overflow-hidden' : 'w-16 lg:w-20'}`}>
-        {/* User Avatar */}
-        <div className="mb-2">
-          {channelAvatar ? (
-            <img src={channelAvatar} alt={channelName} className="w-10 h-10 rounded-full border-2 border-twitch-brand" />
+      <div className={`hidden md:flex bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex-col items-center py-4 shrink-0 z-20 transition-all duration-300 ${leftSidebarHidden ? 'w-0 border-r-0 p-0 overflow-hidden' : moderatedChannels.length > 1 ? 'w-20' : 'w-16 lg:w-20'}`}>
+        {/* Channel Orbit - User Avatar with Moderated Channels */}
+        <div className="mb-0 flex items-center justify-center w-full">
+          {moderatedChannels.length > 1 ? (
+            <ChannelOrbit
+              channels={moderatedChannels}
+              selectedChannel={selectedChannel}
+              onSelectChannel={selectModeratedChannel}
+              userAvatar={userOriginalAvatar || channelAvatar}
+              userName={userLogin || channelName}
+              size="md"
+            />
+          ) : (userOriginalAvatar || channelAvatar) ? (
+            <img src={userOriginalAvatar || channelAvatar || ''} alt={activeChannelName} className="w-10 h-10 rounded-full border-2 border-twitch-brand" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-twitch-brand flex items-center justify-center text-white font-bold text-lg">
-              {channelName.charAt(0).toUpperCase()}
+              {activeChannelName.charAt(0).toUpperCase()}
             </div>
           )}
         </div>
@@ -1279,7 +1366,7 @@ const App: React.FC = () => {
         {/* Hide Sidebar Button */}
         <button
           onClick={() => setLeftSidebarHidden(true)}
-          className="w-8 h-5 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors mb-4"
+          className="w-8 h-5 flex items-center justify-center text-zinc-400 hover:text-twitch-brand hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors mb-2"
           title="Ocultar menú (Ctrl+B)"
         >
           <ChevronDown size={16} className="rotate-180" />
@@ -1422,7 +1509,7 @@ const App: React.FC = () => {
                     isConnected={status === ConnectionStatus.CONNECTED}
                     userVoteMap={poll.userVoteMap}
                     collaborationChannels={collaborationChannels}
-                    mainChannel={channelName}
+                    mainChannel={activeChannelName}
                     onAddCollaborator={addCollaborator}
                     onRemoveCollaborator={removeCollaborator}
                     onCreatePoll={handleCreatePoll}
@@ -1449,7 +1536,7 @@ const App: React.FC = () => {
                   isEmbedded={true}
                   userVoteMap={poll.userVoteMap}
                   collaborationChannels={collaborationChannels}
-                  mainChannel={channelName}
+                  mainChannel={activeChannelName}
                   onAddCollaborator={addCollaborator}
                   onRemoveCollaborator={removeCollaborator}
                   authToken={authToken}
@@ -1469,6 +1556,7 @@ const App: React.FC = () => {
                   channel={activeChannelName}
                   channelId={activeChannelId}
                   authToken={authToken}
+                  loggedInUserId={userId}
                   isPartnerOrAffiliate={true}
                   hasPredictionsScope={authCapabilities.canManagePredictions && isActiveChannelOwn}
                   hasRewardsScope={authCapabilities.canManageRedemptions && isActiveChannelOwn}
@@ -1483,6 +1571,7 @@ const App: React.FC = () => {
                   hasModeratedChannels={hasModeratedChannels}
                   isViewingModeratedChannel={isViewingModeratedChannel}
                   moderatedChannelsError={moderatedChannelsError}
+                  userScopes={authState.scopes}
                 />
               </div>
             )}
@@ -1709,19 +1798,21 @@ const App: React.FC = () => {
                       userVoteMap={poll.userVoteMap} 
                       options={poll.currentPoll?.options}
                       collaborationChannels={collaborationChannels}
-                      mainChannel={channelName}
+                      mainChannel={activeChannelName}
                       isConnected={status === ConnectionStatus.CONNECTED}
                       authToken={authToken}
+                      broadcasterId={activeChannelId}
+                      userId={authState.userId}
                     />
                   ) : activeRightTab === 'stream' ? (
                     <div className="h-full p-2 bg-black">
-                      <StreamPlayer channel={channelName} />
+                      <StreamPlayer channel={activeChannelName} />
                     </div>
                   ) : (
                     // Collaboration tab
                     <div className="h-full p-4 overflow-y-auto">
                       <CollaborationPanel
-                        mainChannel={channelName}
+                        mainChannel={activeChannelName}
                         collaborationChannels={collaborationChannels}
                         onAddCollaborator={addCollaborator}
                         onRemoveCollaborator={removeCollaborator}
@@ -1747,7 +1838,7 @@ const App: React.FC = () => {
                           </button>
                         </div>
                         <CollaborationPanel
-                          mainChannel={channelName}
+                          mainChannel={activeChannelName}
                           collaborationChannels={collaborationChannels}
                           onAddCollaborator={addCollaborator}
                           onRemoveCollaborator={removeCollaborator}
@@ -1766,9 +1857,11 @@ const App: React.FC = () => {
                         userVoteMap={poll.userVoteMap} 
                         options={poll.currentPoll?.options}
                         collaborationChannels={collaborationChannels}
-                        mainChannel={channelName}
+                        mainChannel={activeChannelName}
                         isConnected={status === ConnectionStatus.CONNECTED}
                         authToken={authToken}
+                        broadcasterId={activeChannelId}
+                        userId={authState.userId}
                       />
                     </div>
                     
@@ -1809,7 +1902,7 @@ const App: React.FC = () => {
                       className="flex-1 overflow-hidden bg-black p-1"
                       style={{ minHeight: '20%' }}
                     >
-                      <StreamPlayer channel={channelName} />
+                      <StreamPlayer channel={activeChannelName} />
                     </div>
                   </>
                 )}

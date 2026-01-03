@@ -43,6 +43,7 @@ const STORAGE_KEY_CHANNEL = 'twitch_channel';
 const STORAGE_KEY_TOKEN = 'twitch_token';
 const STORAGE_KEY_TOKEN_EXPIRES = 'twitch_token_expires';
 const STORAGE_KEY_USER_ID = 'twitch_user_id';
+const STORAGE_KEY_USER_NAME = 'twitch_user_name';
 
 /**
  * Saved credentials from localStorage
@@ -51,6 +52,7 @@ export interface SavedCredentials {
   channel: string;
   token: string;
   userId?: string;
+  userName?: string; // The logged-in user's name (may differ from channel when moderating)
 }
 
 /**
@@ -69,6 +71,8 @@ export interface UseTwitchServiceReturn {
   authToken: string;
   /** User ID (broadcaster ID) for API calls */
   userId: string;
+  /** Logged-in user's login name (may differ from channelName when moderating) */
+  userLogin: string;
   /** Connect to a Twitch channel */
   connect: (channel?: string, token?: string, userId?: string) => void;
   /** Disconnect from current channel */
@@ -133,6 +137,7 @@ function loadSavedCredentials(): SavedCredentials | null {
     const token = localStorage.getItem(STORAGE_KEY_TOKEN);
     const expires = localStorage.getItem(STORAGE_KEY_TOKEN_EXPIRES);
     const savedUserId = localStorage.getItem(STORAGE_KEY_USER_ID);
+    const savedUserName = localStorage.getItem(STORAGE_KEY_USER_NAME);
     
     if (channel && token) {
       // Check if token might still be valid (stored expiration time)
@@ -144,10 +149,16 @@ function loadSavedCredentials(): SavedCredentials | null {
           localStorage.removeItem(STORAGE_KEY_TOKEN);
           localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
           localStorage.removeItem(STORAGE_KEY_USER_ID);
+          localStorage.removeItem(STORAGE_KEY_USER_NAME);
           return null;
         }
       }
-      return { channel, token, userId: savedUserId || undefined };
+      return { 
+        channel, 
+        token, 
+        userId: savedUserId || undefined,
+        userName: savedUserName || undefined,
+      };
     }
     return null;
   } catch {
@@ -184,6 +195,7 @@ export function useTwitchService(
   const [channelAvatar, setChannelAvatar] = useState<string | null>(null);
   const [authToken, setAuthToken] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  const [userLogin, setUserLogin] = useState<string>(''); // The actual logged-in user's login name
   
   // Token expiration state
   const [tokenExpiresIn, setTokenExpiresIn] = useState<number | null>(null);
@@ -210,6 +222,7 @@ export function useTwitchService(
     localStorage.removeItem(STORAGE_KEY_TOKEN);
     localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
     localStorage.removeItem(STORAGE_KEY_USER_ID);
+    localStorage.removeItem(STORAGE_KEY_USER_NAME);
     setSavedCredentials(null);
   }, []);
 
@@ -271,6 +284,12 @@ export function useTwitchService(
           }
           
           const finalUserId = passedUserId || validation.userId || '';
+          const finalUserName = validation.login || ''; // The actual logged-in user's name
+          
+          // Set the logged-in user's login name
+          if (finalUserName) {
+            setUserLogin(finalUserName);
+          }
           
           if (validation.expiresIn > 0) {
             // Token has expiration info - track it
@@ -287,13 +306,21 @@ export function useTwitchService(
             if (finalUserId) {
               localStorage.setItem(STORAGE_KEY_USER_ID, finalUserId);
             }
+            if (finalUserName) {
+              localStorage.setItem(STORAGE_KEY_USER_NAME, finalUserName);
+            }
             if (validation.expiresIn > 0) {
               const expiresAt = Date.now() + (validation.expiresIn * 1000);
               localStorage.setItem(STORAGE_KEY_TOKEN_EXPIRES, expiresAt.toString());
             } else {
               localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
             }
-            setSavedCredentials({ channel, token, userId: finalUserId || undefined });
+            setSavedCredentials({ 
+              channel, 
+              token, 
+              userId: finalUserId || undefined,
+              userName: finalUserName || undefined,
+            });
           } catch (e) {
             console.error('Error saving credentials to localStorage:', e);
           }
@@ -413,6 +440,7 @@ export function useTwitchService(
     channelAvatar,
     authToken,
     userId,
+    userLogin,
     connect,
     disconnect,
     collaborationChannels,

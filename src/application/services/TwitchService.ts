@@ -244,6 +244,30 @@ export class TwitchService {
   isConnected(): boolean {
     return this.adapter.getConnectionStatus() === 'connected';
   }
+
+  /**
+   * Switch to a different channel without full reconnection
+   * This is a silent switch that doesn't trigger UI status changes
+   * @param channel - New channel to switch to
+   * @param token - OAuth token (optional, uses existing if not provided)
+   */
+  async switchChannel(channel: string, token?: string): Promise<void> {
+    if (!channel || !channel.trim()) return;
+    
+    const currentChannel = this.getCurrentChannel();
+    if (currentChannel?.toLowerCase() === channel.toLowerCase()) {
+      return; // Already on this channel
+    }
+
+    console.log(`[TwitchService] Silently switching from ${currentChannel} to ${channel}`);
+    
+    // Use the adapter's part/join methods to switch channels without full reconnect
+    if (currentChannel) {
+      await this.adapter.partChannel(currentChannel);
+    }
+    
+    await this.adapter.joinChannel(channel);
+  }
   
   // ============================================
   // Messaging
@@ -784,6 +808,22 @@ export class TwitchService {
    */
   async removeVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     return this.adapter.removeVIP(token, broadcasterId, userId);
+  }
+
+  /**
+   * Add a moderator to the channel
+   * Requires OAuth token with channel:manage:moderators scope
+   */
+  async addModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    return this.adapter.addModerator(token, broadcasterId, userId);
+  }
+
+  /**
+   * Remove a moderator from the channel
+   * Requires OAuth token with channel:manage:moderators scope
+   */
+  async removeModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    return this.adapter.removeModerator(token, broadcasterId, userId);
   }
   
   /**

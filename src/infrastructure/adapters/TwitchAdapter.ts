@@ -284,6 +284,42 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       this.collaborationClients.delete(normalized);
     }
   }
+
+  /**
+   * Leave a channel without disconnecting the client
+   * Used for silent channel switching
+   * @param channel - Channel name to leave
+   */
+  async partChannel(channel: string): Promise<void> {
+    if (!this.client) return;
+    
+    const normalized = channel.toLowerCase().replace('#', '');
+    try {
+      await this.client.part(`#${normalized}`);
+      console.log(`[TwitchAdapter] Left channel: ${normalized}`);
+    } catch (error) {
+      console.error(`[TwitchAdapter] Failed to leave channel ${normalized}:`, error);
+    }
+  }
+
+  /**
+   * Join a channel without reconnecting the client
+   * Used for silent channel switching
+   * @param channel - Channel name to join
+   */
+  async joinChannel(channel: string): Promise<void> {
+    if (!this.client) return;
+    
+    const normalized = channel.toLowerCase().replace('#', '');
+    try {
+      await this.client.join(`#${normalized}`);
+      this.currentChannel = normalized;
+      console.log(`[TwitchAdapter] Joined channel: ${normalized}`);
+    } catch (error) {
+      console.error(`[TwitchAdapter] Failed to join channel ${normalized}:`, error);
+      throw error;
+    }
+  }
   
   getConnectedChannels(): string[] {
     const channels: string[] = [];
@@ -771,7 +807,9 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       'moderator:manage:chat_messages',
       'moderator:manage:chat_settings',
       'moderator:manage:announcements',
+      'moderator:manage:shoutouts',
       'channel:manage:vips',
+      'channel:manage:moderators',
     ];
   }
   
@@ -1616,10 +1654,17 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
     broadcasterId: string, 
     moderatorId: string,
     message: string,
-    color: 'blue' | 'green' | 'orange' | 'purple' | 'primary' = 'primary'
+    color?: 'blue' | 'green' | 'orange' | 'purple' | 'primary'
   ): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
+      
+      // Build request body - only include color if it's a valid Twitch color (not 'primary')
+      const body: { message: string; color?: string } = { message };
+      if (color && color !== 'primary') {
+        body.color = color;
+      }
+      
       const response = await fetch(
         `https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
@@ -1629,7 +1674,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
             'Client-Id': TWITCH_CLIENT_ID,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ message, color })
+          body: JSON.stringify(body)
         }
       );
       
@@ -1690,6 +1735,254 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       );
       
       return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Send a shoutout to another channel
+   * Requires OAuth token with moderator:manage:shoutouts scope
+   * @param token - OAuth token
+   * @param fromBroadcasterId - Broadcaster sending the shoutout
+   * @param toBroadcasterId - Broadcaster receiving the shoutout
+   * @param moderatorId - Moderator user ID
+   * @returns True if successful
+   */
+  async sendShoutout(
+    token: string,
+    fromBroadcasterId: string,
+    toBroadcasterId: string,
+    moderatorId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${fromBroadcasterId}&to_broadcaster_id=${toBroadcasterId}&moderator_id=${moderatorId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        if (response.status === 429) {
+          return { success: false, error: 'Debes esperar 2 minutos entre shoutouts' };
+        }
+        if (response.status === 400 && errorBody.includes('not streaming')) {
+          return { success: false, error: 'El canal no está en directo' };
+        }
+        return { success: false, error: 'Error al enviar shoutout' };
+      }
+      
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión' };
+    }
+  }
+
+  /**
+   * Start a raid to another channel
+   * Requires OAuth token with channel:manage:raids scope
+   * Only the broadcaster can start raids
+   * @param token - OAuth token
+   * @param fromBroadcasterId - Broadcaster starting the raid
+   * @param toBroadcasterId - Target broadcaster ID
+   * @returns True if successful
+   */
+  async startRaid(
+    token: string,
+    fromBroadcasterId: string,
+    toBroadcasterId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/raids?from_broadcaster_id=${fromBroadcasterId}&to_broadcaster_id=${toBroadcasterId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        if (response.status === 400 && errorBody.includes('not streaming')) {
+          return { success: false, error: 'El canal destino no está en directo' };
+        }
+        if (response.status === 409) {
+          return { success: false, error: 'Ya hay un raid en progreso' };
+        }
+        return { success: false, error: 'Error al iniciar raid' };
+      }
+      
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Error de conexión' };
+    }
+  }
+
+  /**
+   * Cancel an ongoing raid
+   * Requires OAuth token with channel:manage:raids scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster ID
+   * @returns True if successful
+   */
+  async cancelRaid(token: string, broadcasterId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/raids?broadcaster_id=${broadcasterId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Create a clip of the current stream
+   * Requires OAuth token with clips:edit scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster ID
+   * @param hasDelay - If true, captures previous 90 seconds
+   * @returns Clip info or error
+   */
+  async createClip(
+    token: string,
+    broadcasterId: string,
+    hasDelay: boolean = false
+  ): Promise<{ success: boolean; clipId?: string; editUrl?: string; error?: string }> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/clips?broadcaster_id=${broadcasterId}&has_delay=${hasDelay}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { success: false, error: 'El canal no está en directo' };
+        }
+        return { success: false, error: 'Error al crear clip' };
+      }
+      
+      const data = await response.json();
+      const clip = data.data?.[0];
+      
+      return {
+        success: true,
+        clipId: clip?.id,
+        editUrl: clip?.edit_url,
+      };
+    } catch {
+      return { success: false, error: 'Error de conexión' };
+    }
+  }
+
+  /**
+   * Get user ID by username
+   * @param token - OAuth token
+   * @param username - Username to look up
+   * @returns User ID or null
+   */
+  async getUserIdByUsername(token: string, username: string): Promise<string | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const cleanUsername = username.replace('@', '').toLowerCase();
+      
+      const response = await fetch(
+        `https://api.twitch.tv/helix/users?login=${cleanUsername}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.[0]?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Add a moderator to the channel
+   * Requires OAuth token with channel:manage:moderators scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to add as moderator
+   * @returns True if successful
+   */
+  async addModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok || response.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Remove a moderator from the channel
+   * Requires OAuth token with channel:manage:moderators scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param userId - User ID to remove as moderator
+   * @returns True if successful
+   */
+  async removeModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&user_id=${userId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      return response.ok || response.status === 204;
     } catch {
       return false;
     }

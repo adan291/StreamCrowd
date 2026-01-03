@@ -52,6 +52,8 @@ export interface UseModeratedChannelsOptions {
   autoFetch?: boolean;
   /** Whether to persist selected channel */
   persistSelection?: boolean;
+  /** The channel name currently connected to (for auto-selection) */
+  connectedChannelName?: string;
 }
 
 // ============================================
@@ -124,6 +126,7 @@ export function useModeratedChannels(
   const {
     autoFetch = true,
     persistSelection = true,
+    connectedChannelName,
   } = options;
 
   // Service ref
@@ -180,18 +183,38 @@ export function useModeratedChannels(
 
       setChannels(result);
 
-      // Restore saved selection or default to own channel
-      const savedChannelId = persistSelection ? loadSavedSelection() : null;
-      const savedChannel = savedChannelId 
-        ? result.find(ch => ch.channelId === savedChannelId)
-        : null;
-
-      if (savedChannel) {
-        setSelectedChannel(savedChannel);
-      } else {
-        // Default to own channel
-        const ownChannel = result.find(ch => ch.isOwnChannel);
-        setSelectedChannel(ownChannel || result[0] || null);
+      // Priority for initial selection:
+      // 1. If connected to a specific channel, select that one
+      // 2. Otherwise, restore saved selection
+      // 3. Default to own channel
+      
+      let channelToSelect: ChannelContext | null = null;
+      
+      // Check if we're connected to a specific channel (not own)
+      if (connectedChannelName && connectedChannelName.toLowerCase() !== userLogin.toLowerCase()) {
+        channelToSelect = result.find(
+          ch => ch.channelLogin.toLowerCase() === connectedChannelName.toLowerCase()
+        ) || null;
+      }
+      
+      // If no connected channel match, try saved selection
+      if (!channelToSelect && persistSelection) {
+        const savedChannelId = loadSavedSelection();
+        if (savedChannelId) {
+          channelToSelect = result.find(ch => ch.channelId === savedChannelId) || null;
+        }
+      }
+      
+      // Default to own channel
+      if (!channelToSelect) {
+        channelToSelect = result.find(ch => ch.isOwnChannel) || result[0] || null;
+      }
+      
+      setSelectedChannel(channelToSelect);
+      
+      // Save the selection
+      if (channelToSelect && persistSelection) {
+        saveSelection(channelToSelect.channelId);
       }
     } catch (err) {
       console.error('Error fetching moderated channels:', err);
@@ -199,7 +222,7 @@ export function useModeratedChannels(
     } finally {
       setIsLoading(false);
     }
-  }, [userId, userLogin, userName, persistSelection]);
+  }, [userId, userLogin, userName, persistSelection, connectedChannelName]);
 
   /**
    * Select a channel by ID

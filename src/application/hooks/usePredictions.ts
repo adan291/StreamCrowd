@@ -4,6 +4,9 @@
  * Provides reactive state and actions for creating, managing, and
  * tracking Twitch predictions with real-time polling and OBS integration.
  * 
+ * IMPORTANTE: Para que los moderadores puedan crear predicciones, el broadcaster
+ * debe haber autorizado la app previamente (token guardado en Firebase).
+ * 
  * @requirements 1.2, 1.3, 2.2, 2.3, 2.4, 2.5, 3.3, 7.1
  */
 
@@ -12,11 +15,16 @@ import {
   TwitchPredictionService,
   createTwitchPredictionService,
   isTwitchPredictionError,
-  type TwitchPredictionError,
 } from '../services/TwitchPredictionService';
 import { getOBSService } from '../services/OBSService';
 import { getMacroService } from '../services/MacroService';
 import type { IPredictionServiceAdapter } from '../services/ActionExecutorService';
+import { getTwitchApiServiceAdapter } from '../adapters/TwitchApiServiceAdapter';
+import { getTwitchAdapter } from '../../infrastructure/adapters/TwitchAdapter';
+import {
+  BroadcasterTokenService,
+  BROADCASTER_SCOPES,
+} from '../services/BroadcasterTokenService';
 import type {
   TwitchPrediction,
   PredictionFormData,
@@ -27,13 +35,8 @@ import type {
 // Constants
 // ============================================
 
-/** Storage key for prediction history */
 const STORAGE_KEY_PREDICTION_HISTORY = 'twitch_prediction_history';
-
-/** Polling interval for active predictions (ms) */
 const POLLING_INTERVAL_MS = 5000;
-
-/** Maximum history items to store */
 const MAX_HISTORY_ITEMS = 50;
 
 // ============================================
@@ -41,48 +44,33 @@ const MAX_HISTORY_ITEMS = 50;
 // ============================================
 
 export interface UsePredictionsReturn {
-  /** Current active prediction (ACTIVE or LOCKED status) */
   currentPrediction: TwitchPrediction | null;
-  /** History of past predictions */
   history: TwitchPrediction[];
-  /** Loading state for async operations */
   isLoading: boolean;
-  /** Error message if any operation failed */
   error: string | null;
-  /** Whether polling is active */
   isPolling: boolean;
+  canCreatePredictions: boolean;
+  permissionMessage: string | null;
   
-  /** Create a new prediction */
   createPrediction: (data: PredictionFormData) => Promise<boolean>;
-  /** Lock the current prediction (prevent new bets) */
   lockPrediction: () => Promise<boolean>;
-  /** Resolve the current prediction with a winning outcome */
   resolvePrediction: (outcomeId: string) => Promise<boolean>;
-  /** Cancel the current prediction and refund points */
   cancelPrediction: () => Promise<boolean>;
-  /** Manually refresh prediction data */
   refreshPrediction: () => Promise<void>;
-  /** Clear error state */
   clearError: () => void;
 }
 
 export interface UsePredictionsOptions {
-  /** Whether to enable polling for active predictions */
   enablePolling?: boolean;
-  /** Custom polling interval in milliseconds */
   pollingInterval?: number;
-  /** Whether to emit OBS events on state changes */
   emitOBSEvents?: boolean;
+  moderatorId?: string;
 }
 
 // ============================================
 // Helper Functions
 // ============================================
 
-/**
- * Load prediction history from localStorage
- * @requirements 3.3 - Store prediction history locally
- */
 function loadHistoryFromStorage(): TwitchPrediction[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_PREDICTION_HISTORY);
@@ -98,29 +86,18 @@ function loadHistoryFromStorage(): TwitchPrediction[] {
   return [];
 }
 
-/**
- * Save prediction history to localStorage
- * @requirements 3.3 - Store prediction history locally
- */
 function saveHistoryToStorage(history: TwitchPrediction[]): void {
   try {
-    const toSave = history.slice(0, MAX_HISTORY_ITEMS);
-    localStorage.setItem(STORAGE_KEY_PREDICTION_HISTORY, JSON.stringify(toSave));
+    localStorage.setItem(STORAGE_KEY_PREDICTION_HISTORY, JSON.stringify(history.slice(0, MAX_HISTORY_ITEMS)));
   } catch (e) {
     console.error('Error saving prediction history:', e);
   }
 }
 
-/**
- * Check if a prediction is in an active state (can be modified)
- */
 function isActivePrediction(prediction: TwitchPrediction): boolean {
   return prediction.status === 'ACTIVE' || prediction.status === 'LOCKED';
 }
 
-/**
- * Check if a prediction is in a terminal state
- */
 function isTerminalPrediction(prediction: TwitchPrediction): boolean {
   return prediction.status === 'RESOLVED' || prediction.status === 'CANCELED';
 }
@@ -129,34 +106,6 @@ function isTerminalPrediction(prediction: TwitchPrediction): boolean {
 // Hook Implementation
 // ============================================
 
-/**
- * Hook for managing Twitch Predictions
- * 
- * @param broadcasterId - The broadcaster's Twitch user ID
- * @param authToken - OAuth token with channel:manage:predictions scope
- * @param options - Configuration options
- * 
- * @example
- * ```tsx
- * const {
- *   currentPrediction,
- *   history,
- *   isLoading,
- *   error,
- *   createPrediction,
- *   lockPrediction,
- *   resolvePrediction,
- *   cancelPrediction,
- * } = usePredictions(userId, authToken);
- * 
- * // Create a prediction
- * await createPrediction({
- *   title: '¿Quién ganará?',
- *   outcomes: ['Equipo A', 'Equipo B'],
- *   duration: 120,
- * });
- * ```
- */
 export function usePredictions(
   broadcasterId: string,
   authToken: string,
@@ -166,11 +115,19 @@ export function usePredictions(
     enablePolling = true,
     pollingInterval = POLLING_INTERVAL_MS,
     emitOBSEvents = true,
+    moderatorId,
   } = options;
 
-  // Service reference
+  // moderatorId is the logged-in user's ID
+  // isOwnChannel is true only if the logged-in user IS the broadcaster
+  const loggedInUserId = moderatorId || '';
+  const isOwnChannel = !!(loggedInUserId && loggedInUserId === broadcasterId);
+
+  // Refs
   const serviceRef = useRef<TwitchPredictionService | null>(null);
   const obsServiceRef = useRef(getOBSService());
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previousStatusRef = useRef<string | null>(null);
 
   // State
   const [currentPrediction, setCurrentPrediction] = useState<TwitchPrediction | null>(null);
@@ -178,114 +135,176 @@ export function usePredictions(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [canCreatePredictions, setCanCreatePredictions] = useState(isOwnChannel);
+  const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
 
-  // Refs for polling
-  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const previousStatusRef = useRef<string | null>(null);
-  
-  // Track current token to detect changes
-  const currentTokenRef = useRef<string>(authToken);
+  // Check permissions (async because Firebase)
+  useEffect(() => {
+    if (!broadcasterId) {
+      setCanCreatePredictions(false);
+      setPermissionMessage('No hay canal seleccionado');
+      return;
+    }
 
-  // Initialize or update service when token changes
+    if (isOwnChannel) {
+      setCanCreatePredictions(true);
+      setPermissionMessage(null);
+      return;
+    }
+
+    // Subscribe to broadcaster token changes from Firebase
+    const unsubscribe = BroadcasterTokenService.subscribeToToken(
+      broadcasterId,
+      (token) => {
+        if (token) {
+          const hasScope = token.scopes.includes(BROADCASTER_SCOPES.predictions);
+          setCanCreatePredictions(hasScope);
+          setPermissionMessage(
+            hasScope ? null : 'El streamer necesita reconectar con permisos de predicciones.'
+          );
+        } else {
+          setCanCreatePredictions(false);
+          setPermissionMessage(
+            'Para crear predicciones, el streamer debe autorizar Stream Crowd.'
+          );
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [broadcasterId, isOwnChannel]);
+
+  // Cached token for API calls (to avoid re-fetching on every poll)
+  const cachedTokenRef = useRef<string | null>(null);
+
+  // Get effective token for API calls
+  const getEffectiveToken = useCallback(async (): Promise<{ token: string } | { error: string }> => {
+    if (isOwnChannel) {
+      cachedTokenRef.current = authToken;
+      return { token: authToken };
+    }
+
+    // Try to get from Firebase
+    const result = await BroadcasterTokenService.getTokenForAction(
+      broadcasterId,
+      [BROADCASTER_SCOPES.predictions]
+    );
+    
+    if ('token' in result) {
+      cachedTokenRef.current = result.token;
+    }
+    
+    return result;
+  }, [broadcasterId, authToken, isOwnChannel]);
+
+  // Get cached token or fetch new one
+  const getTokenForPolling = useCallback(async (): Promise<string | null> => {
+    if (cachedTokenRef.current) {
+      return cachedTokenRef.current;
+    }
+    const result = await getEffectiveToken();
+    return 'token' in result ? result.token : null;
+  }, [getEffectiveToken]);
+
+  // Initialize service
   useEffect(() => {
     if (authToken) {
-      // Create new service or update existing one
-      if (serviceRef.current && currentTokenRef.current !== authToken) {
-        // Token changed - update existing service
-        serviceRef.current.setToken(authToken);
-      } else if (!serviceRef.current) {
-        // No service yet - create new one
-        serviceRef.current = createTwitchPredictionService(authToken);
-      }
-      currentTokenRef.current = authToken;
+      serviceRef.current = createTwitchPredictionService(authToken);
       
-      // Connect prediction service to MacroService for macro execution
-      if (serviceRef.current && broadcasterId) {
+      // Configure MacroService
+      if (broadcasterId) {
         const predictionAdapter: IPredictionServiceAdapter = {
           createPrediction: async (data) => {
-            return serviceRef.current!.createPrediction(data);
+            const tokenResult = await getEffectiveToken();
+            if ('error' in tokenResult) {
+              return {
+                code: 'no_broadcaster_token',
+                status: 403,
+                message: tokenResult.error,
+                solution: 'El streamer debe autorizar la app.',
+                retryable: false,
+              };
+            }
+            const tempService = createTwitchPredictionService(tokenResult.token);
+            return tempService.createPrediction(data);
           },
           getBroadcasterId: () => broadcasterId,
         };
         getMacroService().configureServices({ predictionService: predictionAdapter });
+        
+        const twitchAdapter = getTwitchAdapter();
+        const twitchApiAdapter = getTwitchApiServiceAdapter(twitchAdapter);
+        if (twitchApiAdapter) {
+          twitchApiAdapter.setCredentials(authToken, broadcasterId, loggedInUserId);
+          getMacroService().configureServices({ twitchApiService: twitchApiAdapter });
+        }
       }
     } else {
       serviceRef.current = null;
-      currentTokenRef.current = '';
     }
-  }, [authToken, broadcasterId]);
+  }, [authToken, broadcasterId, loggedInUserId, getEffectiveToken]);
 
-  /**
-   * Emit OBS trigger event for prediction state changes
-   * @requirements 7.1 - Emit events when prediction starts, locks, or resolves
-   */
+  // OBS trigger helper
   const emitOBSTrigger = useCallback((
     triggerType: 'prediction_start' | 'prediction_lock' | 'prediction_resolve',
     prediction: TwitchPrediction
   ) => {
     if (!emitOBSEvents) return;
-    
     try {
-      // Use dedicated trigger type for predictions
       obsServiceRef.current.executeTrigger(triggerType);
     } catch (e) {
       console.warn('Failed to emit OBS trigger:', e);
     }
   }, [emitOBSEvents]);
 
-  /**
-   * Add a prediction to history
-   */
+  // Add to history
   const addToHistory = useCallback((prediction: TwitchPrediction) => {
     if (!isTerminalPrediction(prediction)) return;
     
     setHistory(prev => {
-      // Check if already in history
       const exists = prev.some(p => p.id === prediction.id);
       if (exists) {
-        // Update existing entry
         const updated = prev.map(p => p.id === prediction.id ? prediction : p);
         saveHistoryToStorage(updated);
         return updated;
       }
-      // Add new entry at the beginning
       const updated = [prediction, ...prev].slice(0, MAX_HISTORY_ITEMS);
       saveHistoryToStorage(updated);
       return updated;
     });
   }, []);
 
-  /**
-   * Fetch current predictions from API
-   * @requirements 1.3, 2.2 - Display current prediction with real-time updates
-   */
+  // Fetch predictions - uses broadcaster token for moderators
   const fetchPredictions = useCallback(async (): Promise<TwitchPrediction | null> => {
-    if (!serviceRef.current || !broadcasterId) return null;
+    if (!broadcasterId) return null;
 
-    const result = await serviceRef.current.getPredictions(broadcasterId);
-    
-    if (isTwitchPredictionError(result)) {
-      setError(result.message);
+    // Get cached token for polling (avoid re-fetching)
+    const token = await getTokenForPolling();
+    if (!token) {
       return null;
     }
 
-    // Find active or locked prediction
-    const activePrediction = result.find(isActivePrediction);
+    const effectiveService = createTwitchPredictionService(token);
+    const result = await effectiveService.getPredictions(broadcasterId);
     
-    // Add any terminal predictions to history
+    if (isTwitchPredictionError(result)) {
+      // Don't set error for 403/401 on polling - moderator might not have read access
+      if (result.status !== 403 && result.status !== 401) {
+        setError(result.message);
+      }
+      return null;
+    }
+
+    const activePrediction = result.find(isActivePrediction);
     result.filter(isTerminalPrediction).forEach(addToHistory);
 
     return activePrediction || null;
-  }, [broadcasterId, addToHistory]);
+  }, [broadcasterId, addToHistory, getTokenForPolling]);
 
-  /**
-   * Refresh prediction data
-   * @requirements 2.2 - Update prediction data every 5 seconds
-   */
+  // Refresh
   const refreshPrediction = useCallback(async () => {
     const prediction = await fetchPredictions();
     
-    // Check for status change and emit OBS events
     if (prediction && previousStatusRef.current !== prediction.status) {
       if (prediction.status === 'LOCKED' && previousStatusRef.current === 'ACTIVE') {
         emitOBSTrigger('prediction_lock', prediction);
@@ -296,22 +315,13 @@ export function usePredictions(
     setCurrentPrediction(prediction);
   }, [fetchPredictions, emitOBSTrigger]);
 
-  /**
-   * Start polling for active prediction updates
-   * @requirements 2.2 - Update prediction data every 5 seconds
-   */
+  // Polling
   const startPolling = useCallback(() => {
     if (pollingIntervalRef.current) return;
-    
     setIsPolling(true);
-    pollingIntervalRef.current = setInterval(() => {
-      refreshPrediction();
-    }, pollingInterval);
+    pollingIntervalRef.current = setInterval(refreshPrediction, pollingInterval);
   }, [refreshPrediction, pollingInterval]);
 
-  /**
-   * Stop polling
-   */
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -320,7 +330,6 @@ export function usePredictions(
     setIsPolling(false);
   }, []);
 
-  // Start/stop polling based on current prediction state
   useEffect(() => {
     if (!enablePolling || !broadcasterId || !authToken) {
       stopPolling();
@@ -336,38 +345,24 @@ export function usePredictions(
     return () => stopPolling();
   }, [currentPrediction, enablePolling, broadcasterId, authToken, startPolling, stopPolling]);
 
-  // Initial fetch when credentials are available or change
-  // This effect handles reconnection scenarios where the token changes
-  // Skip initial fetch if polling is disabled (moderator view)
+  // Initial fetch
   useEffect(() => {
     if (broadcasterId && authToken && enablePolling) {
-      // Clear any previous error when credentials change (reconnection)
       setError(null);
-      
-      // Small delay to ensure service is updated with new token
-      // This handles the race condition between service update and fetch
-      const timeoutId = setTimeout(() => {
-        refreshPrediction();
-      }, 100);
-      
+      const timeoutId = setTimeout(refreshPrediction, 100);
       return () => clearTimeout(timeoutId);
     }
-  }, [broadcasterId, authToken, enablePolling]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [broadcasterId, authToken, enablePolling]); // eslint-disable-line
 
-  /**
-   * Create a new prediction
-   * @requirements 1.2 - Create prediction via Twitch API
-   */
+  // Create prediction
   const createPrediction = useCallback(async (data: PredictionFormData): Promise<boolean> => {
-    console.log('[usePredictions] createPrediction called', {
-      data,
-      hasService: !!serviceRef.current,
-      broadcasterId,
-    });
-    
-    if (!serviceRef.current || !broadcasterId) {
-      setError('No hay conexión con Twitch');
-      console.log('[usePredictions] Error: No service or broadcasterId');
+    if (!broadcasterId) {
+      setError('No hay canal seleccionado');
+      return false;
+    }
+
+    if (!canCreatePredictions) {
+      setError(permissionMessage || 'No tienes permisos para crear predicciones');
       return false;
     }
 
@@ -375,6 +370,15 @@ export function usePredictions(
     setError(null);
 
     try {
+      const tokenResult = await getEffectiveToken();
+      
+      if ('error' in tokenResult) {
+        setError(tokenResult.error);
+        return false;
+      }
+
+      const effectiveService = createTwitchPredictionService(tokenResult.token);
+
       const createData: CreatePredictionData = {
         broadcaster_id: broadcasterId,
         title: data.title,
@@ -382,40 +386,29 @@ export function usePredictions(
         prediction_window: data.duration,
       };
 
-      console.log('[usePredictions] Calling service.createPrediction with:', createData);
-      const result = await serviceRef.current.createPrediction(createData);
-      console.log('[usePredictions] Result:', result);
+      const result = await effectiveService.createPrediction(createData);
 
       if (isTwitchPredictionError(result)) {
-        console.log('[usePredictions] Error result:', result);
         setError(result.message);
         return false;
       }
 
       setCurrentPrediction(result);
       previousStatusRef.current = result.status;
-      
-      // Emit OBS event for prediction start
       emitOBSTrigger('prediction_start', result);
       
-      console.log('[usePredictions] Prediction created successfully:', result.id);
       return true;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error al crear predicción';
-      console.error('[usePredictions] Exception:', e);
-      setError(message);
+      setError(e instanceof Error ? e.message : 'Error al crear predicción');
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [broadcasterId, emitOBSTrigger]);
+  }, [broadcasterId, canCreatePredictions, permissionMessage, getEffectiveToken, emitOBSTrigger]);
 
-  /**
-   * Lock the current prediction
-   * @requirements 2.3 - Lock prediction preventing new bets
-   */
+  // Lock prediction
   const lockPrediction = useCallback(async (): Promise<boolean> => {
-    if (!serviceRef.current || !currentPrediction || !broadcasterId) {
+    if (!currentPrediction || !broadcasterId) {
       setError('No hay predicción activa');
       return false;
     }
@@ -429,10 +422,14 @@ export function usePredictions(
     setError(null);
 
     try {
-      const result = await serviceRef.current.lockPrediction(
-        broadcasterId,
-        currentPrediction.id
-      );
+      const tokenResult = await getEffectiveToken();
+      if ('error' in tokenResult) {
+        setError(tokenResult.error);
+        return false;
+      }
+
+      const effectiveService = createTwitchPredictionService(tokenResult.token);
+      const result = await effectiveService.lockPrediction(broadcasterId, currentPrediction.id);
 
       if (isTwitchPredictionError(result)) {
         setError(result.message);
@@ -441,32 +438,21 @@ export function usePredictions(
 
       setCurrentPrediction(result);
       previousStatusRef.current = result.status;
-      
-      // Emit OBS event for prediction lock
       emitOBSTrigger('prediction_lock', result);
       
       return true;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error al bloquear predicción';
-      setError(message);
+      setError(e instanceof Error ? e.message : 'Error al bloquear predicción');
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [broadcasterId, currentPrediction, emitOBSTrigger]);
+  }, [broadcasterId, currentPrediction, getEffectiveToken, emitOBSTrigger]);
 
-  /**
-   * Resolve the current prediction with a winning outcome
-   * @requirements 2.4 - Resolve prediction via API
-   */
+  // Resolve prediction
   const resolvePrediction = useCallback(async (outcomeId: string): Promise<boolean> => {
-    if (!serviceRef.current || !currentPrediction || !broadcasterId) {
+    if (!currentPrediction || !broadcasterId) {
       setError('No hay predicción activa');
-      return false;
-    }
-
-    if (currentPrediction.status === 'RESOLVED' || currentPrediction.status === 'CANCELED') {
-      setError('La predicción ya ha terminado');
       return false;
     }
 
@@ -474,47 +460,38 @@ export function usePredictions(
     setError(null);
 
     try {
-      const result = await serviceRef.current.resolvePrediction(
-        broadcasterId,
-        currentPrediction.id,
-        outcomeId
-      );
+      const tokenResult = await getEffectiveToken();
+      if ('error' in tokenResult) {
+        setError(tokenResult.error);
+        return false;
+      }
+
+      const effectiveService = createTwitchPredictionService(tokenResult.token);
+      const result = await effectiveService.resolvePrediction(broadcasterId, currentPrediction.id, outcomeId);
 
       if (isTwitchPredictionError(result)) {
         setError(result.message);
         return false;
       }
 
-      // Add to history and clear current
       addToHistory(result);
       setCurrentPrediction(null);
       previousStatusRef.current = null;
-      
-      // Emit OBS event for prediction resolve
       emitOBSTrigger('prediction_resolve', result);
       
       return true;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error al resolver predicción';
-      setError(message);
+      setError(e instanceof Error ? e.message : 'Error al resolver predicción');
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [broadcasterId, currentPrediction, addToHistory, emitOBSTrigger]);
+  }, [broadcasterId, currentPrediction, getEffectiveToken, addToHistory, emitOBSTrigger]);
 
-  /**
-   * Cancel the current prediction and refund points
-   * @requirements 2.5 - Cancel and refund via API
-   */
+  // Cancel prediction
   const cancelPrediction = useCallback(async (): Promise<boolean> => {
-    if (!serviceRef.current || !currentPrediction || !broadcasterId) {
+    if (!currentPrediction || !broadcasterId) {
       setError('No hay predicción activa');
-      return false;
-    }
-
-    if (currentPrediction.status === 'RESOLVED' || currentPrediction.status === 'CANCELED') {
-      setError('La predicción ya ha terminado');
       return false;
     }
 
@@ -522,37 +499,34 @@ export function usePredictions(
     setError(null);
 
     try {
-      const result = await serviceRef.current.cancelPrediction(
-        broadcasterId,
-        currentPrediction.id
-      );
+      const tokenResult = await getEffectiveToken();
+      if ('error' in tokenResult) {
+        setError(tokenResult.error);
+        return false;
+      }
+
+      const effectiveService = createTwitchPredictionService(tokenResult.token);
+      const result = await effectiveService.cancelPrediction(broadcasterId, currentPrediction.id);
 
       if (isTwitchPredictionError(result)) {
         setError(result.message);
         return false;
       }
 
-      // Add to history and clear current
       addToHistory(result);
       setCurrentPrediction(null);
       previousStatusRef.current = null;
       
       return true;
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error al cancelar predicción';
-      setError(message);
+      setError(e instanceof Error ? e.message : 'Error al cancelar predicción');
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [broadcasterId, currentPrediction, addToHistory]);
+  }, [broadcasterId, currentPrediction, getEffectiveToken, addToHistory]);
 
-  /**
-   * Clear error state
-   */
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  const clearError = useCallback(() => setError(null), []);
 
   return {
     currentPrediction,
@@ -560,6 +534,8 @@ export function usePredictions(
     isLoading,
     error,
     isPolling,
+    canCreatePredictions,
+    permissionMessage,
     createPrediction,
     lockPrediction,
     resolvePrediction,

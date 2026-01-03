@@ -9,6 +9,7 @@
  * Also handles:
  * - Partner/Affiliate status check
  * - OAuth scope verification
+ * - Broadcaster token delegation for moderators
  * - Error display and notifications
  * 
  * @requirements 1.5, 1.6, 8.1 - Scope verification and Partner/Affiliate messaging
@@ -23,12 +24,14 @@ import {
   History,
   Zap,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  Shield,
 } from 'lucide-react';
 import { Button } from './Button';
 import { PredictionForm } from './PredictionForm';
 import { ActivePrediction } from './ActivePrediction';
 import { PredictionHistory } from './PredictionHistory';
+import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
 import { usePredictions } from '../src/application/hooks/usePredictions';
 import { useStreamNotifications } from '../hooks/useStreamNotifications';
 import { useI18n } from '../i18n';
@@ -41,7 +44,12 @@ import type { PredictionFormData } from '../types/twitch';
 
 export interface PredictionPanelProps {
   channelId: string;
+  channelLogin?: string;
+  channelName?: string;
   authToken: string;
+  userId?: string;
+  userLogin?: string;
+  userScopes?: string[];
   isPartnerOrAffiliate: boolean;
   hasRequiredScope?: boolean;
   /** Whether the user is viewing a moderated channel (not their own) */
@@ -64,7 +72,12 @@ const REQUIRED_SCOPE = 'channel:manage:predictions';
 
 export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   channelId,
+  channelLogin = '',
+  channelName = '',
   authToken,
+  userId = '',
+  userLogin = '',
+  userScopes = [],
   isPartnerOrAffiliate,
   hasRequiredScope = true,
   isModeratorView = false,
@@ -74,6 +87,7 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabType>('create');
   const [modCreatedPrediction, setModCreatedPrediction] = useState(false);
+  const [showAuthPanel, setShowAuthPanel] = useState(false);
   
   // Stream notifications hook for push notifications
   const { notifyPredictionResolved } = useStreamNotifications();
@@ -85,6 +99,8 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
     isLoading,
     error,
     isPolling,
+    canCreatePredictions,
+    permissionMessage,
     createPrediction,
     lockPrediction,
     resolvePrediction,
@@ -92,7 +108,8 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
     refreshPrediction,
     clearError,
   } = usePredictions(channelId, authToken, {
-    enablePolling: !isModeratorView, // Disable for mods - they can't read predictions
+    enablePolling: true, // Enable for all - will use broadcaster token from Firebase for mods
+    moderatorId: userId,
   });
 
   // Auto-switch to active tab when prediction is created
@@ -181,38 +198,89 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
     );
   }
 
-  // Moderator view - simplified UI (can only create, not view/manage)
+  // Moderator view - now with full control when broadcaster has authorized
   if (isModeratorView) {
     return (
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="shrink-0 p-4 border-b border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-twitch-brand/10 flex items-center justify-center">
-              <Zap size={18} className="text-twitch-brand" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-twitch-brand/10 flex items-center justify-center">
+                <Zap size={18} className="text-twitch-brand" />
+              </div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Predicciones
+              </h2>
+              <span className="px-2 py-0.5 bg-orange-500/20 text-orange-500 text-xs font-medium rounded">
+                Moderador
+              </span>
             </div>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              Predicciones
-            </h2>
-            <span className="px-2 py-0.5 bg-orange-500/20 text-orange-500 text-xs font-medium rounded">
-              Modo Moderador
-            </span>
+            {canCreatePredictions && (
+              <div className="flex items-center gap-2">
+                {isPolling && (
+                  <span className="flex items-center gap-1 text-xs text-green-500">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    En vivo
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={refreshPrediction}
+                  disabled={isLoading}
+                  title="Actualizar"
+                >
+                  <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Moderator Info Banner */}
-        <div className="shrink-0 mx-4 mt-4 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
-          <div className="flex items-start gap-2">
-            <ShieldAlert size={16} className="text-orange-500 mt-0.5 shrink-0" />
-            <div className="text-sm text-orange-600 dark:text-orange-400">
-              <p className="font-medium">Funcionalidad limitada</p>
-              <p className="text-xs mt-1 opacity-80">
-                Como moderador puedes crear predicciones, pero no ver ni gestionar las existentes. 
-                Usa el panel de Twitch para bloquear/resolver.
-              </p>
+        {/* Broadcaster Auth Status */}
+        {!canCreatePredictions && permissionMessage && (
+          <div className="shrink-0 mx-4 mt-4">
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Shield size={16} className="text-yellow-500 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                    Autorización requerida
+                  </p>
+                  <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                    {permissionMessage}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAuthPanel(!showAuthPanel)}
+                  className="text-xs text-yellow-500 hover:text-yellow-400 underline"
+                >
+                  {showAuthPanel ? 'Ocultar' : 'Más info'}
+                </button>
+              </div>
             </div>
+            
+            {/* Expandable Auth Panel */}
+            {showAuthPanel && (
+              <div className="mt-3">
+                <BroadcasterAuthPanel
+                  channelId={channelId}
+                  channelLogin={channelLogin}
+                  channelName={channelName}
+                  currentUserId={userId}
+                  currentUserToken={authToken}
+                  currentUserScopes={userScopes}
+                  onAuthSuccess={() => {
+                    setShowAuthPanel(false);
+                    onNotification?.('success', '¡Autorización completada!');
+                  }}
+                  onNotification={(msg, type) => onNotification?.(type, msg)}
+                />
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -232,42 +300,23 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
           </div>
         )}
 
-        {/* Content */}
+        {/* Content - Show active prediction or create form */}
         <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {modCreatedPrediction ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Zap size={24} className="text-green-500" />
-              </div>
-              <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                ¡Predicción creada!
-              </h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-                Gestiona la predicción desde el panel de Twitch
-              </p>
-              <div className="flex flex-col gap-2 items-center">
-                <a
-                  href="https://dashboard.twitch.tv/viewer-rewards/predictions"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-twitch-brand text-white rounded-lg hover:bg-twitch-light transition-colors"
-                >
-                  Abrir Panel de Twitch
-                  <ExternalLink size={14} />
-                </a>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setModCreatedPrediction(false)}
-                >
-                  Crear otra predicción
-                </Button>
-              </div>
-            </div>
+          {currentPrediction ? (
+            // Show active prediction with controls
+            <ActivePrediction
+              prediction={currentPrediction}
+              onLock={handleLock}
+              onResolve={handleResolve}
+              onCancel={handleCancel}
+              isLoading={isLoading}
+            />
           ) : (
+            // Show create form
             <PredictionForm
               onSubmit={handleCreatePrediction}
               isLoading={isLoading}
-              disabled={!channelId || !authToken}
+              disabled={!channelId || !authToken || !canCreatePredictions}
             />
           )}
         </div>

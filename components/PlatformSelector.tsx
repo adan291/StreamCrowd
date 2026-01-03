@@ -1,8 +1,23 @@
 import React from 'react';
-import { Twitch, Youtube, Zap, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Twitch, Youtube, Zap, CheckCircle, AlertCircle, Loader2, Shield, Crown } from 'lucide-react';
 import { PlatformConfig } from '../config/platforms';
 import { useI18n } from '../i18n';
 import type { Platform, PlatformConnection, PlatformConnectionStatus } from '../types/platform';
+
+// ============================================
+// Broadcaster Auth Status Types
+// ============================================
+
+export interface BroadcasterAuthStatus {
+  /** Si el broadcaster ha autorizado la app */
+  isAuthorized: boolean;
+  /** Si el usuario actual es el broadcaster */
+  isOwnChannel: boolean;
+  /** Nombre del broadcaster */
+  broadcasterName?: string;
+  /** Si está cargando el estado */
+  isLoading?: boolean;
+}
 
 // Icon mapping for platform types
 const PLATFORM_ICONS: Record<string, React.ReactNode> = {
@@ -44,6 +59,8 @@ interface PlatformCardProps {
   connectedText?: string;
   connectingText?: string;
   errorText?: string;
+  /** Estado de autorización del broadcaster (solo para Twitch) */
+  broadcasterAuth?: BroadcasterAuthStatus;
 }
 
 const PlatformCard: React.FC<PlatformCardProps> = ({
@@ -59,6 +76,7 @@ const PlatformCard: React.FC<PlatformCardProps> = ({
   connectedText = 'Connected',
   connectingText = 'Connecting...',
   errorText = 'Error',
+  broadcasterAuth,
 }) => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.key === 'Enter' || e.key === ' ') && enabled && !comingSoon) {
@@ -161,6 +179,32 @@ const PlatformCard: React.FC<PlatformCardProps> = ({
           {statusText}
         </p>
       )}
+
+      {/* Broadcaster Auth Status (Twitch only) */}
+      {broadcasterAuth && !broadcasterAuth.isLoading && (
+        <div className={`mt-2 flex items-center gap-1.5 text-xs ${
+          broadcasterAuth.isAuthorized 
+            ? 'text-green-600 dark:text-green-400' 
+            : 'text-yellow-600 dark:text-yellow-400'
+        }`}>
+          {broadcasterAuth.isOwnChannel ? (
+            <>
+              <Crown size={12} className="text-yellow-500" />
+              <span>{broadcasterAuth.isAuthorized ? 'Autorizado' : 'Autorizar app'}</span>
+            </>
+          ) : (
+            <>
+              <Shield size={12} />
+              <span>
+                {broadcasterAuth.isAuthorized 
+                  ? `${broadcasterAuth.broadcasterName || 'Streamer'} autorizado`
+                  : 'Streamer no autorizado'
+                }
+              </span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -172,6 +216,8 @@ interface PlatformSelectorProps {
   connections?: Record<Platform, PlatformConnection | null>;
   /** Allow selecting multiple platforms */
   multiSelect?: boolean;
+  /** Estado de autorización del broadcaster para Twitch */
+  twitchBroadcasterAuth?: BroadcasterAuthStatus;
 }
 
 /**
@@ -184,6 +230,7 @@ export const PlatformSelector: React.FC<PlatformSelectorProps> = ({
   onSelectPlatform,
   connections,
   multiSelect = false,
+  twitchBroadcasterAuth,
 }) => {
   const { t } = useI18n();
 
@@ -239,6 +286,7 @@ export const PlatformSelector: React.FC<PlatformSelectorProps> = ({
             connectedText={t.platforms?.connected || 'Conectado'}
             connectingText={t.platforms?.connecting || 'Conectando...'}
             errorText={t.platforms?.error || 'Error'}
+            broadcasterAuth={platform.id === 'twitch' ? twitchBroadcasterAuth : undefined}
           />
         ))}
       </div>

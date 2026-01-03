@@ -1,7 +1,8 @@
-import React from 'react';
-import { Terminal, TrendingUp, Coins, Zap, ArrowLeft, Timer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Terminal, TrendingUp, Coins, Zap, ArrowLeft, Timer, Shield, CheckCircle, Users, Workflow, ChevronDown, ChevronUp } from 'lucide-react';
 import { ToolConfig } from '../config/platforms';
 import { useI18n } from '../i18n';
+import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
 
 // Icon mapping for tool types
 const TOOL_ICONS: Record<string, React.ReactNode> = {
@@ -10,6 +11,7 @@ const TOOL_ICONS: Record<string, React.ReactNode> = {
   Coins: <Coins size={28} />,
   Zap: <Zap size={28} />,
   Timer: <Timer size={28} />,
+  Workflow: <Workflow size={28} />,
 };
 
 interface ToolCardProps {
@@ -106,14 +108,30 @@ interface TwitchToolSelectorProps {
   tools: ToolConfig[];
   onSelectTool: (toolId: string) => void;
   onBack: () => void;
+  /** Broadcaster auth props */
+  broadcasterAuth?: {
+    channelId: string;
+    channelLogin: string;
+    channelName: string;
+    currentUserId: string;
+    currentUserToken: string;
+    currentUserScopes: string[];
+    hasBroadcasterToken: boolean;
+    isOwnChannel: boolean;
+    isLoading: boolean;
+  };
+  onNotification?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
   tools,
   onSelectTool,
   onBack,
+  broadcasterAuth,
+  onNotification,
 }) => {
   const { t } = useI18n();
+  const [showAuthPanel, setShowAuthPanel] = useState(false);
 
   const handleBackKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -140,7 +158,7 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
       </button>
 
       {/* Header */}
-      <div className="mb-6 sm:mb-8">
+      <div className="mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-2">
           {t.platforms?.twitchTitle || 'Twitch'}
         </h2>
@@ -148,6 +166,117 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
           {t.platforms?.twitchToolsDescription || 'Herramientas y funcionalidades de Twitch'}
         </p>
       </div>
+
+      {/* Broadcaster Auth Banner */}
+      {broadcasterAuth && !broadcasterAuth.isLoading && (
+        <div className="mb-4 sm:mb-6">
+          {broadcasterAuth.isOwnChannel ? (
+            // Broadcaster view
+            <div className={`rounded-lg p-3 border ${
+              broadcasterAuth.hasBroadcasterToken 
+                ? 'bg-green-500/10 border-green-500/30' 
+                : 'bg-purple-500/10 border-purple-500/30'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {broadcasterAuth.hasBroadcasterToken ? (
+                    <CheckCircle size={20} className="text-green-500" />
+                  ) : (
+                    <Users size={20} className="text-purple-500" />
+                  )}
+                  <div>
+                    <p className={`text-sm font-medium ${
+                      broadcasterAuth.hasBroadcasterToken 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-purple-600 dark:text-purple-400'
+                    }`}>
+                      {broadcasterAuth.hasBroadcasterToken 
+                        ? 'Moderadores habilitados' 
+                        : 'Habilitar moderadores'
+                      }
+                    </p>
+                    <p className={`text-xs ${
+                      broadcasterAuth.hasBroadcasterToken 
+                        ? 'text-green-600/70 dark:text-green-400/70' 
+                        : 'text-purple-600/70 dark:text-purple-400/70'
+                    }`}>
+                      {broadcasterAuth.hasBroadcasterToken 
+                        ? 'Tus mods pueden crear predicciones y polls' 
+                        : 'Permite que tus mods creen predicciones y polls'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAuthPanel(!showAuthPanel)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    broadcasterAuth.hasBroadcasterToken
+                      ? 'bg-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-500/30'
+                      : 'bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/30'
+                  }`}
+                >
+                  {showAuthPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {broadcasterAuth.hasBroadcasterToken ? 'Gestionar' : 'Configurar'}
+                </button>
+              </div>
+              
+              {/* Expandable Auth Panel */}
+              {showAuthPanel && (
+                <div className="mt-3 pt-3 border-t border-current/10">
+                  <BroadcasterAuthPanel
+                    channelId={broadcasterAuth.channelId}
+                    channelLogin={broadcasterAuth.channelLogin}
+                    channelName={broadcasterAuth.channelName}
+                    currentUserId={broadcasterAuth.currentUserId}
+                    currentUserToken={broadcasterAuth.currentUserToken}
+                    currentUserScopes={broadcasterAuth.currentUserScopes}
+                    onAuthSuccess={() => {
+                      setShowAuthPanel(false);
+                      onNotification?.('success', '¡Moderadores habilitados!');
+                    }}
+                    onNotification={(msg, type) => onNotification?.(type, msg)}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            // Moderator view
+            <div className={`rounded-lg p-3 border ${
+              broadcasterAuth.hasBroadcasterToken 
+                ? 'bg-green-500/10 border-green-500/30' 
+                : 'bg-yellow-500/10 border-yellow-500/30'
+            }`}>
+              <div className="flex items-center gap-3">
+                <Shield size={20} className={
+                  broadcasterAuth.hasBroadcasterToken ? 'text-green-500' : 'text-yellow-500'
+                } />
+                <div>
+                  <p className={`text-sm font-medium ${
+                    broadcasterAuth.hasBroadcasterToken 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : 'text-yellow-600 dark:text-yellow-400'
+                  }`}>
+                    {broadcasterAuth.hasBroadcasterToken 
+                      ? `${broadcasterAuth.channelName} te ha autorizado` 
+                      : 'Permisos limitados'
+                    }
+                  </p>
+                  <p className={`text-xs ${
+                    broadcasterAuth.hasBroadcasterToken 
+                      ? 'text-green-600/70 dark:text-green-400/70' 
+                      : 'text-yellow-600/70 dark:text-yellow-400/70'
+                  }`}>
+                    {broadcasterAuth.hasBroadcasterToken 
+                      ? 'Puedes crear predicciones y polls' 
+                      : `${broadcasterAuth.channelName} debe autorizar Stream Crowd`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tool Cards Grid */}
       <div

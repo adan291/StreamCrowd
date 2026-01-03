@@ -59,6 +59,12 @@ const ACTION_ICONS: Record<ActionType, React.ReactNode> = {
   send_notification: <span className="text-cyan-400">🔔</span>,
   set_variable: <span className="text-emerald-400">📝</span>,
   delay: <span className="text-zinc-400">⏱️</span>,
+  // New Twitch API actions
+  send_announcement: <span className="text-purple-400">📢</span>,
+  update_chat_settings: <span className="text-green-400">⚙️</span>,
+  send_shoutout: <span className="text-orange-400">📣</span>,
+  start_raid: <span className="text-purple-400">⚡</span>,
+  create_clip: <span className="text-pink-400">🎬</span>,
 };
 
 const ACTION_LABELS: Record<ActionType, string> = {
@@ -71,6 +77,12 @@ const ACTION_LABELS: Record<ActionType, string> = {
   send_notification: 'Enviar notificación',
   set_variable: 'Establecer variable',
   delay: 'Esperar',
+  // New Twitch API actions
+  send_announcement: 'Anuncio',
+  update_chat_settings: 'Config. chat',
+  send_shoutout: 'Shoutout',
+  start_raid: 'Raid',
+  create_clip: 'Crear clip',
 };
 
 // ============================================
@@ -135,6 +147,12 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
       send_notification: { type: 'send_notification', config: { channels: [], title: '', message: '' }, delay: 0 },
       set_variable: { type: 'set_variable', config: { variableName: '', value: '', operation: 'set' }, delay: 0 },
       delay: { type: 'delay', config: { seconds: 5 }, delay: 0 },
+      // New Twitch API actions
+      send_announcement: { type: 'send_announcement', config: { message: '', color: 'primary' }, delay: 0 },
+      update_chat_settings: { type: 'update_chat_settings', config: {}, delay: 0 },
+      send_shoutout: { type: 'send_shoutout', config: { targetUsername: '' }, delay: 0 },
+      start_raid: { type: 'start_raid', config: { targetUsername: '' }, delay: 0 },
+      create_clip: { type: 'create_clip', config: { hasDelay: false }, delay: 0 },
     };
     
     addAction(defaultConfigs[type]);

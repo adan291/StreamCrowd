@@ -27,6 +27,11 @@ import type {
   SendNotificationConfig,
   SetVariableConfig,
   DelayConfig,
+  SendAnnouncementConfig,
+  UpdateChatSettingsConfig,
+  SendShoutoutConfig,
+  StartRaidConfig,
+  CreateClipConfig,
 } from '../../types/macros';
 
 // ============================================
@@ -44,11 +49,12 @@ export interface ActionBuilderProps {
 // Constants
 // ============================================
 
+// Only show platforms that are actually implemented
 const PLATFORMS = [
-  { value: 'all', label: 'Todas las plataformas' },
-  { value: 'twitch', label: 'Twitch' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'kick', label: 'Kick' },
+  { value: 'twitch', label: 'Twitch', icon: '💜' },
+  // YouTube and Kick not yet implemented
+  // { value: 'youtube', label: 'YouTube', icon: '🔴' },
+  // { value: 'kick', label: 'Kick', icon: '💚' },
 ];
 
 const TOGGLE_ACTIONS = [
@@ -67,6 +73,14 @@ const VARIABLE_OPERATIONS = [
   { value: 'set', label: 'Establecer' },
   { value: 'increment', label: 'Incrementar' },
   { value: 'decrement', label: 'Decrementar' },
+];
+
+const ANNOUNCEMENT_COLORS = [
+  { value: 'primary', label: 'Primario', color: '#9146FF' },
+  { value: 'blue', label: 'Azul', color: '#3B82F6' },
+  { value: 'green', label: 'Verde', color: '#10B981' },
+  { value: 'orange', label: 'Naranja', color: '#F97316' },
+  { value: 'purple', label: 'Púrpura', color: '#8B5CF6' },
 ];
 
 const SYSTEM_VARIABLES = [
@@ -159,19 +173,26 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         </div>
 
         <div>
-          <label htmlFor="action-platform" className="block text-sm font-medium text-zinc-400 mb-1">
+          <label className="block text-sm font-medium text-zinc-400 mb-1">
             Plataforma
           </label>
-          <select
-            id="action-platform"
-            value={config.platform || 'all'}
-            onChange={(e) => updateConfig<SendChatMessageConfig>({ platform: e.target.value as SendChatMessageConfig['platform'] })}
-            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-          >
+          <div className="flex gap-2">
             {PLATFORMS.map(p => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => updateConfig<SendChatMessageConfig>({ platform: p.value as SendChatMessageConfig['platform'] })}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  (config.platform || 'twitch') === p.value
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-600'
+                }`}
+              >
+                <span>{p.icon}</span>
+                {p.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
       </div>
     );
@@ -689,6 +710,289 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
   };
 
   /**
+   * Render send announcement config (Twitch API)
+   */
+  const renderSendAnnouncement = () => {
+    const config = action.config as SendAnnouncementConfig;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-purple-500/10 rounded-lg text-purple-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Envía un anuncio destacado al chat via API de Twitch</span>
+        </div>
+
+        <div>
+          <label htmlFor="action-announcement-message" className="block text-sm font-medium text-zinc-400 mb-1">
+            Mensaje del anuncio *
+          </label>
+          <textarea
+            id="action-announcement-message"
+            value={config.message || ''}
+            onChange={(e) => updateConfig<SendAnnouncementConfig>({ message: e.target.value })}
+            placeholder="Escribe el mensaje del anuncio..."
+            rows={3}
+            maxLength={500}
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
+          />
+          <div className="flex justify-between mt-1">
+            <div className="flex flex-wrap gap-1">
+              {SYSTEM_VARIABLES.slice(0, 5).map(v => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVariable(
+                    config.message || '',
+                    v,
+                    (val) => updateConfig<SendAnnouncementConfig>({ message: val })
+                  )}
+                  className="text-xs bg-zinc-600 text-purple-400 px-1.5 py-0.5 rounded hover:bg-zinc-500 transition-colors"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-zinc-500">{(config.message || '').length}/500</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-zinc-400 mb-2">
+            Color del anuncio
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ANNOUNCEMENT_COLORS.map(c => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => updateConfig<SendAnnouncementConfig>({ color: c.value as SendAnnouncementConfig['color'] })}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  (config.color || 'primary') === c.value
+                    ? 'ring-2 ring-white/50'
+                    : 'opacity-70 hover:opacity-100'
+                }`}
+                style={{ backgroundColor: c.color }}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Render update chat settings config (Twitch API)
+   */
+  const renderUpdateChatSettings = () => {
+    const config = action.config as UpdateChatSettingsConfig;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-green-500/10 rounded-lg text-green-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Modifica la configuración del chat via API de Twitch</span>
+        </div>
+
+        {/* Slow Mode */}
+        <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-white">Modo lento</p>
+            <p className="text-xs text-zinc-400">Limita la frecuencia de mensajes</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.slowMode || false}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ slowMode: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+          </label>
+        </div>
+
+        {config.slowMode && (
+          <div className="ml-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-zinc-400">Tiempo de espera</label>
+              <span className="text-sm font-medium text-purple-400">{config.slowModeWaitTime || 30}s</span>
+            </div>
+            <input
+              type="range"
+              min={3}
+              max={120}
+              value={config.slowModeWaitTime || 30}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ slowModeWaitTime: Number(e.target.value) })}
+              className="w-full h-2 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+          </div>
+        )}
+
+        {/* Emote Only Mode */}
+        <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-white">Solo emotes</p>
+            <p className="text-xs text-zinc-400">Solo se permiten emotes en el chat</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.emoteMode || false}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ emoteMode: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+          </label>
+        </div>
+
+        {/* Subscriber Only Mode */}
+        <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-white">Solo suscriptores</p>
+            <p className="text-xs text-zinc-400">Solo subs pueden chatear</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.subscriberMode || false}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ subscriberMode: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+          </label>
+        </div>
+
+        {/* Follower Only Mode */}
+        <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-white">Solo seguidores</p>
+            <p className="text-xs text-zinc-400">Solo seguidores pueden chatear</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.followerMode || false}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ followerMode: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+          </label>
+        </div>
+
+        {config.followerMode && (
+          <div className="ml-4">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-zinc-400">Tiempo mínimo siguiendo</label>
+              <span className="text-sm font-medium text-purple-400">{config.followerModeDuration || 0} min</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={129600}
+              step={10}
+              value={config.followerModeDuration || 0}
+              onChange={(e) => updateConfig<UpdateChatSettingsConfig>({ followerModeDuration: Number(e.target.value) })}
+              className="w-full h-2 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+            <p className="text-xs text-zinc-500 mt-1">0 = cualquier seguidor</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * Render send shoutout config (Twitch API)
+   */
+  const renderSendShoutout = () => {
+    const config = action.config as SendShoutoutConfig;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-orange-500/10 rounded-lg text-orange-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Envía un shoutout oficial a otro streamer. El canal debe estar en directo.</span>
+        </div>
+
+        <div>
+          <label htmlFor="action-shoutout-username" className="block text-sm font-medium text-zinc-400 mb-1">
+            Nombre del streamer *
+          </label>
+          <input
+            type="text"
+            id="action-shoutout-username"
+            value={config.targetUsername || ''}
+            onChange={(e) => updateConfig<SendShoutoutConfig>({ targetUsername: e.target.value })}
+            placeholder="nombre_del_streamer"
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+          />
+          <p className="text-xs text-zinc-500 mt-1">
+            Cooldown de 2 minutos entre shoutouts
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Render start raid config (Twitch API)
+   */
+  const renderStartRaid = () => {
+    const config = action.config as StartRaidConfig;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-purple-500/10 rounded-lg text-purple-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Solo el streamer puede iniciar raids. El canal destino debe estar en directo.</span>
+        </div>
+
+        <div>
+          <label htmlFor="action-raid-username" className="block text-sm font-medium text-zinc-400 mb-1">
+            Canal destino *
+          </label>
+          <input
+            type="text"
+            id="action-raid-username"
+            value={config.targetUsername || ''}
+            onChange={(e) => updateConfig<StartRaidConfig>({ targetUsername: e.target.value })}
+            placeholder="nombre_del_canal"
+            className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Render create clip config (Twitch API)
+   */
+  const renderCreateClip = () => {
+    const config = action.config as CreateClipConfig;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-pink-500/10 rounded-lg text-pink-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Crea un clip del stream actual. El canal debe estar en directo.</span>
+        </div>
+
+        <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-white">Capturar con delay</p>
+            <p className="text-xs text-zinc-400">Captura los 90 segundos anteriores</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.hasDelay || false}
+              onChange={(e) => updateConfig<CreateClipConfig>({ hasDelay: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-zinc-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+          </label>
+        </div>
+      </div>
+    );
+  };
+
+  /**
    * Render config based on action type
    */
   const renderConfig = () => {
@@ -711,6 +1015,17 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         return renderSetVariable();
       case 'delay':
         return renderDelay();
+      // New Twitch API actions
+      case 'send_announcement':
+        return renderSendAnnouncement();
+      case 'update_chat_settings':
+        return renderUpdateChatSettings();
+      case 'send_shoutout':
+        return renderSendShoutout();
+      case 'start_raid':
+        return renderStartRaid();
+      case 'create_clip':
+        return renderCreateClip();
       default:
         return null;
     }

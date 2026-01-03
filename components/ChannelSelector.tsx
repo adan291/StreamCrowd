@@ -58,8 +58,8 @@ export const ChannelSelector: React.FC<ChannelSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Don't render if no channels or only own channel
-  if (channels.length <= 1) {
+  // Don't render if no channels available
+  if (channels.length === 0) {
     return null;
   }
 

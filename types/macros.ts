@@ -96,7 +96,13 @@ export type ActionType =
   | 'start_prediction'
   | 'send_notification'
   | 'set_variable'
-  | 'delay';
+  | 'delay'
+  // New Twitch API actions
+  | 'send_announcement'
+  | 'update_chat_settings'
+  | 'send_shoutout'
+  | 'start_raid'
+  | 'create_clip';
 
 /**
  * Send chat message action configuration
@@ -173,6 +179,53 @@ export interface DelayConfig {
 }
 
 /**
+ * Send announcement action configuration (Twitch API)
+ * Requires scope: moderator:manage:announcements
+ */
+export interface SendAnnouncementConfig {
+  message: string;
+  color?: 'blue' | 'green' | 'orange' | 'purple' | 'primary';
+}
+
+/**
+ * Update chat settings action configuration (Twitch API)
+ * Requires scope: moderator:manage:chat_settings
+ */
+export interface UpdateChatSettingsConfig {
+  slowMode?: boolean;
+  slowModeWaitTime?: number; // 3-120 seconds
+  emoteMode?: boolean;
+  subscriberMode?: boolean;
+  followerMode?: boolean;
+  followerModeDuration?: number; // 0-129600 minutes (0 = any follower)
+}
+
+/**
+ * Send shoutout action configuration (Twitch API)
+ * Requires scope: moderator:manage:shoutouts
+ */
+export interface SendShoutoutConfig {
+  targetUsername: string;
+}
+
+/**
+ * Start raid action configuration (Twitch API)
+ * Requires scope: channel:manage:raids
+ * Only broadcaster can start raids
+ */
+export interface StartRaidConfig {
+  targetUsername: string;
+}
+
+/**
+ * Create clip action configuration (Twitch API)
+ * Requires scope: clips:edit
+ */
+export interface CreateClipConfig {
+  hasDelay?: boolean; // If true, clip captures previous 90 seconds
+}
+
+/**
  * Union type for all action configurations
  */
 export type ActionConfig = 
@@ -184,7 +237,12 @@ export type ActionConfig =
   | StartPredictionConfig
   | SendNotificationConfig
   | SetVariableConfig
-  | DelayConfig;
+  | DelayConfig
+  | SendAnnouncementConfig
+  | UpdateChatSettingsConfig
+  | SendShoutoutConfig
+  | StartRaidConfig
+  | CreateClipConfig;
 
 // ============================================================================
 // Condition Types

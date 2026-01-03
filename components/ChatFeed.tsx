@@ -1,8 +1,30 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { TwitchMessage, PollOption, CollaborationChannel } from '../types';
-import { MessageSquare, CheckCircle2, ArrowDown, Settings, Send, X, Type, Minus, Plus, Clock, Ban, Crown, Heart, ExternalLink, User } from 'lucide-react';
+import { MessageSquare, CheckCircle2, ArrowDown, Settings, Send, X, Type, Minus, Plus, Clock, Ban, Crown, Heart, ExternalLink, User, Terminal, Megaphone } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { getTwitchService } from '../src/application/services/TwitchService';
+import { ChatCommandService } from '../src/application/services/ChatCommandService';
+import { getTwitchApiServiceAdapter } from '../src/application/adapters/TwitchApiServiceAdapter';
+import { getTwitchAdapter } from '../src/infrastructure/adapters/TwitchAdapter';
+
+// Local announcement message type
+interface LocalAnnouncement {
+  id: string;
+  text: string;
+  color: 'blue' | 'green' | 'orange' | 'purple' | 'primary';
+  timestamp: number;
+  username: string;
+}
+
+// System notification type (for shoutout, raid, clip, etc.)
+interface SystemNotification {
+  id: string;
+  type: 'shoutout' | 'raid' | 'clip' | 'poll' | 'prediction' | 'moderation';
+  icon: string;
+  text: string;
+  link?: string;
+  timestamp: number;
+}
 
 interface ChatSettings {
   fontSize: 'xs' | 'sm' | 'base' | 'lg';
@@ -26,19 +48,45 @@ interface ChatFeedProps {
   mainChannel?: string;
   isConnected?: boolean;
   authToken?: string | null;
+  broadcasterId?: string | null;
+  userId?: string | null;
 }
 
-export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options, collaborationChannels = [], mainChannel, isConnected = false, authToken }) => {
+export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options, collaborationChannels = [], mainChannel, isConnected = false, authToken, broadcasterId, userId }) => {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
+  const [localAnnouncements, setLocalAnnouncements] = useState<LocalAnnouncement[]>([]);
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
   const [settings, setSettings] = useState<ChatSettings>(() => {
     const saved = localStorage.getItem('chat_settings');
     return saved ? { ...DEFAULT_CHAT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_CHAT_SETTINGS;
   });
+
+  // Function to add a local announcement
+  const addLocalAnnouncement = useCallback((text: string, color: 'blue' | 'green' | 'orange' | 'purple' | 'primary', username: string) => {
+    const announcement: LocalAnnouncement = {
+      id: `announce_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      text,
+      color,
+      timestamp: Date.now(),
+      username,
+    };
+    setLocalAnnouncements(prev => [...prev, announcement]);
+  }, []);
+
+  // Function to add a system notification
+  const addSystemNotification = useCallback((notification: { type: SystemNotification['type']; icon: string; text: string; link?: string }) => {
+    const sysNotif: SystemNotification = {
+      id: `sysnotif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      ...notification,
+      timestamp: Date.now(),
+    };
+    setSystemNotifications(prev => [...prev, sysNotif]);
+  }, []);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -58,6 +106,35 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
   }, [mainChannel, collaborationChannels]);
 
   const isCollaborationMode = collaborationChannels.length > 0;
+
+  // Combine messages with local announcements and system notifications, sorted by timestamp
+  type CombinedMessage = 
+    | { type: 'message'; data: TwitchMessage; timestamp: number }
+    | { type: 'announcement'; data: LocalAnnouncement; timestamp: number }
+    | { type: 'system'; data: SystemNotification; timestamp: number };
+  
+  const combinedMessages = useMemo((): CombinedMessage[] => {
+    const msgItems: CombinedMessage[] = messages.map(msg => ({
+      type: 'message' as const,
+      data: msg,
+      timestamp: msg.timestamp || 0,
+    }));
+    
+    const announceItems: CombinedMessage[] = localAnnouncements.map(ann => ({
+      type: 'announcement' as const,
+      data: ann,
+      timestamp: ann.timestamp,
+    }));
+
+    const sysNotifItems: CombinedMessage[] = systemNotifications.map(notif => ({
+      type: 'system' as const,
+      data: notif,
+      timestamp: notif.timestamp,
+    }));
+    
+    // Combine and sort by timestamp
+    return [...msgItems, ...announceItems, ...sysNotifItems].sort((a, b) => a.timestamp - b.timestamp);
+  }, [messages, localAnnouncements, systemNotifications]);
 
   // Handle scroll events to detect if user scrolled up
   const handleScroll = () => {
@@ -88,6 +165,70 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
 
   const [sendingMessage, setSendingMessage] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [commandFeedback, setCommandFeedback] = useState<{ message: string; success: boolean } | null>(null);
+
+  // Create ChatCommandService instance
+  const commandService = useMemo(() => {
+    // Initialize the adapter if needed
+    const twitchAdapter = getTwitchAdapter();
+    const twitchApiService = getTwitchApiServiceAdapter(twitchAdapter);
+    
+    if (!twitchApiService || !authToken || !broadcasterId) {
+      return null;
+    }
+
+    // Set credentials on the adapter
+    twitchApiService.setCredentials(authToken, broadcasterId, userId || broadcasterId);
+
+    return new ChatCommandService({
+      twitchApiService,
+      sendChatMessage: async (message: string) => {
+        return getTwitchService().sendMessage(message);
+      },
+      timeoutUser: async (username: string, duration: number) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().timeoutUser(authToken, broadcasterId, targetUserId, duration);
+      },
+      banUser: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().banUser(authToken, broadcasterId, targetUserId);
+      },
+      unbanUser: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().unbanUser(authToken, broadcasterId, targetUserId);
+      },
+      addVIP: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().addVIP(authToken, broadcasterId, targetUserId);
+      },
+      removeVIP: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().removeVIP(authToken, broadcasterId, targetUserId);
+      },
+      addModerator: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().addModerator(authToken, broadcasterId, targetUserId);
+      },
+      removeModerator: async (username: string) => {
+        if (!authToken || !mainChannel) return false;
+        const targetUserId = await getTwitchService().getUserId(authToken, username);
+        if (!targetUserId || !broadcasterId) return false;
+        return getTwitchService().removeModerator(authToken, broadcasterId, targetUserId);
+      },
+    });
+  }, [authToken, broadcasterId, userId, mainChannel]);
 
   // Estado para menú de moderación
   const [selectedUser, setSelectedUser] = useState<{ username: string; userId?: string; color?: string; position: { x: number; y: number } } | null>(null);
@@ -241,8 +382,44 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
     
     setSendingMessage(true);
     setSendError(null);
+    setCommandFeedback(null);
     
     try {
+      // Check if it's a command
+      if (chatMessage.trim().startsWith('/')) {
+        if (commandService) {
+          const result = await commandService.execute(chatMessage.trim());
+          if (result.isCommand) {
+            setCommandFeedback({ message: result.message, success: result.success });
+            if (result.success) {
+              setChatMessage('');
+              
+              // If it was an announcement, add it to local display
+              if (result.announcementData) {
+                const username = mainChannel || 'Moderador';
+                addLocalAnnouncement(
+                  result.announcementData.text, 
+                  result.announcementData.color,
+                  username
+                );
+              }
+              
+              // If it has a system notification, add it to local display
+              if (result.systemNotification) {
+                addSystemNotification(result.systemNotification);
+              }
+            }
+            // Auto-hide feedback after 5 seconds
+            setTimeout(() => setCommandFeedback(null), 5000);
+            return;
+          }
+        } else {
+          setSendError('Comandos no disponibles. Verifica la autenticación.');
+          return;
+        }
+      }
+      
+      // Regular message
       const success = await getTwitchService().sendMessage(chatMessage.trim());
       if (success) {
         setChatMessage('');
@@ -410,13 +587,110 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
         onScroll={handleScroll}
         className={`flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 custom-scrollbar bg-zinc-50/50 dark:bg-black/20 ${fontFamilyClass} ${fontSizeClass} ${settings.compactMode ? 'space-y-0.5' : 'space-y-1.5 sm:space-y-2 md:space-y-3'}`}
       >
-        {messages.length === 0 && (
+        {combinedMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">
             <MessageSquare size={24} />
             <span className="text-xs italic">{t.chat.waitingMessages}</span>
           </div>
         )}
-        {messages.map((msg, i) => {
+        {combinedMessages.map((item, i) => {
+          // Render announcement
+          if (item.type === 'announcement') {
+            const ann = item.data;
+            const colorMap: Record<string, string> = {
+              blue: '#3b82f6',
+              green: '#22c55e',
+              orange: '#f97316',
+              purple: '#a855f7',
+              primary: '#a855f7',
+            };
+            const bgColorMap: Record<string, string> = {
+              blue: 'rgba(59, 130, 246, 0.15)',
+              green: 'rgba(34, 197, 94, 0.15)',
+              orange: 'rgba(249, 115, 22, 0.15)',
+              purple: 'rgba(168, 85, 247, 0.15)',
+              primary: 'rgba(168, 85, 247, 0.15)',
+            };
+            const borderColor = colorMap[ann.color] || colorMap.primary;
+            const bgColor = bgColorMap[ann.color] || bgColorMap.primary;
+            
+            return (
+              <div 
+                key={ann.id}
+                className="animate-fade-in rounded-lg p-2 border-l-4"
+                style={{ 
+                  backgroundColor: bgColor,
+                  borderLeftColor: borderColor,
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Megaphone size={14} style={{ color: borderColor }} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: borderColor }}>
+                    Anuncio
+                  </span>
+                  {settings.showTimestamps && (
+                    <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">
+                      {formatTimestamp(ann.timestamp)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-zinc-800 dark:text-zinc-200 text-sm font-medium">
+                  {ann.text}
+                </p>
+              </div>
+            );
+          }
+
+          // Render system notification
+          if (item.type === 'system') {
+            const notif = item.data;
+            const typeColors: Record<string, { bg: string; border: string; text: string }> = {
+              shoutout: { bg: 'rgba(236, 72, 153, 0.15)', border: '#ec4899', text: '#ec4899' },
+              raid: { bg: 'rgba(249, 115, 22, 0.15)', border: '#f97316', text: '#f97316' },
+              clip: { bg: 'rgba(59, 130, 246, 0.15)', border: '#3b82f6', text: '#3b82f6' },
+              poll: { bg: 'rgba(34, 197, 94, 0.15)', border: '#22c55e', text: '#22c55e' },
+              prediction: { bg: 'rgba(168, 85, 247, 0.15)', border: '#a855f7', text: '#a855f7' },
+              moderation: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', text: '#ef4444' },
+            };
+            const colors = typeColors[notif.type] || typeColors.moderation;
+            
+            return (
+              <div 
+                key={notif.id}
+                className="animate-fade-in rounded-lg p-2 border-l-4"
+                style={{ 
+                  backgroundColor: colors.bg,
+                  borderLeftColor: colors.border,
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{notif.icon}</span>
+                  <span className="text-xs font-medium" style={{ color: colors.text }}>
+                    {notif.text}
+                  </span>
+                  {notif.link && (
+                    <a 
+                      href={notif.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] underline hover:no-underline ml-1"
+                      style={{ color: colors.text }}
+                    >
+                      Ver
+                    </a>
+                  )}
+                  {settings.showTimestamps && (
+                    <span className="text-zinc-400 dark:text-zinc-500 text-[10px] ml-auto">
+                      {formatTimestamp(notif.timestamp)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          }
+          
+          // Render regular message
+          const msg = item.data as TwitchMessage;
           const votedOptionId = userVoteMap.get(msg.userId || '') || userVoteMap.get(msg.username);
           const hasVoted = votedOptionId !== undefined;
           
@@ -535,6 +809,31 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
 
       {/* Chat Input */}
       <div className="p-2 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+        {/* Command feedback */}
+        {commandFeedback && (
+          <div className={`mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2 ${
+            commandFeedback.success 
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            <Terminal size={14} />
+            <span>{commandFeedback.message}</span>
+            <button 
+              onClick={() => setCommandFeedback(null)}
+              className="ml-auto hover:opacity-70"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+        
+        {/* Command hint when typing / */}
+        {chatMessage.startsWith('/') && (
+          <div className="mb-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg text-[10px] text-zinc-400 border border-zinc-700">
+            <span className="text-twitch-brand font-bold">Comandos:</span> /announce, /slow, /emoteonly, /shoutout, /raid, /clip, /poll, /prediction, /timeout, /ban...
+          </div>
+        )}
+        
         <div className="flex gap-2">
           <input
             id="chat-message-input"
@@ -543,8 +842,8 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
             value={chatMessage}
             onChange={(e) => setChatMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isConnected && authToken ? "Escribe un mensaje..." : "Conecta con OAuth para chatear"}
-            aria-label={isConnected && authToken ? "Escribe un mensaje en el chat" : "Conecta con OAuth para chatear"}
+            placeholder={isConnected && authToken ? "Mensaje o /comando..." : "Conecta con OAuth para chatear"}
+            aria-label={isConnected && authToken ? "Escribe un mensaje o comando" : "Conecta con OAuth para chatear"}
             disabled={!isConnected || !authToken || sendingMessage}
             className="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-twitch-brand focus:ring-1 focus:ring-twitch-brand disabled:opacity-50 disabled:cursor-not-allowed"
           />
@@ -552,7 +851,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
             onClick={handleSendMessage}
             disabled={!isConnected || !authToken || !chatMessage.trim() || sendingMessage}
             className="px-3 py-2 bg-twitch-brand hover:bg-twitch-light text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-twitch-brand"
-            title={isConnected && authToken ? "Enviar mensaje" : "Requiere autenticación OAuth de Twitch"}
+            title={isConnected && authToken ? "Enviar mensaje o ejecutar comando" : "Requiere autenticación OAuth de Twitch"}
           >
             {sendingMessage ? (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

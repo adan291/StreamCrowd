@@ -73,6 +73,12 @@ const ERROR_MESSAGES: Record<string, Omit<TwitchPredictionError, 'status'>> = {
     solution: 'Las predicciones de Twitch solo están disponibles para Partners y Affiliates.',
     retryable: false,
   },
+  channel_points_disabled: {
+    code: 'channel_points_disabled',
+    message: 'Puntos de canal no habilitados',
+    solution: 'Debes ser Afiliado/Partner y tener los Puntos de Canal activados en tu Panel de Control de Twitch.',
+    retryable: false,
+  },
   rate_limit: {
     code: 'rate_limit',
     message: 'Demasiadas peticiones',
@@ -187,6 +193,16 @@ export class TwitchPredictionService {
   parseError(status: number, body?: string): TwitchPredictionError {
     // Authentication errors - check for missing scope first
     if (status === 401) {
+      // Check if it's a broadcaster_id mismatch
+      if (body?.includes('broadcaster_id must match')) {
+        return { 
+          code: 'broadcaster_mismatch',
+          message: 'Solo el streamer puede crear predicciones',
+          solution: 'La API de Twitch solo permite crear predicciones al dueño del canal. Los moderadores no pueden crear predicciones via API.',
+          retryable: false,
+          status 
+        };
+      }
       // Check if it's specifically a missing scope error
       if (body?.includes('scope') || body?.includes('Missing scope')) {
         return { ...ERROR_MESSAGES['missing_scope'], status };
@@ -196,6 +212,9 @@ export class TwitchPredictionService {
 
     // Permission errors
     if (status === 403) {
+      if (body?.includes('channel points not enabled')) {
+        return { ...ERROR_MESSAGES['channel_points_disabled'], status };
+      }
       if (body?.includes('scope')) {
         return { ...ERROR_MESSAGES['missing_scope'], status };
       }

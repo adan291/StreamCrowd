@@ -24,6 +24,7 @@ import {
   Download,
   Upload,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 import { useMacros } from '../../hooks/useMacros';
 import { useMacroExecution } from '../../hooks/useMacroExecution';
@@ -32,6 +33,7 @@ import { MacroCard } from './MacroCard';
 import { MacroEditor } from './MacroEditor';
 import { MacroImportExport } from './MacroImportExport';
 import { MacroPresets } from './MacroPresets';
+import { QuickCommands } from './QuickCommands';
 import type { Macro, TriggerType, MacroFormData } from '../../types/macros';
 import type { MacroPreset } from '../../config/macroPresets';
 
@@ -48,14 +50,16 @@ export interface MacroManagerProps {
   platform?: 'twitch' | 'youtube' | 'kick';
   /** Whether there's an active prediction */
   hasPredictionActive?: boolean;
-  /** Channel ID for API calls */
+  /** Channel ID for API calls (broadcaster's ID) */
   channelId?: string;
   /** Auth token for API calls */
   authToken?: string;
+  /** User ID of the logged-in user (may differ from channelId when moderating) */
+  loggedInUserId?: string;
 }
 
 type FilterType = 'all' | 'enabled' | 'disabled' | TriggerType;
-type ViewMode = 'list' | 'presets';
+type ViewMode = 'list' | 'presets' | 'quick';
 
 interface DeleteConfirmation {
   macroId: string;
@@ -88,16 +92,20 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
   hasPredictionActive: hasPredictionActiveProp,
   channelId = '',
   authToken = '',
+  loggedInUserId = '',
 }) => {
   // Use predictions hook to check for active prediction
   // Only enable if NOT moderator view (API doesn't work for mods)
-  const { currentPrediction, cancelPrediction } = usePredictions(channelId, authToken, {
+  // Pass loggedInUserId as moderatorId for API calls
+  const { currentPrediction, cancelPrediction, lockPrediction, refreshPrediction } = usePredictions(channelId, authToken, {
     enablePolling: !!channelId && !!authToken && !isModeratorView,
     pollingInterval: 10000, // Check every 10 seconds
+    moderatorId: loggedInUserId || channelId, // Use logged-in user as moderator
   });
   
   // Use prop if provided, otherwise use hook result (null for moderators)
   const hasPredictionActive = hasPredictionActiveProp ?? (isModeratorView ? false : currentPrediction !== null);
+  const predictionStatus = currentPrediction?.status as 'ACTIVE' | 'LOCKED' | null;
   
   const {
     macros,
@@ -245,11 +253,21 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
     try {
       const result = await execute(macroId);
       onExecute?.(macroId);
+      
+      // If this was a prediction macro, refresh prediction state after a short delay
+      const macro = macros.find(m => m.id === macroId);
+      if (macro?.actions.some(a => a.type === 'start_prediction')) {
+        // Wait a bit for the API to process, then refresh
+        setTimeout(() => {
+          refreshPrediction();
+        }, 1500);
+      }
+      
       return result?.success ?? false;
     } catch {
       return false;
     }
-  }, [execute, onExecute]);
+  }, [execute, onExecute, macros, refreshPrediction]);
 
   /**
    * Handle canceling active prediction
@@ -263,6 +281,19 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
       return false;
     }
   }, [currentPrediction, cancelPrediction]);
+
+  /**
+   * Handle locking active prediction
+   */
+  const handleLockPrediction = useCallback(async (): Promise<boolean> => {
+    if (!currentPrediction) return false;
+    try {
+      const success = await lockPrediction();
+      return success;
+    } catch {
+      return false;
+    }
+  }, [currentPrediction, lockPrediction]);
 
   /**
    * Handle closing the editor
@@ -357,6 +388,17 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
             <Zap size={16} />
             Mis Macros
           </button>
+          <button
+            onClick={() => setViewMode('quick')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'quick'
+                ? 'bg-amber-500 text-white'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+            }`}
+          >
+            <Terminal size={16} />
+            Comandos Rápidos
+          </button>
         </div>
 
         {/* Search and Filters - only show in list view */}
@@ -444,6 +486,10 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
             isModeratorView={isModeratorView}
             platform={platform}
           />
+        ) : viewMode === 'quick' ? (
+          <QuickCommands
+            isModeratorView={isModeratorView}
+          />
         ) : (
           /* Macro List */
           <div className="p-4">
@@ -504,8 +550,10 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
                     onExecute={() => handleExecute(macro.id)}
                     onClearError={() => clearMacroError(macro.id)}
                     onStopPrediction={handleCancelPrediction}
+                    onLockPrediction={handleLockPrediction}
                     isPaused={isPaused}
                     hasPredictionActive={hasPredictionActive}
+                    predictionStatus={predictionStatus}
                   />
                 ))}
               </div>

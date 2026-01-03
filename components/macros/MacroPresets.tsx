@@ -24,6 +24,11 @@ import {
   Sparkles,
   Skull,
   Flame,
+  Megaphone,
+  Smile,
+  Star,
+  UserCheck,
+  Film,
 } from 'lucide-react';
 import {
   MACRO_PRESETS,
@@ -63,6 +68,12 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Sparkles: <Sparkles size={18} />,
   Skull: <Skull size={18} />,
   Flame: <Flame size={18} />,
+  Megaphone: <Megaphone size={18} />,
+  Smile: <Smile size={18} />,
+  Star: <Star size={18} />,
+  UserCheck: <UserCheck size={18} />,
+  Film: <Film size={18} />,
+  Shield: <Shield size={18} />,
 };
 
 const getIcon = (iconName: string) => ICON_MAP[iconName] || <Zap size={18} />;

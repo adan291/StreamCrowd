@@ -12,7 +12,7 @@ export type LeftTab = 'dynamics' | 'games' | 'platforms' | 'obs' | 'gallery' | '
 /**
  * Sub-views within the Dynamics section
  */
-export type DynamicsView = 'selector' | 'poll' | 'judge' | 'giveaway' | 'countdown';
+export type DynamicsView = 'selector' | 'poll' | 'judge' | 'giveaway' | 'countdown' | 'spinner';
 
 // ============================================
 // PLATFORMS NAVIGATION TYPES

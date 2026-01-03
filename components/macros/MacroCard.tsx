@@ -30,6 +30,8 @@ import {
   Square,
   Loader2,
   Check,
+  Lock,
+  Trophy,
 } from 'lucide-react';
 import type { Macro, TriggerType, ActionType } from '../../types/macros';
 
@@ -54,10 +56,16 @@ export interface MacroCardProps {
   onClearError?: () => void;
   /** Callback when stop/cancel prediction is clicked */
   onStopPrediction?: () => Promise<boolean>;
+  /** Callback when lock prediction is clicked */
+  onLockPrediction?: () => Promise<boolean>;
+  /** Callback to open prediction panel for resolve */
+  onOpenPredictionPanel?: () => void;
   /** Whether all macros are globally paused */
   isPaused?: boolean;
   /** Whether there's an active prediction (for prediction macros) */
   hasPredictionActive?: boolean;
+  /** Current prediction status */
+  predictionStatus?: 'ACTIVE' | 'LOCKED' | null;
 }
 
 // ============================================
@@ -154,8 +162,11 @@ export const MacroCard: React.FC<MacroCardProps> = ({
   onExecute,
   onClearError,
   onStopPrediction,
+  onLockPrediction,
+  onOpenPredictionPanel,
   isPaused = false,
   hasPredictionActive = false,
+  predictionStatus = null,
 }) => {
   const [showMenu, setShowMenu] = React.useState(false);
   const [isExecuting, setIsExecuting] = React.useState(false);
@@ -196,6 +207,18 @@ export const MacroCard: React.FC<MacroCardProps> = ({
     
     try {
       await onStopPrediction();
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Handle lock prediction
+  const handleLockPrediction = async () => {
+    if (isExecuting || !onLockPrediction) return;
+    setIsExecuting(true);
+    
+    try {
+      await onLockPrediction();
     } finally {
       setIsExecuting(false);
     }
@@ -255,11 +278,15 @@ export const MacroCard: React.FC<MacroCardProps> = ({
               {/* Prediction active indicator */}
               {hasPredictionActive && macro.actions.some(a => a.type === 'start_prediction') && (
                 <span 
-                  className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-medium rounded"
-                  title="Ya hay una predicción activa"
+                  className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded ${
+                    predictionStatus === 'LOCKED' 
+                      ? 'bg-yellow-500/20 text-yellow-400' 
+                      : 'bg-cyan-500/20 text-cyan-400'
+                  }`}
+                  title={predictionStatus === 'LOCKED' ? 'Predicción bloqueada - elige ganador' : 'Predicción activa'}
                 >
-                  <TrendingUp size={10} />
-                  Activa
+                  {predictionStatus === 'LOCKED' ? <Lock size={10} /> : <TrendingUp size={10} />}
+                  {predictionStatus === 'LOCKED' ? 'Bloqueada' : 'Activa'}
                 </span>
               )}
               {hasError && (
@@ -277,21 +304,50 @@ export const MacroCard: React.FC<MacroCardProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Execute/Stop Button */}
+            {/* Prediction Controls when active */}
             {isPredictionMacro && hasPredictionActive ? (
-              // Stop button for active prediction
-              <button
-                onClick={handleStopPrediction}
-                disabled={isExecuting || !onStopPrediction}
-                className="p-2 text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Cancelar predicción activa"
-              >
-                {isExecuting ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Square size={16} />
+              <div className="flex items-center gap-1">
+                {/* Lock button - only show if prediction is ACTIVE */}
+                {predictionStatus === 'ACTIVE' && onLockPrediction && (
+                  <button
+                    onClick={handleLockPrediction}
+                    disabled={isExecuting}
+                    className="p-2 text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Bloquear predicción (cerrar votaciones)"
+                  >
+                    {isExecuting ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Lock size={16} />
+                    )}
+                  </button>
                 )}
-              </button>
+                
+                {/* Resolve button - open prediction panel */}
+                {predictionStatus === 'LOCKED' && onOpenPredictionPanel && (
+                  <button
+                    onClick={onOpenPredictionPanel}
+                    className="p-2 text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-lg transition-colors"
+                    title="Resolver predicción (elegir ganador)"
+                  >
+                    <Trophy size={16} />
+                  </button>
+                )}
+                
+                {/* Cancel button */}
+                <button
+                  onClick={handleStopPrediction}
+                  disabled={isExecuting || !onStopPrediction}
+                  className="p-2 text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Cancelar predicción"
+                >
+                  {isExecuting ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <X size={16} />
+                  )}
+                </button>
+              </div>
             ) : (
               // Execute button
               <button
