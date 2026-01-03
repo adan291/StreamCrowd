@@ -358,8 +358,15 @@ export function usePredictions(
    * @requirements 1.2 - Create prediction via Twitch API
    */
   const createPrediction = useCallback(async (data: PredictionFormData): Promise<boolean> => {
+    console.log('[usePredictions] createPrediction called', {
+      data,
+      hasService: !!serviceRef.current,
+      broadcasterId,
+    });
+    
     if (!serviceRef.current || !broadcasterId) {
       setError('No hay conexión con Twitch');
+      console.log('[usePredictions] Error: No service or broadcasterId');
       return false;
     }
 
@@ -374,9 +381,12 @@ export function usePredictions(
         prediction_window: data.duration,
       };
 
+      console.log('[usePredictions] Calling service.createPrediction with:', createData);
       const result = await serviceRef.current.createPrediction(createData);
+      console.log('[usePredictions] Result:', result);
 
       if (isTwitchPredictionError(result)) {
+        console.log('[usePredictions] Error result:', result);
         setError(result.message);
         return false;
       }
@@ -387,9 +397,11 @@ export function usePredictions(
       // Emit OBS event for prediction start
       emitOBSTrigger('prediction_start', result);
       
+      console.log('[usePredictions] Prediction created successfully:', result.id);
       return true;
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Error al crear predicción';
+      console.error('[usePredictions] Exception:', e);
       setError(message);
       return false;
     } finally {

@@ -410,11 +410,17 @@ export class ActionExecutorService implements IActionExecutor {
     config: StartPredictionConfig,
     context: ExecutionContext
   ): Promise<void> {
+    console.log('[Macro] executeStartPrediction called', { 
+      config, 
+      hasPredictionService: !!this.predictionService 
+    });
+    
     if (!this.predictionService) {
       throw new Error('Servicio de predicciones no disponible');
     }
 
     const broadcasterId = this.predictionService.getBroadcasterId();
+    console.log('[Macro] Broadcaster ID:', broadcasterId);
     
     if (!broadcasterId) {
       throw new Error('ID de canal no disponible');
@@ -426,6 +432,13 @@ export class ActionExecutorService implements IActionExecutor {
       title: this.variableResolver.resolve(outcome, context),
     }));
 
+    console.log('[Macro] Creating prediction with:', {
+      broadcaster_id: broadcasterId,
+      title: resolvedTitle,
+      outcomes: resolvedOutcomes,
+      prediction_window: config.duration,
+    });
+
     const result = await this.predictionService.createPrediction({
       broadcaster_id: broadcasterId,
       title: resolvedTitle,
@@ -433,11 +446,16 @@ export class ActionExecutorService implements IActionExecutor {
       prediction_window: config.duration,
     });
     
+    console.log('[Macro] Prediction result:', result);
+    
     // Check if result is an error
     if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
       const error = result as { code: string; message: string; solution?: string };
+      console.log('[Macro] Prediction error:', error);
       throw new Error(error.message + (error.solution ? ` - ${error.solution}` : ''));
     }
+    
+    console.log('[Macro] Prediction created successfully');
   }
 
   /**

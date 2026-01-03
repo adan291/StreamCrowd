@@ -310,8 +310,18 @@ export class TwitchPredictionService {
    * @requirements 1.2 - Create prediction via Twitch API
    */
   async createPrediction(data: CreatePredictionData): Promise<TwitchPrediction | TwitchPredictionError> {
+    console.log('[TwitchPredictionService] createPrediction called', {
+      broadcaster_id: data.broadcaster_id,
+      title: data.title,
+      outcomes: data.outcomes,
+      prediction_window: data.prediction_window,
+    });
+    
     return this.withRetry(async () => {
       try {
+        console.log('[TwitchPredictionService] Making API request to:', `${TWITCH_API_BASE}/predictions`);
+        console.log('[TwitchPredictionService] Request body:', JSON.stringify(data, null, 2));
+        
         const response = await fetch(
           `${TWITCH_API_BASE}/predictions`,
           {
@@ -321,15 +331,21 @@ export class TwitchPredictionService {
           }
         );
 
+        console.log('[TwitchPredictionService] Response status:', response.status);
+
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
-          return this.parseError(response.status, errorBody);
+          console.log('[TwitchPredictionService] Error response body:', errorBody);
+          const parsedError = this.parseError(response.status, errorBody);
+          console.log('[TwitchPredictionService] Parsed error:', parsedError);
+          return parsedError;
         }
 
         const result: TwitchApiResponse<TwitchPrediction> = await response.json();
+        console.log('[TwitchPredictionService] Success! Prediction created:', result.data[0]?.id);
         return result.data[0];
       } catch (err) {
-        console.error('Error creating prediction:', err);
+        console.error('[TwitchPredictionService] Exception creating prediction:', err);
         return this.parseError(0, String(err));
       }
     });
