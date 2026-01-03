@@ -93,8 +93,8 @@ const ERROR_MESSAGES: Record<string, Omit<TwitchPredictionError, 'status'>> = {
   },
   invalid_status_transition: {
     code: 'invalid_status_transition',
-    message: 'Transición de estado inválida',
-    solution: 'No se puede cambiar el estado de la predicción de esta manera.',
+    message: 'Ya hay una predicción activa',
+    solution: 'Resuelve o cancela la predicción actual antes de crear una nueva.',
     retryable: false,
   },
   server_error: {
@@ -210,11 +210,38 @@ export class TwitchPredictionService {
 
     // Bad request - check for specific errors
     if (status === 400) {
-      if (body?.includes('active prediction')) {
+      // Check for active prediction
+      if (body?.toLowerCase().includes('active prediction') || body?.toLowerCase().includes('already')) {
         return { ...ERROR_MESSAGES['prediction_active'], status };
       }
+      // Check for status transition errors
       if (body?.includes('status') || body?.includes('transition')) {
         return { ...ERROR_MESSAGES['invalid_status_transition'], status };
+      }
+      // Check for CREATE_PREDICTION_ERROR which usually means there's already an active prediction
+      if (body?.includes('CREATE_PREDICTION_ERROR') || body?.includes('PREDICTION')) {
+        return {
+          code: 'prediction_active',
+          status,
+          message: 'Ya hay una predicción activa',
+          solution: 'Debes resolver o cancelar la predicción actual antes de crear una nueva. Ve al panel de Predicciones.',
+          retryable: false,
+        };
+      }
+      // Generic 400 error - try to extract message from body
+      try {
+        const parsed = JSON.parse(body || '{}');
+        if (parsed.message) {
+          return {
+            code: 'bad_request',
+            status,
+            message: parsed.message,
+            solution: 'Verifica los datos de la predicción e intenta de nuevo.',
+            retryable: false,
+          };
+        }
+      } catch {
+        // Ignore parse errors
       }
     }
 

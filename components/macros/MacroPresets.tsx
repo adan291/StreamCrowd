@@ -8,22 +8,20 @@
 import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
-  BarChart2,
-  Shield,
   Heart,
-  Megaphone,
   Monitor,
   Plus,
   Zap,
   Clock,
-  Star,
-  Smile,
-  Trash2,
   Share2,
   Users,
   Droplet,
-  Gamepad2,
   Check,
+  Search,
+  X,
+  Shield,
+  Trophy,
+  Sparkles,
 } from 'lucide-react';
 import {
   MACRO_PRESETS,
@@ -53,19 +51,14 @@ type Platform = 'twitch' | 'youtube' | 'kick';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   TrendingUp: <TrendingUp size={18} />,
-  BarChart2: <BarChart2 size={18} />,
-  Shield: <Shield size={18} />,
   Heart: <Heart size={18} />,
-  Megaphone: <Megaphone size={18} />,
   Monitor: <Monitor size={18} />,
   Clock: <Clock size={18} />,
-  Star: <Star size={18} />,
-  Smile: <Smile size={18} />,
-  Trash2: <Trash2 size={18} />,
   Share2: <Share2 size={18} />,
   Users: <Users size={18} />,
   Droplet: <Droplet size={18} />,
-  Gamepad2: <Gamepad2 size={18} />,
+  Trophy: <Trophy size={18} />,
+  Sparkles: <Sparkles size={18} />,
 };
 
 const getIcon = (iconName: string) => ICON_MAP[iconName] || <Zap size={18} />;
@@ -81,8 +74,9 @@ export const MacroPresets: React.FC<MacroPresetsProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<PresetCategory | null>(null);
   const [addedPresets, setAddedPresets] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter presets based on platform and moderator view
+  // Filter presets based on platform, user role, category, and search
   const filteredPresets = useMemo(() => {
     let presets = MACRO_PRESETS.filter(p => p.platforms.includes(platform as Platform));
     
@@ -94,10 +88,20 @@ export const MacroPresets: React.FC<MacroPresetsProps> = ({
       presets = presets.filter(p => p.category === selectedCategory);
     }
     
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      presets = presets.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        p.description.toLowerCase().includes(query) ||
+        p.macro.name.toLowerCase().includes(query)
+      );
+    }
+    
     return presets;
-  }, [platform, isModeratorView, selectedCategory]);
+  }, [platform, isModeratorView, selectedCategory, searchQuery]);
 
-  // Get categories that have presets
+  // Get categories that have presets for the current user role
   const availableCategories = useMemo(() => {
     const categoryIds = new Set(
       MACRO_PRESETS
@@ -124,15 +128,37 @@ export const MacroPresets: React.FC<MacroPresetsProps> = ({
 
   return (
     <>
-      {/* Moderator View Banner */}
+      {/* Role View Banner */}
       {isModeratorView && (
         <div className="mx-4 mt-4 flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
           <Shield size={14} className="text-green-500" />
           <span className="text-xs text-green-400">
-            Mostrando presets compatibles con moderadores
+            Vista de moderador: solo presets basados en comandos de chat
           </span>
         </div>
       )}
+
+      {/* Search Bar */}
+      <div className="px-4 pt-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar presets..."
+            className="w-full pl-9 pr-8 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-white transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Category Tabs */}
       <div className="px-4 py-3 overflow-x-auto">

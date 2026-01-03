@@ -411,12 +411,13 @@ export class ActionExecutorService implements IActionExecutor {
     context: ExecutionContext
   ): Promise<void> {
     if (!this.predictionService) {
-      throw new Error('Prediction service not available');
+      throw new Error('Servicio de predicciones no disponible');
     }
 
     const broadcasterId = this.predictionService.getBroadcasterId();
+    
     if (!broadcasterId) {
-      throw new Error('Broadcaster ID not available');
+      throw new Error('ID de canal no disponible');
     }
 
     // Resolve variables in title and outcomes
@@ -425,12 +426,18 @@ export class ActionExecutorService implements IActionExecutor {
       title: this.variableResolver.resolve(outcome, context),
     }));
 
-    await this.predictionService.createPrediction({
+    const result = await this.predictionService.createPrediction({
       broadcaster_id: broadcasterId,
       title: resolvedTitle,
       outcomes: resolvedOutcomes,
       prediction_window: config.duration,
     });
+    
+    // Check if result is an error
+    if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
+      const error = result as { code: string; message: string; solution?: string };
+      throw new Error(error.message + (error.solution ? ` - ${error.solution}` : ''));
+    }
   }
 
   /**

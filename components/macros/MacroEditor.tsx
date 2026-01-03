@@ -262,44 +262,24 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
             />
           </div>
 
-          {/* Enabled & Cooldown */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Enabled Toggle */}
-            <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
-              <span className="text-sm text-zinc-300">Habilitada</span>
-              <button
-                type="button"
-                onClick={() => setEnabled(!formData.enabled)}
-                className={`relative w-11 h-6 rounded-full transition-colors ${
-                  formData.enabled ? 'bg-purple-500' : 'bg-zinc-600'
-                }`}
-                role="switch"
-                aria-checked={formData.enabled}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    formData.enabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Cooldown */}
-            <div className="p-3 bg-zinc-800/50 rounded-lg">
-              <label htmlFor="macro-cooldown" className="flex items-center gap-1 text-sm text-zinc-300 mb-1">
-                <Clock size={12} />
-                Cooldown (seg)
-              </label>
-              <input
-                type="number"
-                id="macro-cooldown"
-                value={formData.cooldown}
-                onChange={(e) => setCooldown(Number(e.target.value))}
-                min={0}
-                max={3600}
-                className="w-full px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
+          {/* Cooldown */}
+          <div className="p-3 bg-zinc-800/50 rounded-lg">
+            <label htmlFor="macro-cooldown" className="flex items-center gap-1 text-sm text-zinc-300 mb-1">
+              <Clock size={12} />
+              Cooldown (segundos)
+            </label>
+            <input
+              type="number"
+              id="macro-cooldown"
+              value={formData.cooldown}
+              onChange={(e) => setCooldown(Number(e.target.value))}
+              min={0}
+              max={3600}
+              className="w-full px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="text-xs text-zinc-500 mt-1">
+              Tiempo mínimo entre ejecuciones
+            </p>
           </div>
         </section>
 
@@ -365,10 +345,7 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
               {formData.actions.map((action, index) => (
                 <div
                   key={action.id}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
                   className={`bg-zinc-800 rounded-lg border transition-all ${
                     draggedIndex === index
                       ? 'border-purple-500 opacity-50'
@@ -378,7 +355,10 @@ export const MacroEditor: React.FC<MacroEditorProps> = ({
                   {/* Action Header */}
                   <div className="flex items-center gap-2 p-3">
                     <div
-                      className="cursor-grab text-zinc-500 hover:text-zinc-300"
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
+                      className="cursor-grab text-zinc-500 hover:text-zinc-300 p-1 -m-1"
                       aria-label="Arrastrar para reordenar"
                     >
                       <GripVertical size={16} />

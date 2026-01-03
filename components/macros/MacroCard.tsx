@@ -25,6 +25,11 @@ import {
   Hash,
   MoreVertical,
   ChevronRight,
+  X,
+  TrendingUp,
+  Square,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import type { Macro, TriggerType, ActionType } from '../../types/macros';
 
@@ -44,9 +49,15 @@ export interface MacroCardProps {
   /** Callback when delete is clicked */
   onDelete: () => void;
   /** Callback when execute is clicked */
-  onExecute: () => void;
+  onExecute: () => Promise<boolean>;
+  /** Callback when clear error is clicked */
+  onClearError?: () => void;
+  /** Callback when stop/cancel prediction is clicked */
+  onStopPrediction?: () => Promise<boolean>;
   /** Whether all macros are globally paused */
   isPaused?: boolean;
+  /** Whether there's an active prediction (for prediction macros) */
+  hasPredictionActive?: boolean;
 }
 
 // ============================================
@@ -141,10 +152,54 @@ export const MacroCard: React.FC<MacroCardProps> = ({
   onDuplicate,
   onDelete,
   onExecute,
+  onClearError,
+  onStopPrediction,
   isPaused = false,
+  hasPredictionActive = false,
 }) => {
   const [showMenu, setShowMenu] = React.useState(false);
+  const [isExecuting, setIsExecuting] = React.useState(false);
+  const [lastExecutionSuccess, setLastExecutionSuccess] = React.useState<boolean | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // Check if this is a prediction macro
+  const isPredictionMacro = macro.actions.some(a => a.type === 'start_prediction');
+  
+  // Reset success indicator after 2 seconds
+  React.useEffect(() => {
+    if (lastExecutionSuccess !== null) {
+      const timer = setTimeout(() => setLastExecutionSuccess(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastExecutionSuccess]);
+
+  // Handle execute with feedback
+  const handleExecute = async () => {
+    if (isExecuting) return;
+    setIsExecuting(true);
+    setLastExecutionSuccess(null);
+    
+    try {
+      const success = await onExecute();
+      setLastExecutionSuccess(success);
+    } catch {
+      setLastExecutionSuccess(false);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Handle stop prediction
+  const handleStopPrediction = async () => {
+    if (isExecuting || !onStopPrediction) return;
+    setIsExecuting(true);
+    
+    try {
+      await onStopPrediction();
+    } finally {
+      setIsExecuting(false);
+    }
+  };
 
   // Close menu when clicking outside
   React.useEffect(() => {
@@ -197,6 +252,16 @@ export const MacroCard: React.FC<MacroCardProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-white font-medium truncate">{macro.name}</h3>
+              {/* Prediction active indicator */}
+              {hasPredictionActive && macro.actions.some(a => a.type === 'start_prediction') && (
+                <span 
+                  className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-medium rounded"
+                  title="Ya hay una predicción activa"
+                >
+                  <TrendingUp size={10} />
+                  Activa
+                </span>
+              )}
               {hasError && (
                 <span className="shrink-0" title="Error en última ejecución">
                   <AlertCircle size={14} className="text-red-400" />
@@ -212,15 +277,46 @@ export const MacroCard: React.FC<MacroCardProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Execute Button (only for manual triggers or testing) */}
-            <button
-              onClick={onExecute}
-              disabled={isDisabled}
-              className="p-2 text-zinc-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Ejecutar macro"
-            >
-              <Play size={16} />
-            </button>
+            {/* Execute/Stop Button */}
+            {isPredictionMacro && hasPredictionActive ? (
+              // Stop button for active prediction
+              <button
+                onClick={handleStopPrediction}
+                disabled={isExecuting || !onStopPrediction}
+                className="p-2 text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Cancelar predicción activa"
+              >
+                {isExecuting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Square size={16} />
+                )}
+              </button>
+            ) : (
+              // Execute button
+              <button
+                onClick={handleExecute}
+                disabled={isDisabled || isExecuting}
+                className={`p-2 rounded-lg transition-all ${
+                  isExecuting
+                    ? 'text-yellow-400 bg-yellow-500/10'
+                    : lastExecutionSuccess === true
+                    ? 'text-green-400 bg-green-500/20'
+                    : lastExecutionSuccess === false
+                    ? 'text-red-400 bg-red-500/20'
+                    : 'text-zinc-400 hover:text-green-400 hover:bg-green-500/10'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title={isExecuting ? 'Ejecutando...' : 'Ejecutar macro'}
+              >
+                {isExecuting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : lastExecutionSuccess === true ? (
+                  <Check size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
+              </button>
+            )}
 
             {/* Edit Button */}
             <button
@@ -330,9 +426,21 @@ export const MacroCard: React.FC<MacroCardProps> = ({
           <div className="mt-3 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
             <div className="flex items-start gap-2">
               <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400 line-clamp-2">
+              <p className="text-xs text-red-400 flex-1">
                 {macro.lastError}
               </p>
+              {onClearError && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClearError();
+                  }}
+                  className="text-red-400 hover:text-red-300 transition-colors"
+                  title="Descartar error"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
           </div>
         )}

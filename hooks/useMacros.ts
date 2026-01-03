@@ -110,6 +110,11 @@ export interface UseMacrosReturn {
    * Clears the error state
    */
   clearError: () => void;
+  
+  /**
+   * Clears the last error of a specific macro
+   */
+  clearMacroError: (id: string) => Promise<void>;
 }
 
 // ============ HOOK ============
@@ -417,6 +422,23 @@ export function useMacros(options: UseMacrosOptions = {}): UseMacrosReturn {
     setError(null);
   }, []);
 
+  /**
+   * Clears the last error of a specific macro
+   */
+  const clearMacroError = useCallback(async (id: string): Promise<void> => {
+    try {
+      // Update macro to clear the error
+      await serviceRef.current.updateMacro(id, {});
+      
+      // Update local state
+      if (isMountedRef.current) {
+        setMacros(prev => prev.map(m => m.id === id ? { ...m, lastError: undefined } : m));
+      }
+    } catch (err) {
+      console.error('Failed to clear macro error:', err);
+    }
+  }, []);
+
   return {
     macros,
     isLoading,
@@ -431,6 +453,7 @@ export function useMacros(options: UseMacrosOptions = {}): UseMacrosReturn {
     importMacros,
     refresh,
     clearError,
+    clearMacroError,
   };
 }
 

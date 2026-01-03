@@ -227,6 +227,8 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
             <MacroManager 
               isModeratorView={isViewingModeratedChannel}
               platform="twitch"
+              channelId={channelId}
+              authToken={authToken}
             />
           </div>
         </div>

@@ -15,6 +15,8 @@ import {
   type TwitchPredictionError,
 } from '../services/TwitchPredictionService';
 import { getOBSService } from '../services/OBSService';
+import { getMacroService } from '../services/MacroService';
+import type { IPredictionServiceAdapter } from '../services/ActionExecutorService';
 import type {
   TwitchPrediction,
   PredictionFormData,
@@ -196,11 +198,22 @@ export function usePredictions(
         serviceRef.current = createTwitchPredictionService(authToken);
       }
       currentTokenRef.current = authToken;
+      
+      // Connect prediction service to MacroService for macro execution
+      if (serviceRef.current && broadcasterId) {
+        const predictionAdapter: IPredictionServiceAdapter = {
+          createPrediction: async (data) => {
+            return serviceRef.current!.createPrediction(data);
+          },
+          getBroadcasterId: () => broadcasterId,
+        };
+        getMacroService().configureServices({ predictionService: predictionAdapter });
+      }
     } else {
       serviceRef.current = null;
       currentTokenRef.current = '';
     }
-  }, [authToken]);
+  }, [authToken, broadcasterId]);
 
   /**
    * Emit OBS trigger event for prediction state changes

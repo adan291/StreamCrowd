@@ -2,12 +2,18 @@
  * Macro Presets Configuration
  * 
  * Pre-configured macros that users can quickly add.
- * Especially useful for moderators who can't access API features directly.
  * 
- * Presets use chat commands (/prediction, /poll, etc.) to work for moderators.
+ * IMPORTANT: Twitch chat commands (starting with /) do NOT work when sent via
+ * TMI.js/IRC. They only work when typed directly in Twitch's web interface.
+ * Therefore, presets only include:
+ * - Regular chat messages (no / commands)
+ * - API-based actions (predictions via Twitch API)
+ * 
+ * Features like /announce, /slow, /pin, /poll require Twitch HTTP API implementation
+ * which is not yet available as macro actions.
  */
 
-import type { MacroFormData, TriggerType, ActionType } from '../types/macros';
+import type { MacroFormData } from '../types/macros';
 
 // ============================================
 // Types
@@ -30,10 +36,7 @@ export interface MacroPreset {
 
 export type PresetCategory = 
   | 'predictions'
-  | 'polls'
-  | 'moderation'
   | 'engagement'
-  | 'announcements'
   | 'obs';
 
 export interface PresetCategoryInfo {
@@ -52,31 +55,13 @@ export const PRESET_CATEGORIES: PresetCategoryInfo[] = [
     id: 'predictions',
     name: 'Predicciones',
     icon: 'TrendingUp',
-    description: 'Crear y gestionar predicciones rápidamente',
-  },
-  {
-    id: 'polls',
-    name: 'Encuestas',
-    icon: 'BarChart2',
-    description: 'Encuestas rápidas para el chat',
-  },
-  {
-    id: 'moderation',
-    name: 'Moderación',
-    icon: 'Shield',
-    description: 'Acciones de moderación del chat',
+    description: 'Crear predicciones via API de Twitch',
   },
   {
     id: 'engagement',
     name: 'Engagement',
     icon: 'Heart',
-    description: 'Interacción con la audiencia',
-  },
-  {
-    id: 'announcements',
-    name: 'Anuncios',
-    icon: 'Megaphone',
-    description: 'Mensajes y anuncios automáticos',
+    description: 'Mensajes de interacción con la audiencia',
   },
   {
     id: 'obs',
@@ -91,19 +76,20 @@ export const PRESET_CATEGORIES: PresetCategoryInfo[] = [
 // ============================================
 
 export const MACRO_PRESETS: MacroPreset[] = [
-  // ========== PREDICTIONS ==========
+  // ========== PREDICTIONS (API) ==========
+  // Predicciones usan la API de Twitch directamente (requiere auth de streamer)
   {
-    id: 'prediction-win-lose',
+    id: 'prediction-api-win-lose',
     name: 'Predicción: ¿Ganará?',
-    description: 'Predicción rápida de victoria/derrota',
+    description: 'Crea predicción de victoria/derrota (requiere auth de streamer)',
     icon: 'TrendingUp',
     color: '#00f0f0',
     category: 'predictions',
     platforms: ['twitch'],
-    worksForModerators: true,
+    worksForModerators: false,
     macro: {
       name: 'Predicción: ¿Ganará?',
-      description: 'Crea una predicción de victoria/derrota',
+      description: 'Crea una predicción de victoria/derrota via API',
       enabled: true,
       trigger: {
         type: 'manual',
@@ -114,10 +100,11 @@ export const MACRO_PRESETS: MacroPreset[] = [
       actions: [
         {
           id: 'action-1',
-          type: 'send_chat_message',
+          type: 'start_prediction',
           config: {
-            message: '/prediction ¿Ganará esta partida? | Sí | No',
-            platform: 'twitch',
+            title: '¿Ganará esta partida?',
+            outcomes: ['Sí', 'No'],
+            duration: 120,
           },
           delay: 0,
         },
@@ -126,17 +113,17 @@ export const MACRO_PRESETS: MacroPreset[] = [
     },
   },
   {
-    id: 'prediction-custom',
-    name: 'Predicción personalizada',
-    description: 'Plantilla para predicción con opciones personalizables',
+    id: 'prediction-api-custom',
+    name: 'Predicción: Personalizada',
+    description: 'Plantilla de predicción editable (requiere auth de streamer)',
     icon: 'TrendingUp',
     color: '#00f0f0',
     category: 'predictions',
     platforms: ['twitch'],
-    worksForModerators: true,
+    worksForModerators: false,
     macro: {
       name: 'Predicción personalizada',
-      description: 'Edita el mensaje para personalizar la predicción',
+      description: 'Edita para personalizar la predicción',
       enabled: true,
       trigger: {
         type: 'manual',
@@ -147,43 +134,11 @@ export const MACRO_PRESETS: MacroPreset[] = [
       actions: [
         {
           id: 'action-1',
-          type: 'send_chat_message',
+          type: 'start_prediction',
           config: {
-            message: '/prediction Tu pregunta aquí | Opción 1 | Opción 2',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 30,
-    },
-  },
-  {
-    id: 'prediction-level',
-    name: 'Predicción: ¿Qué nivel?',
-    description: 'Predicción de nivel alcanzado',
-    icon: 'TrendingUp',
-    color: '#00f0f0',
-    category: 'predictions',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Predicción: ¿Qué nivel?',
-      description: 'Predicción de nivel alcanzado',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/prediction ¿Qué nivel alcanzará? | Nivel 1-5 | Nivel 6-10 | Nivel 11+',
-            platform: 'twitch',
+            title: 'Tu pregunta aquí',
+            outcomes: ['Opción 1', 'Opción 2'],
+            duration: 120,
           },
           delay: 0,
         },
@@ -192,409 +147,8 @@ export const MACRO_PRESETS: MacroPreset[] = [
     },
   },
 
-  // ========== POLLS ==========
-  {
-    id: 'poll-yes-no',
-    name: 'Encuesta: Sí/No',
-    description: 'Encuesta rápida de sí o no',
-    icon: 'BarChart2',
-    color: '#a970ff',
-    category: 'polls',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Encuesta: Sí/No',
-      description: 'Encuesta rápida de sí o no',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/poll ¿Qué opinas? | Sí | No',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 30,
-    },
-  },
-  {
-    id: 'poll-game-choice',
-    name: 'Encuesta: Elegir juego',
-    description: 'Deja que el chat elija el próximo juego',
-    icon: 'Gamepad2',
-    color: '#a970ff',
-    category: 'polls',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Encuesta: Elegir juego',
-      description: 'El chat elige el próximo juego',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/poll ¿Qué juego jugamos? | Juego 1 | Juego 2 | Juego 3',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 30,
-    },
-  },
-
-  // ========== MODERATION ==========
-  {
-    id: 'mod-slow-mode',
-    name: 'Modo lento',
-    description: 'Activa el modo lento en el chat',
-    icon: 'Clock',
-    color: '#10b981',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Modo lento',
-      description: 'Activa modo lento de 30 segundos',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/slow 30',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 5,
-    },
-  },
-  {
-    id: 'mod-slow-off',
-    name: 'Desactivar modo lento',
-    description: 'Desactiva el modo lento',
-    icon: 'Clock',
-    color: '#10b981',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Desactivar modo lento',
-      description: 'Desactiva el modo lento del chat',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/slowoff',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 5,
-    },
-  },
-  {
-    id: 'mod-subscribers-only',
-    name: 'Solo suscriptores',
-    description: 'Activa el modo solo suscriptores',
-    icon: 'Star',
-    color: '#fbbf24',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Solo suscriptores',
-      description: 'Activa modo solo suscriptores',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/subscribers',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 5,
-    },
-  },
-  {
-    id: 'mod-subscribers-off',
-    name: 'Desactivar solo subs',
-    description: 'Desactiva el modo solo suscriptores',
-    icon: 'Star',
-    color: '#fbbf24',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Desactivar solo subs',
-      description: 'Desactiva modo solo suscriptores',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/subscribersoff',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 5,
-    },
-  },
-  {
-    id: 'mod-emote-only',
-    name: 'Solo emotes',
-    description: 'Activa el modo solo emotes',
-    icon: 'Smile',
-    color: '#f472b6',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Solo emotes',
-      description: 'Activa modo solo emotes',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/emoteonly',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 5,
-    },
-  },
-  {
-    id: 'mod-clear-chat',
-    name: 'Limpiar chat',
-    description: 'Limpia todos los mensajes del chat',
-    icon: 'Trash2',
-    color: '#ef4444',
-    category: 'moderation',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Limpiar chat',
-      description: 'Limpia todos los mensajes del chat',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/clear',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 10,
-    },
-  },
-
-  // ========== ANNOUNCEMENTS ==========
-  {
-    id: 'announce-general',
-    name: 'Anuncio general',
-    description: 'Envía un anuncio destacado al chat',
-    icon: 'Megaphone',
-    color: '#8b5cf6',
-    category: 'announcements',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Anuncio general',
-      description: 'Envía un anuncio al chat',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/announce ¡Mensaje importante para el chat!',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 30,
-    },
-  },
-  {
-    id: 'announce-social',
-    name: 'Anuncio: Redes sociales',
-    description: 'Recuerda seguir en redes sociales',
-    icon: 'Share2',
-    color: '#06b6d4',
-    category: 'announcements',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Anuncio: Redes sociales',
-      description: 'Recuerda las redes sociales',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/announce 📱 ¡Sígueme en redes! Twitter: @tu_usuario | Instagram: @tu_usuario | Discord: discord.gg/tu_server',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 300,
-    },
-  },
-  {
-    id: 'announce-follow',
-    name: 'Anuncio: Seguir canal',
-    description: 'Recuerda seguir el canal',
-    icon: 'Heart',
-    color: '#ef4444',
-    category: 'announcements',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Anuncio: Seguir canal',
-      description: 'Recuerda seguir el canal',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/announce 💜 ¡Si te está gustando el stream, no olvides darle al FOLLOW! Es gratis y me ayuda mucho 💜',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 600,
-    },
-  },
-
-  // ========== ENGAGEMENT ==========
-  {
-    id: 'engagement-shoutout',
-    name: 'Shoutout',
-    description: 'Da un shoutout a otro streamer',
-    icon: 'Megaphone',
-    color: '#f97316',
-    category: 'engagement',
-    platforms: ['twitch'],
-    worksForModerators: true,
-    macro: {
-      name: 'Shoutout',
-      description: 'Da un shoutout (edita el nombre)',
-      enabled: true,
-      trigger: {
-        type: 'manual',
-        config: {
-          showInQuickActions: true,
-        },
-      },
-      actions: [
-        {
-          id: 'action-1',
-          type: 'send_chat_message',
-          config: {
-            message: '/shoutout nombre_del_streamer',
-            platform: 'twitch',
-          },
-          delay: 0,
-        },
-      ],
-      cooldown: 60,
-    },
-  },
+  // ========== ENGAGEMENT (Mensajes normales) ==========
+  // Estos presets envían mensajes normales al chat (funcionan correctamente)
   {
     id: 'engagement-raid-thanks',
     name: 'Agradecer raid',
@@ -659,6 +213,171 @@ export const MACRO_PRESETS: MacroPreset[] = [
         },
       ],
       cooldown: 1800,
+    },
+  },
+  {
+    id: 'engagement-social',
+    name: 'Redes sociales',
+    description: 'Recuerda seguir en redes sociales',
+    icon: 'Share2',
+    color: '#06b6d4',
+    category: 'engagement',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Redes sociales',
+      description: 'Recuerda las redes sociales',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'send_chat_message',
+          config: {
+            message: '📱 ¡Sígueme en redes! Twitter: @tu_usuario | Instagram: @tu_usuario | Discord: discord.gg/tu_server',
+            platform: 'twitch',
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 300,
+    },
+  },
+  {
+    id: 'engagement-follow',
+    name: 'Seguir canal',
+    description: 'Recuerda seguir el canal',
+    icon: 'Heart',
+    color: '#ef4444',
+    category: 'engagement',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Seguir canal',
+      description: 'Recuerda seguir el canal',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'send_chat_message',
+          config: {
+            message: '💜 ¡Si te está gustando el stream, no olvides darle al FOLLOW! Es gratis y me ayuda mucho 💜',
+            platform: 'twitch',
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 600,
+    },
+  },
+  {
+    id: 'engagement-welcome',
+    name: 'Bienvenida',
+    description: 'Mensaje de bienvenida al stream',
+    icon: 'Sparkles',
+    color: '#fbbf24',
+    category: 'engagement',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'Bienvenida',
+      description: 'Da la bienvenida a nuevos viewers',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'send_chat_message',
+          config: {
+            message: '👋 ¡Bienvenidos al stream! Siéntanse como en casa y disfruten del contenido 🎮',
+            platform: 'twitch',
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 300,
+    },
+  },
+  {
+    id: 'engagement-gg',
+    name: 'GG / Bien jugado',
+    description: 'Celebra una victoria o buen momento',
+    icon: 'Trophy',
+    color: '#10b981',
+    category: 'engagement',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'GG',
+      description: 'Celebra una victoria',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'send_chat_message',
+          config: {
+            message: '🏆 ¡GG! ¡Bien jugado! 🎉',
+            platform: 'twitch',
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 30,
+    },
+  },
+  {
+    id: 'engagement-brb',
+    name: 'BRB / Vuelvo enseguida',
+    description: 'Avisa que vuelves pronto',
+    icon: 'Clock',
+    color: '#8b5cf6',
+    category: 'engagement',
+    platforms: ['twitch'],
+    worksForModerators: true,
+    macro: {
+      name: 'BRB',
+      description: 'Avisa que vuelves pronto',
+      enabled: true,
+      trigger: {
+        type: 'manual',
+        config: {
+          showInQuickActions: true,
+        },
+      },
+      actions: [
+        {
+          id: 'action-1',
+          type: 'send_chat_message',
+          config: {
+            message: '⏰ ¡BRB! Vuelvo en un momento, no se vayan 👀',
+            platform: 'twitch',
+          },
+          delay: 0,
+        },
+      ],
+      cooldown: 60,
     },
   },
 ];

@@ -11,11 +11,11 @@
  * @requirements 7.6 - THE Macro_Manager SHALL allow searching and filtering macros
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Search,
   Plus,
-  Filter,
+  X,
   Zap,
   AlertCircle,
   RefreshCw,
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useMacros } from '../../hooks/useMacros';
 import { useMacroExecution } from '../../hooks/useMacroExecution';
+import { usePredictions } from '../../src/application/hooks/usePredictions';
 import { MacroCard } from './MacroCard';
 import { MacroEditor } from './MacroEditor';
 import { MacroImportExport } from './MacroImportExport';
@@ -45,6 +46,12 @@ export interface MacroManagerProps {
   isModeratorView?: boolean;
   /** Current platform */
   platform?: 'twitch' | 'youtube' | 'kick';
+  /** Whether there's an active prediction */
+  hasPredictionActive?: boolean;
+  /** Channel ID for API calls */
+  channelId?: string;
+  /** Auth token for API calls */
+  authToken?: string;
 }
 
 type FilterType = 'all' | 'enabled' | 'disabled' | TriggerType;
@@ -78,7 +85,19 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
   onExecute,
   isModeratorView = false,
   platform = 'twitch',
+  hasPredictionActive: hasPredictionActiveProp,
+  channelId = '',
+  authToken = '',
 }) => {
+  // Use predictions hook to check for active prediction
+  const { currentPrediction, cancelPrediction } = usePredictions(channelId, authToken, {
+    enablePolling: !!channelId && !!authToken,
+    pollingInterval: 10000, // Check every 10 seconds
+  });
+  
+  // Use prop if provided, otherwise use hook result
+  const hasPredictionActive = hasPredictionActiveProp ?? (currentPrediction !== null);
+  
   const {
     macros,
     isLoading,
@@ -90,6 +109,7 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
     duplicateMacro,
     refresh,
     clearError,
+    clearMacroError,
   } = useMacros();
 
   const {
@@ -108,7 +128,6 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
   /**
    * Filter and search macros
@@ -221,10 +240,28 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
   /**
    * Handle macro execution
    */
-  const handleExecute = useCallback(async (macroId: string) => {
-    await execute(macroId);
-    onExecute?.(macroId);
+  const handleExecute = useCallback(async (macroId: string): Promise<boolean> => {
+    try {
+      const result = await execute(macroId);
+      onExecute?.(macroId);
+      return result?.success ?? false;
+    } catch {
+      return false;
+    }
   }, [execute, onExecute]);
+
+  /**
+   * Handle canceling active prediction
+   */
+  const handleCancelPrediction = useCallback(async (): Promise<boolean> => {
+    if (!currentPrediction) return false;
+    try {
+      const success = await cancelPrediction();
+      return success;
+    } catch {
+      return false;
+    }
+  }, [currentPrediction, cancelPrediction]);
 
   /**
    * Handle closing the editor
@@ -324,51 +361,42 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
         {/* Search and Filters - only show in list view */}
         {viewMode === 'list' && (
           <>
-            <div className="flex items-center gap-2">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar macros..."
-                  className="w-full pl-9 pr-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-                />
-              </div>
-
-              {/* Filter Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`p-2 rounded-lg transition-colors ${
-                  filter !== 'all'
-                    ? 'bg-purple-500/20 text-purple-400'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
-                }`}
-                title="Filtros"
-              >
-                <Filter size={18} />
-              </button>
+            {/* Search */}
+            <div className="relative mb-3">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar macros..."
+                className="w-full pl-9 pr-8 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-500 hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
-            {/* Filter Options */}
-            {showFilters && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {FILTER_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setFilter(option.value)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      filter === option.value
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Category Filter Buttons */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                    filter === option.value
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </>
         )}
       </div>
@@ -473,7 +501,10 @@ export const MacroManager: React.FC<MacroManagerProps> = ({
                     onDuplicate={() => handleDuplicate(macro.id)}
                     onDelete={() => handleDeleteRequest(macro)}
                     onExecute={() => handleExecute(macro.id)}
+                    onClearError={() => clearMacroError(macro.id)}
+                    onStopPrediction={handleCancelPrediction}
                     isPaused={isPaused}
+                    hasPredictionActive={hasPredictionActive}
                   />
                 ))}
               </div>

@@ -273,9 +273,14 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         </div>
 
         <div>
-          <label htmlFor="action-volume" className="block text-sm font-medium text-zinc-400 mb-1">
-            Volumen: {config.volume || 100}%
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="action-volume" className="text-sm font-medium text-zinc-400">
+              Volumen
+            </label>
+            <span className="text-sm font-medium text-purple-400 min-w-[45px] text-right">
+              {config.volume || 100}%
+            </span>
+          </div>
           <input
             type="range"
             id="action-volume"
@@ -374,9 +379,14 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         </div>
 
         <div>
-          <label htmlFor="action-poll-duration" className="block text-sm font-medium text-zinc-400 mb-1">
-            Duración (segundos): {config.duration || 60}s
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="action-poll-duration" className="text-sm font-medium text-zinc-400">
+              Duración
+            </label>
+            <span className="text-sm font-medium text-purple-400 min-w-[50px] text-right">
+              {config.duration || 60}s
+            </span>
+          </div>
           <input
             type="range"
             id="action-poll-duration"
@@ -417,8 +427,23 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
       updateConfig<StartPredictionConfig>({ outcomes: newOutcomes });
     };
 
+    // Format duration for display
+    const formatDuration = (seconds: number) => {
+      if (seconds >= 60) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return secs > 0 ? `${mins}m ${secs}s` : `${mins} min`;
+      }
+      return `${seconds}s`;
+    };
+
     return (
       <div className="space-y-3">
+        <div className="flex items-start gap-2 p-2 bg-purple-500/10 rounded-lg text-purple-400 text-xs">
+          <Info size={14} className="shrink-0 mt-0.5" />
+          <span>Requiere autenticación como streamer del canal (la API de Twitch no permite que mods creen predicciones)</span>
+        </div>
+
         <div>
           <label htmlFor="action-prediction-title" className="block text-sm font-medium text-zinc-400 mb-1">
             Título de la predicción *
@@ -476,9 +501,14 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
         </div>
 
         <div>
-          <label htmlFor="action-prediction-duration" className="block text-sm font-medium text-zinc-400 mb-1">
-            Duración (segundos): {config.duration || 120}s
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="action-prediction-duration" className="text-sm font-medium text-zinc-400">
+              Duración
+            </label>
+            <span className="text-sm font-medium text-purple-400 min-w-[60px] text-right">
+              {formatDuration(config.duration || 120)}
+            </span>
+          </div>
           <input
             type="range"
             id="action-prediction-duration"
@@ -489,6 +519,9 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
             onChange={(e) => updateConfig<StartPredictionConfig>({ duration: Number(e.target.value) })}
             className="w-full h-2 bg-zinc-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
           />
+          <p className="text-xs text-zinc-500 mt-1">
+            Mínimo 30 segundos, máximo 30 minutos (límite de Twitch)
+          </p>
         </div>
       </div>
     );
@@ -633,9 +666,14 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
     return (
       <div className="space-y-3">
         <div>
-          <label htmlFor="action-delay-seconds" className="block text-sm font-medium text-zinc-400 mb-1">
-            Segundos de espera: {config.seconds || 0}s
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="action-delay-seconds" className="text-sm font-medium text-zinc-400">
+              Segundos de espera
+            </label>
+            <span className="text-sm font-medium text-purple-400 min-w-[40px] text-right">
+              {config.seconds || 5}s
+            </span>
+          </div>
           <input
             type="range"
             id="action-delay-seconds"
@@ -686,10 +724,15 @@ export const ActionBuilder: React.FC<ActionBuilderProps> = ({
       {/* Delay before action (for non-delay actions) */}
       {action.type !== 'delay' && (
         <div className="pt-3 border-t border-zinc-600">
-          <label htmlFor="action-pre-delay" className="flex items-center gap-1 text-sm font-medium text-zinc-400 mb-1">
-            <Clock size={12} />
-            Delay antes de ejecutar: {action.delay}s
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="action-pre-delay" className="flex items-center gap-1 text-sm font-medium text-zinc-400">
+              <Clock size={12} />
+              Delay antes de ejecutar
+            </label>
+            <span className="text-sm font-medium text-purple-400 min-w-[40px] text-right">
+              {action.delay}s
+            </span>
+          </div>
           <input
             type="range"
             id="action-pre-delay"

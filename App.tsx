@@ -18,6 +18,8 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { getTwitchService } from './src/application/services/TwitchService';
 import { getIndexedDBService } from './src/application/services/IndexedDBService';
 import { getMigrationService } from './src/application/services/MigrationService';
+import { getMacroService } from './src/application/services/MacroService';
+import { createTwitchPredictionService } from './src/application/services/TwitchPredictionService';
 import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
@@ -357,6 +359,29 @@ const App: React.FC = () => {
       console.error('Macro trigger error:', error);
     },
   });
+  
+  // Configure macro services when authenticated
+  // This connects prediction service to MacroService for macro execution
+  useEffect(() => {
+    if (authToken && userId && status === ConnectionStatus.CONNECTED) {
+      const predictionService = createTwitchPredictionService(authToken);
+      const twitchService = getTwitchService();
+      
+      getMacroService().configureServices({
+        predictionService: {
+          createPrediction: async (data) => {
+            return predictionService.createPrediction(data);
+          },
+          getBroadcasterId: () => userId,
+        },
+        chatService: {
+          sendMessage: async (message: string) => {
+            return twitchService.sendMessage(message);
+          },
+        },
+      });
+    }
+  }, [authToken, userId, status]);
   
   // Sync channel name with stream events hook
   useEffect(() => {

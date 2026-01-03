@@ -162,7 +162,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       await this.client.say(`#${this.currentChannel}`, message);
       return true;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('[TwitchAdapter] Failed to send message:', error);
       return false;
     }
   }

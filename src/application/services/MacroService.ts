@@ -73,6 +73,9 @@ export interface IMacroService {
   resumeAll(): void;
   isPaused(): boolean;
   
+  // Service configuration
+  configureServices(services: Partial<ActionExecutorDependencies>): void;
+  
   // Import/Export
   exportMacros(ids: string[], author?: string): Promise<string>;
   importMacros(json: string): Promise<MacroImportResult>;
@@ -331,6 +334,7 @@ export class MacroService implements IMacroService {
 
     // Get macro
     const macro = await this.storageService.getMacro(id);
+    
     if (!macro) {
       return this.createFailedResult(id, startedAt, `Macro not found: ${id}`);
     }
@@ -362,6 +366,12 @@ export class MacroService implements IMacroService {
     const completedAt = Date.now();
     const actionsExecuted = actionResults.filter(r => !r.skipped).length;
 
+    // Build detailed error message from failed actions (user-friendly)
+    const failedActions = actionResults.filter(r => !r.success && !r.skipped && r.error);
+    const detailedError = failedActions.length > 0
+      ? failedActions.map(r => r.error).join('; ')
+      : undefined;
+
     // Create execution result
     const executionResult: ExecutionResult = {
       macroId: id,
@@ -370,7 +380,7 @@ export class MacroService implements IMacroService {
       completedAt,
       actionsExecuted,
       actionResults,
-      error: hasError ? 'One or more actions failed' : undefined
+      error: detailedError
     };
 
     // Record execution for cooldown
@@ -643,6 +653,33 @@ export class MacroService implements IMacroService {
    */
   getStorageService(): IMacroStorageService {
     return this.storageService;
+  }
+
+  /**
+   * Configures external services for action execution
+   * This allows connecting services that are created after MacroService initialization
+   */
+  configureServices(services: Partial<ActionExecutorDependencies>): void {
+    const executor = this.actionExecutor as ActionExecutorService;
+    
+    if (services.chatService && executor.setChatService) {
+      executor.setChatService(services.chatService);
+    }
+    if (services.obsService && executor.setOBSService) {
+      executor.setOBSService(services.obsService);
+    }
+    if (services.soundService && executor.setSoundService) {
+      executor.setSoundService(services.soundService);
+    }
+    if (services.pollService && executor.setPollService) {
+      executor.setPollService(services.pollService);
+    }
+    if (services.predictionService && executor.setPredictionService) {
+      executor.setPredictionService(services.predictionService);
+    }
+    if (services.notificationService && executor.setNotificationService) {
+      executor.setNotificationService(services.notificationService);
+    }
   }
 }
 
