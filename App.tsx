@@ -68,7 +68,6 @@ import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
 import { SpinnerWheel } from './components/SpinnerWheel';
 import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
-import { JudgePanel } from './components/JudgePanel';
 import { GiveawayHub } from './components/GiveawayHub';
 import { StreamGames } from './components/StreamGames';
 import { DynamicsPanel } from './components/DynamicsPanel';
@@ -80,6 +79,9 @@ import { ChannelSelector } from './components/ChannelSelector';
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
 const StreamActivity = lazy(() => import('./components/StreamActivity'));
+
+// Lazy load JudgePanel - used in both overlay and main app
+const JudgePanel = lazy(() => import('./components/JudgePanel'));
 
 // Lazy load game overlays - only loaded when overlay mode is active
 const PiumOverlay = lazy(() => import('./components/games/PiumOverlay'));
