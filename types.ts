@@ -37,7 +37,7 @@ export type PlatformsView = 'selector' | 'twitch';
  * 
  * @requirements 6.3 - Navigation state supports platform and tool selection independently
  */
-export type PlatformsTool = 'none' | 'commands' | 'macros' | 'predictions' | 'channelpoints' | 'timers';
+export type PlatformsTool = 'none' | 'commands' | 'macros' | 'predictions' | 'channelpoints' | 'timers' | 'hypetrain' | 'goals' | 'shieldmode' | 'markers';
 
 /**
  * Configuration for each activity card in the ActivitySelector

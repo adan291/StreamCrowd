@@ -17,6 +17,7 @@ import { EnhancedCommandPanel } from './commands/EnhancedCommandPanel';
 import { PredictionPanel } from './PredictionPanel';
 import { RewardsPanel } from './RewardsPanel';
 import { TimersPanel } from './timers';
+import { HypeTrainPanel, GoalsPanel, ShieldModeToggle, StreamMarkersPanel } from './twitch';
 import { ChannelSelector } from './ChannelSelector';
 import { MacroManager } from './macros/MacroManager';
 import { useI18n } from '../i18n';
@@ -181,34 +182,10 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
     // Level 2: Twitch Tool Selector (when no tool is selected)
     if (view === 'twitch' && tool === 'none') {
       // Only show reconnect banner if there's an error AND user might want the feature
-      // For now, we'll make it a small, dismissible hint rather than a prominent banner
       const showModeratorHint = moderatedChannelsError && onReauthenticate;
-      
-      // Show channel selector if there are multiple channels (own + moderated)
-      const showChannelSelector = moderatedChannels.length > 1;
       
       return (
         <div className="h-full flex flex-col">
-          {/* Channel Selector - show if user has multiple channels available */}
-          {showChannelSelector && (
-            <div className="px-4 pt-4 pb-2 border-b border-zinc-200 dark:border-zinc-800">
-              <ChannelSelector
-                channels={moderatedChannels}
-                selectedChannel={selectedChannel}
-                onSelectChannel={onSelectChannel || (() => {})}
-                isLoading={isLoadingChannels}
-                onRefresh={onRefreshChannels}
-              />
-              {isViewingModeratedChannel && (
-                <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <Shield size={14} className="text-green-500" />
-                  <span className="text-xs text-green-600 dark:text-green-400">
-                    Gestionando como moderador. Algunas funciones pueden estar limitadas.
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
           <div className="flex-1 min-h-0">
             <TwitchToolSelector
               tools={TWITCH_TOOLS}
@@ -224,6 +201,13 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
                 hasBroadcasterToken,
                 isOwnChannel,
                 isLoading: isBroadcasterTokenLoading,
+              } : undefined}
+              channelSelector={moderatedChannels.length > 1 ? {
+                channels: moderatedChannels,
+                selectedChannel,
+                onSelectChannel: onSelectChannel || (() => {}),
+                isLoading: isLoadingChannels,
+                isViewingModeratedChannel,
               } : undefined}
               onNotification={onNotification}
             />
@@ -336,6 +320,83 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
               channel={channel}
               chatMessages={chatMessages}
               onNotification={onNotification}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Hype Train Panel
+    if (view === 'twitch' && tool === 'hypetrain') {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            {renderToolBackButton()}
+          </div>
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            <HypeTrainPanel
+              token={authToken || ''}
+              broadcasterId={channelId || ''}
+              onNotification={(msg, type) => onNotification?.(type, msg)}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Goals Panel
+    if (view === 'twitch' && tool === 'goals') {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            {renderToolBackButton()}
+          </div>
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            <GoalsPanel
+              token={authToken || ''}
+              broadcasterId={channelId || ''}
+              isOwnChannel={!isViewingModeratedChannel}
+              onNotification={(msg, type) => onNotification?.(type, msg)}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Shield Mode Panel
+    if (view === 'twitch' && tool === 'shieldmode') {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            {renderToolBackButton()}
+          </div>
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            <ShieldModeToggle
+              token={authToken || ''}
+              broadcasterId={channelId || ''}
+              moderatorId={loggedInUserId || ''}
+              isOwnChannel={!isViewingModeratedChannel}
+              isModerator={isViewingModeratedChannel}
+              onNotification={(msg, type) => onNotification?.(type, msg)}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Stream Markers Panel
+    if (view === 'twitch' && tool === 'markers') {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            {renderToolBackButton()}
+          </div>
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            <StreamMarkersPanel
+              token={authToken || ''}
+              broadcasterId={channelId || ''}
+              isOwnChannel={!isViewingModeratedChannel}
+              onNotification={(msg, type) => onNotification?.(type, msg)}
             />
           </div>
         </div>

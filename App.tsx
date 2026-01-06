@@ -1963,7 +1963,13 @@ const App: React.FC = () => {
       
       {/* Tools Modal */}
       {showTools && (
-        <Tools onClose={() => setShowTools(false)} theme={theme} onToggleTheme={toggleTheme} />
+        <Tools 
+          onClose={() => setShowTools(false)} 
+          theme={theme} 
+          onToggleTheme={toggleTheme}
+          showAIVision={aiAnalytics.showMascot}
+          onToggleAIVision={aiAnalytics.toggleMascot}
+        />
       )}
 
       {/* Countdown Widget - Global flotante */}

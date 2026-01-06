@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Wrench, Keyboard, ChevronRight, Globe, Sun, Moon, Check, RotateCcw, GraduationCap, Bell } from 'lucide-react';
+import { X, Wrench, Keyboard, ChevronRight, Globe, Sun, Moon, Check, RotateCcw, GraduationCap, Bell, Eye } from 'lucide-react';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationConfigPanel } from './NotificationConfigPanel';
 import { useI18n, Locale } from '../i18n';
@@ -10,6 +10,10 @@ interface ToolsProps {
   onToggleTheme: () => void;
   /** Callback to restart the onboarding tutorial */
   onRestartTutorial?: () => void;
+  /** AI Vision mascot visibility */
+  showAIVision?: boolean;
+  /** Toggle AI Vision mascot */
+  onToggleAIVision?: () => void;
 }
 
 type ToolSection = 'main' | 'shortcuts' | 'notifications';
@@ -19,7 +23,7 @@ const languages: { code: Locale; name: string; flag: string }[] = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
 ];
 
-export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onRestartTutorial }) => {
+export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onRestartTutorial, showAIVision, onToggleAIVision }) => {
   const { t, locale, setLocale } = useI18n();
   const currentLang = languages.find((l) => l.code === locale);
   const [activeSection, setActiveSection] = useState<ToolSection>('main');
@@ -159,6 +163,34 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
               </button>
             </div>
           </div>
+
+          {/* AI Vision Toggle */}
+          {onToggleAIVision && (
+            <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-xl ${showAIVision ? 'bg-cyan-500/20' : 'bg-zinc-200 dark:bg-zinc-800'}`}>
+                  <Eye className={showAIVision ? 'text-cyan-500' : 'text-zinc-400'} size={24} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-zinc-900 dark:text-white">AI Vision</h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {showAIVision ? 'Mascota activa' : 'Mascota oculta'}
+                  </p>
+                </div>
+                <button
+                  onClick={onToggleAIVision}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    showAIVision ? 'bg-cyan-500' : 'bg-zinc-300 dark:bg-zinc-700'
+                  }`}
+                >
+                  <span
+                    className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                    style={{ transform: showAIVision ? 'translateX(24px)' : 'translateX(0)' }}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Keyboard Shortcuts */}
           <button

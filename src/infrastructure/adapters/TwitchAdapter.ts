@@ -28,6 +28,56 @@ import type { StreamEvent as DomainStreamEvent, SubTier } from '../../domain/ent
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
+// Hype Train Types
+export interface HypeTrainContribution {
+  userId: string;
+  userLogin: string;
+  userName: string;
+  type: 'bits' | 'subscription' | 'other';
+  total: number;
+}
+
+export interface HypeTrainEvent {
+  id: string;
+  broadcasterId: string;
+  level: number;
+  total: number;
+  goal: number;
+  topContributions: HypeTrainContribution[];
+  lastContribution?: HypeTrainContribution;
+  startedAt: Date;
+  expiresAt: Date;
+  isActive: boolean;
+}
+
+// Channel Goal Types
+export interface ChannelGoal {
+  id: string;
+  broadcasterId: string;
+  type: 'follower' | 'subscription' | 'subscription_count' | 'new_subscription' | 'new_subscription_count';
+  description: string;
+  currentAmount: number;
+  targetAmount: number;
+  createdAt: Date;
+}
+
+// Stream Marker Types
+export interface StreamMarker {
+  id: string;
+  createdAt: Date;
+  description: string;
+  positionSeconds: number;
+  videoId?: string;
+}
+
+// Shield Mode Types
+export interface ShieldModeStatus {
+  isActive: boolean;
+  moderatorId?: string;
+  moderatorLogin?: string;
+  lastActivatedAt?: Date;
+}
+
 interface TwitchAdapterConfig {
   maxReconnectAttempts?: number;
   reconnectBaseDelay?: number;
@@ -66,6 +116,10 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   private statusCallbacks = new Set<StatusCallback>();
   private chatProviderStreamEventCallbacks = new Set<StreamEventCallback>();
   private domainStreamEventCallbacks = new Set<DomainStreamEventCallback>();
+  
+  // Enhanced feature callbacks
+  private hypeTrainCallbacks = new Set<(event: HypeTrainEvent) => void>();
+  private goalProgressCallbacks = new Set<(goal: ChannelGoal) => void>();
   
   private reconnectAttempts = 0;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1983,6 +2037,342 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       );
       
       return response.ok || response.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  // ============================================
+  // Hype Train Methods
+  // ============================================
+
+  /**
+   * Get current or recent Hype Train events
+   * Requires OAuth token with channel:read:hype_train scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Array of Hype Train events or null if failed
+   */
+  async getHypeTrainEvents(token: string, broadcasterId: string): Promise<HypeTrainEvent[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/hypetrain/events?broadcaster_id=${broadcasterId}&first=5`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[TwitchAdapter] getHypeTrainEvents failed: ${response.status} - ${errorText}`);
+        // Throw error with status code so the panel can handle it
+        const error = new Error(`HTTP ${response.status}: ${errorText}`);
+        (error as any).status = response.status;
+        throw error;
+      }
+      
+      const data = await response.json();
+      return data.data?.map((event: any) => ({
+        id: event.id,
+        broadcasterId: event.broadcaster_id,
+        level: event.level,
+        total: event.total,
+        goal: event.goal,
+        topContributions: event.top_contributions?.map((c: any) => ({
+          userId: c.user_id,
+          userLogin: c.user_login,
+          userName: c.user_name,
+          type: c.type,
+          total: c.total,
+        })) || [],
+        lastContribution: event.last_contribution ? {
+          userId: event.last_contribution.user_id,
+          userLogin: event.last_contribution.user_login,
+          userName: event.last_contribution.user_name,
+          type: event.last_contribution.type,
+          total: event.last_contribution.total,
+        } : undefined,
+        startedAt: new Date(event.started_at),
+        expiresAt: new Date(event.expires_at),
+        isActive: new Date(event.expires_at) > new Date(),
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to Hype Train events
+   * @param callback - Callback to receive Hype Train events
+   * @returns Unsubscribe function
+   */
+  onHypeTrain(callback: (event: HypeTrainEvent) => void): () => void {
+    this.hypeTrainCallbacks.add(callback);
+    return () => this.hypeTrainCallbacks.delete(callback);
+  }
+
+  /**
+   * Emit a Hype Train event to all subscribers
+   * @param event - Hype Train event to emit
+   */
+  private emitHypeTrainEvent(event: HypeTrainEvent): void {
+    this.hypeTrainCallbacks.forEach(cb => {
+      try {
+        cb(event);
+      } catch (e) {
+        console.error('Error in Hype Train callback:', e);
+      }
+    });
+  }
+
+  // ============================================
+  // Channel Goals Methods
+  // ============================================
+
+  /**
+   * Get channel goals
+   * Requires OAuth token with channel:read:goals scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @returns Array of channel goals or null if failed
+   */
+  async getChannelGoals(token: string, broadcasterId: string): Promise<ChannelGoal[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/goals?broadcaster_id=${broadcasterId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      return data.data?.map((goal: any) => ({
+        id: goal.id,
+        broadcasterId: goal.broadcaster_id,
+        type: goal.type,
+        description: goal.description,
+        currentAmount: goal.current_amount,
+        targetAmount: goal.target_amount,
+        createdAt: new Date(goal.created_at),
+      })) || [];
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Subscribe to goal progress events
+   * @param callback - Callback to receive goal progress events
+   * @returns Unsubscribe function
+   */
+  onGoalProgress(callback: (goal: ChannelGoal) => void): () => void {
+    this.goalProgressCallbacks.add(callback);
+    return () => this.goalProgressCallbacks.delete(callback);
+  }
+
+  /**
+   * Emit a goal progress event to all subscribers
+   * @param goal - Goal with updated progress
+   */
+  private emitGoalProgress(goal: ChannelGoal): void {
+    this.goalProgressCallbacks.forEach(cb => {
+      try {
+        cb(goal);
+      } catch (e) {
+        console.error('Error in goal progress callback:', e);
+      }
+    });
+  }
+
+  // ============================================
+  // Stream Markers Methods
+  // ============================================
+
+  /**
+   * Create a stream marker
+   * Requires OAuth token with channel:manage:broadcast scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID (must be the token owner)
+   * @param description - Optional description for the marker
+   * @returns Created marker or null if failed
+   */
+  async createStreamMarker(token: string, broadcasterId: string, description?: string): Promise<StreamMarker | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const body: { user_id: string; description?: string } = { user_id: broadcasterId };
+      if (description) {
+        body.description = description.substring(0, 140); // Max 140 chars
+      }
+      
+      const response = await fetch(
+        'https://api.twitch.tv/helix/streams/markers',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body)
+        }
+      );
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.error('Stream marker failed: Stream is not live');
+        }
+        return null;
+      }
+      
+      const data = await response.json();
+      const marker = data.data?.[0];
+      if (!marker) return null;
+      
+      return {
+        id: marker.id,
+        createdAt: new Date(marker.created_at),
+        description: marker.description || '',
+        positionSeconds: marker.position_seconds,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get stream markers for a video
+   * Requires OAuth token with user:read:broadcast scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param videoId - Optional video ID (if not provided, gets markers for recent VODs)
+   * @returns Array of stream markers or null if failed
+   */
+  async getStreamMarkers(token: string, broadcasterId: string, videoId?: string): Promise<StreamMarker[] | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const url = new URL('https://api.twitch.tv/helix/streams/markers');
+      url.searchParams.set('user_id', broadcasterId);
+      url.searchParams.set('first', '20');
+      if (videoId) {
+        url.searchParams.set('video_id', videoId);
+      }
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${cleanToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
+        }
+      });
+      
+      // 404 means no VODs with markers - return empty array
+      if (response.status === 404) {
+        return [];
+      }
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const markers: StreamMarker[] = [];
+      
+      // Response is nested by video
+      data.data?.forEach((video: any) => {
+        video.videos?.forEach((v: any) => {
+          v.markers?.forEach((m: any) => {
+            markers.push({
+              id: m.id,
+              createdAt: new Date(m.created_at),
+              description: m.description || '',
+              positionSeconds: m.position_seconds,
+              videoId: v.video_id,
+            });
+          });
+        });
+      });
+      
+      return markers;
+    } catch {
+      return null;
+    }
+  }
+
+  // ============================================
+  // Shield Mode Methods
+  // ============================================
+
+  /**
+   * Get Shield Mode status
+   * Requires OAuth token with moderator:read:shield_mode scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @returns Shield Mode status or null if failed
+   */
+  async getShieldModeStatus(token: string, broadcasterId: string, moderatorId: string): Promise<ShieldModeStatus | null> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/shield_mode?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+          }
+        }
+      );
+      
+      if (!response.ok) return null;
+      
+      const data = await response.json();
+      const status = data.data?.[0];
+      if (!status) return null;
+      
+      return {
+        isActive: status.is_active,
+        moderatorId: status.moderator_id,
+        moderatorLogin: status.moderator_login,
+        lastActivatedAt: status.last_activated_at ? new Date(status.last_activated_at) : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Update Shield Mode status
+   * Requires OAuth token with moderator:manage:shield_mode scope
+   * @param token - OAuth token
+   * @param broadcasterId - Broadcaster user ID
+   * @param moderatorId - Moderator user ID
+   * @param isActive - Whether to activate or deactivate Shield Mode
+   * @returns True if successful
+   */
+  async updateShieldMode(token: string, broadcasterId: string, moderatorId: string, isActive: boolean): Promise<boolean> {
+    try {
+      const cleanToken = token.replace('oauth:', '');
+      const response = await fetch(
+        `https://api.twitch.tv/helix/moderation/shield_mode?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${cleanToken}`,
+            'Client-Id': TWITCH_CLIENT_ID,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ is_active: isActive })
+        }
+      );
+      
+      return response.ok;
     } catch {
       return false;
     }

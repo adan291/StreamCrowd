@@ -34,6 +34,12 @@ const OAUTH_SCOPES = [
   'channel:read:redemptions',
   // Moderator channel access
   'user:read:moderated_channels',
+  // Enhanced features scopes (Hype Train, Goals, Stream Markers, Shield Mode)
+  'channel:read:hype_train',
+  'channel:read:goals',
+  'channel:manage:broadcast',
+  'moderator:read:shield_mode',
+  'moderator:manage:shield_mode',
 ].join(' ');
 
 // Callback path - can be root or specific path, must match Twitch Dev Console
@@ -66,11 +72,13 @@ function getRedirectUri(): string {
 
 /**
  * Generate a random state string for CSRF protection
+ * Prefixed with 'twitch_' to identify the OAuth provider in callback
  */
 function generateState(): string {
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  const randomPart = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  return `twitch_${randomPart}`;
 }
 
 /**
@@ -83,7 +91,7 @@ function buildAuthUrl(state: string): string {
     response_type: 'token',
     scope: OAUTH_SCOPES,
     state: state,
-    force_verify: 'false', // Don't force re-auth if already authorized
+    force_verify: 'true', // Force re-auth to get new scopes
   });
   
   return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;

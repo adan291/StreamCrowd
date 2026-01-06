@@ -130,6 +130,38 @@ export const TWITCH_TOOLS: ToolConfig[] = [
     color: '#10b981',
     enabled: true,
   },
+  {
+    id: 'hypetrain',
+    icon: 'Train',
+    title: 'Hype Train',
+    description: 'Monitor del tren del hype',
+    color: '#ff6b6b',
+    enabled: true,
+  },
+  {
+    id: 'goals',
+    icon: 'Target',
+    title: 'Objetivos',
+    description: 'Objetivos de subs y seguidores',
+    color: '#4ecdc4',
+    enabled: true,
+  },
+  {
+    id: 'shieldmode',
+    icon: 'Shield',
+    title: 'Modo Escudo',
+    description: 'Protección del chat',
+    color: '#45b7d1',
+    enabled: true,
+  },
+  {
+    id: 'markers',
+    icon: 'Bookmark',
+    title: 'Marcadores',
+    description: 'Marcadores de stream',
+    color: '#96ceb4',
+    enabled: true,
+  },
 ];
 
 /**

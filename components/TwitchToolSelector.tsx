@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Terminal, TrendingUp, Coins, Zap, ArrowLeft, Timer, Shield, CheckCircle, Users, Workflow, ChevronDown, ChevronUp } from 'lucide-react';
+import { Terminal, TrendingUp, Coins, Zap, ArrowLeft, Timer, Shield, CheckCircle, Users, Workflow, ChevronDown, ChevronUp, Train, Target, Bookmark } from 'lucide-react';
 import { ToolConfig } from '../config/platforms';
 import { useI18n } from '../i18n';
 import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
+import type { ChannelContext } from '../src/application/services/ModeratedChannelsService';
 
 // Icon mapping for tool types
 const TOOL_ICONS: Record<string, React.ReactNode> = {
@@ -12,6 +13,10 @@ const TOOL_ICONS: Record<string, React.ReactNode> = {
   Zap: <Zap size={28} />,
   Timer: <Timer size={28} />,
   Workflow: <Workflow size={28} />,
+  Train: <Train size={28} />,
+  Target: <Target size={28} />,
+  Bookmark: <Bookmark size={28} />,
+  Shield: <Shield size={28} />,
 };
 
 interface ToolCardProps {
@@ -120,6 +125,14 @@ interface TwitchToolSelectorProps {
     isOwnChannel: boolean;
     isLoading: boolean;
   };
+  /** Channel selector props */
+  channelSelector?: {
+    channels: ChannelContext[];
+    selectedChannel: ChannelContext | null;
+    onSelectChannel: (channelId: string) => void;
+    isLoading: boolean;
+    isViewingModeratedChannel: boolean;
+  };
   onNotification?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
@@ -128,16 +141,94 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
   onSelectTool,
   onBack,
   broadcasterAuth,
+  channelSelector,
   onNotification,
 }) => {
   const { t } = useI18n();
   const [showAuthPanel, setShowAuthPanel] = useState(false);
+  const [showChannelDropdown, setShowChannelDropdown] = useState(false);
 
   const handleBackKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onBack();
     }
+  };
+
+  // Compact channel selector for header
+  const renderChannelSelector = () => {
+    if (!channelSelector || channelSelector.channels.length <= 1) return null;
+
+    const selected = channelSelector.selectedChannel;
+    
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setShowChannelDropdown(!showChannelDropdown)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-800/50 border border-purple-300 dark:border-purple-700 transition-colors"
+        >
+          {selected?.channelAvatar ? (
+            <img src={selected.channelAvatar} alt="" className="w-6 h-6 rounded-full ring-2 ring-purple-400/50" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center">
+              <span className="text-xs text-white font-bold">
+                {selected?.channelName?.charAt(0)?.toUpperCase() || '?'}
+              </span>
+            </div>
+          )}
+          <span className="text-purple-700 dark:text-purple-200 font-semibold text-sm max-w-[140px] truncate">
+            {selected?.channelName || 'Seleccionar canal'}
+          </span>
+          <ChevronDown size={16} className={`text-purple-600 dark:text-purple-300 transition-transform ${showChannelDropdown ? 'rotate-180' : ''}`} />
+        </button>
+        
+        {showChannelDropdown && (
+          <>
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setShowChannelDropdown(false)} 
+            />
+            <div className="absolute top-full right-0 mt-1 w-60 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-700 z-20 py-1.5 overflow-hidden">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase text-zinc-500 dark:text-zinc-400">
+                Cambiar canal
+              </div>
+              {channelSelector.channels.map((ch) => (
+                <button
+                  key={ch.channelId}
+                  onClick={() => {
+                    channelSelector.onSelectChannel(ch.channelId);
+                    setShowChannelDropdown(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors ${
+                    ch.channelId === selected?.channelId ? 'bg-purple-100 dark:bg-purple-900/30' : ''
+                  }`}
+                >
+                  {ch.channelAvatar ? (
+                    <img src={ch.channelAvatar} alt="" className="w-8 h-8 rounded-full ring-2 ring-purple-300 dark:ring-purple-600" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">{ch.channelName?.charAt(0)?.toUpperCase()}</span>
+                    </div>
+                  )}
+                  <span className="flex-1 text-left truncate font-semibold text-zinc-800 dark:text-white">
+                    {ch.channelName}
+                  </span>
+                  {ch.isOwnChannel ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500 text-white font-semibold">
+                      Tuyo
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500 text-white font-semibold">
+                      Mod
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -159,12 +250,23 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
 
       {/* Header */}
       <div className="mb-4 sm:mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-          {t.platforms?.twitchTitle || 'Twitch'}
-        </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {t.platforms?.twitchToolsDescription || 'Herramientas y funcionalidades de Twitch'}
-        </p>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
+            {t.platforms?.twitchTitle || 'Twitch'}
+          </h2>
+          {renderChannelSelector()}
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {t.platforms?.twitchToolsDescription || 'Herramientas y funcionalidades de Twitch'}
+          </p>
+          {channelSelector?.isViewingModeratedChannel && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-green-500/10 text-green-600 dark:text-green-400">
+              <Shield size={10} />
+              Moderador
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Broadcaster Auth Banner */}

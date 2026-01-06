@@ -20,6 +20,7 @@ import {
 import { AuthService } from '../services/AuthService';
 import type { ConnectionStatus as DomainConnectionStatus, MessageCallback, StatusCallback } from '../../domain/ports/IChatProvider';
 import { ConnectionStatus } from '../../../types';
+import { PlatformManagerService } from '../services/PlatformManagerService';
 
 // Re-export types for convenience
 export type { CollaborationChannel, TwitchConnectionOptions };
@@ -373,6 +374,9 @@ export function useTwitchService(
             setError(null);
           }
           onStatusChangeRef.current?.(toEnumStatus(newStatus), errorMsg);
+          
+          // Sync with PlatformManagerService for multi-platform panel
+          PlatformManagerService.syncConnectionState('twitch', newStatus, channel);
         },
       };
       
@@ -397,6 +401,10 @@ export function useTwitchService(
     setCollaborationChannels([]);
     setTokenExpiresIn(null);
     setTokenExpiringSoon(false);
+    
+    // Sync with PlatformManagerService for multi-platform panel
+    PlatformManagerService.syncConnectionState('twitch', 'disconnected', null);
+    
     if (expirationTimerRef.current) {
       clearInterval(expirationTimerRef.current);
     }

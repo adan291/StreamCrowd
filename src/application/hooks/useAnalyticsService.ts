@@ -140,8 +140,14 @@ export function useAnalyticsService(
   );
   const sessionRef = useRef<AnalyticsSession | null>(currentSession);
 
-  // Mascot State
-  const [showMascot, setShowMascot] = useState(opts.initialMascotVisible);
+  // Mascot State - with localStorage persistence
+  const [showMascot, setShowMascot] = useState(() => {
+    const saved = localStorage.getItem('streamcrowd_show_mascot');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return opts.initialMascotVisible;
+  });
   const [userDifficulty, setUserDifficultyState] = useState<UserDifficulty | undefined>(undefined);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
 
@@ -161,9 +167,13 @@ export function useAnalyticsService(
     setShowConfig((prev) => !prev);
   }, []);
 
-  // Toggle mascot visibility
+  // Toggle mascot visibility with persistence
   const toggleMascot = useCallback(() => {
-    setShowMascot((prev) => !prev);
+    setShowMascot((prev) => {
+      const newValue = !prev;
+      localStorage.setItem('streamcrowd_show_mascot', String(newValue));
+      return newValue;
+    });
   }, []);
 
   // Set user difficulty

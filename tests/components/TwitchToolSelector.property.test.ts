@@ -416,8 +416,8 @@ describe('TwitchToolSelector Property Tests', () => {
       expect(commandsTool?.icon).toBe('Terminal');
     });
 
-    it('should have exactly 3 tools: commands, predictions, channelpoints', () => {
-      const expectedIds = ['commands', 'predictions', 'channelpoints'];
+    it('should have exactly 9 tools: commands, predictions, channelpoints, macros, timers, hypetrain, goals, shieldmode, markers', () => {
+      const expectedIds = ['commands', 'predictions', 'channelpoints', 'macros', 'timers', 'hypetrain', 'goals', 'shieldmode', 'markers'];
       const actualIds = TWITCH_TOOLS.map((t) => t.id);
 
       expect(actualIds.sort()).toEqual(expectedIds.sort());
