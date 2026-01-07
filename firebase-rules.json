@@ -1,0 +1,51 @@
+{
+  "rules": {
+    // Overlay sync - authenticated users can read/write their own overlay data
+    // Uses Firebase Auth UID to namespace data per user
+    "overlays": {
+      "$overlayId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    
+    // Broadcaster tokens - only authenticated users can access
+    // The linkedPlatformId stored client-side should match broadcasterId
+    // Note: For full security, implement server-side verification of broadcaster identity
+    "broadcaster_tokens": {
+      "$broadcasterId": {
+        // Allow read if authenticated (moderators need to read broadcaster tokens)
+        ".read": "auth != null",
+        // Allow write only if authenticated
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'accessToken', 'storedAt'])"
+      }
+    },
+    
+    // Platform broadcaster tokens (multi-platform support)
+    "platform_broadcaster_tokens": {
+      "$platform": {
+        "$broadcasterId": {
+          // Allow read if authenticated (moderators need to read broadcaster tokens)
+          ".read": "auth != null",
+          // Allow write only if authenticated
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'accessToken', 'storedAt'])"
+        }
+      }
+    },
+    
+    // User-specific data (future use)
+    "users": {
+      "$uid": {
+        // Users can only read/write their own data
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    
+    // Default: deny all other access
+    ".read": false,
+    ".write": false
+  }
+}

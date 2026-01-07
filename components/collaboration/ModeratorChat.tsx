@@ -118,20 +118,44 @@ export function ModeratorChat({ className = '' }: ModeratorChatProps) {
     });
   };
 
-  // Render message content with highlighted mentions
+  // Render message content with highlighted mentions (safe version)
   const renderMessageContent = (message: ChatMessage) => {
-    let content = message.content;
+    const content = message.content;
     
-    // Highlight mentions
+    // Build parts array for safe rendering
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    
+    // Find all mentions and create safe React elements
     message.mentions.forEach(userId => {
       const user = collaborators.find(c => c.id === userId);
       if (user) {
-        const regex = new RegExp(`@${user.name}`, 'gi');
-        content = content.replace(regex, `<span class="text-purple-400 font-medium">@${user.name}</span>`);
+        const mentionPattern = `@${user.name}`;
+        const regex = new RegExp(mentionPattern, 'gi');
+        let match;
+        
+        while ((match = regex.exec(content)) !== null) {
+          // Add text before mention
+          if (match.index > lastIndex) {
+            parts.push(content.slice(lastIndex, match.index));
+          }
+          // Add highlighted mention as React element
+          parts.push(
+            <span key={`${userId}-${match.index}`} className="text-purple-400 font-medium">
+              {match[0]}
+            </span>
+          );
+          lastIndex = match.index + match[0].length;
+        }
       }
     });
-
-    return <span dangerouslySetInnerHTML={{ __html: content }} />;
+    
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+    
+    return <span>{parts.length > 0 ? parts : content}</span>;
   };
 
   // Get typing users

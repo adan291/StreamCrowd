@@ -147,10 +147,6 @@ export default defineConfig(({ mode }) => {
               if (id.includes('firebase')) {
                 return 'vendor-firebase';
               }
-              // Excel export - pesado
-              if (id.includes('xlsx')) {
-                return 'vendor-xlsx';
-              }
               // Recharts y D3 - gráficos pesados
               if (id.includes('recharts') || id.includes('d3-')) {
                 return 'vendor-charts';

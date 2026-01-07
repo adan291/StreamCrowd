@@ -12,26 +12,28 @@
  * 
  * SEGURIDAD:
  * - Los tokens se guardan en Firebase Realtime Database
+ * - Firebase Auth provides anonymous authentication for secure access
  * - Solo se permite usar el token si el usuario es moderador verificado del canal
- * - Los tokens se encriptan antes de guardar (básico, para producción usar mejor encriptación)
+ * - Los tokens se encriptan con AES-GCM antes de guardar
  * 
  * @module src/application/services/BroadcasterTokenService
  */
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, set, get, onValue, off, Database } from 'firebase/database';
+import { FirebaseAuthService } from '../../infrastructure/auth/FirebaseAuthService';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
 // Firebase config (same as FirebaseSyncAdapter)
 const FIREBASE_CONFIG = {
-  apiKey: "REDACTED_FIREBASE_API_KEY",
-  authDomain: "twtich-vote-live.firebaseapp.com",
-  databaseURL: "https://twtich-vote-live-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "twtich-vote-live",
-  storageBucket: "twtich-vote-live.firebasestorage.app",
-  messagingSenderId: "779005710594",
-  appId: "1:779005710594:web:8df44b0c02a57fc262b21b",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "twtich-vote-live.firebaseapp.com",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://twtich-vote-live-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "twtich-vote-live",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "twtich-vote-live.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "779005710594",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:779005710594:web:8df44b0c02a57fc262b21b",
 };
 
 const FIREBASE_PATH = 'broadcaster_tokens';
@@ -114,27 +116,102 @@ export const ALL_BROADCASTER_SCOPES = [
 ];
 
 // ============================================
-// Simple Encryption (for basic protection)
-// In production, use proper encryption or a secure backend
+// AES-GCM Encryption for Firebase tokens
 // ============================================
 
+const ENCRYPTION_APP_ID = 'streamcrowd_firebase_2024';
+
+// Derive encryption key from app identifier
+async function getFirebaseEncryptionKey(): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(ENCRYPTION_APP_ID),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('firebase_token_salt_v1'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptForFirebase(text: string): Promise<string> {
+  try {
+    const key = await getFirebaseEncryptionKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(text);
+    
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encoded
+    );
+    
+    // Combine IV + ciphertext and encode as base64
+    const combined = new Uint8Array(iv.length + encrypted.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encrypted), iv.length);
+    
+    return btoa(String.fromCharCode(...combined));
+  } catch (err) {
+    console.error('[BroadcasterTokenService] Encryption failed:', err);
+    // Fallback to simple obfuscation
+    return simpleEncrypt(text);
+  }
+}
+
+async function decryptFromFirebase(encoded: string): Promise<string> {
+  try {
+    const key = await getFirebaseEncryptionKey();
+    
+    // Decode base64
+    const combined = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+    
+    // Extract IV and ciphertext
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext
+    );
+    
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    // Try fallback decryption for legacy data
+    return simpleDecrypt(encoded);
+  }
+}
+
+// Legacy simple encryption for backwards compatibility
 const ENCRYPTION_KEY = 'streamcrowd_2024_key';
 
 function simpleEncrypt(text: string): string {
-  // Simple XOR encryption - NOT secure for production!
-  // Use this only as basic obfuscation
   let result = '';
   for (let i = 0; i < text.length; i++) {
     result += String.fromCharCode(
       text.charCodeAt(i) ^ ENCRYPTION_KEY.charCodeAt(i % ENCRYPTION_KEY.length)
     );
   }
-  return btoa(result); // Base64 encode
+  return btoa(result);
 }
 
 function simpleDecrypt(encoded: string): string {
   try {
-    const text = atob(encoded); // Base64 decode
+    const text = atob(encoded);
     let result = '';
     for (let i = 0; i < text.length; i++) {
       result += String.fromCharCode(
@@ -162,16 +239,32 @@ class BroadcasterTokenServiceImpl {
     this.initFirebase();
   }
 
-  private initFirebase(): void {
+  private async initFirebase(): Promise<void> {
     try {
+      // Initialize Firebase Auth first
+      await FirebaseAuthService.initialize();
+      
       // Use existing Firebase app or create new one
       const apps = getApps();
       const app = apps.length > 0 ? apps[0] : initializeApp(FIREBASE_CONFIG, 'broadcaster-tokens');
       this.database = getDatabase(app);
       this.initialized = true;
-      console.log('[BroadcasterTokenService] Firebase initialized');
+      console.log('[BroadcasterTokenService] Firebase initialized with Auth');
     } catch (err) {
       console.error('[BroadcasterTokenService] Error initializing Firebase:', err);
+    }
+  }
+
+  /**
+   * Ensure Firebase is initialized before operations
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await this.initFirebase();
+    }
+    // Ensure we're authenticated
+    if (!FirebaseAuthService.isAuthenticated()) {
+      await FirebaseAuthService.signInAnonymously();
     }
   }
 
@@ -191,17 +284,25 @@ class BroadcasterTokenServiceImpl {
     scopes: string[];
     expiresIn?: number;
   }): Promise<boolean> {
+    await this.ensureInitialized();
+    
     if (!this.database) {
       console.error('[BroadcasterTokenService] Firebase not initialized');
       return false;
     }
 
     try {
+      // Link the broadcaster ID to Firebase Auth for security rules
+      FirebaseAuthService.linkPlatformId(data.broadcasterId);
+      
+      // Encrypt token with AES-GCM before storing in Firebase
+      const encryptedToken = await encryptForFirebase(data.accessToken);
+      
       const token: StoredBroadcasterToken = {
         broadcasterId: data.broadcasterId,
         broadcasterLogin: data.broadcasterLogin.toLowerCase(),
         broadcasterName: data.broadcasterName,
-        accessToken: simpleEncrypt(data.accessToken), // Encrypt before storing
+        accessToken: encryptedToken,
         scopes: data.scopes,
         storedAt: Date.now(),
       };
@@ -238,6 +339,8 @@ class BroadcasterTokenServiceImpl {
       return this.tokensCache.get(broadcasterId) || null;
     }
 
+    await this.ensureInitialized();
+    
     if (!this.database) {
       return null;
     }
@@ -252,10 +355,11 @@ class BroadcasterTokenServiceImpl {
 
       const data = snapshot.val() as StoredBroadcasterToken;
       
-      // Decrypt token
+      // Decrypt token with AES-GCM (falls back to legacy decryption)
+      const decryptedAccessToken = await decryptFromFirebase(data.accessToken);
       const decryptedToken: StoredBroadcasterToken = {
         ...data,
-        accessToken: simpleDecrypt(data.accessToken),
+        accessToken: decryptedAccessToken,
       };
 
       // Cache it
@@ -309,7 +413,7 @@ class BroadcasterTokenServiceImpl {
 
     const tokenRef = ref(this.database, `${FIREBASE_PATH}/${broadcasterId}`);
     
-    const unsubscribe = onValue(tokenRef, (snapshot) => {
+    const unsubscribe = onValue(tokenRef, async (snapshot) => {
       if (!snapshot.exists()) {
         this.tokensCache.delete(broadcasterId);
         callback(null);
@@ -317,13 +421,21 @@ class BroadcasterTokenServiceImpl {
       }
 
       const data = snapshot.val() as StoredBroadcasterToken;
-      const decryptedToken: StoredBroadcasterToken = {
-        ...data,
-        accessToken: simpleDecrypt(data.accessToken),
-      };
+      
+      // Decrypt token asynchronously
+      try {
+        const decryptedAccessToken = await decryptFromFirebase(data.accessToken);
+        const decryptedToken: StoredBroadcasterToken = {
+          ...data,
+          accessToken: decryptedAccessToken,
+        };
 
-      this.tokensCache.set(broadcasterId, decryptedToken);
-      callback(decryptedToken);
+        this.tokensCache.set(broadcasterId, decryptedToken);
+        callback(decryptedToken);
+      } catch (err) {
+        console.error('[BroadcasterTokenService] Error decrypting token in subscription:', err);
+        callback(null);
+      }
     });
 
     // Store unsubscribe function

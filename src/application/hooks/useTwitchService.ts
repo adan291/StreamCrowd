@@ -6,6 +6,8 @@
  * 
  * Mantiene API compatible con hooks/useTwitchConnection.ts
  * 
+ * Uses centralized TokenStorage via PlatformAuthService for encrypted credential storage.
+ * 
  * @module src/application/hooks/useTwitchService
  * @requirements 5.4, 5.6
  */
@@ -18,6 +20,8 @@ import {
   CollaborationChannel 
 } from '../services/TwitchService';
 import { AuthService } from '../services/AuthService';
+import { PlatformAuthService, type PlatformCredentials } from '../services/PlatformAuthService';
+import { TokenStorage } from '../services/TokenStorage';
 import type { ConnectionStatus as DomainConnectionStatus, MessageCallback, StatusCallback } from '../../domain/ports/IChatProvider';
 import { ConnectionStatus } from '../../../types';
 import { PlatformManagerService } from '../services/PlatformManagerService';
@@ -39,7 +43,7 @@ const toEnumStatus = (status: DomainConnectionStatus): ConnectionStatus => {
   }
 };
 
-// LocalStorage keys for credential persistence
+// LocalStorage keys for legacy credential persistence (for migration)
 const STORAGE_KEY_CHANNEL = 'twitch_channel';
 const STORAGE_KEY_TOKEN = 'twitch_token';
 const STORAGE_KEY_TOKEN_EXPIRES = 'twitch_token_expires';
@@ -130,9 +134,17 @@ async function fetchChannelAvatar(channel: string): Promise<string | null> {
 }
 
 /**
- * Load saved credentials from localStorage
+ * Load saved credentials from centralized TokenStorage
+ * Falls back to legacy localStorage keys for migration
  */
 function loadSavedCredentials(): SavedCredentials | null {
+  // Check centralized storage first (sync check)
+  if (TokenStorage.has('twitch')) {
+    // Return placeholder - actual retrieval is async
+    return null;
+  }
+  
+  // Fallback to legacy storage for migration
   try {
     const channel = localStorage.getItem(STORAGE_KEY_CHANNEL);
     const token = localStorage.getItem(STORAGE_KEY_TOKEN);
@@ -145,12 +157,8 @@ function loadSavedCredentials(): SavedCredentials | null {
       if (expires) {
         const expiresAt = parseInt(expires, 10);
         if (Date.now() > expiresAt) {
-          // Token expired, clear storage
-          localStorage.removeItem(STORAGE_KEY_CHANNEL);
-          localStorage.removeItem(STORAGE_KEY_TOKEN);
-          localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
-          localStorage.removeItem(STORAGE_KEY_USER_ID);
-          localStorage.removeItem(STORAGE_KEY_USER_NAME);
+          // Token expired, clear legacy storage
+          clearLegacyStorage();
           return null;
         }
       }
@@ -163,6 +171,81 @@ function loadSavedCredentials(): SavedCredentials | null {
     }
     return null;
   } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear legacy localStorage keys
+ */
+function clearLegacyStorage(): void {
+  localStorage.removeItem(STORAGE_KEY_CHANNEL);
+  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
+  localStorage.removeItem(STORAGE_KEY_USER_ID);
+  localStorage.removeItem(STORAGE_KEY_USER_NAME);
+}
+
+/**
+ * Load saved credentials with async token decryption from centralized storage
+ */
+async function loadSavedCredentialsAsync(): Promise<SavedCredentials | null> {
+  try {
+    // Initialize PlatformAuthService (handles migration from legacy)
+    await PlatformAuthService.initialize();
+    
+    // Try centralized storage first
+    const credentials = await TokenStorage.retrieve('twitch');
+    if (credentials) {
+      return {
+        channel: credentials.username, // username is the channel for Twitch
+        token: credentials.accessToken,
+        userId: credentials.userId,
+        userName: credentials.username,
+      };
+    }
+    
+    // Fallback: check legacy storage and migrate if found
+    const channel = localStorage.getItem(STORAGE_KEY_CHANNEL);
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const expires = localStorage.getItem(STORAGE_KEY_TOKEN_EXPIRES);
+    const savedUserId = localStorage.getItem(STORAGE_KEY_USER_ID);
+    const savedUserName = localStorage.getItem(STORAGE_KEY_USER_NAME);
+    
+    if (!channel || !token) return null;
+    
+    // Check expiration
+    if (expires) {
+      const expiresAt = parseInt(expires, 10);
+      if (Date.now() > expiresAt) {
+        clearLegacyStorage();
+        return null;
+      }
+    }
+    
+    // Migrate to centralized storage
+    console.log('[useTwitchService] Migrating legacy credentials to TokenStorage');
+    const migratedCredentials: PlatformCredentials = {
+      platform: 'twitch',
+      accessToken: token,
+      expiresAt: expires ? parseInt(expires, 10) : undefined,
+      username: savedUserName || channel,
+      userId: savedUserId || '',
+      scopes: [],
+    };
+    await TokenStorage.store('twitch', migratedCredentials);
+    
+    // Clear legacy storage after migration
+    clearLegacyStorage();
+    
+    return { 
+      channel, 
+      token, 
+      userId: savedUserId || undefined,
+      userName: savedUserName || undefined,
+    };
+  } catch (err) {
+    console.error('[useTwitchService] Error loading credentials:', err);
     return null;
   }
 }
@@ -206,10 +289,21 @@ export function useTwitchService(
   // Collaboration state
   const [collaborationChannels, setCollaborationChannels] = useState<CollaborationChannel[]>([]);
 
-  // Saved credentials
+  // Saved credentials (initially sync, then async decrypt)
   const [savedCredentials, setSavedCredentials] = useState<SavedCredentials | null>(() => 
     loadSavedCredentials()
   );
+  const [credentialsLoaded, setCredentialsLoaded] = useState(false);
+
+  // Load credentials async with decryption
+  useEffect(() => {
+    loadSavedCredentialsAsync().then(creds => {
+      if (creds) {
+        setSavedCredentials(creds);
+      }
+      setCredentialsLoaded(true);
+    });
+  }, []);
 
   // Store callback refs to avoid stale closures
   const onStatusChangeRef = useRef(onStatusChange);
@@ -218,12 +312,11 @@ export function useTwitchService(
   onMessageRef.current = onMessage;
 
   // Clear saved credentials
-  const clearSavedCredentials = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY_CHANNEL);
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
-    localStorage.removeItem(STORAGE_KEY_USER_ID);
-    localStorage.removeItem(STORAGE_KEY_USER_NAME);
+  const clearSavedCredentials = useCallback(async () => {
+    // Clear from centralized storage
+    await TokenStorage.remove('twitch');
+    // Also clear any legacy storage
+    clearLegacyStorage();
     setSavedCredentials(null);
   }, []);
 
@@ -277,7 +370,7 @@ export function useTwitchService(
       setAuthToken(token);
       
       // Validate token and get expiration (non-blocking)
-      serviceRef.current.validateToken(token).then(validation => {
+      serviceRef.current.validateToken(token).then(async (validation) => {
         if (validation && validation.valid) {
           // If we got userId from validation and don't have one yet, use it
           if (validation.userId && !passedUserId) {
@@ -300,22 +393,18 @@ export function useTwitchService(
             setTokenExpiresIn(null);
           }
           
-          // Save to localStorage
+          // Save to centralized TokenStorage (encrypted)
           try {
-            localStorage.setItem(STORAGE_KEY_CHANNEL, channel);
-            localStorage.setItem(STORAGE_KEY_TOKEN, token);
-            if (finalUserId) {
-              localStorage.setItem(STORAGE_KEY_USER_ID, finalUserId);
-            }
-            if (finalUserName) {
-              localStorage.setItem(STORAGE_KEY_USER_NAME, finalUserName);
-            }
-            if (validation.expiresIn > 0) {
-              const expiresAt = Date.now() + (validation.expiresIn * 1000);
-              localStorage.setItem(STORAGE_KEY_TOKEN_EXPIRES, expiresAt.toString());
-            } else {
-              localStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRES);
-            }
+            const credentialsToStore: PlatformCredentials = {
+              platform: 'twitch',
+              accessToken: token,
+              expiresAt: validation.expiresIn > 0 ? Date.now() + (validation.expiresIn * 1000) : undefined,
+              username: finalUserName || channel,
+              userId: finalUserId,
+              scopes: validation.scopes || [],
+            };
+            await TokenStorage.store('twitch', credentialsToStore);
+            
             setSavedCredentials({ 
               channel, 
               token, 
@@ -323,7 +412,7 @@ export function useTwitchService(
               userName: finalUserName || undefined,
             });
           } catch (e) {
-            console.error('Error saving credentials to localStorage:', e);
+            console.error('Error saving credentials to TokenStorage:', e);
           }
           
           // Update AuthService with OAuth authentication
