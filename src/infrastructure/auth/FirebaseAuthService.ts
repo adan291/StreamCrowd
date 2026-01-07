@@ -121,8 +121,20 @@ class FirebaseAuthServiceImpl {
       this.currentUser = result.user;
       console.log('[FirebaseAuth] Signed in anonymously:', result.user.uid);
       return result.user.uid;
-    } catch (err) {
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string };
       console.error('[FirebaseAuth] Anonymous sign-in error:', err);
+      
+      // Handle specific Firebase Auth errors
+      if (error.code === 'auth/configuration-not-found') {
+        console.warn('[FirebaseAuth] Anonymous authentication is not enabled in Firebase Console.');
+        console.warn('[FirebaseAuth] To enable: Firebase Console → Authentication → Sign-in method → Anonymous → Enable');
+        console.warn('[FirebaseAuth] The app will continue without Firebase sync features.');
+      } else if (error.code === 'auth/network-request-failed') {
+        console.warn('[FirebaseAuth] Network error - Firebase sync will be unavailable.');
+      }
+      
+      // Don't throw - allow app to continue without auth
       return null;
     }
   }

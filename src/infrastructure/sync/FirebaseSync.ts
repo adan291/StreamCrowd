@@ -7,8 +7,9 @@
  * @module infrastructure/sync/FirebaseSync
  */
 
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, onValue, off, DatabaseReference } from 'firebase/database';
+import { initializeApp, getApps } from 'firebase/app';
+import { getDatabase, ref, set, onValue, off } from 'firebase/database';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
@@ -21,9 +22,47 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-TJZ968LQPC"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase - reuse existing app if available
+const apps = getApps();
+const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
 const database = getDatabase(app);
+const auth = getAuth(app);
+
+// Wait for auth to be ready before allowing writes
+let authReady = false;
+let authReadyPromise: Promise<void> | null = null;
+
+function waitForAuth(): Promise<void> {
+  if (authReady) return Promise.resolve();
+  
+  if (!authReadyPromise) {
+    authReadyPromise = new Promise((resolve) => {
+      // Check if already authenticated
+      if (auth.currentUser) {
+        authReady = true;
+        resolve();
+        return;
+      }
+      
+      // Wait for auth state change
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          authReady = true;
+          unsubscribe();
+          resolve();
+        }
+      });
+      
+      // Timeout after 5 seconds - allow operations without auth (will fail gracefully)
+      setTimeout(() => {
+        unsubscribe();
+        resolve();
+      }, 5000);
+    });
+  }
+  
+  return authReadyPromise;
+}
 
 // ============ TYPES ============
 
@@ -80,19 +119,59 @@ export interface SyncedOverlayState {
 
 // ============ CORE FUNCTIONS ============
 
+// Track if Firebase sync is available (auth succeeded)
+let firebaseSyncEnabled = true;
+let permissionErrorLogged = false;
+
+/**
+ * Disable Firebase sync (called when auth fails)
+ */
+export function disableFirebaseSync(): void {
+  firebaseSyncEnabled = false;
+  console.warn('[FirebaseSync] Sync disabled - Firebase features will not work');
+}
+
+/**
+ * Check if Firebase sync is enabled
+ */
+export function isFirebaseSyncEnabled(): boolean {
+  return firebaseSyncEnabled;
+}
+
 /**
  * Write state to Firebase
  * @param path - Database path
  * @param data - Data to sync
  */
 export async function syncState(path: string, data: any): Promise<void> {
+  // Skip if sync is disabled
+  if (!firebaseSyncEnabled) {
+    return;
+  }
+
+  // Wait for auth to be ready
+  await waitForAuth();
+
   try {
     const dbRef = ref(database, `overlays/${path}`);
     await set(dbRef, {
       ...data,
       updatedAt: Date.now()
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    
+    // Handle permission denied errors gracefully
+    if (err.message?.includes('PERMISSION_DENIED')) {
+      if (!permissionErrorLogged) {
+        console.warn('[FirebaseSync] Permission denied - check Firebase rules and authentication.');
+        permissionErrorLogged = true;
+      }
+      // Disable further sync attempts to avoid spam
+      firebaseSyncEnabled = false;
+      return;
+    }
+    
     console.error('Error syncing to Firebase:', error);
     throw error;
   }
@@ -108,12 +187,30 @@ export function subscribeToState<T>(
   path: string, 
   callback: (data: T | null) => void
 ): () => void {
+  // Skip if sync is disabled
+  if (!firebaseSyncEnabled) {
+    // Return a no-op unsubscribe function
+    return () => {};
+  }
+
   const dbRef = ref(database, `overlays/${path}`);
   
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     callback(data as T | null);
-  }, (error) => {
+  }, (error: unknown) => {
+    const err = error as { message?: string };
+    
+    // Handle permission denied errors gracefully
+    if (err.message?.includes('PERMISSION_DENIED')) {
+      if (!permissionErrorLogged) {
+        console.warn(`[FirebaseSync] Permission denied for ${path} - Anonymous auth may not be enabled.`);
+        permissionErrorLogged = true;
+      }
+      firebaseSyncEnabled = false;
+      return;
+    }
+    
     console.error(`Firebase subscription error for ${path}:`, error);
   });
 
