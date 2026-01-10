@@ -3,7 +3,6 @@ import { ConnectionPanel } from './components/ConnectionPanel';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
 import { LivePoll } from './components/LivePoll';
-import { PollHistory } from './components/PollHistory';
 import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
 import { StreamPlayer } from './components/StreamPlayer';
@@ -64,7 +63,7 @@ import {
   useModeratedChannels,
 } from './src/application/hooks';
 import { DemoTourOverlay } from './components/DemoTourOverlay';
-import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, History, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2, Sparkles, Layers, Zap } from 'lucide-react';
+import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2, Sparkles, Layers, Zap } from 'lucide-react';
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
@@ -78,6 +77,7 @@ import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ChannelSelector } from './components/ChannelSelector';
 import { ChannelOrbit } from './components/ChannelOrbit';
+import { useChatControlIntegration } from './hooks/useChatControlIntegration';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -385,6 +385,28 @@ const App: React.FC = () => {
     },
   });
   
+  // Chat control commands integration - allows mods/streamers to control dynamics from chat
+  // Commands: !encuesta, !sorteo, !prediccion, !torneo
+  const chatControl = useChatControlIntegration({
+    enabled: status === ConnectionStatus.CONNECTED && !isOverlayMode,
+    poll: {
+      currentPoll: poll.currentPoll,
+      createPoll: poll.createPoll,
+      stopPoll: poll.stopPoll,
+      resetPoll: poll.resetPoll,
+    },
+    onSendMessage: (message) => {
+      if (authToken) {
+        getTwitchService().sendMessage(message);
+      }
+    },
+    onCommandExecuted: (command, result) => {
+      if (result.success) {
+        console.log(`[ChatControl] Command executed: ${command.dynamic}/${command.action}`, result.message);
+      }
+    },
+  });
+  
   // Configure macro services when authenticated
   // This connects prediction service to MacroService for macro execution
   useEffect(() => {
@@ -487,7 +509,6 @@ const App: React.FC = () => {
 
   // UI State (not extracted to hooks - local to App)
   const [chatMessages, setChatMessages] = useState<TwitchMessage[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
   const [activeRightTab, setActiveRightTab] = useState<'chat' | 'stream' | 'collab'>('chat');
   const [leftTab, setLeftTab] = useState<LeftTab>('dynamics');
   const [dynamicsView, setDynamicsView] = useState<DynamicsView>('selector');
@@ -636,12 +657,10 @@ const App: React.FC = () => {
       setDynamicsView('selector');
     },
     closeModal: () => {
-      setShowHistory(false);
       setShowTools(false);
       setShowSoundBoard(false);
     },
     toggleTheme: () => toggleTheme(),
-    showHistory: () => setShowHistory(true),
     toggleSidebar: () => setLeftSidebarHidden(prev => !prev),
   }), [poll, toggleTheme]);
 
@@ -1398,14 +1417,8 @@ const App: React.FC = () => {
             label={t.nav.sounds}
             dataTour="soundboard"
           />
-        </div>
-
-        {/* Bottom section */}
-        <div className="mt-auto flex flex-col gap-3 w-full px-2 mb-3">
-          {/* 1. Historial */}
-          <NavButton onClick={() => setShowHistory(true)} icon={<History size={20} />} label={t.nav.history} />
           
-          {/* 2. AI Vision */}
+          {/* AI Vision */}
           <NavButton 
             active={aiAnalytics.showMascot} 
             onClick={aiAnalytics.toggleMascot} 
@@ -1413,12 +1426,12 @@ const App: React.FC = () => {
             label="AI Vision" 
           />
           
-          {/* 3. Tools (incluye idioma y tema) */}
+          {/* Tools (incluye idioma y tema) */}
           <NavButton onClick={() => setShowTools(true)} icon={<Wrench size={20} />} label="Tools" />
         </div>
-        
+
         {/* Disconnect button */}
-        <div className="w-full px-2 mt-auto">
+        <div className="mt-auto w-full px-2 mb-3">
           <button onClick={handleDisconnect} className="w-full p-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex flex-col items-center gap-1 group">
             <Power size={20} />
             <span className="text-[9px] font-bold group-hover:opacity-100 opacity-0 transition-opacity">{t.common.exit}</span>
@@ -1518,7 +1531,6 @@ const App: React.FC = () => {
                     onAddAsset={handleAddAsset}
                     moderationConfig={moderation.config}
                     onModerationConfigChange={moderation.setConfig}
-                    onShowHistory={() => setShowHistory(true)}
                     sidebarHidden={leftSidebarHidden}
                     onClearChatMessages={() => setChatMessages([])}
                     onShowCountdown={() => setShowCountdown(true)}
@@ -1911,32 +1923,6 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {showHistory && (
-        <PollHistory 
-          history={poll.pastPolls} 
-          onClose={() => setShowHistory(false)} 
-          onLoadPoll={(pastPoll) => {
-            // Load poll data into creator by creating a new poll with same options
-            poll.createPoll({
-              title: pastPoll.title || 'Encuesta',
-              question: pastPoll.question,
-              options: pastPoll.options.map(o => ({
-                label: o.label,
-                color: o.color,
-                icon: o.icon,
-                image: o.image,
-                voteKey: o.voteKey
-              })),
-              maxVotes: pastPoll.maxVotes,
-              duration: pastPoll.duration
-            });
-            moderation.reset();
-            addNotification('success', 'Encuesta cargada del historial');
-          }}
-          onDownloadPoll={() => addNotification('success', 'Encuesta descargada')}
-        />
-      )}
 
       {/* Offline Indicator - Requirements 3.1, 3.2, 3.3, 3.4 */}
       <OfflineIndicator />

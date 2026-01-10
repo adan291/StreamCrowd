@@ -6,6 +6,11 @@ import { ToolWithChat } from './ToolWithChat';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { gameSync } from '../src/infrastructure/sync/FirebaseSync';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ChatSettingsPopover } from './ui/ChatSettingsPopover';
+import { useActivityConfig } from '../hooks/useActivityConfig';
+import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
 
 type WheelMode = 'classic' | 'voting';
 
@@ -75,6 +80,16 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
 }) => {
   const { t } = useI18n();
   useOverlayMode(isOverlayMode); // Clean up body background for OBS
+  
+  // Sound effects
+  const sound = useActivitySound({ storageKey: 'spinner_sound_config' });
+  
+  // Chat settings - version 2 forces update to !tv commands
+  const chatConfig = useActivityConfig<ChatSettingsConfig>({
+    storageKey: 'spinner_chat_config',
+    defaultConfig: getDefaultChatSettings('game'),
+    version: 2,
+  });
   
   // Widget flotante - Estado para drag, minimize y resize
   const [isMinimized, setIsMinimized] = useState(false);
@@ -483,6 +498,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     setIsSpinning(true);
     setShowWinner(false);
     setWinner(null);
+    sound.play('start');
 
     const spins = 5 + Math.random() * 5;
     const randomAngle = Math.random() * 360;
@@ -504,6 +520,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
       setWinner(winnerOpt);
       setShowWinner(true);
       setIsSpinning(false);
+      sound.play('winner');
       syncToOverlay({ rotation: totalRotation, isSpinning: false, showWinner: true, winner: winnerOpt });
     }, 4000);
   };
@@ -921,7 +938,18 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             </div>
 
             {/* OBS Overlay URL */}
-            <div className="mb-3">
+            <div className="mb-3 flex items-center gap-2">
+              <ChatSettingsPopover
+                config={chatConfig.config}
+                onConfigChange={chatConfig.updateConfig}
+                activityType="game"
+              />
+              <SoundSettingsPopover
+                config={sound.config}
+                onConfigChange={sound.setConfig}
+                onTestSound={() => sound.play('winner')}
+                showMilestoneOption={false}
+              />
               <OBSOverlayUrl overlayParam="overlaySpinner" title="la ruleta" />
             </div>
 
@@ -1164,3 +1192,5 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   );
 };
 
+
+export default SpinnerWheel;

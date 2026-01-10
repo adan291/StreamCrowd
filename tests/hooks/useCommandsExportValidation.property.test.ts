@@ -87,7 +87,7 @@ const uniqueValidCommandsArb = fc.array(validExportedCommandArb, { minLength: 0,
 
 // Generate a valid CommandExportFormat
 const validExportFormatArb: fc.Arbitrary<CommandExportFormat> = fc.record({
-  version: fc.constant('1.0' as const),
+  version: fc.constant('2.0' as const),
   exportedAt: fc.date({ min: new Date('2020-01-01'), max: new Date() }).map(d => d.toISOString()),
   source: fc.constant('twitch-vote' as const),
   commands: uniqueValidCommandsArb,
@@ -170,7 +170,7 @@ describe('useCommandsExport Validation Property Tests', () => {
 
     it('should reject objects with invalid version', () => {
       const invalidVersionArb = fc.oneof(
-        fc.constant('2.0'),
+        fc.constant('3.0'),
         fc.constant('0.9'),
         fc.constant('1.1'),
         fc.integer(),
@@ -205,7 +205,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           fc.constant(undefined),
           () => {
             const invalidData = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               // commands missing
@@ -227,7 +227,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           invalidCommandNameArb,
           (invalidName) => {
             const invalidData: CommandExportFormat = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: [{
@@ -255,7 +255,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           invalidCooldownArb,
           (invalidCooldown) => {
             const invalidData: CommandExportFormat = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: [{
@@ -283,7 +283,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           invalidUserLevelArb,
           (invalidLevel) => {
             const invalidData = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: [{
@@ -323,7 +323,7 @@ describe('useCommandsExport Validation Property Tests', () => {
             delete command[missingField];
             
             const invalidData = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: [command],
@@ -345,7 +345,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           validCommandNameArb,
           (name) => {
             const invalidData: CommandExportFormat = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: [
@@ -380,15 +380,15 @@ describe('useCommandsExport Validation Property Tests', () => {
       // Test that error messages are specific and helpful
       const testCases = [
         {
-          data: { version: '2.0', commands: [] },
+          data: { version: '3.0', commands: [] },
           expectedErrorPattern: /version/i,
         },
         {
-          data: { version: '1.0', commands: [{ name: '123invalid' }] },
+          data: { version: '2.0', commands: [{ name: '123invalid' }] },
           expectedErrorPattern: /name/i,
         },
         {
-          data: { version: '1.0', commands: [{ name: 'test', cooldown: -1 }] },
+          data: { version: '2.0', commands: [{ name: 'test', cooldown: -1 }] },
           expectedErrorPattern: /cooldown/i,
         },
       ];
@@ -407,7 +407,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           uniqueValidCommandsArb,
           (source, commands) => {
             const data = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source,
               commands,
@@ -439,7 +439,7 @@ describe('useCommandsExport Validation Property Tests', () => {
           fc.array(commandLikeArb, { minLength: 0, maxLength: 20 }),
           (commands) => {
             const data = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands,

@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   ExternalLink,
   Shield,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from './Button';
 import { PredictionForm } from './PredictionForm';
@@ -34,6 +35,10 @@ import { PredictionHistory } from './PredictionHistory';
 import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
 import { usePredictions } from '../src/application/hooks/usePredictions';
 import { useStreamNotifications } from '../hooks/useStreamNotifications';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ChatSettingsPanel, getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
+import { useActivityConfig } from '../hooks/useActivityConfig';
 import { useI18n } from '../i18n';
 import type { NotificationType } from './Notification';
 import type { PredictionFormData } from '../types/twitch';
@@ -58,7 +63,7 @@ export interface PredictionPanelProps {
   onReauthenticate?: () => void;
 }
 
-type TabType = 'create' | 'active' | 'history';
+type TabType = 'create' | 'active' | 'history' | 'chat';
 
 // ============================================
 // Constants
@@ -91,6 +96,16 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   
   // Stream notifications hook for push notifications
   const { notifyPredictionResolved } = useStreamNotifications();
+  
+  // Sound effects
+  const sound = useActivitySound({ storageKey: 'prediction_sound_config' });
+  
+  // Chat settings - version 2 forces update to !tv commands
+  const chatConfig = useActivityConfig<ChatSettingsConfig>({
+    storageKey: 'prediction_chat_config',
+    defaultConfig: getDefaultChatSettings('prediction'),
+    version: 2,
+  });
 
   // Use predictions hook - disable polling for moderators (API doesn't allow reading other's predictions)
   const {
@@ -116,6 +131,7 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
   const handleCreatePrediction = useCallback(async (data: PredictionFormData) => {
     const success = await createPrediction(data);
     if (success) {
+      sound.play('start');
       if (isModeratorView) {
         setModCreatedPrediction(true);
         onNotification?.('success', 'Predicción creada correctamente. Gestiona desde Twitch.');
@@ -124,20 +140,22 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
         onNotification?.('success', 'Predicción creada correctamente');
       }
     }
-  }, [createPrediction, onNotification, isModeratorView]);
+  }, [createPrediction, onNotification, isModeratorView, sound]);
 
   // Handle lock
   const handleLock = useCallback(async () => {
     const success = await lockPrediction();
     if (success) {
+      sound.play('alert');
       onNotification?.('info', 'Predicción bloqueada - No se aceptan más votos');
     }
-  }, [lockPrediction, onNotification]);
+  }, [lockPrediction, onNotification, sound]);
 
   // Handle resolve
   const handleResolve = useCallback(async (outcomeId: string) => {
     const success = await resolvePrediction(outcomeId);
     if (success) {
+      sound.play('winner');
       setActiveTab('history');
       onNotification?.('success', 'Predicción resuelta correctamente');
       
@@ -155,16 +173,17 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
         }
       }
     }
-  }, [resolvePrediction, onNotification, currentPrediction, notifyPredictionResolved]);
+  }, [resolvePrediction, onNotification, currentPrediction, notifyPredictionResolved, sound]);
 
   // Handle cancel
   const handleCancel = useCallback(async () => {
     const success = await cancelPrediction();
     if (success) {
+      sound.play('end');
       setActiveTab('create');
       onNotification?.('info', 'Predicción cancelada - Puntos reembolsados');
     }
-  }, [cancelPrediction, onNotification]);
+  }, [cancelPrediction, onNotification, sound]);
 
   // Determine which tab to show based on state
   const effectiveTab = currentPrediction ? 'active' : activeTab;
@@ -224,6 +243,12 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
                     En vivo
                   </span>
                 )}
+                <SoundSettingsPopover
+                  config={sound.config}
+                  onConfigChange={sound.setConfig}
+                  onTestSound={() => sound.play('winner')}
+                  showMilestoneOption={false}
+                />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -370,6 +395,12 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
                 En vivo
               </span>
             )}
+            <SoundSettingsPopover
+              config={sound.config}
+              onConfigChange={sound.setConfig}
+              onTestSound={() => sound.play('winner')}
+              showMilestoneOption={false}
+            />
             <Button
               variant="ghost"
               size="sm"
@@ -426,6 +457,17 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
                 {history.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'chat'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+            title="Configuración de comandos de chat"
+          >
+            <MessageSquare size={14} />
           </button>
         </div>
       </div>
@@ -499,6 +541,15 @@ export const PredictionPanel: React.FC<PredictionPanelProps> = ({
         {/* History Tab */}
         {effectiveTab === 'history' && (
           <PredictionHistory predictions={history} />
+        )}
+
+        {/* Chat Settings Tab */}
+        {activeTab === 'chat' && (
+          <ChatSettingsPanel
+            config={chatConfig.config}
+            onConfigChange={chatConfig.updateConfig}
+            activityType="prediction"
+          />
         )}
       </div>
     </div>

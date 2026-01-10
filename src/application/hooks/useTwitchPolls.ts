@@ -73,7 +73,14 @@ function loadHistoryFromStorage(): TwitchPoll[] {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        return parsed.slice(0, MAX_HISTORY_ITEMS);
+        // Deduplicate by ID to prevent duplicate key warnings
+        const seen = new Set<string>();
+        const deduplicated = parsed.filter((poll: TwitchPoll) => {
+          if (seen.has(poll.id)) return false;
+          seen.add(poll.id);
+          return true;
+        });
+        return deduplicated.slice(0, MAX_HISTORY_ITEMS);
       }
     }
   } catch (e) {

@@ -10,6 +10,7 @@
  */
 
 import { TwitchAdapter, getTwitchAdapter } from '../../infrastructure/adapters/TwitchAdapter';
+import { PlatformManagerService } from './PlatformManagerService';
 import type { 
   ConnectionStatus, 
   ChatMessage, 
@@ -156,6 +157,8 @@ export class TwitchService {
         // Convert to legacy format for backward compatibility
         this.messageCallback(message);
       }
+      // Forward to PlatformManagerService for chat control commands
+      PlatformManagerService.forwardMessage('twitch', message);
     });
     this.adapterUnsubscribers.push(messageUnsub);
     

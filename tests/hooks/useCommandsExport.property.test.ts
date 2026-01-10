@@ -98,7 +98,7 @@ const uniqueExportedCommandsArb = fc.array(exportedCommandArb, { minLength: 0, m
 
 // Generate a valid CommandExportFormat
 const exportFormatArb: fc.Arbitrary<CommandExportFormat> = fc.record({
-  version: fc.constant('1.0' as const),
+  version: fc.constant('2.0' as const),
   exportedAt: fc.date({ min: new Date('2020-01-01'), max: new Date() }).map(d => d.toISOString()),
   source: fc.constant('twitch-vote' as const),
   commands: uniqueExportedCommandsArb,
@@ -156,7 +156,7 @@ describe('useCommandsExport Property Tests', () => {
             const exported = toExportFormat(commands);
             
             // Verify format structure
-            expect(exported.version).toBe('1.0');
+            expect(exported.version).toBe('2.0');
             expect(exported.source).toBe('twitch-vote');
             expect(typeof exported.exportedAt).toBe('string');
             expect(Array.isArray(exported.commands)).toBe(true);
@@ -263,7 +263,7 @@ describe('useCommandsExport Property Tests', () => {
             const testNames = uniqueNames.slice(0, 5);
             
             const exportData: CommandExportFormat = {
-              version: '1.0',
+              version: '2.0',
               exportedAt: new Date().toISOString(),
               source: 'twitch-vote',
               commands: testNames.map(name => ({

@@ -530,7 +530,7 @@ describe('ActionLogService', () => {
       const persistentService = new ActionLogService({ persistToStorage: true });
       persistentService.logAction('Test', 'user1', 'Alice', '', 'poll');
 
-      const stored = localStorage.getItem('streamcrowd_collab_action_log');
+      const stored = localStorage.getItem('twitchvote_collab_action_log');
       expect(stored).not.toBeNull();
       
       const parsed = JSON.parse(stored!);
@@ -550,7 +550,7 @@ describe('ActionLogService', () => {
         timestamp: Date.now(),
         category: 'poll'
       }];
-      localStorage.setItem('streamcrowd_collab_action_log', JSON.stringify(entries));
+      localStorage.setItem('twitchvote_collab_action_log', JSON.stringify(entries));
 
       // Create new service that loads from storage
       const persistentService = new ActionLogService({ persistToStorage: true });

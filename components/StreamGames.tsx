@@ -1,8 +1,14 @@
-import React, { useState, lazy, Suspense } from 'react';
-import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair, Eye, Swords, Skull, Flag, Camera, Dice6, ChevronDown, Tv, Users, Loader2 } from 'lucide-react';
+import React, { useState, lazy, Suspense, useEffect } from 'react';
+import { X, Gamepad2, Target, CircleDot, Fish, Bomb, HelpCircle, Ship, Crosshair, Eye, Swords, Skull, Flag, Camera, Dice6, ChevronDown, Tv, Users, Loader2, Clock } from 'lucide-react';
 import { TwitchMessage, CollaborationChannel } from '../types';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ChatSettingsPopover } from './ui/ChatSettingsPopover';
+import { useActivityConfig } from '../hooks/useActivityConfig';
+import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
+import { useLastPlayedGame } from '../hooks/useLastPlayedGame';
 
 // Lazy loaded game components
 const LazyGames = {
@@ -137,12 +143,33 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
   const [activeGame, setActiveGame] = useState<GameTab>('trivia');
   const [activeCategory, setActiveCategory] = useState<GameCategory>('streamer');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  
+  // Sound effects for games
+  const sound = useActivitySound({ storageKey: 'games_sound_config' });
+  
+  // Chat settings for games - version 2 forces update to !tv commands
+  const chatConfig = useActivityConfig<ChatSettingsConfig>({
+    storageKey: 'games_chat_config',
+    defaultConfig: getDefaultChatSettings('game'),
+    version: 2,
+  });
+  
+  // Last played game tracking
+  const { lastPlayed, setLastPlayed, isLastPlayed } = useLastPlayedGame();
 
   const currentCategory = CATEGORIES.find(c => c.id === activeCategory)!;
   const gamesInCategory = GAMES.filter(g => g.category === activeCategory);
+  
+  // Sort games to show last played first
+  const sortedGamesInCategory = [...gamesInCategory].sort((a, b) => {
+    if (isLastPlayed(a.id)) return -1;
+    if (isLastPlayed(b.id)) return 1;
+    return 0;
+  });
 
   const handleSelectGame = (gameId: GameTab) => {
     setActiveGame(gameId);
+    setLastPlayed(gameId);
   };
 
   const handleSelectCategory = (categoryId: GameCategory) => {
@@ -180,6 +207,19 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
             <X size={20} />
           </button>
         )}
+        {/* Chat & Sound Settings */}
+        <ChatSettingsPopover
+          config={chatConfig.config}
+          onConfigChange={chatConfig.updateConfig}
+          activityType="game"
+        />
+        <SoundSettingsPopover
+          config={sound.config}
+          onConfigChange={sound.setConfig}
+          onTestSound={() => sound.play('winner')}
+          showVoteOption={false}
+          showMilestoneOption={false}
+        />
       </div>
 
       {/* Category Selector + Game Tabs */}
@@ -229,7 +269,7 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
 
           {/* Game Tabs for current category */}
           <div className="flex-1 flex gap-1 overflow-x-auto">
-            {gamesInCategory.map((game) => (
+            {sortedGamesInCategory.map((game) => (
               <button
                 key={game.id}
                 onClick={() => handleSelectGame(game.id)}
@@ -241,6 +281,9 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
               >
                 {game.icon}
                 <span>{game.name}</span>
+                {isLastPlayed(game.id) && activeGame !== game.id && (
+                  <Clock size={10} className="text-amber-500" title="Último jugado" />
+                )}
                 <span className="text-[9px] opacity-50 hidden sm:inline">{game.cmd}</span>
               </button>
             ))}

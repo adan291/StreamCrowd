@@ -39,6 +39,8 @@ function getPanelForView(view: DynamicsView): string {
       return 'JudgePanel';
     case 'giveaway':
       return 'GiveawayHub';
+    case 'countdown':
+      return 'CountdownPanel';
     default:
       return 'ActivitySelector';
   }
@@ -48,7 +50,7 @@ function getPanelForView(view: DynamicsView): string {
  * Validates that a view is a valid DynamicsView
  */
 function isValidDynamicsView(view: string): view is DynamicsView {
-  const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway'];
+  const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway', 'countdown'];
   return validViews.includes(view as DynamicsView);
 }
 
@@ -60,7 +62,7 @@ function handleDynamicsNavigation(
   view: string,
   setDynamicsView: (view: DynamicsView) => void
 ): void {
-  const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway'];
+  const validViews: DynamicsView[] = ['selector', 'poll', 'judge', 'giveaway', 'countdown'];
   if (validViews.includes(view as DynamicsView)) {
     setDynamicsView(view as DynamicsView);
   } else {
@@ -76,6 +78,7 @@ const ACTIVITY_TO_PANEL_MAP: Record<Exclude<DynamicsView, 'selector'>, string> =
   poll: 'PollCreator',
   judge: 'JudgePanel',
   giveaway: 'GiveawayHub',
+  countdown: 'CountdownPanel',
 };
 
 /**
@@ -105,14 +108,16 @@ function simulateNavigationFlow(
 const activityViewArb: fc.Arbitrary<Exclude<DynamicsView, 'selector'>> = fc.constantFrom(
   'poll',
   'judge',
-  'giveaway'
+  'giveaway',
+  'countdown'
 );
 
 const dynamicsViewArb: fc.Arbitrary<DynamicsView> = fc.constantFrom(
   'selector',
   'poll',
   'judge',
-  'giveaway'
+  'giveaway',
+  'countdown'
 );
 
 const invalidViewArb: fc.Arbitrary<string> = fc.oneof(
@@ -122,8 +127,9 @@ const invalidViewArb: fc.Arbitrary<string> = fc.oneof(
   fc.constant('polls'),
   fc.constant('judges'),
   fc.constant('giveaways'),
+  fc.constant('countdowns'),
   fc.stringOf(fc.char(), { minLength: 1, maxLength: 10 }).filter(
-    s => !['selector', 'poll', 'judge', 'giveaway'].includes(s)
+    s => !['selector', 'poll', 'judge', 'giveaway', 'countdown'].includes(s)
   )
 );
 
@@ -300,6 +306,7 @@ describe('Activity Navigation Property Tests', () => {
       expect(getPanelForView('poll')).toBe('PollCreator');
       expect(getPanelForView('judge')).toBe('JudgePanel');
       expect(getPanelForView('giveaway')).toBe('GiveawayHub');
+      expect(getPanelForView('countdown')).toBe('CountdownPanel');
       expect(getPanelForView('selector')).toBe('ActivitySelector');
     });
 
@@ -313,7 +320,7 @@ describe('Activity Navigation Property Tests', () => {
           expect(panel.length).toBeGreaterThan(0);
 
           // Property: panel should be one of the expected panels
-          const validPanels = ['ActivitySelector', 'PollCreator', 'JudgePanel', 'GiveawayHub'];
+          const validPanels = ['ActivitySelector', 'PollCreator', 'JudgePanel', 'GiveawayHub', 'CountdownPanel'];
           expect(validPanels).toContain(panel);
         }),
         { numRuns: 100 }

@@ -89,6 +89,22 @@ export interface SyncedOverlayState {
     isSpinning: boolean;
     displayName: string;
     participants: string[];
+    // Extended data for overlay
+    activeThreads?: Array<{
+      id: string;
+      name: string;
+      keyword: string;
+      mode: string;
+      participantCount: number;
+      endsAt?: number;
+      isPaused?: boolean;
+      winner?: string;
+    }>;
+    scheduledThreads?: Array<{
+      id: string;
+      name: string;
+      startsAt: number;
+    }>;
     updatedAt: number;
   };
   judgePanel?: {
@@ -124,6 +140,35 @@ let firebaseSyncEnabled = true;
 let permissionErrorLogged = false;
 
 /**
+ * Recursively remove undefined values from an object
+ * Firebase doesn't accept undefined values
+ */
+function removeUndefinedDeep(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedDeep(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const result: Record<string, any> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const value = obj[key];
+        if (value !== undefined) {
+          result[key] = removeUndefinedDeep(value);
+        }
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+}
+
+/**
  * Disable Firebase sync (called when auth fails)
  */
 export function disableFirebaseSync(): void {
@@ -154,10 +199,12 @@ export async function syncState(path: string, data: any): Promise<void> {
 
   try {
     const dbRef = ref(database, `overlays/${path}`);
-    await set(dbRef, {
+    // Remove undefined values before sending to Firebase
+    const cleanData = removeUndefinedDeep({
       ...data,
       updatedAt: Date.now()
     });
+    await set(dbRef, cleanData);
   } catch (error: unknown) {
     const err = error as { message?: string };
     

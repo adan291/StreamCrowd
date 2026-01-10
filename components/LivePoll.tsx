@@ -8,6 +8,8 @@ import { ModerationStatsDisplay } from './ModerationStatsDisplay';
 import { ModerationLogViewer } from './ModerationLogViewer';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useI18n } from '../i18n';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
 
 interface OverlayStyles {
   textColor?: string;
@@ -98,6 +100,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
   // Moderation panel state
   const [showModerationPanel, setShowModerationPanel] = useState(false);
   
+  // Sound effects
+  const sound = useActivitySound({ storageKey: 'poll_sound_config' });
   // Chart container dimensions to avoid negative dimension warnings
   const [chartSize, setChartSize] = useState<{width: number, height: number}>({width: 400, height: 250});
   const chartContainerRef = React.useRef<HTMLDivElement>(null);
@@ -198,6 +202,22 @@ export const LivePoll: React.FC<LivePollProps> = ({
         setCountdownNumber(null);
     }
   }, [poll.isActive, poll.startTime, poll.duration, poll.totalVotes]);
+
+  // Sound effects for countdown
+  useEffect(() => {
+    if (variant !== 'default' || isSimulationMode) return;
+    if (countdownNumber !== null && countdownNumber > 0 && countdownNumber <= 10) {
+      sound.playCountdown(countdownNumber);
+    }
+  }, [countdownNumber, variant, isSimulationMode, sound]);
+
+  // Sound effect for winner
+  useEffect(() => {
+    if (variant !== 'default' || isSimulationMode) return;
+    if (showWinnerOverlay && !poll.isActive && poll.totalVotes > 0) {
+      sound.play('winner');
+    }
+  }, [showWinnerOverlay, poll.isActive, poll.totalVotes, variant, isSimulationMode, sound]);
 
   // Detect vote changes to trigger animation
   useEffect(() => {
@@ -618,6 +638,17 @@ export const LivePoll: React.FC<LivePollProps> = ({
              {/* OBS Overlay - inline with actions */}
              {poll.isActive && overlayWindowRef && !isSimulationMode && (
                 <OBSOverlayUrl overlayParam="overlayPoll" title="la encuesta" />
+             )}
+             
+             {/* Sound Toggle */}
+             {!isSimulationMode && (
+                <SoundSettingsPopover
+                  config={sound.config}
+                  onConfigChange={sound.setConfig}
+                  onTestSound={() => sound.play('winner')}
+                  showVoteOption={true}
+                  showMilestoneOption={true}
+                />
              )}
              
              {!isSimulationMode && (

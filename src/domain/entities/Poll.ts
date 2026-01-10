@@ -64,8 +64,11 @@ export function createPoll(params: {
   votePrefix?: string;
   voteMatchMode?: 'exact' | 'partial';
 }): Poll {
+  // Generate unique ID using timestamp + random string
+  const uniqueId = `poll_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  
   return {
-    id: `poll_${Date.now()}`,
+    id: uniqueId,
     title: params.title,
     question: params.question,
     options: params.options.map((o, i) => ({

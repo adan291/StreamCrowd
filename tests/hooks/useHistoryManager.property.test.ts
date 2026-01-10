@@ -529,7 +529,7 @@ describe('useHistoryManager Property Tests', () => {
       try {
         const data = JSON.parse(json);
         
-        if (data.version !== 1 || data.application !== 'twitchvote' || !Array.isArray(data.items)) {
+        if (data.version !== 1 || data.application !== 'streamcrowd' || !Array.isArray(data.items)) {
           return { success: false, error: 'Invalid format' };
         }
         
@@ -600,7 +600,7 @@ describe('useHistoryManager Property Tests', () => {
             
             const parsed = JSON.parse(exported);
             expect(parsed.version).toBe(1);
-            expect(parsed.application).toBe('twitchvote');
+            expect(parsed.application).toBe('streamcrowd');
             expect(Array.isArray(parsed.items)).toBe(true);
             expect(typeof parsed.exportedAt).toBe('number');
           }
@@ -657,7 +657,7 @@ describe('useHistoryManager Property Tests', () => {
       fc.assert(
         fc.property(
           fc.array(historyItemArb, { minLength: 1, maxLength: 10 }),
-          fc.string({ minLength: 1, maxLength: 20 }).filter(s => s !== 'twitchvote'),
+          fc.string({ minLength: 1, maxLength: 20 }).filter(s => s !== 'streamcrowd'),
           (items, wrongApp) => {
             const exportData = {
               version: 1,

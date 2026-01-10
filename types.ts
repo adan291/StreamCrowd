@@ -201,6 +201,11 @@ export interface GiveawayThread {
   mode: 'keyword' | 'subs';
   // Configuración de valores para modo subs
   subsConfig?: SubsGiveawayConfig;
+  // Tiempo límite del sorteo
+  startsAt?: number; // Timestamp de cuando empieza (si es programado)
+  endsAt?: number; // Timestamp de cuando termina el sorteo
+  // Imágenes del premio
+  prizeImages?: string[]; // URLs de las imágenes (base64 o URLs)
 }
 
 /**

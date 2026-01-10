@@ -509,6 +509,15 @@ class PlatformManagerServiceImpl {
   }
 
   /**
+   * Forward a message from external services (e.g., TwitchService)
+   * This allows the legacy TwitchService to send messages to PlatformManagerService
+   * for processing by chat control commands and other subscribers.
+   */
+  forwardMessage(platform: Platform, message: ChatMessage): void {
+    this.handleMessage(platform, message);
+  }
+
+  /**
    * Handle stream event from adapter
    */
   private handleStreamEvent(platform: Platform, event: StreamEvent): void {

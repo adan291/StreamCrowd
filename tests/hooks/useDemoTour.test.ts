@@ -22,12 +22,12 @@ describe('useDemoTour', () => {
 
     it('should have correct total steps for Spanish locale', () => {
       const { result } = renderHook(() => useDemoTour({ locale: 'es' }));
-      expect(result.current.totalSteps).toBe(11);
+      expect(result.current.totalSteps).toBe(13);
     });
 
     it('should have correct total steps for English locale', () => {
       const { result } = renderHook(() => useDemoTour({ locale: 'en' }));
-      expect(result.current.totalSteps).toBe(11);
+      expect(result.current.totalSteps).toBe(13);
     });
   });
 

@@ -26,13 +26,18 @@ import {
   Grid,
   Vote,
   Sliders,
-  Wand2,
 } from 'lucide-react';
 import { CollapsibleSection } from './ui/CollapsibleSection';
 import { PresetSelector } from './ui/PresetSelector';
 import { ViewModeToggle, useViewMode } from './ui/ViewModeToggle';
 import { WizardStepper, useWizard } from './ui/WizardStepper';
+import { WizardButton } from './ui/WizardButton';
 import { Tooltip } from './ui/Tooltip';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ChatSettingsPopover } from './ui/ChatSettingsPopover';
+import { useActivityConfig } from '../hooks/useActivityConfig';
+import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
 import { 
   JUDGE_PRESETS, 
   JudgePanelPresetValues, 
@@ -122,6 +127,16 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
   onAddAsset,
 }) => {
   const { t } = useI18n();
+  
+  // Sound effects
+  const sound = useActivitySound({ storageKey: 'judge_panel_sound_config' });
+  
+  // Chat settings - version 2 forces update to !tv commands
+  const chatConfig = useActivityConfig<ChatSettingsConfig>({
+    storageKey: 'judge_chat_config',
+    defaultConfig: getDefaultChatSettings('judge'),
+    version: 2,
+  });
   
   // State
   const [state, setState] = useState<JudgePanelState>(createDefaultState);
@@ -707,6 +722,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
     // Reset finished state first
     setIsFinished(false);
     setWinnerId(null);
+    sound.play('start');
     
     setState(prev => {
       // Apply defaults: prefix "+" if empty, voteKey "1", "2", "3"... if empty
@@ -741,6 +757,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
     if (results.length > 0) {
       const winner = results[0]; // Already sorted by finalScore
       setWinnerId(winner.contestant.id);
+      sound.play('winner');
     }
     setIsFinished(true);
     setState(prev => ({
@@ -1616,7 +1633,20 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
         <h2 className={`text-xl font-bold ${isEmbedded ? 'text-zinc-900 dark:text-white' : 'text-white'} flex items-center gap-2`}>
           <Trophy className="text-yellow-400" /> Panel de Jueces
         </h2>
-        <OBSOverlayUrl overlayParam="overlayJudgePanel" title="el panel de jueces" />
+        <div className="flex items-center gap-2">
+          <ChatSettingsPopover
+            config={chatConfig.config}
+            onConfigChange={chatConfig.updateConfig}
+            activityType="judge"
+          />
+          <SoundSettingsPopover
+            config={sound.config}
+            onConfigChange={sound.setConfig}
+            onTestSound={() => sound.play('winner')}
+            showMilestoneOption={false}
+          />
+          <OBSOverlayUrl overlayParam="overlayJudgePanel" title="el panel de jueces" />
+        </div>
       </div>
       <p className="text-zinc-400 text-sm mb-4">Sistema de puntuación con jueces y votación pública</p>
 
@@ -1666,18 +1696,10 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                   storageKey="judge-panel-view-mode"
                   disabled={wizardMode}
                 />
-                <button
+                <WizardButton
+                  isActive={wizardMode}
                   onClick={() => setWizardMode(!wizardMode)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    wizardMode 
-                      ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' 
-                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
-                  }`}
-                  title="Modo Asistente"
-                >
-                  <Wand2 size={14} />
-                  <span>Asistente</span>
-                </button>
+                />
               </div>
             </div>
 

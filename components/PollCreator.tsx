@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Download, FolderUp, History, Wand2, Settings, ListChecks } from 'lucide-react';
+import { Plus, Trash2, Save, Bookmark, X, RefreshCcw, Smile, Upload, AlertCircle, Star, Check, Grid, Zap, Eye, Target, Clock, Palette, Infinity as InfinityIcon, Shield, Copy, FileText, GripVertical, Disc3, Download, FolderUp, Settings, ListChecks } from 'lucide-react';
 import { SpinnerWheel } from './SpinnerWheel';
 import { Button } from './Button';
 import { MAX_OPTIONS, MIN_OPTIONS, CHART_COLORS } from '../constants';
@@ -16,6 +16,12 @@ import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
 import { CollapsibleSection } from './ui/CollapsibleSection';
 import { ViewModeToggle, useViewMode } from './ui/ViewModeToggle';
 import { WizardStepper, useWizard } from './ui/WizardStepper';
+import { WizardButton } from './ui/WizardButton';
+import { ChatSettingsPopover } from './ui/ChatSettingsPopover';
+import { useActivityConfig } from '../hooks/useActivityConfig';
+import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
 
 interface PollCreatorProps {
   onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
@@ -25,7 +31,6 @@ interface PollCreatorProps {
   moderationConfig?: ModerationConfig;
   onModerationConfigChange?: (config: ModerationConfig) => void;
   chatMessages?: TwitchMessage[];
-  onShowHistory?: () => void;
   sidebarHidden?: boolean;
   onClearChatMessages?: () => void;
   userVoteMap?: Map<string, number>;
@@ -36,9 +41,23 @@ interface PollCreatorProps {
   isConnected?: boolean;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], onShowHistory, sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
   const { t } = useI18n();
   const { triggerPollStart } = useOBSTriggers();
+  
+  // Sound settings
+  const sound = useActivitySound({
+    storageKey: 'poll_sound_config',
+    activityType: 'poll',
+  });
+  
+  // Chat settings - version 2 forces update to !tv commands
+  const chatConfig = useActivityConfig<ChatSettingsConfig>({
+    storageKey: 'poll_chat_config',
+    defaultConfig: getDefaultChatSettings('poll'),
+    version: 2,
+  });
+  
   const [title, setTitle] = useState(t.poll.title);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<{ label: string; color: string; icon?: string; image?: string; voteKey?: string }[]>([
@@ -652,18 +671,10 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
               onChange={setViewMode}
               disabled={wizardMode}
             />
-            <button
+            <WizardButton
+              isActive={wizardMode}
               onClick={() => setWizardMode(!wizardMode)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                wizardMode 
-                  ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30' 
-                  : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-700'
-              }`}
-              title="Modo Asistente"
-            >
-              <Wand2 size={14} />
-              <span className="hidden sm:inline">Asistente</span>
-            </button>
+            />
             <div className="w-px h-5 bg-zinc-300 dark:bg-zinc-700" />
             <button 
               type="button"
@@ -686,17 +697,18 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
             >
               <Bookmark size={14} /> <span className="hidden xs:inline">{t.poll.templates}</span>
             </button>
-            {onShowHistory && (
-              <Tooltip text="Ver historial de encuestas pasadas">
-                <button 
-                  type="button"
-                  onClick={onShowHistory}
-                  className="text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 bg-white dark:bg-zinc-900 px-2 sm:px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-twitch-brand transition-all"
-                >
-                  <History size={14} /> <span className="hidden xs:inline">Historial</span>
-                </button>
-              </Tooltip>
-            )}
+            {/* Chat Settings */}
+            <ChatSettingsPopover
+              config={chatConfig.config}
+              onConfigChange={chatConfig.updateConfig}
+              activityType="poll"
+            />
+            {/* Sound Settings */}
+            <SoundSettingsPopover
+              config={sound.config}
+              onConfigChange={sound.setConfig}
+              activityType="poll"
+            />
           </div>
         </div>
 

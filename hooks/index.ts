@@ -48,6 +48,31 @@ export type { UseOnboardingOptions } from './useOnboarding';
 export { useBackupService } from './useBackupService';
 export type { UseBackupServiceReturn } from './useBackupService';
 
+// ==================== Chat Control Commands ====================
+export { useChatControlCommands } from './useChatControlCommands';
+export type { 
+  UseChatControlCommandsOptions, 
+  UseChatControlCommandsReturn 
+} from './useChatControlCommands';
+
+export { useChatControlIntegration } from './useChatControlIntegration';
+export type { 
+  UseChatControlIntegrationOptions, 
+  UseChatControlIntegrationReturn 
+} from './useChatControlIntegration';
+
+export { usePollControlHandler } from './usePollControlHandler';
+export type { PollState, PollActions, UsePollControlHandlerOptions } from './usePollControlHandler';
+
+export { useGiveawayControlHandler } from './useGiveawayControlHandler';
+export type { GiveawayState, GiveawayActions, UseGiveawayControlHandlerOptions } from './useGiveawayControlHandler';
+
+export { usePredictionControlHandler } from './usePredictionControlHandler';
+export type { PredictionState, PredictionActions, UsePredictionControlHandlerOptions } from './usePredictionControlHandler';
+
+export { useJudgeControlHandler } from './useJudgeControlHandler';
+export type { JudgeState, JudgeActions, UseJudgeControlHandlerOptions } from './useJudgeControlHandler';
+
 export { useAutoBackup } from './useAutoBackup';
 export type { UseAutoBackupOptions, UseAutoBackupReturn } from './useAutoBackup';
 

@@ -29,6 +29,8 @@ import {
 import { Button } from './Button';
 import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
 import { useTwitchPolls, type PollFormData } from '../src/application/hooks/useTwitchPolls';
+import { useActivitySound } from '../hooks/useActivitySound';
+import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
 import type { TwitchPoll } from '../src/application/services/TwitchPollService';
 import type { NotificationType } from './Notification';
 
@@ -366,6 +368,9 @@ export const TwitchPollPanel: React.FC<TwitchPollPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('create');
   const [showAuthPanel, setShowAuthPanel] = useState(false);
+  
+  // Sound effects
+  const sound = useActivitySound({ storageKey: 'twitch_poll_sound_config' });
 
   const {
     currentPoll,
@@ -388,26 +393,29 @@ export const TwitchPollPanel: React.FC<TwitchPollPanelProps> = ({
   const handleCreatePoll = useCallback(async (data: PollFormData) => {
     const success = await createPoll(data);
     if (success) {
+      sound.play('start');
       onNotification?.('success', 'Encuesta creada correctamente');
       setActiveTab('active');
     }
-  }, [createPoll, onNotification]);
+  }, [createPoll, onNotification, sound]);
 
   const handleTerminate = useCallback(async () => {
     const success = await terminatePoll();
     if (success) {
+      sound.play('winner');
       onNotification?.('success', 'Encuesta terminada');
       setActiveTab('history');
     }
-  }, [terminatePoll, onNotification]);
+  }, [terminatePoll, onNotification, sound]);
 
   const handleArchive = useCallback(async () => {
     const success = await archivePoll();
     if (success) {
+      sound.play('end');
       onNotification?.('info', 'Encuesta archivada');
       setActiveTab('create');
     }
-  }, [archivePoll, onNotification]);
+  }, [archivePoll, onNotification, sound]);
 
   // Not Partner/Affiliate
   if (!isPartnerOrAffiliate) {
@@ -463,6 +471,12 @@ export const TwitchPollPanel: React.FC<TwitchPollPanelProps> = ({
                 En vivo
               </span>
             )}
+            <SoundSettingsPopover
+              config={sound.config}
+              onConfigChange={sound.setConfig}
+              onTestSound={() => sound.play('winner')}
+              showMilestoneOption={false}
+            />
             <Button
               variant="ghost"
               size="sm"

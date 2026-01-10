@@ -447,10 +447,9 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {customSounds.map((sound) => (
-                    <button
+                    <div
                       key={sound.id}
-                      onClick={() => playCustomSound(sound)}
-                      disabled={isMuted}
+                      onClick={() => !isMuted && playCustomSound(sound)}
                       className={`
                         relative p-4 rounded-xl transition-all transform group
                         ${playingId === sound.id ? 'scale-95 ring-2 ring-white' : 'hover:scale-105'}
@@ -472,7 +471,7 @@ export const SoundBoard: React.FC<SoundBoardProps> = ({ onClose }) => {
                       >
                         <Trash2 size={12} />
                       </button>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}

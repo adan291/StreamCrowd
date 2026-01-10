@@ -1,7 +1,10 @@
-import React from 'react';
-import { Vote, Trophy, Gift, Timer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Vote, Trophy, Gift, Timer, Disc3, BarChart3, History, Terminal } from 'lucide-react';
 import { DynamicsView, ACTIVITIES } from '../types';
 import { useI18n } from '../i18n';
+import { ActivityStatsDrawer } from './ui/ActivityStatsDrawer';
+import { UnifiedHistoryDrawer } from './ui/UnifiedHistoryDrawer';
+import { ChatControlPopover } from './ui/ChatControlPopover';
 
 // Icon mapping for activity types
 const ACTIVITY_ICONS: Record<Exclude<DynamicsView, 'selector'>, React.ReactNode> = {
@@ -9,6 +12,7 @@ const ACTIVITY_ICONS: Record<Exclude<DynamicsView, 'selector'>, React.ReactNode>
   judge: <Trophy size={28} />,
   giveaway: <Gift size={28} />,
   countdown: <Timer size={28} />,
+  spinner: <Disc3 size={28} />, // Keep for type safety, not displayed
 };
 
 interface ActivityCardProps {
@@ -81,6 +85,8 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
   onSelectActivity,
 }) => {
   const { t } = useI18n();
+  const [showStats, setShowStats] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Get translated titles and descriptions for activities
   const getActivityTitle = (id: Exclude<DynamicsView, 'selector'>): string => {
@@ -93,6 +99,8 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
         return t.nav?.giveaway || 'Sorteos';
       case 'countdown':
         return t.nav?.countdown || 'Countdown';
+      case 'spinner':
+        return t.nav?.spinner || 'Ruleta';
       default:
         return id;
     }
@@ -108,6 +116,8 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
         return t.nav?.giveawayDescription || 'Sorteos y giveaways para tu comunidad';
       case 'countdown':
         return t.nav?.countdownDescription || 'Temporizador con cuenta atrás para eventos';
+      case 'spinner':
+        return t.nav?.spinnerDescription || 'Ruleta de la fortuna para decisiones aleatorias';
       default:
         return '';
     }
@@ -119,13 +129,36 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
       aria-label={t.nav?.dynamicsSelector || 'Selector de dinámicas'}
     >
       {/* Header */}
-      <div className="mb-6 sm:mb-8">
-        <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-          {t.nav?.dynamics || 'Dinámicas'}
-        </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {t.nav?.dynamicsDescription || 'Selecciona una actividad interactiva para tu stream'}
-        </p>
+      <div className="mb-6 sm:mb-8 flex items-start justify-between">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+            {t.nav?.dynamics || 'Dinámicas'}
+          </h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {t.nav?.dynamicsDescription || 'Selecciona una actividad interactiva para tu stream'}
+          </p>
+        </div>
+        
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <ChatControlPopover size="md" position="bottom" />
+          <button
+            onClick={() => setShowHistory(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors"
+            title="Ver historial"
+          >
+            <History size={18} />
+            <span className="text-sm font-medium hidden sm:inline">Historial</span>
+          </button>
+          <button
+            onClick={() => setShowStats(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg transition-colors"
+            title="Ver estadísticas"
+          >
+            <BarChart3 size={18} />
+            <span className="text-sm font-medium hidden sm:inline">Estadísticas</span>
+          </button>
+        </div>
       </div>
 
       {/* Activity Cards Grid */}
@@ -145,6 +178,12 @@ export const ActivitySelector: React.FC<ActivitySelectorProps> = ({
           />
         ))}
       </div>
+      
+      {/* Stats Drawer */}
+      <ActivityStatsDrawer isOpen={showStats} onClose={() => setShowStats(false)} />
+      
+      {/* History Drawer */}
+      <UnifiedHistoryDrawer isOpen={showHistory} onClose={() => setShowHistory(false)} />
     </div>
   );
 };

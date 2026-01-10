@@ -16,7 +16,7 @@ import { ACTIVITIES, DynamicsView, ActivityConfig } from '../../types';
 // ============ PURE FUNCTIONS FOR TESTING ============
 
 /**
- * Validates that the ACTIVITIES configuration contains exactly 3 activities
+ * Validates that the ACTIVITIES configuration contains exactly 4 activities
  * with all required fields
  */
 function validateActivitiesConfig(activities: ActivityConfig[]): {
@@ -35,7 +35,7 @@ function validateActivitiesConfig(activities: ActivityConfig[]): {
   );
 
   return {
-    isValid: activities.length === 3 && hasAllFields,
+    isValid: activities.length === 4 && hasAllFields,
     count: activities.length,
     hasAllFields,
     activityIds: activities.map((a) => a.id),
@@ -46,7 +46,7 @@ function validateActivitiesConfig(activities: ActivityConfig[]): {
  * Validates that an activity ID is one of the expected values
  */
 function isValidActivityId(id: string): boolean {
-  const validIds: Exclude<DynamicsView, 'selector'>[] = ['poll', 'judge', 'giveaway'];
+  const validIds: Exclude<DynamicsView, 'selector'>[] = ['poll', 'judge', 'giveaway', 'countdown'];
   return validIds.includes(id as Exclude<DynamicsView, 'selector'>);
 }
 
@@ -72,7 +72,8 @@ function isValidHexColor(color: string): boolean {
 const activityIdArb: fc.Arbitrary<Exclude<DynamicsView, 'selector'>> = fc.constantFrom(
   'poll',
   'judge',
-  'giveaway'
+  'giveaway',
+  'countdown'
 );
 
 const activitySelectionSequenceArb = fc.array(activityIdArb, { minLength: 1, maxLength: 10 });
@@ -90,10 +91,10 @@ describe('ActivitySelector Property Tests', () => {
      * **Validates: Requirements 1.1, 1.2**
      */
 
-    it('should have exactly 3 activities in the ACTIVITIES configuration', () => {
+    it('should have exactly 4 activities in the ACTIVITIES configuration', () => {
       const result = validateActivitiesConfig(ACTIVITIES);
       
-      expect(result.count).toBe(3);
+      expect(result.count).toBe(4);
       expect(result.isValid).toBe(true);
     });
 
@@ -103,12 +104,13 @@ describe('ActivitySelector Property Tests', () => {
       expect(result.hasAllFields).toBe(true);
     });
 
-    it('should contain poll, judge, and giveaway activities', () => {
+    it('should contain poll, judge, giveaway, and countdown activities', () => {
       const result = validateActivitiesConfig(ACTIVITIES);
       
       expect(result.activityIds).toContain('poll');
       expect(result.activityIds).toContain('judge');
       expect(result.activityIds).toContain('giveaway');
+      expect(result.activityIds).toContain('countdown');
     });
 
     it('should have valid hex colors for all activities', () => {
@@ -211,8 +213,8 @@ describe('ActivitySelector Property Tests', () => {
             counts.push(ACTIVITIES.length);
           }
 
-          // Property: activity count should always be 3
-          expect(counts.every((c) => c === 3)).toBe(true);
+          // Property: activity count should always be 4
+          expect(counts.every((c) => c === 4)).toBe(true);
         }),
         { numRuns: 100 }
       );
@@ -220,7 +222,7 @@ describe('ActivitySelector Property Tests', () => {
 
     it('should have activities with expected structure for any access', () => {
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 2 }), (index) => {
+        fc.property(fc.integer({ min: 0, max: 3 }), (index) => {
           const activity = ACTIVITIES[index];
 
           // Property: each activity should have all required properties
@@ -239,6 +241,7 @@ describe('ActivitySelector Property Tests', () => {
       const pollActivity = ACTIVITIES.find((a) => a.id === 'poll');
       const judgeActivity = ACTIVITIES.find((a) => a.id === 'judge');
       const giveawayActivity = ACTIVITIES.find((a) => a.id === 'giveaway');
+      const countdownActivity = ACTIVITIES.find((a) => a.id === 'countdown');
 
       expect(pollActivity).toBeDefined();
       expect(pollActivity?.title).toBe('Encuesta');
@@ -248,6 +251,9 @@ describe('ActivitySelector Property Tests', () => {
       
       expect(giveawayActivity).toBeDefined();
       expect(giveawayActivity?.title).toBe('Sorteos');
+      
+      expect(countdownActivity).toBeDefined();
+      expect(countdownActivity?.title).toBe('Countdown');
     });
   });
 });
