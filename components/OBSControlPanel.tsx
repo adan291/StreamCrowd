@@ -1071,12 +1071,12 @@ export const OBSControlPanel: React.FC<OBSControlPanelProps> = ({ onNotification
           </div>
           <div className="flex items-center gap-2">
             {isConnected ? (
-              <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+              <span data-testid="obs-connected" className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Conectado
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <span data-testid="obs-disconnected" className="flex items-center gap-1.5 text-xs text-zinc-500">
                 <span className="w-2 h-2 bg-zinc-400 rounded-full" />
                 Desconectado
               </span>

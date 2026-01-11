@@ -11,7 +11,7 @@ export interface UsePairingReturn {
   isParsing: boolean;
   error: string | null;
   parseQRCode: (data: string) => Promise<PairingData | null>;
-  validateCode: (code: string) => boolean;
+  validateCode: (code: string, serverUrl: string) => Promise<PairingData | null>;
   clearError: () => void;
 }
 
@@ -25,30 +25,42 @@ export function usePairing(): UsePairingReturn {
     setError(null);
 
     try {
-      const pairingData = pairingService.parseQRCode(data);
+      const result = pairingService.parseQRCode(data);
       
-      if (!pairingData) {
-        setError('Código QR inválido');
+      if (!result.success || !result.data) {
+        setError(result.error || 'Código QR inválido');
         return null;
       }
 
-      if (pairingService.isExpired(pairingData)) {
-        setError('El código ha expirado');
-        return null;
-      }
-
-      return pairingData;
+      return result.data;
     } catch (err) {
       setError('Error al procesar el código');
       return null;
     } finally {
       setIsParsing(false);
     }
-  }, []);
+  }, [pairingService]);
 
-  const validateCode = useCallback((code: string): boolean => {
-    return pairingService.validateSessionCode(code);
-  }, []);
+  const validateCode = useCallback(async (code: string, serverUrl: string): Promise<PairingData | null> => {
+    setIsParsing(true);
+    setError(null);
+
+    try {
+      const result = await pairingService.validateCode(code, serverUrl);
+      
+      if (!result.success || !result.data) {
+        setError(result.error || 'Código inválido');
+        return null;
+      }
+
+      return result.data;
+    } catch (err) {
+      setError('Error al validar el código');
+      return null;
+    } finally {
+      setIsParsing(false);
+    }
+  }, [pairingService]);
 
   const clearError = useCallback(() => {
     setError(null);

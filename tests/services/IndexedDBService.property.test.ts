@@ -26,10 +26,10 @@ const storeNameArb: fc.Arbitrary<keyof DBSchema> = fc.constantFrom(
 );
 
 /**
- * Arbitrary for valid keys (non-empty strings)
+ * Arbitrary for valid keys (non-empty strings, excluding reserved names)
  */
 const keyArb = fc.string({ minLength: 1, maxLength: 50 })
-  .filter(s => s.trim().length > 0);
+  .filter(s => s.trim().length > 0 && !['__proto__', 'constructor', 'prototype'].includes(s));
 
 /**
  * Arbitrary for poll-like objects

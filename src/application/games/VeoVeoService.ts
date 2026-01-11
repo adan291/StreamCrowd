@@ -85,7 +85,7 @@ export class VeoVeoService extends BaseGameService<VeoVeoState> {
     return this.state.secretWord;
   }
 
-  getPlayers(): VeoVeoPlayer[] {
+  getVeoVeoPlayers(): VeoVeoPlayer[] {
     return [...this.state.veoPlayers.values()].sort((a, b) => b.score - a.score);
   }
 

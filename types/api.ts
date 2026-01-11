@@ -471,6 +471,10 @@ export class APIException extends Error {
   static internal(message = 'Internal server error'): APIException {
     return new APIException('INTERNAL_ERROR', message, undefined, 500);
   }
+
+  static serviceUnavailable(message = 'Service unavailable'): APIException {
+    return new APIException('SERVICE_UNAVAILABLE', message, undefined, 503);
+  }
 }
 
 // ============================================

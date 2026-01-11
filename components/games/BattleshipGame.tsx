@@ -151,7 +151,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
           if (isHit) {
             setLeaderboard(prev => {
               const newBoard = new Map(prev);
-              const existing = newBoard.get(oderId);
+              const existing = newBoard.get(oderId) as { hits: number; username: string; color: string } | undefined;
               newBoard.set(oderId, {
                 hits: (existing?.hits || 0) + 1,
                 username: msg.username,

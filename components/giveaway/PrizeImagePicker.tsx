@@ -43,7 +43,7 @@ export const PrizeImagePicker: React.FC<PrizeImagePickerProps> = ({
     const remainingSlots = maxImages - images.length;
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-    filesToProcess.forEach((file) => {
+    filesToProcess.forEach((file: File) => {
       if (!file.type.startsWith('image/')) return;
       if (file.size > 5 * 1024 * 1024) return; // Max 5MB
 

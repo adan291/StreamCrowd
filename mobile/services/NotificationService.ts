@@ -113,7 +113,8 @@ class NotificationService {
     // Check if this notification type is enabled
     if (!this.shouldShowNotification(notification)) return;
 
-    const options: NotificationOptions = {
+    // Use extended notification options (supported by service workers)
+    const options: Record<string, unknown> = {
       body: notification.message,
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-72.png',

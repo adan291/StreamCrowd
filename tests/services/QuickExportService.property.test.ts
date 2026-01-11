@@ -410,12 +410,16 @@ describe('QuickExportService Property Tests', () => {
       await service.addOverlayToOBS('poll');
       await service.addOverlayToOBS('prediction');
       
-      // Manually delete source from mock (simulating external deletion)
-      mockOBS.sources.delete('StreamCrowd Poll');
+      // Verify both are exported initially
+      let exported = await service.listExportedOverlays();
+      expect(exported.length).toBe(2);
       
-      const exported = await service.listExportedOverlays();
+      // Remove the poll overlay using the service (proper way)
+      await service.removeOverlayFromOBS('poll');
       
-      // Should only have prediction since poll source was deleted
+      exported = await service.listExportedOverlays();
+      
+      // Should only have prediction since poll was removed
       expect(exported.length).toBe(1);
       expect(exported[0].overlayType).toBe('prediction');
     });

@@ -8,8 +8,8 @@
  */
 
 import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase, ref, set, onValue, off } from 'firebase/database';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getDatabase, ref, set, onValue, off, Database } from 'firebase/database';
+import { FirebaseAuthService } from '../auth/FirebaseAuthService';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
@@ -23,45 +23,37 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase - reuse existing app if available
-const apps = getApps();
-const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
-const database = getDatabase(app);
-const auth = getAuth(app);
+let database: Database | null = null;
+let initPromise: Promise<void> | null = null;
 
-// Wait for auth to be ready before allowing writes
-let authReady = false;
-let authReadyPromise: Promise<void> | null = null;
-
-function waitForAuth(): Promise<void> {
-  if (authReady) return Promise.resolve();
+async function ensureInitialized(): Promise<void> {
+  if (database) return;
+  if (initPromise) return initPromise;
   
-  if (!authReadyPromise) {
-    authReadyPromise = new Promise((resolve) => {
-      // Check if already authenticated
-      if (auth.currentUser) {
-        authReady = true;
-        resolve();
-        return;
-      }
-      
-      // Wait for auth state change
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-          authReady = true;
-          unsubscribe();
-          resolve();
-        }
-      });
-      
-      // Timeout after 5 seconds - allow operations without auth (will fail gracefully)
-      setTimeout(() => {
-        unsubscribe();
-        resolve();
-      }, 5000);
-    });
+  initPromise = doInitialize();
+  return initPromise;
+}
+
+async function doInitialize(): Promise<void> {
+  try {
+    // Initialize Firebase Auth first
+    await FirebaseAuthService.initialize();
+    
+    // Ensure we're authenticated
+    if (!FirebaseAuthService.isAuthenticated()) {
+      await FirebaseAuthService.signInAnonymously();
+    }
+    
+    // Get or create Firebase app
+    const apps = getApps();
+    const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
+    database = getDatabase(app);
+    
+    console.log('[FirebaseSync] Initialized with Auth, UID:', FirebaseAuthService.getUid());
+  } catch (error) {
+    console.error('[FirebaseSync] Initialization error:', error);
+    throw error;
   }
-  
-  return authReadyPromise;
 }
 
 // ============ TYPES ============
@@ -130,6 +122,7 @@ export interface SyncedOverlayState {
     type: string;
     state: any;
     updatedAt: number;
+    dataUrl?: string; // For drawing sync (partyco_drawing)
   };
 }
 
@@ -185,7 +178,7 @@ export function isFirebaseSyncEnabled(): boolean {
 
 /**
  * Write state to Firebase
- * @param path - Database path
+ * @param path - Database path (e.g., 'poll', 'countdown')
  * @param data - Data to sync
  */
 export async function syncState(path: string, data: any): Promise<void> {
@@ -194,11 +187,23 @@ export async function syncState(path: string, data: any): Promise<void> {
     return;
   }
 
-  // Wait for auth to be ready
-  await waitForAuth();
+  // Ensure initialized and authenticated
+  await ensureInitialized();
+  
+  if (!database) {
+    console.warn('[FirebaseSync] Database not initialized');
+    return;
+  }
+  
+  const uid = FirebaseAuthService.getUid();
+  if (!uid) {
+    console.warn('[FirebaseSync] No authenticated user, skipping sync');
+    return;
+  }
 
   try {
-    const dbRef = ref(database, `overlays/${path}`);
+    // Write to user-specific path: overlays/{uid}/{type}
+    const dbRef = ref(database, `overlays/${uid}/${path}`);
     // Remove undefined values before sending to Firebase
     const cleanData = removeUndefinedDeep({
       ...data,
@@ -226,13 +231,15 @@ export async function syncState(path: string, data: any): Promise<void> {
 
 /**
  * Subscribe to real-time changes
- * @param path - Database path
+ * @param path - Database path (e.g., 'poll', 'countdown')
  * @param callback - Callback for data changes
+ * @param customUid - Optional custom UID to subscribe to (for overlay viewers)
  * @returns Unsubscribe function
  */
 export function subscribeToState<T>(
   path: string, 
-  callback: (data: T | null) => void
+  callback: (data: T | null) => void,
+  customUid?: string
 ): () => void {
   // Skip if sync is disabled
   if (!firebaseSyncEnabled) {
@@ -240,29 +247,48 @@ export function subscribeToState<T>(
     return () => {};
   }
 
-  const dbRef = ref(database, `overlays/${path}`);
-  
-  onValue(dbRef, (snapshot) => {
-    const data = snapshot.val();
-    callback(data as T | null);
-  }, (error: unknown) => {
-    const err = error as { message?: string };
+  let unsubscribed = false;
+  let dbRef: ReturnType<typeof ref> | null = null;
+
+  // Initialize and subscribe
+  ensureInitialized().then(() => {
+    if (unsubscribed || !database) return;
     
-    // Handle permission denied errors gracefully
-    if (err.message?.includes('PERMISSION_DENIED')) {
-      if (!permissionErrorLogged) {
-        console.warn(`[FirebaseSync] Permission denied for ${path} - Anonymous auth may not be enabled.`);
-        permissionErrorLogged = true;
-      }
-      firebaseSyncEnabled = false;
+    const uid = customUid || FirebaseAuthService.getUid();
+    if (!uid) {
+      console.warn('[FirebaseSync] No UID for subscription');
       return;
     }
     
-    console.error(`Firebase subscription error for ${path}:`, error);
+    dbRef = ref(database, `overlays/${uid}/${path}`);
+    
+    onValue(dbRef, (snapshot) => {
+      const data = snapshot.val();
+      callback(data as T | null);
+    }, (error: unknown) => {
+      const err = error as { message?: string };
+      
+      // Handle permission denied errors gracefully
+      if (err.message?.includes('PERMISSION_DENIED')) {
+        if (!permissionErrorLogged) {
+          console.warn(`[FirebaseSync] Permission denied for ${path} - Anonymous auth may not be enabled.`);
+          permissionErrorLogged = true;
+        }
+        firebaseSyncEnabled = false;
+        return;
+      }
+      
+      console.error(`Firebase subscription error for ${path}:`, error);
+    });
+  }).catch(err => {
+    console.error('[FirebaseSync] Subscribe initialization error:', err);
   });
 
   // Return unsubscribe function
-  return () => off(dbRef);
+  return () => {
+    unsubscribed = true;
+    if (dbRef) off(dbRef);
+  };
 }
 
 // ============ OVERLAY-SPECIFIC HELPERS ============
@@ -311,5 +337,23 @@ export const gameSync = {
   subscribe: (callback: (data: SyncedOverlayState['game'] | null) => void) => 
     subscribeToState<SyncedOverlayState['game']>('game', callback)
 };
+
+/**
+ * Get current user UID for overlay URL generation
+ */
+export function getCurrentUid(): string | null {
+  return FirebaseAuthService.getUid();
+}
+
+/**
+ * Subscribe to a specific user's overlay (for overlay viewers)
+ */
+export function subscribeToUserOverlay<T>(
+  uid: string,
+  path: string,
+  callback: (data: T | null) => void
+): () => void {
+  return subscribeToState<T>(path, callback, uid);
+}
 
 export { database };

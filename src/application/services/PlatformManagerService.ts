@@ -21,7 +21,7 @@
  * @module src/application/services/PlatformManagerService
  */
 
-import type { Platform } from '../../../types/platform';
+import type { Platform, IPlatformAdapter } from '../../../types/platform';
 import type { IChatProvider, ConnectionStatus, ChatMessage, StreamEvent } from '../../domain/ports/IChatProvider';
 import { PlatformAuthService } from './PlatformAuthService';
 import { TokenStorage, type PlatformCredentials } from './TokenStorage';
@@ -29,6 +29,12 @@ import { TwitchAdapter } from '../../infrastructure/adapters/TwitchAdapter';
 import { YouTubeAdapter } from '../../infrastructure/adapters/YouTubeAdapter';
 import { KickAdapter } from '../../infrastructure/adapters/KickAdapter';
 import type { ChannelContext } from './PlatformModeratedChannelsService';
+
+/**
+ * Union type for platform adapters
+ * TwitchAdapter implements IChatProvider, while YouTube/Kick implement IPlatformAdapter
+ */
+type PlatformAdapter = IChatProvider | IPlatformAdapter;
 
 // ============================================
 // Types
@@ -99,8 +105,8 @@ const DEFAULT_STATE: Omit<PlatformState, 'platform'> = {
 // ============================================
 
 class PlatformManagerServiceImpl {
-  /** Platform adapters */
-  private adapters: Map<Platform, IChatProvider> = new Map();
+  /** Platform adapters (IChatProvider for Twitch, IPlatformAdapter for YouTube/Kick) */
+  private adapters: Map<Platform, PlatformAdapter> = new Map();
   
   /** Platform states */
   private states: Map<Platform, PlatformState> = new Map();
@@ -194,6 +200,7 @@ class PlatformManagerServiceImpl {
 
   /**
    * Setup event handlers for an adapter
+   * Handles both IChatProvider (Twitch) and IPlatformAdapter (YouTube/Kick) interfaces
    */
   private setupAdapterHandlers(platform: Platform): void {
     const adapter = this.adapters.get(platform);
@@ -201,25 +208,63 @@ class PlatformManagerServiceImpl {
 
     const unsubscribes: Array<() => void> = [];
 
-    // Status change handler
-    const statusUnsub = adapter.onStatusChange((status, error) => {
-      this.handleStatusChange(platform, status, error);
-    });
-    unsubscribes.push(statusUnsub);
+    // Check if adapter is IChatProvider (has providerId) or IPlatformAdapter (has platform)
+    const isIChatProvider = 'providerId' in adapter;
 
-    // Message handler
+    // Status change handler - different signatures for each interface
+    if (isIChatProvider) {
+      // IChatProvider: (status, error?) => void
+      const statusUnsub = (adapter as IChatProvider).onStatusChange((status, error) => {
+        this.handleStatusChange(platform, status, error);
+      });
+      unsubscribes.push(statusUnsub);
+    } else {
+      // IPlatformAdapter: (platform, status, error?) => void
+      const statusUnsub = (adapter as IPlatformAdapter).onStatusChange((_plat, status, error) => {
+        this.handleStatusChange(platform, status as ConnectionStatus, error);
+      });
+      unsubscribes.push(statusUnsub);
+    }
+
+    // Message handler - both have similar signatures but different message types
     const messageUnsub = adapter.onMessage((message) => {
-      this.handleMessage(platform, message);
+      // Convert to ChatMessage if needed (IPlatformAdapter uses different ChatMessage type)
+      const chatMessage = this.normalizeChatMessage(message, platform);
+      this.handleMessage(platform, chatMessage);
     });
     unsubscribes.push(messageUnsub);
 
-    // Stream event handler
-    const eventUnsub = adapter.onStreamEvent((event) => {
-      this.handleStreamEvent(platform, event);
-    });
-    unsubscribes.push(eventUnsub);
+    // Stream event handler - only IChatProvider has this
+    if (isIChatProvider && 'onStreamEvent' in adapter) {
+      const eventUnsub = (adapter as IChatProvider).onStreamEvent((event) => {
+        this.handleStreamEvent(platform, event);
+      });
+      unsubscribes.push(eventUnsub);
+    }
 
     this.adapterUnsubscribes.set(platform, unsubscribes);
+  }
+
+  /**
+   * Normalize chat message from different adapter types
+   */
+  private normalizeChatMessage(message: unknown, platform: Platform): ChatMessage {
+    const msg = message as Record<string, unknown>;
+    return {
+      id: String(msg.id || ''),
+      username: String(msg.username || ''),
+      displayName: String(msg.displayName || msg.username || ''),
+      message: String(msg.message || ''),
+      timestamp: Number(msg.timestamp || Date.now()),
+      userId: msg.userId ? String(msg.userId) : undefined,
+      color: msg.color ? String(msg.color) : undefined,
+      isSubscriber: Boolean(msg.isSubscriber),
+      isModerator: Boolean(msg.isModerator),
+      isBroadcaster: Boolean(msg.isBroadcaster),
+      badges: msg.badges as Record<string, string> | undefined,
+      sourceChannel: msg.sourceChannel ? String(msg.sourceChannel) : undefined,
+      provider: (msg.provider as ChatMessage['provider']) || (platform === 'twitch' ? 'twitch' : platform === 'youtube' ? 'youtube' : 'custom'),
+    };
   }
 
   // ============================================
@@ -229,7 +274,7 @@ class PlatformManagerServiceImpl {
   /**
    * Get adapter for a platform
    */
-  getAdapter(platform: Platform): IChatProvider | null {
+  getAdapter(platform: Platform): PlatformAdapter | null {
     return this.adapters.get(platform) || null;
   }
 

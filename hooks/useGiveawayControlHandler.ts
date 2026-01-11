@@ -285,13 +285,21 @@ export function useGiveawayControlHandler(options: UseGiveawayControlHandlerOpti
       // ============================================
       // INFO / HELP
       // ============================================
-      case 'info':
       case 'help':
+      case 'commands':
+      case 'cmds': {
+        return {
+          success: true,
+          message: '🎁 SORTEO: !tv raffle start "Premio" [keyword] [seg] | !tv raffle winner | !tv raffle reroll | !tv raffle close | !tv raffle participants',
+        };
+      }
+
+      case 'info':
       case '': {
         if (!state?.isActive) {
           return {
             success: true,
-            message: '📋 Commands: !tv raffle start "Prize" [keyword] | !tv raffle winner | !tv raffle close',
+            message: '🎁 No hay sorteo activo. Usa !tv raffle help para ver comandos',
           };
         }
         return {

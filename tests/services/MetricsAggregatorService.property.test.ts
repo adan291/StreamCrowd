@@ -71,8 +71,8 @@ describe('MetricsAggregatorService Property Tests', () => {
 
             // Aggregated max should be <= raw max (we use max within buckets)
             expect(aggregatedMax).toBeLessThanOrEqual(rawMax);
-            // But should capture the peak if it's the only point in its bucket
-            expect(aggregatedMax).toBeGreaterThan(0);
+            // Aggregated max should equal raw max (peak is preserved)
+            expect(aggregatedMax).toBe(rawMax);
           }
         ),
         { numRuns: 100 }

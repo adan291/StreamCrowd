@@ -47,9 +47,9 @@ export interface VoteContext {
 }
 
 /**
- * Resultado de procesar un voto
+ * Resultado de procesar un voto con moderación
  */
-export interface ProcessVoteResult extends ModerationResult {
+export interface ModerationProcessVoteResult extends ModerationResult {
   isVoteChange: boolean;
   previousOptionId?: number;
   previousWeight?: number;
@@ -68,7 +68,7 @@ export interface UseModerationServiceReturn {
 
   // Actions
   setConfig: (config: ModerationConfig) => void;
-  processVote: (context: VoteContext, validOptionIds: number[]) => ProcessVoteResult;
+  processVote: (context: VoteContext, validOptionIds: number[]) => ModerationProcessVoteResult;
   reset: () => void;
   logEntry: (entry: ModerationLogEntry) => void;
   
@@ -196,7 +196,7 @@ export function useModerationService(): UseModerationServiceReturn {
   const processVote = useCallback((
     context: VoteContext,
     validOptionIds: number[]
-  ): ProcessVoteResult => {
+  ): ModerationProcessVoteResult => {
     const { userId, username, optionId, isSubscriber, isFollower, accountAgeDays = 365 } = context;
 
     // Convert context to VoteInput

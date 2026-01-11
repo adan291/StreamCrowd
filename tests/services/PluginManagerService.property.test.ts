@@ -209,60 +209,25 @@ describe('PluginManagerService Property Tests', () => {
       // Clear localStorage to start fresh
       localStorageMock.clear();
       
-      // Manually set up localStorage with plugins
-      const plugins = [
-        {
-          id: 'startup-test-plugin-1',
-          manifest: {
-            id: 'startup-test-plugin-1',
-            name: 'Plugin 1',
-            version: '1.0.0',
-            description: 'Test',
-            author: 'Test',
-            minAppVersion: '1.0.0',
-            permissions: ['storage'],
-            main: 'index.js'
-          },
-          status: 'installed',
-          config: {},
-          code: 'code1',
-          installedAt: Date.now(),
-          updatedAt: Date.now(),
-          logs: []
-        },
-        {
-          id: 'startup-test-plugin-2',
-          manifest: {
-            id: 'startup-test-plugin-2',
-            name: 'Plugin 2',
-            version: '1.0.0',
-            description: 'Test',
-            author: 'Test',
-            minAppVersion: '1.0.0',
-            permissions: ['storage'],
-            main: 'index.js'
-          },
-          status: 'installed',
-          config: {},
-          code: 'code2',
-          installedAt: Date.now(),
-          updatedAt: Date.now(),
-          logs: []
-        }
-      ];
+      // Install plugins using the manager API
+      const manifest1 = createManifest({ name: 'Plugin 1' });
+      const manifest2 = createManifest({ name: 'Plugin 2' });
       
-      localStorageMock.setItem('streamcrowd_plugins', JSON.stringify(plugins));
+      await manager.installFromJSON(JSON.stringify(manifest1), 'code1');
+      await manager.installFromJSON(JSON.stringify(manifest2), 'code2');
       
-      // Create new registry (should load from localStorage)
+      // Create new registry and manager (should load from localStorage)
       const newRegistry = new PluginRegistryService();
       const newManager = new PluginManagerService(loader, newRegistry, sandbox, host);
       
       await newManager.initialize();
       
-      expect(newManager.listPlugins().length).toBe(2);
-      
-      // Clean up
-      localStorageMock.clear();
+      // Should have exactly 2 plugins (the ones we just installed)
+      const plugins = newManager.listPlugins();
+      const installedPlugins = plugins.filter(p => 
+        p.manifest.name === 'Plugin 1' || p.manifest.name === 'Plugin 2'
+      );
+      expect(installedPlugins.length).toBe(2);
     });
 
     it('should only initialize once', async () => {

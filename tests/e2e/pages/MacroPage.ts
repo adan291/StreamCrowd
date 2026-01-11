@@ -57,13 +57,22 @@ export class MacroPage extends BasePage {
   }
 
   /**
-   * Navigate to macros page
+   * Navigate to macros page (via Platforms section)
    */
   async goto(): Promise<void> {
     await this.page.goto('/');
-    const macrosButton = this.page.getByRole('button', { name: /macros/i });
-    if (await macrosButton.isVisible()) {
-      await macrosButton.click();
+    
+    // Macros might be in Platforms > Twitch
+    const platformsNav = this.page.locator('[data-tour="nav-platforms"]');
+    if (await platformsNav.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await platformsNav.click();
+      await this.waitForPageLoad();
+      
+      // Look for macros option
+      const macrosButton = this.page.locator('button:has-text("Macros"), [data-testid="macros-nav"]');
+      if (await macrosButton.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        await macrosButton.first().click();
+      }
     }
     await this.waitForPageLoad();
   }

@@ -390,13 +390,21 @@ export function useJudgeControlHandler(options: UseJudgeControlHandlerOptions): 
       // ============================================
       // INFO / HELP
       // ============================================
-      case 'info':
       case 'help':
+      case 'commands':
+      case 'cmds': {
+        return {
+          success: true,
+          message: '🏆 TORNEO: !tv judge start | !tv judge pause | !tv judge resume | !tv judge next | !tv judge prev | !tv judge vote [seg] | !tv judge winner | !tv judge ranking',
+        };
+      }
+
+      case 'info':
       case '': {
         if (!state || state.status === 'idle') {
           return {
             success: true,
-            message: '📋 Commands: !tv judge start | !tv judge pause | !tv judge next | !tv judge vote | !tv judge winner | !tv judge ranking',
+            message: '🏆 No hay torneo activo. Usa !tv judge help para ver comandos',
           };
         }
         return {

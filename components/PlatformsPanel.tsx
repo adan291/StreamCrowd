@@ -230,6 +230,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
     }
 
     // Level 3: Tool Panels
+
     if (view === 'twitch' && tool === 'commands') {
       return (
         <div className="h-full flex flex-col">

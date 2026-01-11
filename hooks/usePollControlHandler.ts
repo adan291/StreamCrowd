@@ -234,13 +234,21 @@ export function usePollControlHandler(options: UsePollControlHandlerOptions): vo
       // ============================================
       // INFO / HELP
       // ============================================
-      case 'info':
       case 'help':
+      case 'commands':
+      case 'cmds': {
+        return {
+          success: true,
+          message: '📊 ENCUESTA: !tv poll create "Pregunta" op1,op2,op3 [seg] | !tv poll close | !tv poll results | !tv poll reset',
+        };
+      }
+
+      case 'info':
       case '': {
         if (!state?.isActive) {
           return {
             success: true,
-            message: '📋 Commands: !tv poll create "Q" op1,op2 | !tv poll close | !tv poll results',
+            message: '📊 No hay encuesta activa. Usa !tv poll help para ver comandos',
           };
         }
         return {

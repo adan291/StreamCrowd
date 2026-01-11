@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../i18n';
 import { StreamlabsConfig } from './StreamlabsConfig';
 import { StreamElementsConfig } from './StreamElementsConfig';
 import { IntegrationEventLog } from './IntegrationEventLog';
@@ -14,22 +14,22 @@ interface Tab {
 }
 
 export function IntegrationsPanel() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<TabId>('streamlabs');
 
   const tabs: Tab[] = [
     { id: 'streamlabs', label: 'Streamlabs', icon: '🎬' },
     { id: 'streamelements', label: 'StreamElements', icon: '⚡' },
-    { id: 'events', label: t('integrations.events', 'Eventos'), icon: '📋' },
-    { id: 'mappings', label: t('integrations.mappings', 'Acciones'), icon: '🔗' },
+    { id: 'events', label: 'Eventos', icon: '📋' },
+    { id: 'mappings', label: 'Acciones', icon: '🔗' },
   ];
 
   return (
     <div className="integrations-panel">
       <div className="integrations-header">
-        <h2>{t('integrations.title', 'Integraciones Externas')}</h2>
+        <h2>Integraciones Externas</h2>
         <p className="integrations-description">
-          {t('integrations.description', 'Conecta con Streamlabs y StreamElements para recibir eventos en tiempo real')}
+          Conecta con Streamlabs y StreamElements para recibir eventos en tiempo real
         </p>
       </div>
 

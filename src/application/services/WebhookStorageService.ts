@@ -9,7 +9,7 @@ import {
   WEBHOOK_STORAGE_KEYS,
   RATE_LIMIT_CONFIG,
 } from '../../../types/webhooks';
-import { encrypt, decrypt } from '../utils/encryption';
+import { encryptSensitiveData as encrypt, decryptSensitiveData as decrypt } from '../utils/encryption';
 
 const DB_NAME = 'twitchvote_webhooks';
 const DB_VERSION = 1;
@@ -365,7 +365,7 @@ export class WebhookStorageService {
 
   private async encryptSecret(secret: string): Promise<string> {
     try {
-      return await encrypt(secret, this.encryptionKey);
+      return await encrypt(secret);
     } catch {
       // Fallback: base64 encode if encryption fails
       return btoa(secret);
@@ -374,7 +374,7 @@ export class WebhookStorageService {
 
   private async decryptSecret(encrypted: string): Promise<string> {
     try {
-      return await decrypt(encrypted, this.encryptionKey);
+      return await decrypt<string>(encrypted);
     } catch {
       // Fallback: try base64 decode
       try {

@@ -84,7 +84,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
         // Actualizar jugador
         setPlayers(prev => {
           const newPlayers = new Map(prev);
-          const existing = newPlayers.get(oderId);
+          const existing = newPlayers.get(oderId) as Player | undefined;
           newPlayers.set(oderId, {
             oderId,
             username: msg.username,

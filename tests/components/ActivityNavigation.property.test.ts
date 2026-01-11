@@ -79,6 +79,7 @@ const ACTIVITY_TO_PANEL_MAP: Record<Exclude<DynamicsView, 'selector'>, string> =
   judge: 'JudgePanel',
   giveaway: 'GiveawayHub',
   countdown: 'CountdownPanel',
+  spinner: 'SpinnerWheel',
 };
 
 /**

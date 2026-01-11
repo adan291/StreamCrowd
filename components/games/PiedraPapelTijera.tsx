@@ -84,7 +84,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
       if (choice) {
         setPlayers(prev => {
           const newPlayers = new Map(prev);
-          const existing = newPlayers.get(oderId);
+          const existing = newPlayers.get(oderId) as Player | undefined;
           if (existing && !existing.eliminated) {
             newPlayers.set(oderId, { ...existing, choice });
           } else if (!existing) {
@@ -172,7 +172,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
     if (losingChoice) {
       setPlayers(prev => {
         const newPlayers = new Map(prev);
-        newPlayers.forEach((player, key) => {
+        newPlayers.forEach((player: Player, key: string) => {
           if (player.choice === losingChoice) {
             newPlayers.set(key, { ...player, eliminated: true });
           }
@@ -198,7 +198,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
   const nextRound = () => {
     setPlayers(prev => {
       const newPlayers = new Map(prev);
-      newPlayers.forEach((player, key) => {
+      newPlayers.forEach((player: Player, key: string) => {
         newPlayers.set(key, { ...player, choice: null });
       });
       return newPlayers;

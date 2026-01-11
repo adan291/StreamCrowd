@@ -98,6 +98,11 @@ const ACTION_ICONS: Record<ActionType, string> = {
   send_notification: '🔔',
   set_variable: '📝',
   delay: '⏱️',
+  send_announcement: '📢',
+  update_chat_settings: '⚙️',
+  send_shoutout: '📣',
+  start_raid: '⚔️',
+  create_clip: '🎬',
 };
 
 // ============================================

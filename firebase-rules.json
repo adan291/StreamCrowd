@@ -1,35 +1,38 @@
 {
   "rules": {
-    // Overlay sync - authenticated users can read/write their own overlay data
-    // Uses Firebase Auth UID to namespace data per user
+    // Overlay sync - authenticated users write to their own path
+    // Structure: /overlays/{uid}/{overlayType}
     "overlays": {
-      "$overlayId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+      "$uid": {
+        // Read: anyone can read (needed for overlay viewers in OBS)
+        ".read": true,
+        // Write: only the authenticated owner can write to their own path
+        ".write": "auth != null && auth.uid == $uid"
       }
     },
     
     // Broadcaster tokens - only authenticated users can access
     // The linkedPlatformId stored client-side should match broadcasterId
-    // Note: For full security, implement server-side verification of broadcaster identity
+    // SECURITY: Only the broadcaster or their moderators can access tokens
     "broadcaster_tokens": {
       "$broadcasterId": {
-        // Allow read if authenticated (moderators need to read broadcaster tokens)
-        ".read": "auth != null",
-        // Allow write only if authenticated
-        ".write": "auth != null",
+        // Allow read if authenticated and is the broadcaster or a moderator
+        ".read": "auth != null && (auth.uid == $broadcasterId || root.child('broadcaster_tokens').child($broadcasterId).child('moderators').hasChild(auth.uid))",
+        // Allow write only if authenticated and is the broadcaster
+        ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
         ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'accessToken', 'storedAt'])"
       }
     },
     
     // Platform broadcaster tokens (multi-platform support)
+    // SECURITY: Same restrictions as broadcaster_tokens
     "platform_broadcaster_tokens": {
       "$platform": {
         "$broadcasterId": {
-          // Allow read if authenticated (moderators need to read broadcaster tokens)
-          ".read": "auth != null",
-          // Allow write only if authenticated
-          ".write": "auth != null",
+          // Allow read if authenticated and is the broadcaster or a moderator
+          ".read": "auth != null && (auth.uid == $broadcasterId || root.child('platform_broadcaster_tokens').child($platform).child($broadcasterId).child('moderators').hasChild(auth.uid))",
+          // Allow write only if authenticated and is the broadcaster
+          ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
           ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'accessToken', 'storedAt'])"
         }
       }

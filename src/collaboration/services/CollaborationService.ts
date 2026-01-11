@@ -81,7 +81,7 @@ export class CollaborationService {
       };
 
       // Initialize role service with session
-      this.roleService.setSessionCollaborators(session.collaborators);
+      // Note: RoleService uses sessionService internally, no need to set collaborators
 
       // Connect WebSocket
       const connected = await this.wsService.connect(session.code, this.currentUser);
@@ -136,7 +136,7 @@ export class CollaborationService {
       this.currentSession = result.session;
 
       // Initialize role service
-      this.roleService.setSessionCollaborators(result.session.collaborators);
+      // Note: RoleService uses sessionService internally, no need to set collaborators
 
       // Connect WebSocket
       const connected = await this.wsService.connect(code, this.currentUser);
@@ -223,7 +223,7 @@ export class CollaborationService {
 
     // Check permission
     const permission = this.getPermissionForAction(action.type);
-    if (permission && !this.roleService.checkPermission(this.currentUser.id, permission)) {
+    if (permission && this.currentSession && !this.roleService.hasPermission(this.currentSession.id, this.currentUser.id, permission)) {
       return false;
     }
 
@@ -270,11 +270,14 @@ export class CollaborationService {
   }
 
   syncState(state: unknown, version: number): void {
-    this.syncService.setState(state, version);
+    this.syncService.applyFullStateSync(state, version);
   }
 
   getState(): unknown {
-    return this.syncService.getState();
+    // Get the last full sync action's payload
+    const actions = this.syncService.getAppliedActions();
+    const fullSync = actions.find(a => a.type === 'state:full_sync');
+    return fullSync?.payload ?? null;
   }
 
   getStateVersion(): number {
@@ -354,13 +357,13 @@ export class CollaborationService {
     if (!this.currentSession || !this.currentUser) return false;
 
     // Check permission
-    if (!this.roleService.checkPermission(this.currentUser.id, 'collaborators:manage')) {
+    if (!this.currentSession || !this.roleService.hasPermission(this.currentSession.id, this.currentUser.id, 'collaborators:manage')) {
       return false;
     }
 
-    const success = this.roleService.assignRole(userId, newRole);
+    const result = this.roleService.assignRole(this.currentSession.id, userId, newRole, this.currentUser.id);
 
-    if (success) {
+    if (result.success) {
       // Send role change via WebSocket
       this.wsService.send({
         type: 'role_change',
@@ -379,17 +382,18 @@ export class CollaborationService {
       );
     }
 
-    return success;
+    return result.success;
   }
 
   setCustomPermissions(userId: string, permissions: Permission[]): boolean {
     if (!this.currentSession || !this.currentUser) return false;
 
-    if (!this.roleService.checkPermission(this.currentUser.id, 'collaborators:manage')) {
+    if (!this.roleService.hasPermission(this.currentSession.id, this.currentUser.id, 'collaborators:manage')) {
       return false;
     }
 
-    return this.roleService.setCustomPermissions(userId, permissions);
+    const result = this.roleService.setCustomPermissions(this.currentSession.id, userId, permissions, this.currentUser.id);
+    return result.success;
   }
 
   transferOwnership(newOwnerId: string): boolean {
@@ -399,7 +403,8 @@ export class CollaborationService {
       return false;
     }
 
-    return this.roleService.transferOwnership(this.currentUser.id, newOwnerId);
+    const result = this.roleService.transferOwnership(this.currentSession.id, this.currentUser.id, newOwnerId);
+    return result.success;
   }
 
   // ============================================
@@ -461,8 +466,8 @@ export class CollaborationService {
   }
 
   hasPermission(permission: Permission): boolean {
-    if (!this.currentUser) return false;
-    return this.roleService.checkPermission(this.currentUser.id, permission);
+    if (!this.currentUser || !this.currentSession) return false;
+    return this.roleService.hasPermission(this.currentSession.id, this.currentUser.id, permission);
   }
 
   getActionLog(limit?: number): ActionLogEntry[] {
@@ -555,7 +560,13 @@ export class CollaborationService {
 
       case 'role_change':
         const rolePayload = message.payload as any;
-        this.roleService.assignRole(rolePayload.userId, rolePayload.newRole);
+        if (this.currentSession) {
+          // Update role via session service directly for remote changes
+          const target = this.currentSession.collaborators.find(c => c.id === rolePayload.userId);
+          if (target) {
+            target.role = rolePayload.newRole;
+          }
+        }
         if (this.currentUser && rolePayload.userId === this.currentUser.id) {
           this.currentUser.role = rolePayload.newRole;
         }

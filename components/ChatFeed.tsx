@@ -712,7 +712,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
 
           return (
             <div 
-              key={msg.id || i} 
+              key={`msg-${msg.id || ''}-${i}`} 
               className={`break-words leading-snug animate-fade-in group hover:bg-zinc-100 dark:hover:bg-zinc-800/50 rounded transition-colors ${settings.compactMode ? 'p-0.5 -mx-0.5' : 'p-1.5 -mx-1.5'}`}
             >
               <div className="flex flex-wrap items-baseline gap-1.5">

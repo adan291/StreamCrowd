@@ -26,11 +26,12 @@ const usernameArb = fc.string({ minLength: 3, maxLength: 25 }).filter(s => /^[a-
 const streamEventArb = (baseTimestamp: number): fc.Arbitrary<Omit<StreamEvent, 'id'>> => fc.record({
   type: eventTypeArb,
   username: usernameArb,
+  displayName: usernameArb,
+  channel: fc.constant('testchannel'),
   timestamp: fc.integer({ min: baseTimestamp, max: baseTimestamp + 3600000 }), // Within 1 hour
   tier: fc.option(subTierArb, { nil: undefined }),
   months: fc.option(fc.integer({ min: 1, max: 120 }), { nil: undefined }),
   bits: fc.option(fc.integer({ min: 1, max: 100000 }), { nil: undefined }),
-  viewers: fc.option(fc.integer({ min: 1, max: 100000 }), { nil: undefined }),
   giftCount: fc.option(fc.integer({ min: 1, max: 100 }), { nil: undefined }),
   message: fc.option(fc.string({ minLength: 0, maxLength: 500 }), { nil: undefined }),
 });
@@ -118,6 +119,8 @@ describe('StreamEventService Property Tests', () => {
               return testService.addEvent({
                 type: 'cheer',
                 username: `user${i}`,
+                displayName: `User${i}`,
+                channel: 'testchannel',
                 timestamp: baseTime + offset,
                 bits: 100,
               });
@@ -172,6 +175,8 @@ describe('StreamEventService Property Tests', () => {
               testService.addEvent({
                 type,
                 username: `user${i}`,
+                displayName: `User${i}`,
+                channel: 'testchannel',
                 timestamp: Date.now() + i,
               });
             });
@@ -215,6 +220,8 @@ describe('StreamEventService Property Tests', () => {
               testService.addEvent({
                 type: 'cheer',
                 username: `user${i}`,
+                displayName: `User${i}`,
+                channel: 'testchannel',
                 timestamp: Date.now() + i,
                 bits: 100,
               });
@@ -231,8 +238,9 @@ describe('StreamEventService Property Tests', () => {
               testService.addEvent({
                 type: 'raid',
                 username: `raider${i}`,
+                displayName: `Raider${i}`,
+                channel: 'testchannel',
                 timestamp: Date.now() + beforeCount + i,
-                viewers: 50,
               });
             }
             

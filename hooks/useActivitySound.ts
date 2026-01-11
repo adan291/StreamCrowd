@@ -49,9 +49,12 @@ export const DEFAULT_ACTIVITY_SOUND_CONFIG: ActivitySoundConfig = {
   startSound: 'synth',
 };
 
+export type ActivityType = 'poll' | 'prediction' | 'giveaway' | 'game' | 'timer' | 'general';
+
 export interface UseActivitySoundOptions {
   storageKey?: string;
   defaultConfig?: Partial<ActivitySoundConfig>;
+  activityType?: ActivityType;
 }
 
 export interface UseActivitySoundReturn {
@@ -75,7 +78,12 @@ class ActivitySoundGenerator {
 
   private getContext(): AudioContext {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        // Return a mock context for test environments
+        throw new Error('AudioContext not available');
+      }
+      this.audioContext = new AudioContextClass();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
     }
@@ -240,16 +248,17 @@ export function useActivitySound(options: UseActivitySoundOptions = {}): UseActi
   const play = useCallback((type: ActivitySoundType): void => {
     if (!config.enabled || !soundGenRef.current) return;
 
-    switch (type) {
-      case 'start':
-        soundGenRef.current.playStart();
-        break;
-      case 'end':
-        soundGenRef.current.playEnd();
-        break;
-      case 'winner':
-        soundGenRef.current.playWinner();
-        break;
+    try {
+      switch (type) {
+        case 'start':
+          soundGenRef.current.playStart();
+          break;
+        case 'end':
+          soundGenRef.current.playEnd();
+          break;
+        case 'winner':
+          soundGenRef.current.playWinner();
+          break;
       case 'tick':
         soundGenRef.current.playTick();
         break;
@@ -277,6 +286,9 @@ export function useActivitySound(options: UseActivitySoundOptions = {}): UseActi
       case 'error':
         soundGenRef.current.playError();
         break;
+      }
+    } catch {
+      // AudioContext not available in test environment
     }
   }, [config]);
 

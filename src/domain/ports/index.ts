@@ -5,7 +5,16 @@
  * Permiten desacoplar la lógica de negocio de las implementaciones concretas.
  */
 
-export * from './IChatProvider';
+// IChatProvider exports (excluding StreamEventCallback which is also in IStreamEventProvider)
+export type { 
+  ConnectionStatus,
+  MessageCallback,
+  StatusCallback,
+  ChatMessage,
+  StreamEvent as ChatStreamEvent,
+  IChatProvider
+} from './IChatProvider';
+
 export * from './IOBSController';
 export * from './IOverlaySync';
 export * from './IStorage';

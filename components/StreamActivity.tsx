@@ -56,6 +56,8 @@ interface StreamActivityProps {
 }
 
 // Legacy storage functions for backward compatibility
+// NOTE: These are exported for backward compatibility but primarily used internally
+// Consider using storageHelpers from useStreamEventService directly for new code
 export const saveEvents = (events: StreamEvent[], channelName: string): void => { storageHelpers.saveEventsForDate(channelName, getTodayString(), events); };
 export const loadEventsByDate = (channelName: string, date: string): StreamEvent[] => storageHelpers.loadEventsForDate(channelName, date);
 export const getAvailableDates = (channelName: string): string[] => storageHelpers.getAvailableDates(channelName);

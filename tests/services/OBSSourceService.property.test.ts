@@ -303,11 +303,21 @@ describe('OBSSourceService Property Tests', () => {
     it('sourceExists returns true for existing sources', async () => {
       await fc.assert(
         fc.asyncProperty(browserSourceConfigArb, async (config) => {
+          // Clean up any existing source with this name first
+          try {
+            await service.deleteBrowserSource(config.name);
+          } catch {
+            // Ignore if doesn't exist
+          }
+          
           expect(await service.sourceExists(config.name)).toBe(false);
           
           await service.createBrowserSource(config);
           
           expect(await service.sourceExists(config.name)).toBe(true);
+          
+          // Clean up
+          await service.deleteBrowserSource(config.name);
         }),
         { numRuns: 20 }
       );
@@ -316,6 +326,13 @@ describe('OBSSourceService Property Tests', () => {
     it('sourceExists returns false after deletion', async () => {
       await fc.assert(
         fc.asyncProperty(browserSourceConfigArb, async (config) => {
+          // Clean up any existing source with this name first
+          try {
+            await service.deleteBrowserSource(config.name);
+          } catch {
+            // Ignore if doesn't exist
+          }
+          
           await service.createBrowserSource(config);
           expect(await service.sourceExists(config.name)).toBe(true);
           

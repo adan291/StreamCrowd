@@ -424,6 +424,8 @@ export const AIVisionMascot: React.FC<AIVisionMascotProps> = ({
                   onDismiss();
                 }}
                 className="p-1 text-gray-400 hover:text-white transition-colors"
+                aria-label="Cerrar mascota"
+                title="Cerrar"
               >
                 <X size={16} />
               </button>

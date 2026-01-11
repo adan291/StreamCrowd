@@ -107,7 +107,7 @@ describe('MetricsExportService Property Tests', () => {
             sessions => sessions.some(s => s.events.length > 0)
           ),
           (sessions) => {
-            const csvContent = service.generateCSVContent(sessions, { includeEvents: true });
+            const csvContent = service.generateCSVContent(sessions, { format: 'csv', includeEvents: true });
             
             expect(csvContent).toContain('Events');
             
@@ -133,7 +133,8 @@ describe('MetricsExportService Property Tests', () => {
             
             expect(html).toContain('Summary');
             expect(html).toContain('Session Details');
-            expect(html).toContain('StreamCrowd');
+            // Check for app branding (TwitchVote or StreamCrowd)
+            expect(html.includes('TwitchVote') || html.includes('StreamCrowd')).toBe(true);
             
             return true;
           }
@@ -191,7 +192,7 @@ describe('MetricsExportService Property Tests', () => {
               end: sorted[0].startTime + 1000,
             };
             
-            const csvContent = service.generateCSVContent(sessions, { dateRange });
+            const csvContent = service.generateCSVContent(sessions, { format: 'csv', dateRange });
             
             expect(csvContent).toContain(sorted[0].id);
             

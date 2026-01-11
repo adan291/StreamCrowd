@@ -87,7 +87,7 @@ export function usePluginConfig<T extends Record<string, unknown> = Record<strin
   }, [config]);
 
   const setValue = useCallback(<K extends keyof T>(key: K, value: T[K]): boolean => {
-    return setConfig({ [key]: value } as Partial<T>);
+    return setConfig({ [key]: value } as unknown as Partial<T>);
   }, [setConfig]);
 
   return {

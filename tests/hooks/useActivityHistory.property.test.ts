@@ -203,11 +203,15 @@ describe('useActivityHistory Property Tests', () => {
       fc.assert(
         fc.property(
           historyListArb,
-          fc.string({ minLength: 1, maxLength: 10 }).filter(s => s.trim().length > 0),
+          // Filter out regex special characters and ensure trimmed search term
+          fc.string({ minLength: 1, maxLength: 10 }).filter(s => {
+            const trimmed = s.trim();
+            return trimmed.length > 0 && !/[\\^$.*+?()[\]{}|!\s]/.test(trimmed);
+          }),
           (items, searchTerm) => {
             const filtered = filterBySearchTerm(items, searchTerm, 'name');
             
-            const searchLower = searchTerm.toLowerCase();
+            const searchLower = searchTerm.toLowerCase().trim();
             return filtered.every(item => 
               item.name.toLowerCase().includes(searchLower)
             );

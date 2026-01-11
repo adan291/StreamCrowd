@@ -236,7 +236,7 @@ export const PlatformSelector: React.FC<PlatformSelectorProps> = ({
 
   // Count connected platforms
   const connectedCount = connections 
-    ? Object.values(connections).filter(c => c?.status === 'connected').length 
+    ? Object.values(connections).filter((c: PlatformConnection | null) => c?.status === 'connected').length 
     : 0;
 
   return (
@@ -251,7 +251,7 @@ export const PlatformSelector: React.FC<PlatformSelectorProps> = ({
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {multiSelect 
-            ? (t.nav?.platformsDescriptionMulti || 'Conecta múltiples plataformas para agregar votos')
+            ? (t.platforms?.platformsDescriptionMulti || 'Conecta múltiples plataformas para agregar votos')
             : (t.nav?.platformsDescription || 'Selecciona una plataforma para acceder a sus herramientas')
           }
         </p>

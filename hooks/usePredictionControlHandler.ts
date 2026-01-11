@@ -321,13 +321,21 @@ export function usePredictionControlHandler(options: UsePredictionControlHandler
       // ============================================
       // INFO / HELP
       // ============================================
-      case 'info':
       case 'help':
+      case 'commands':
+      case 'cmds': {
+        return {
+          success: true,
+          message: '🔮 PREDICCIÓN: !tv pred create "Título" op1,op2 [seg] | !tv pred lock | !tv pred resolve <num> | !tv pred cancel',
+        };
+      }
+
+      case 'info':
       case '': {
         if (!state || state.status === 'none') {
           return {
             success: true,
-            message: '📋 Commands: !tv pred create "Title" op1,op2 | !tv pred lock | !tv pred resolve <num> | !tv pred cancel',
+            message: '🔮 No hay predicción activa. Usa !tv pred help para ver comandos',
           };
         }
         return {

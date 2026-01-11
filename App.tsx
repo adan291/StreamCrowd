@@ -908,14 +908,19 @@ const App: React.FC = () => {
     }
     moderation.reset();
     
-    // Announce in chat and sync with overlay - single compact message
+    // Announce in chat and sync with overlay
     if (authToken) {
+      // Internal sync command (hidden from users)
       const optLabels = newPoll.options.map(o => o.label).join('|');
       getTwitchService().sendMessage(`!pollsync ${question}|${optLabels}`);
-      // Single compact message: "📊 Encuesta: pregunta | +1 Op1 | +2 Op2 | Vota con +1, +2..."
+      
+      // User-friendly message with voting instructions
       const opts = newPoll.options.map((o, idx) => `${prefix}${idx + 1} ${o.label}`).join(' | ');
       const voteHint = t.chat.voteHint.replace('+', prefix);
-      getTwitchService().sendMessage(`${t.chat.newPoll}: ${question} | ${opts} | ${voteHint}`);
+      getTwitchService().sendMessage(`📊 ${t.chat.newPoll}: ${question} | ${opts} | ${voteHint}`);
+      
+      // Show remote control hint for mods
+      getTwitchService().sendMessage(`💡 Mods: !tv poll close (cerrar) | !tv poll results (ver votos)`);
     }
   };
 
@@ -950,9 +955,10 @@ const App: React.FC = () => {
     streamNotifications.notifyPollEnded(result.poll.question, winner.label, totalVotes);
     
     if (authToken) {
+      // Internal sync command
       getTwitchService().sendMessage(`!pollend`);
-      // Single compact message: "📊 Encuesta Finalizada: {nombre} | 🏆 Ganador: {opción} ({votos} votos)"
-      getTwitchService().sendMessage(`📊 ${t.chat.pollEnded}: ${result.poll.question} | 🏆 ${t.chat.winner}: ${winner.label} (${winner.votes} ${t.poll.votesLabel || 'votos'})`);
+      // Results message
+      getTwitchService().sendMessage(`📊 ${t.chat.pollEnded}: ${result.poll.question} | 🏆 ${winner.label} (${winner.votes} ${t.poll.votesLabel || 'votos'})`);
     }
     
     // OBS Trigger: Poll results (after a short delay)
@@ -1177,7 +1183,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-200 dark:bg-black text-zinc-900 dark:text-zinc-100 flex flex-col p-4 transition-colors duration-300 relative">
         <AnimatedBackground />
-        <div className="flex justify-between mb-4 gap-2 relative z-50">
+        <nav className="flex justify-between mb-4 gap-2 relative z-50" aria-label="Acciones principales">
           {/* Demo button */}
           <button 
             onClick={demoTour.startTour}
@@ -1197,8 +1203,8 @@ const App: React.FC = () => {
             </button>
             <LanguageSelector variant="icon" />
           </div>
-        </div>
-        <div className="relative z-10 flex-1 flex items-center justify-center" data-tour="connection">
+        </nav>
+        <main className="relative z-10 flex-1 flex items-center justify-center" data-tour="connection">
           <ConnectionPanel 
             status={status} 
             onConnect={handleConnect} 
@@ -1206,7 +1212,7 @@ const App: React.FC = () => {
             savedCredentials={savedCredentials}
             onClearSavedCredentials={clearSavedCredentials}
           />
-        </div>
+        </main>
         
         {/* AI Vision Mascot on connection screen - hidden during demo tour */}
         {aiAnalytics.showMascot && !demoTour.isActive && (
@@ -1450,7 +1456,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Token Expiration Info Banner - Non-invasive */}
         {tokenExpiringSoon && status === ConnectionStatus.CONNECTED && tokenExpiresIn !== null && (
           <div className="bg-zinc-800 border-b border-zinc-700 text-zinc-300 px-4 py-1.5 flex items-center justify-between text-xs">
@@ -1922,7 +1928,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Offline Indicator - Requirements 3.1, 3.2, 3.3, 3.4 */}
       <OfflineIndicator />

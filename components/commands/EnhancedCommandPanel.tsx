@@ -33,7 +33,8 @@ import {
   FolderOpen,
   Wand2,
   Filter,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
 import { 
   useCommands, 
@@ -54,6 +55,7 @@ const CommandTemplateLibrary = lazy(() => import('./CommandTemplateLibrary').the
 const AICommandGenerator = lazy(() => import('./AICommandGenerator').then(m => ({ default: m.AICommandGenerator })));
 const CommandCategoryManager = lazy(() => import('./CommandCategoryManager').then(m => ({ default: m.CommandCategoryManager })));
 const CommandAnalysisPanel = lazy(() => import('./CommandAnalysisPanel').then(m => ({ default: m.CommandAnalysisPanel })));
+const DynamicCommandsPanel = lazy(() => import('../DynamicCommandsPanel').then(m => ({ default: m.DynamicCommandsPanel })));
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ text?: string }> = ({ text = 'Cargando...' }) => (
@@ -72,7 +74,7 @@ const USER_LEVELS: { value: UserLevel; label: string; description: string }[] = 
   { value: 'broadcaster', label: 'Broadcaster', description: 'Solo el streamer' },
 ];
 
-type PanelView = 'list' | 'templates' | 'ai' | 'categories' | 'analysis';
+type PanelView = 'list' | 'templates' | 'ai' | 'categories' | 'analysis' | 'dynamics';
 
 interface CommandFormData {
   name: string;
@@ -544,6 +546,12 @@ export const EnhancedCommandPanel: React.FC = () => {
           setActiveView('analysis');
         }
         break;
+      case '6':
+        if (e.altKey) {
+          e.preventDefault();
+          setActiveView('dynamics');
+        }
+        break;
     }
   }, [showForm, editingCommand, testingCommand]);
 
@@ -779,6 +787,19 @@ export const EnhancedCommandPanel: React.FC = () => {
             <BarChart3 size={14} aria-hidden="true" />
             Análisis
           </button>
+          <button
+            onClick={() => setActiveView('dynamics')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/50 ${
+              activeView === 'dynamics' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'
+            }`}
+            role="tab"
+            aria-selected={activeView === 'dynamics'}
+            aria-controls="dynamics-panel"
+            title="Alt+6"
+          >
+            <Zap size={14} aria-hidden="true" />
+            Dinámicas
+          </button>
         </div>
       )}
 
@@ -1013,6 +1034,15 @@ export const EnhancedCommandPanel: React.FC = () => {
                     }
                   }}
                 />
+              </Suspense>
+            </div>
+          )}
+
+          {/* Dynamics View */}
+          {activeView === 'dynamics' && (
+            <div id="dynamics-panel" role="tabpanel" aria-label="Comandos de dinámicas">
+              <Suspense fallback={<LoadingFallback text="Cargando dinámicas..." />}>
+                <DynamicCommandsPanel />
               </Suspense>
             </div>
           )}

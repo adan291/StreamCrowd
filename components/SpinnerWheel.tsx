@@ -266,8 +266,18 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   }, [isOverlayMode, rotation, isSpinning, winner, showWinner, currentOptions]);
 
   // Update options when prop changes and sync to overlay
+  // Use a ref to track previous options to avoid unnecessary syncs
+  const prevOptionsRef = useRef<string>('');
+  
   useEffect(() => {
     if (!isOverlayMode && options.length > 0) {
+      // Only sync if options actually changed (compare by content, not reference)
+      const optionsKey = JSON.stringify(options.map(o => ({ id: o.id, label: o.label, votes: o.votes, color: o.color })));
+      if (optionsKey === prevOptionsRef.current) {
+        return; // Options haven't actually changed
+      }
+      prevOptionsRef.current = optionsKey;
+      
       setCurrentOptions(options);
       // Sync with the new options directly
       const fullState = {
@@ -275,16 +285,15 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
         isSpinning,
         winner,
         showWinner,
-        options: options, // Use the new options directly
+        options: options,
       };
-      console.log('[SpinnerMain] Options changed, syncing:', fullState);
       channelRef.current?.postMessage(fullState);
       try {
         localStorage.setItem(STORAGE_KEY_SPINNER, JSON.stringify(fullState));
       } catch { /* ignore */ }
       gameSync.update('spinner', fullState).catch(err => console.error('Firebase spinner sync error:', err));
     }
-  }, [options, isOverlayMode]);
+  }, [options, isOverlayMode, rotation, isSpinning, winner, showWinner]);
 
 
   // Calculate total votes helper

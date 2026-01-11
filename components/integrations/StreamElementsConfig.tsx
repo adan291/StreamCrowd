@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../i18n';
 import { useStreamElements } from '../../hooks/useStreamElements';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 
 export function StreamElementsConfig() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const {
     isConnected,
     isConnecting,
@@ -79,7 +79,7 @@ export function StreamElementsConfig() {
 
         <div className="config-form">
           <div className="form-group">
-            <label>{t('integrations.jwtToken', 'JWT Token')}</label>
+            <label>JWT Token</label>
             <div className="secret-input">
               <input
                 type={showToken ? 'text' : 'password'}
@@ -96,7 +96,7 @@ export function StreamElementsConfig() {
               </button>
             </div>
             <p className="help-text">
-              {t('integrations.jwtHelp', 'Obtén tu token en streamelements.com → Dashboard → Account → Show secrets')}
+              Obtén tu token en streamelements.com → Dashboard → Account → Show secrets
             </p>
           </div>
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../i18n';
 import { useEventMappings } from '../../hooks/useEventMappings';
 import type { IntegrationProvider, IntegrationEventType, MappedAction, EventFilters } from '../../types/integrations';
 
@@ -7,7 +7,7 @@ const EVENT_TYPES: IntegrationEventType[] = ['donation', 'tip', 'follow', 'subsc
 const ACTION_TYPES: MappedAction['type'][] = ['macro', 'notification', 'obs', 'webhook', 'sound'];
 
 export function EventMappingEditor() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const { mappings, createMapping, updateMapping, deleteMapping, toggleMapping, exportMappings, importMappings } = useEventMappings();
   
   const [isCreating, setIsCreating] = useState(false);

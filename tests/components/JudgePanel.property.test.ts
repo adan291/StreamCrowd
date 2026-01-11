@@ -243,13 +243,15 @@ interface JudgePanelConfig {
  */
 function applyPreset(
   _currentConfig: JudgePanelConfig,
-  presetValues: JudgePanelPresetValues
+  presetValues: Partial<JudgePanelPresetValues>
 ): JudgePanelConfig {
-  const newCriteria = createCriteriaFromPreset(presetValues.criteria);
+  const newCriteria = presetValues.criteria 
+    ? createCriteriaFromPreset(presetValues.criteria)
+    : _currentConfig.criteria;
   return {
     criteria: newCriteria,
-    publicVotingEnabled: presetValues.publicVotingEnabled,
-    publicVoteWeight: presetValues.publicVoteWeight ?? 0.3,
+    publicVotingEnabled: presetValues.publicVotingEnabled ?? _currentConfig.publicVotingEnabled,
+    publicVoteWeight: presetValues.publicVoteWeight ?? _currentConfig.publicVoteWeight ?? 0.3,
   };
 }
 
@@ -871,7 +873,8 @@ describe('JudgePanel Property Tests', () => {
             presetArb,
             (currentConfig, preset) => {
               const newConfig = applyPreset(currentConfig, preset.values);
-              const expectedWeight = preset.values.publicVoteWeight ?? 0.3;
+              // If preset has publicVoteWeight, use it; otherwise use currentConfig's value or default 0.3
+              const expectedWeight = preset.values.publicVoteWeight ?? currentConfig.publicVoteWeight ?? 0.3;
               expect(newConfig.publicVoteWeight).toBe(expectedWeight);
             }
           ),

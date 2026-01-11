@@ -363,20 +363,38 @@ describe('SessionService Property Tests', () => {
     });
 
     it('should not load expired sessions', () => {
-      const session = service.createSession(generateUserId(), 'Owner');
+      // Create a session with already expired timestamp directly in localStorage
+      const expiredSession = {
+        id: 'expired-session-test',
+        code: 'ABC123',
+        ownerId: 'owner-1',
+        ownerName: 'Owner',
+        collaborators: [{
+          id: 'owner-1',
+          name: 'Owner',
+          role: 'owner',
+          status: 'online',
+          joinedAt: Date.now() - 10000,
+          lastActiveAt: Date.now() - 10000,
+        }],
+        settings: {
+          maxCollaborators: 10,
+          allowViewers: true,
+          requireApproval: false,
+          autoExpireMinutes: 480,
+        },
+        createdAt: Date.now() - 10000,
+        expiresAt: Date.now() - 1000, // Already expired
+        stateVersion: 0,
+      };
       
-      // Manually expire
-      const stored = service.getSession(session.id);
-      if (stored) {
-        stored.expiresAt = Date.now() - 1000;
-        // Force save
-        localStorage.setItem('streamcrowd_collab_sessions', JSON.stringify([stored]));
-      }
+      localStorage.setItem('streamcrowd_collab_sessions', JSON.stringify([expiredSession]));
       
-      // Create new service instance
+      // Create new service instance - should filter out expired sessions on load
       const newService = new SessionService();
       
-      expect(newService.getSession(session.id)).toBeNull();
+      // The expired session should not be accessible
+      expect(newService.getSession(expiredSession.id)).toBeNull();
     });
   });
 

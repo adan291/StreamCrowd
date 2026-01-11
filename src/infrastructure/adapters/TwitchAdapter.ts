@@ -2047,17 +2047,18 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   // ============================================
 
   /**
-   * Get current or recent Hype Train events
+   * Get current Hype Train status
+   * Uses the new "Get Hype Train Status" endpoint (replaces deprecated "Get Hype Train Events")
    * Requires OAuth token with channel:read:hype_train scope
    * @param token - OAuth token
    * @param broadcasterId - Broadcaster user ID
-   * @returns Array of Hype Train events or null if failed
+   * @returns Array of Hype Train events (current and/or last) or null if failed
    */
   async getHypeTrainEvents(token: string, broadcasterId: string): Promise<HypeTrainEvent[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
       const response = await fetch(
-        `https://api.twitch.tv/helix/hypetrain/events?broadcaster_id=${broadcasterId}&first=5`,
+        `https://api.twitch.tv/helix/hypetrain/status?broadcaster_id=${broadcasterId}`,
         {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
@@ -2076,33 +2077,56 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       }
       
       const data = await response.json();
-      return data.data?.map((event: any) => ({
-        id: event.id,
-        broadcasterId: event.broadcaster_id,
-        level: event.level,
-        total: event.total,
-        goal: event.goal,
-        topContributions: event.top_contributions?.map((c: any) => ({
-          userId: c.user_id,
-          userLogin: c.user_login,
-          userName: c.user_name,
-          type: c.type,
-          total: c.total,
-        })) || [],
-        lastContribution: event.last_contribution ? {
-          userId: event.last_contribution.user_id,
-          userLogin: event.last_contribution.user_login,
-          userName: event.last_contribution.user_name,
-          type: event.last_contribution.type,
-          total: event.last_contribution.total,
-        } : undefined,
-        startedAt: new Date(event.started_at),
-        expiresAt: new Date(event.expires_at),
-        isActive: new Date(event.expires_at) > new Date(),
-      })) || [];
+      const events: HypeTrainEvent[] = [];
+      
+      // Parse current active Hype Train if exists
+      if (data.data?.[0]?.current) {
+        const current = data.data[0].current;
+        events.push(this.parseHypeTrainData(current, true));
+      }
+      
+      // Parse last Hype Train if exists (and no current active)
+      if (data.data?.[0]?.last && events.length === 0) {
+        const last = data.data[0].last;
+        events.push(this.parseHypeTrainData(last, false));
+      }
+      
+      return events;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Parse Hype Train data from API response
+   * @param data - Raw Hype Train data from API
+   * @param isActive - Whether this is the current active Hype Train
+   */
+  private parseHypeTrainData(data: any, isActive: boolean): HypeTrainEvent {
+    return {
+      id: data.id,
+      broadcasterId: data.broadcaster_user_id || data.broadcaster_id,
+      level: data.level,
+      total: data.total,
+      goal: data.goal,
+      topContributions: data.top_contributions?.map((c: any) => ({
+        userId: c.user_id,
+        userLogin: c.user_login,
+        userName: c.user_name,
+        type: c.type?.toLowerCase() || 'other',
+        total: c.total,
+      })) || [],
+      lastContribution: data.last_contribution ? {
+        userId: data.last_contribution.user_id,
+        userLogin: data.last_contribution.user_login,
+        userName: data.last_contribution.user_name,
+        type: data.last_contribution.type?.toLowerCase() || 'other',
+        total: data.last_contribution.total,
+      } : undefined,
+      startedAt: new Date(data.started_at),
+      expiresAt: new Date(data.expires_at || data.ended_at || Date.now()),
+      isActive,
+    };
   }
 
   /**

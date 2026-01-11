@@ -29,6 +29,14 @@ export type { default as UseViewerCountReturn } from './useViewerCount';
 
 export { useOverlayMode, OVERLAY_BG_COLORS } from './useOverlayMode';
 
+// ==================== Overlay Sync Hook ====================
+export { useOverlaySync, useOverlayReceiver } from './useOverlaySync';
+export type { 
+  UseOverlaySyncOptions, 
+  UseOverlaySyncReturn,
+  OverlaySyncMessage,
+} from './useOverlaySync';
+
 export { useHistoryManager } from './useHistoryManager';
 export type { UseHistoryManagerReturn } from './useHistoryManager';
 
@@ -173,7 +181,7 @@ export type {
   UseModerationServiceReturn,
   UseModerationServiceReturn as UseModerationReturn,
   VoteContext,
-  ProcessVoteResult,
+  ModerationProcessVoteResult,
   ModerationLogEntry,
 } from '../src/application/hooks/useModerationService';
 

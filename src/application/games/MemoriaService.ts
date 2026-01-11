@@ -101,7 +101,7 @@ export class MemoriaService extends BaseGameService<MemoriaState> {
     return this.state.imageUrl;
   }
 
-  getPlayers(): MemoriaPlayer[] {
+  getMemoriaPlayers(): MemoriaPlayer[] {
     return [...this.state.memoriaPlayers.values()].sort((a, b) => b.points - a.points);
   }
 

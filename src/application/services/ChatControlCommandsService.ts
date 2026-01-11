@@ -303,6 +303,15 @@ export class ChatControlCommandsService {
     message: string,
     user: CommandUser
   ): Promise<CommandExecutionResult | null> {
+    // Check for global help command: !tv help or !tv commands
+    const trimmed = message.trim().toLowerCase();
+    if (trimmed === `${this.config.prefix}tv help` || 
+        trimmed === `${this.config.prefix}tv commands` || 
+        trimmed === `${this.config.prefix}tv cmds` ||
+        trimmed === `${this.config.prefix}tv`) {
+      return this.getGlobalHelp();
+    }
+    
     // Parse command
     const parsed = parseControlCommand(message, user, this.config);
     if (!parsed) return null;
@@ -343,6 +352,16 @@ export class ChatControlCommandsService {
         message: `Error ejecutando comando: ${errorMsg}`,
       };
     }
+  }
+
+  /**
+   * Get global help message with all available commands
+   */
+  getGlobalHelp(): CommandExecutionResult {
+    return {
+      success: true,
+      message: '📋 COMANDOS: !tv poll help (encuestas) | !tv raffle help (sorteos) | !tv pred help (predicciones) | !tv judge help (torneos)',
+    };
   }
 
   // ============================================

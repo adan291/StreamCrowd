@@ -214,7 +214,7 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({
         {/* Available commands info */}
         <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
           <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">
-            Comandos disponibles:
+            📝 Comandos para usuarios:
           </p>
           <ul className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
             <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">{localConfig.prefix}participantes</code> - Ver participantes</li>
@@ -222,6 +222,24 @@ export const ChatSettings: React.FC<ChatSettingsProps> = ({
             <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">{localConfig.prefix}tiempo</code> - Tiempo restante</li>
             <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">{localConfig.prefix}ganador</code> - Último ganador</li>
           </ul>
+        </div>
+
+        {/* Control commands for mods */}
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+          <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+            🎮 Comandos de control (mods/streamer):
+          </p>
+          <ul className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle help</code> - Ver todos los comandos</li>
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle start "Premio" [keyword] [seg]</code> - Iniciar sorteo</li>
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle winner</code> - Elegir ganador</li>
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle reroll</code> - Elegir nuevo ganador</li>
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle close</code> - Cerrar sorteo</li>
+            <li><code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv raffle participants</code> - Ver participantes</li>
+          </ul>
+          <p className="text-xs text-zinc-500 mt-2">
+            💡 Escribe <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">!tv help</code> en el chat para ver todos los comandos.
+          </p>
         </div>
       </div>
 

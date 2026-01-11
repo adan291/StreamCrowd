@@ -6,7 +6,23 @@
  */
 
 export * from './Poll';
-export * from './Vote';
+// Vote exports (excluding ModerationConfig which is in its own file)
+export { 
+  validateVote,
+  validateAccountAge,
+  validateCooldown,
+  canChangeVote,
+  calculateWeight,
+  isUserBlacklisted,
+  isUserWhitelisted,
+  DEFAULT_MODERATION_CONFIG as VOTE_DEFAULT_MODERATION_CONFIG
+} from './Vote';
+export type { 
+  RejectionReason, 
+  VoteValidationInput, 
+  VoteValidationResult, 
+  UserVoteState 
+} from './Vote';
 export * from './StreamEvent';
 export * from './ModerationConfig';
 export * from './ChatMetrics';

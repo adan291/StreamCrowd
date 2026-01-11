@@ -572,7 +572,7 @@ export function useBackupService(): UseBackupServiceReturn {
       const backupData: BackupData = {
         version: BACKUP_DATA_VERSION,
         timestamp: Date.now(),
-        application: 'twitchvote',
+        application: 'streamcrowd',
         data: backupDataContent,
         checksum,
       };

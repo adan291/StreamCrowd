@@ -291,7 +291,7 @@ export class BattleshipService extends BaseGameService<BattleshipState> {
     let newLeaderboard = new Map(this.state.leaderboard);
     let newShips = this.state.ships;
     let newShipsRemaining = this.state.shipsRemaining;
-    let newPhase = this.state.phase;
+    let newPhase: 'setup' | 'playing' | 'finished' = this.state.phase;
 
     if (isHit) {
       const existing = newLeaderboard.get(oderId);

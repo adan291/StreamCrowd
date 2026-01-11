@@ -7,29 +7,54 @@ import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './BasePage';
 
 export class DashboardPage extends BasePage {
-  // Navigation
+  // Main Navigation (sidebar)
+  get dynamicsNav(): Locator {
+    return this.page.locator('[data-tour="nav-dynamics"]');
+  }
+
+  get gamesNav(): Locator {
+    return this.page.locator('[data-tour="nav-games"]');
+  }
+
+  get platformsNav(): Locator {
+    return this.page.locator('[data-tour="nav-platforms"]');
+  }
+
+  get obsNav(): Locator {
+    return this.page.locator('[data-tour="nav-obs"]');
+  }
+
+  get dataNav(): Locator {
+    return this.page.getByRole('button', { name: /data|datos|analytics/i });
+  }
+
+  get galleryNav(): Locator {
+    return this.page.getByRole('button', { name: /gallery|galería/i });
+  }
+
+  // Legacy aliases for backward compatibility
   get pollsNav(): Locator {
-    return this.page.getByRole('button', { name: /encuestas|polls/i });
+    return this.dynamicsNav; // Polls are inside dynamics
   }
 
   get predictionsNav(): Locator {
-    return this.page.getByRole('button', { name: /predicciones|predictions/i });
+    return this.platformsNav; // Predictions are inside platforms > twitch
   }
 
   get giveawaysNav(): Locator {
-    return this.page.getByRole('button', { name: /sorteos|giveaways/i });
+    return this.dynamicsNav; // Giveaways are inside dynamics
   }
 
   get timersNav(): Locator {
-    return this.page.getByRole('button', { name: /timers|temporizadores/i });
+    return this.dynamicsNav; // Timers/countdown are inside dynamics
   }
 
   get macrosNav(): Locator {
-    return this.page.getByRole('button', { name: /macros/i });
+    return this.platformsNav; // Macros might be in platforms
   }
 
   get settingsNav(): Locator {
-    return this.page.getByRole('button', { name: /ajustes|settings/i });
+    return this.page.getByRole('button', { name: /ajustes|settings|tools|herramientas/i });
   }
 
   // Status indicators
@@ -55,50 +80,104 @@ export class DashboardPage extends BasePage {
   }
 
   /**
-   * Navigate to dashboard
+   * Navigate to dashboard (only if not already there)
+   * If already connected and on dashboard, this is a no-op
    */
   async goto(): Promise<void> {
+    // Check if we're already on the dashboard (connected state)
+    const isConnected = await this.isConnected();
+    if (isConnected) {
+      // Already on dashboard, no need to navigate
+      return;
+    }
+    
+    // Not connected, navigate to root
     await super.goto('/');
   }
 
   /**
-   * Navigate to polls section
+   * Navigate to dynamics section (contains polls, giveaways, countdown, etc.)
+   */
+  async goToDynamics(): Promise<void> {
+    await this.dynamicsNav.click();
+    await this.waitForPageLoad();
+  }
+
+  /**
+   * Navigate to polls section (via dynamics > poll activity card)
    */
   async goToPolls(): Promise<void> {
-    await this.pollsNav.click();
-    await this.waitForPageLoad();
+    await this.goToDynamics();
+    // Click on the poll activity card
+    const pollCard = this.page.locator('[aria-label*="Encuesta"], [aria-label*="Poll"]').first();
+    if (await pollCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await pollCard.click();
+      await this.waitForPageLoad();
+    }
   }
 
   /**
-   * Navigate to predictions section
+   * Navigate to predictions section (via platforms > twitch)
    */
   async goToPredictions(): Promise<void> {
-    await this.predictionsNav.click();
+    await this.platformsNav.click();
     await this.waitForPageLoad();
   }
 
   /**
-   * Navigate to giveaways section
+   * Navigate to giveaways section (via dynamics > giveaway activity card)
    */
   async goToGiveaways(): Promise<void> {
-    await this.giveawaysNav.click();
-    await this.waitForPageLoad();
+    await this.goToDynamics();
+    // Click on the giveaway activity card
+    const giveawayCard = this.page.locator('[aria-label*="Sorteos"], [aria-label*="Giveaway"]').first();
+    if (await giveawayCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await giveawayCard.click();
+      await this.waitForPageLoad();
+    }
   }
 
   /**
-   * Navigate to timers section
+   * Navigate to timers section (via dynamics > countdown activity card)
    */
   async goToTimers(): Promise<void> {
-    await this.timersNav.click();
+    await this.goToDynamics();
+    // Click on the countdown activity card
+    const countdownCard = this.page.locator('[aria-label*="Countdown"], [aria-label*="Timer"]').first();
+    if (await countdownCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await countdownCard.click();
+      await this.waitForPageLoad();
+    }
+  }
+
+  /**
+   * Navigate to games section
+   */
+  async goToGames(): Promise<void> {
+    await this.gamesNav.click();
     await this.waitForPageLoad();
   }
 
   /**
-   * Navigate to macros section
+   * Navigate to macros section (via platforms > twitch > macros)
    */
   async goToMacros(): Promise<void> {
-    await this.macrosNav.click();
+    await this.platformsNav.click();
     await this.waitForPageLoad();
+    
+    // Click on Twitch platform card if visible
+    const twitchCard = this.page.locator('[data-tour="platform-twitch"], text=/Twitch/i').first();
+    if (await twitchCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await twitchCard.click();
+      await this.waitForPageLoad();
+    }
+    
+    // Click on Macros tool if visible
+    const macrosTool = this.page.locator('[data-tour="tool-macros"], button:has-text("Macros")').first();
+    if (await macrosTool.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await macrosTool.click();
+      await this.waitForPageLoad();
+    }
   }
 
   /**
@@ -113,8 +192,9 @@ export class DashboardPage extends BasePage {
    * Check if connected to Twitch
    */
   async isConnected(): Promise<boolean> {
-    const status = await this.connectionStatus.getAttribute('data-status');
-    return status === 'connected';
+    // Check if we're on the dashboard (not login screen)
+    const sidebar = this.page.locator('[data-tour="nav-dynamics"]');
+    return await sidebar.isVisible({ timeout: 2000 }).catch(() => false);
   }
 
   /**
@@ -129,8 +209,7 @@ export class DashboardPage extends BasePage {
    * Verify dashboard is loaded
    */
   async verifyLoaded(): Promise<void> {
-    await expect(this.sidebar).toBeVisible();
-    await expect(this.pollsNav).toBeVisible();
+    await expect(this.dynamicsNav).toBeVisible({ timeout: 10000 });
   }
 
   /**

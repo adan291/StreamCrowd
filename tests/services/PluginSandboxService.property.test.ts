@@ -26,12 +26,12 @@ const createMockIframe = () => {
   return iframe;
 };
 
-vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
   if (tag === 'iframe') {
     return createMockIframe();
   }
   return document.createElement(tag);
-});
+}) as typeof document.createElement);
 
 vi.spyOn(document.body, 'appendChild').mockImplementation((node: Node) => node);
 

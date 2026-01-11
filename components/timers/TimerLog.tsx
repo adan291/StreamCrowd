@@ -97,7 +97,7 @@ export const TimerLog: React.FC<TimerLogProps> = ({
       </div>
 
       {/* Log entries grouped by date */}
-      {Object.entries(groupedLog).map(([date, entries]) => (
+      {Object.entries(groupedLog).map(([date, entries]: [string, TimerExecutionLog[]]) => (
         <div key={date}>
           <h4 className="text-xs font-medium text-zinc-500 mb-2 px-1">
             {date}

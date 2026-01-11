@@ -345,7 +345,7 @@ export function useHistoryManager(): UseHistoryManagerReturn {
     const exportData: HistoryExport = {
       version: 1,
       exportedAt: Date.now(),
-      application: 'twitchvote',
+      application: 'streamcrowd',
       items: items,
       metadata: {
         totalItems: items.length,

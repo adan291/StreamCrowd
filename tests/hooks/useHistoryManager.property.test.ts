@@ -220,7 +220,7 @@ function matchesFilter(item: HistoryItem, filter: HistoryFilter): boolean {
 }
 
 function getSearchableText(item: HistoryItem): string {
-  const data = item.data as Record<string, unknown>;
+  const data = item.data as unknown as Record<string, unknown>;
   const parts: string[] = [];
 
   if ('question' in data && typeof data.question === 'string') parts.push(data.question);

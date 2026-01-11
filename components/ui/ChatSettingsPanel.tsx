@@ -78,29 +78,38 @@ const USER_COMMANDS: Record<string, CommandConfig[]> = {
 // Nota: estos comandos NO usan el prefijo configurable, siempre son !tv
 const CONTROL_COMMANDS: Record<string, CommandConfig[]> = {
   poll: [
-    { name: '!tv poll create', enabled: true, cooldownMs: 2000, description: 'Crear encuesta: !tv poll create "Pregunta" op1,op2,op3', aliases: [] },
-    { name: '!tv poll close', enabled: true, cooldownMs: 2000, description: 'Cerrar encuesta activa', aliases: [] },
-    { name: '!tv poll results', enabled: true, cooldownMs: 2000, description: 'Mostrar resultados', aliases: [] },
-    { name: '!tv poll reset', enabled: true, cooldownMs: 2000, description: 'Reiniciar encuesta', aliases: [] },
+    { name: '!tv poll help', enabled: true, cooldownMs: 2000, description: 'Ver todos los comandos de encuesta', aliases: ['!tv poll commands'] },
+    { name: '!tv poll create', enabled: true, cooldownMs: 2000, description: 'Crear encuesta: !tv poll create "Pregunta" op1,op2,op3 [seg]', aliases: [] },
+    { name: '!tv poll close', enabled: true, cooldownMs: 2000, description: 'Cerrar encuesta activa', aliases: ['!tv poll stop', '!tv poll end'] },
+    { name: '!tv poll results', enabled: true, cooldownMs: 2000, description: 'Mostrar resultados', aliases: ['!tv poll votes'] },
+    { name: '!tv poll reset', enabled: true, cooldownMs: 2000, description: 'Reiniciar encuesta', aliases: ['!tv poll clear'] },
   ],
   prediction: [
-    { name: '!tv pred create', enabled: true, cooldownMs: 2000, description: 'Crear predicción: !tv pred create "Título" op1,op2', aliases: [] },
-    { name: '!tv pred lock', enabled: true, cooldownMs: 2000, description: 'Bloquear predicciones', aliases: [] },
-    { name: '!tv pred resolve', enabled: true, cooldownMs: 2000, description: 'Resolver: !tv pred resolve 1', aliases: [] },
+    { name: '!tv pred help', enabled: true, cooldownMs: 2000, description: 'Ver todos los comandos de predicción', aliases: ['!tv pred commands'] },
+    { name: '!tv pred create', enabled: true, cooldownMs: 2000, description: 'Crear predicción: !tv pred create "Título" op1,op2 [seg]', aliases: ['!tv pred new'] },
+    { name: '!tv pred lock', enabled: true, cooldownMs: 2000, description: 'Bloquear predicciones', aliases: ['!tv pred close'] },
+    { name: '!tv pred resolve', enabled: true, cooldownMs: 2000, description: 'Resolver: !tv pred resolve <num>', aliases: ['!tv pred winner'] },
     { name: '!tv pred cancel', enabled: true, cooldownMs: 2000, description: 'Cancelar predicción', aliases: [] },
   ],
   game: [],
   giveaway: [
-    { name: '!tv raffle start', enabled: true, cooldownMs: 2000, description: 'Iniciar sorteo: !tv raffle start "Premio" keyword', aliases: [] },
-    { name: '!tv raffle winner', enabled: true, cooldownMs: 2000, description: 'Elegir ganador', aliases: [] },
-    { name: '!tv raffle reroll', enabled: true, cooldownMs: 2000, description: 'Elegir nuevo ganador', aliases: [] },
-    { name: '!tv raffle close', enabled: true, cooldownMs: 2000, description: 'Cerrar sorteo', aliases: [] },
+    { name: '!tv raffle help', enabled: true, cooldownMs: 2000, description: 'Ver todos los comandos de sorteo', aliases: ['!tv raffle commands'] },
+    { name: '!tv raffle start', enabled: true, cooldownMs: 2000, description: 'Iniciar sorteo: !tv raffle start "Premio" [keyword] [seg]', aliases: ['!tv raffle new'] },
+    { name: '!tv raffle winner', enabled: true, cooldownMs: 2000, description: 'Elegir ganador', aliases: ['!tv raffle pick'] },
+    { name: '!tv raffle reroll', enabled: true, cooldownMs: 2000, description: 'Elegir nuevo ganador', aliases: ['!tv raffle again'] },
+    { name: '!tv raffle close', enabled: true, cooldownMs: 2000, description: 'Cerrar sorteo', aliases: ['!tv raffle stop', '!tv raffle end'] },
+    { name: '!tv raffle participants', enabled: true, cooldownMs: 2000, description: 'Ver participantes', aliases: ['!tv raffle count'] },
   ],
   judge: [
-    { name: '!tv judge start', enabled: true, cooldownMs: 2000, description: 'Iniciar torneo', aliases: [] },
+    { name: '!tv judge help', enabled: true, cooldownMs: 2000, description: 'Ver todos los comandos de torneo', aliases: ['!tv judge commands'] },
+    { name: '!tv judge start', enabled: true, cooldownMs: 2000, description: 'Iniciar torneo', aliases: ['!tv judge begin'] },
     { name: '!tv judge pause', enabled: true, cooldownMs: 2000, description: 'Pausar torneo', aliases: [] },
+    { name: '!tv judge resume', enabled: true, cooldownMs: 2000, description: 'Reanudar torneo', aliases: ['!tv judge continue'] },
     { name: '!tv judge next', enabled: true, cooldownMs: 2000, description: 'Siguiente concursante', aliases: [] },
-    { name: '!tv judge winner', enabled: true, cooldownMs: 2000, description: 'Declarar ganador', aliases: [] },
+    { name: '!tv judge prev', enabled: true, cooldownMs: 2000, description: 'Concursante anterior', aliases: ['!tv judge previous'] },
+    { name: '!tv judge vote', enabled: true, cooldownMs: 2000, description: 'Iniciar votación: !tv judge vote [seg]', aliases: ['!tv judge voting'] },
+    { name: '!tv judge winner', enabled: true, cooldownMs: 2000, description: 'Declarar ganador', aliases: ['!tv judge finish'] },
+    { name: '!tv judge ranking', enabled: true, cooldownMs: 2000, description: 'Ver ranking', aliases: ['!tv judge rank', '!tv judge top'] },
   ],
 };
 
@@ -424,6 +433,12 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
                   <li><strong>📝 Usuarios:</strong> Para que el chat participe</li>
                   <li><strong>🎮 Control:</strong> Solo mods/streamer pueden controlar</li>
                 </ul>
+                <div className="mt-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                  <p className="font-medium text-zinc-700 dark:text-zinc-300">💡 Comando de ayuda:</p>
+                  <p className="text-zinc-500">
+                    Escribe <code className="px-1 bg-zinc-200 dark:bg-zinc-700 rounded">!tv help</code> en el chat para ver todos los comandos disponibles.
+                  </p>
+                </div>
                 {activityType === 'poll' && (
                   <div className="mt-2 p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
                     <p className="font-medium text-zinc-700 dark:text-zinc-300">💡 Votación:</p>

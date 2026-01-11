@@ -14,14 +14,16 @@ const statusColors: Record<PluginStatus, string> = {
   installed: 'bg-gray-500',
   active: 'bg-green-500',
   disabled: 'bg-yellow-500',
-  error: 'bg-red-500'
+  error: 'bg-red-500',
+  updating: 'bg-blue-500'
 };
 
 const statusLabels: Record<PluginStatus, string> = {
   installed: 'Instalado',
   active: 'Activo',
   disabled: 'Desactivado',
-  error: 'Error'
+  error: 'Error',
+  updating: 'Actualizando'
 };
 
 export const PluginCard: React.FC<PluginCardProps> = ({

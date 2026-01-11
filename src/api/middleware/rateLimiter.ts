@@ -141,3 +141,12 @@ export function recordIPRequest(ip: string): RateLimitResult {
     headers: service.getHeaders(keyId, IP_RATE_LIMIT)
   };
 }
+
+// ============================================
+// Legacy Exports (for backward compatibility)
+// ============================================
+
+/**
+ * @deprecated Use enforceRateLimit() instead
+ */
+export const rateLimiterMiddleware = enforceRateLimit;

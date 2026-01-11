@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../i18n';
 import { useStreamlabs } from '../../hooks/useStreamlabs';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 
 export function StreamlabsConfig() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const {
     isConnected,
     isConnecting,
@@ -55,7 +55,7 @@ export function StreamlabsConfig() {
 
         <div className="config-form">
           <div className="form-group">
-            <label>{t('integrations.clientId', 'Client ID')}</label>
+            <label>Client ID</label>
             <input
               type="text"
               value={clientId}
@@ -65,7 +65,7 @@ export function StreamlabsConfig() {
           </div>
 
           <div className="form-group">
-            <label>{t('integrations.clientSecret', 'Client Secret')}</label>
+            <label>Client Secret</label>
             <div className="secret-input">
               <input
                 type={showSecret ? 'text' : 'password'}
@@ -85,7 +85,7 @@ export function StreamlabsConfig() {
 
           <div className="button-group">
             <button onClick={handleSaveConfig} className="btn-secondary">
-              {t('common.save', 'Guardar')}
+              Guardar
             </button>
             
             {!isConnected ? (
@@ -94,11 +94,11 @@ export function StreamlabsConfig() {
                 disabled={!clientId || !clientSecret || isConnecting}
                 className="btn-primary"
               >
-                {isConnecting ? t('common.connecting', 'Conectando...') : t('integrations.connect', 'Conectar con Streamlabs')}
+                {isConnecting ? 'Conectando...' : 'Conectar con Streamlabs'}
               </button>
             ) : (
               <button onClick={disconnect} className="btn-danger">
-                {t('integrations.disconnect', 'Desconectar')}
+                Desconectar
               </button>
             )}
           </div>
@@ -108,7 +108,7 @@ export function StreamlabsConfig() {
       {isConnected && (
         <>
           <div className="config-section">
-            <h4>{t('integrations.testAlerts', 'Probar Alertas')}</h4>
+            <h4>Probar Alertas</h4>
             <div className="button-group">
               <button onClick={() => testAlert('donation')} className="btn-small">
                 💰 Donación
@@ -123,7 +123,7 @@ export function StreamlabsConfig() {
           </div>
 
           <div className="config-section">
-            <h4>{t('integrations.recentEvents', 'Eventos Recientes')}</h4>
+            <h4>Eventos Recientes</h4>
             <div className="events-list">
               {donations.slice(0, 5).map((d) => (
                 <div key={d.id} className="event-item donation">
@@ -148,7 +148,7 @@ export function StreamlabsConfig() {
                 </div>
               ))}
               {donations.length === 0 && follows.length === 0 && subscriptions.length === 0 && (
-                <p className="no-events">{t('integrations.noEvents', 'No hay eventos recientes')}</p>
+                <p className="no-events">No hay eventos recientes</p>
               )}
             </div>
           </div>

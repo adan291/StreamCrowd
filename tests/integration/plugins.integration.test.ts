@@ -306,7 +306,7 @@ describe('Plugin System Integration Tests', () => {
       const panelId = api.ui.registerPanel({
         id: 'test-panel',
         title: 'Test Panel',
-        render: () => {}
+        render: () => '<div>Test</div>'
       });
 
       expect(panelId).toBe('test-panel');
@@ -342,7 +342,7 @@ describe('Plugin System Integration Tests', () => {
       // Register overlay
       const overlayId = api.ui.registerOverlay({
         id: 'test-overlay',
-        render: () => {}
+        render: () => '<div>Overlay</div>'
       });
 
       expect(overlayId).toBe('test-overlay');

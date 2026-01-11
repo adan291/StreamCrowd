@@ -5,7 +5,7 @@
  * Only renders items that are visible in the viewport.
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 export interface VirtualListOptions {
   /** Total number of items */

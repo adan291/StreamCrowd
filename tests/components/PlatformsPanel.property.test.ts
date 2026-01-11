@@ -139,7 +139,7 @@ function applyNavigationSequence(
  */
 function isValidState(state: NavigationState): boolean {
   const validViews: PlatformsView[] = ['selector', 'twitch'];
-  const validTools: PlatformsTool[] = ['none', 'commands', 'predictions', 'channelpoints'];
+  const validTools: PlatformsTool[] = ['none', 'commands', 'predictions', 'channelpoints', 'macros', 'timers', 'hypetrain', 'goals', 'shieldmode', 'markers'];
   
   if (!validViews.includes(state.view)) return false;
   if (!validTools.includes(state.tool)) return false;

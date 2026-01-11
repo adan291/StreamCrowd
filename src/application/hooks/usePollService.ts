@@ -180,6 +180,8 @@ export function usePollService(options: UsePollServiceOptions = {}): UsePollServ
         })),
         totalVotes: currentPoll.totalVotes,
         isActive: currentPoll.isActive,
+        showResults: true,
+        updatedAt: Date.now(),
       }).catch(err => console.error('[PollService] Firebase sync error:', err));
     } else {
       // Clear poll in Firebase

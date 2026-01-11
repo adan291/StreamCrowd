@@ -1,5 +1,5 @@
 // Hook para suscripción a eventos de plugins
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PluginEvent } from '../types/plugins';
 import { getPluginHostService } from '../src/plugins/services/PluginHostService';
 import { getPluginManagerService } from '../src/plugins/services/PluginManagerService';

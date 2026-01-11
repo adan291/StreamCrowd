@@ -20,8 +20,8 @@ import {
   CollaborationChannel 
 } from '../services/TwitchService';
 import { AuthService } from '../services/AuthService';
-import { PlatformAuthService, type PlatformCredentials } from '../services/PlatformAuthService';
-import { TokenStorage } from '../services/TokenStorage';
+import { PlatformAuthService } from '../services/PlatformAuthService';
+import { TokenStorage, type PlatformCredentials } from '../services/TokenStorage';
 import type { ConnectionStatus as DomainConnectionStatus, MessageCallback, StatusCallback } from '../../domain/ports/IChatProvider';
 import { ConnectionStatus } from '../../../types';
 import { PlatformManagerService } from '../services/PlatformManagerService';

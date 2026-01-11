@@ -63,11 +63,11 @@ export class PPTService extends BaseGameService<PPTState> {
     return this.state.phase;
   }
 
-  getActivePlayers(): PPTPlayer[] {
+  getPPTActivePlayers(): PPTPlayer[] {
     return [...this.state.pptPlayers.values()].filter(p => !p.eliminated);
   }
 
-  getAllPlayers(): PPTPlayer[] {
+  getPPTAllPlayers(): PPTPlayer[] {
     return [...this.state.pptPlayers.values()];
   }
 
@@ -80,7 +80,7 @@ export class PPTService extends BaseGameService<PPTState> {
   }
 
   getChosenCount(): number {
-    return this.getActivePlayers().filter(p => p.choice).length;
+    return this.getPPTActivePlayers().filter(p => p.choice).length;
   }
 
   setRoundTime(seconds: number): void {
@@ -131,7 +131,7 @@ export class PPTService extends BaseGameService<PPTState> {
   private resolveRound(): void {
     this.setState({ ...this.state, phase: 'reveal' });
 
-    const active = this.getActivePlayers().filter(p => p.choice);
+    const active = this.getPPTActivePlayers().filter(p => p.choice);
     
     if (active.length < 2) {
       setTimeout(() => {
@@ -251,7 +251,7 @@ export class PPTService extends BaseGameService<PPTState> {
   protected getOverlayData(): Record<string, unknown> {
     return {
       phase: this.state.phase,
-      players: this.getActivePlayers(),
+      players: this.getPPTActivePlayers(),
       round: this.state.round,
       timeLeft: this.state.timeLeft,
       champion: this.state.champion,

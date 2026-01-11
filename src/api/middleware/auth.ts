@@ -187,3 +187,12 @@ export function getScopesByCategory(): Record<string, APIScope[]> {
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
+
+// ============================================
+// Legacy Exports (for backward compatibility)
+// ============================================
+
+/**
+ * @deprecated Use requireAuth() instead
+ */
+export const authMiddleware = requireAuth;

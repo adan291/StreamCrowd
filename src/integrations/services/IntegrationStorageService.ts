@@ -5,7 +5,7 @@ import type {
   IntegrationSettings,
 } from '../../../types/integrations';
 import { DEFAULT_INTEGRATION_SETTINGS } from '../../../types/integrations';
-import { encrypt, decrypt } from '../../application/utils/encryption';
+import { encryptSensitiveData as encrypt, decryptSensitiveData as decrypt } from '../../application/utils/encryption';
 
 const STORAGE_KEYS = {
   STREAMLABS_TOKENS: 'integration:streamlabs:tokens',
@@ -31,7 +31,7 @@ export class IntegrationStorageService {
       ...tokens,
       expiresAt: tokens.expiresAt.toISOString(),
     });
-    const encrypted = await encrypt(data, this.encryptionKey);
+    const encrypted = await encrypt(data);
     localStorage.setItem(STORAGE_KEYS.STREAMLABS_TOKENS, encrypted);
   }
 
@@ -40,7 +40,7 @@ export class IntegrationStorageService {
       const encrypted = localStorage.getItem(STORAGE_KEYS.STREAMLABS_TOKENS);
       if (!encrypted) return null;
 
-      const decrypted = await decrypt(encrypted, this.encryptionKey);
+      const decrypted = await decrypt<string>(encrypted);
       const parsed = JSON.parse(decrypted);
       return {
         ...parsed,
@@ -57,7 +57,7 @@ export class IntegrationStorageService {
 
   async saveStreamElementsConfig(config: StreamElementsConfig): Promise<void> {
     const data = JSON.stringify(config);
-    const encrypted = await encrypt(data, this.encryptionKey);
+    const encrypted = await encrypt(data);
     localStorage.setItem(STORAGE_KEYS.STREAMELEMENTS_CONFIG, encrypted);
   }
 
@@ -66,7 +66,7 @@ export class IntegrationStorageService {
       const encrypted = localStorage.getItem(STORAGE_KEYS.STREAMELEMENTS_CONFIG);
       if (!encrypted) return null;
 
-      const decrypted = await decrypt(encrypted, this.encryptionKey);
+      const decrypted = await decrypt<string>(encrypted);
       return JSON.parse(decrypted);
     } catch {
       return null;

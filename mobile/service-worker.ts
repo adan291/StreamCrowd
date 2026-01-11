@@ -95,7 +95,8 @@ self.addEventListener('push', (event) => {
   
   const data = event.data.json();
   
-  const options: NotificationOptions = {
+  // Use extended notification options (supported by service workers)
+  const options = {
     body: data.body || '',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge-72x72.png',

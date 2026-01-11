@@ -190,8 +190,8 @@ describe('PluginHostService Property Tests', () => {
       let count1 = 0;
       let count2 = 0;
       
-      api1.events.on('shared:event' as any, () => count1++);
-      api2.events.on('shared:event' as any, () => count2++);
+      api1.events.on('shared:event' as any, () => { count1++; });
+      api2.events.on('shared:event' as any, () => { count2++; });
       
       service.broadcastEvent('shared:event' as any, {});
       

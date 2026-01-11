@@ -18,6 +18,8 @@ export interface Toast {
 interface ToastItemProps {
   toast: Toast;
   onDismiss: (id: string) => void;
+  /** React key prop - handled internally by React */
+  key?: string;
 }
 
 const iconMap = {

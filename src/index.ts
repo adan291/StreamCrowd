@@ -7,10 +7,33 @@
  * - application/    → Servicios, hooks y juegos
  */
 
-// Domain
+// Domain - Entities
 export * from './domain/entities/Poll';
-export * from './domain/entities/Vote';
-export * from './domain/ports/IChatProvider';
+export { 
+  validateVote,
+  validateAccountAge,
+  validateCooldown,
+  canChangeVote,
+  calculateWeight,
+  isUserBlacklisted,
+  isUserWhitelisted
+} from './domain/entities/Vote';
+export type { 
+  RejectionReason,
+  VoteValidationInput,
+  VoteValidationResult,
+  UserVoteState
+} from './domain/entities/Vote';
+
+// Domain - Ports (explicit exports to avoid duplicates)
+export type { 
+  ConnectionStatus,
+  MessageCallback,
+  StatusCallback,
+  ChatMessage,
+  StreamEvent,
+  IChatProvider
+} from './domain/ports/IChatProvider';
 export * from './domain/ports/IOverlaySync';
 export * from './domain/ports/IStorage';
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../i18n';
 import { useIntegrationEvents } from '../../hooks/useIntegrationEvents';
 import type { IntegrationProvider, IntegrationEventType } from '../../types/integrations';
 
@@ -15,7 +15,7 @@ const EVENT_ICONS: Record<IntegrationEventType, string> = {
 };
 
 export function IntegrationEventLog() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const { events, stats, filters, setFilters, clearFilters, clearEvents, exportEvents } = useIntegrationEvents();
   
   const [providerFilter, setProviderFilter] = useState<IntegrationProvider | ''>('');

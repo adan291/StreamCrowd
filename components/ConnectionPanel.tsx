@@ -280,7 +280,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
             <div className="w-full border-t border-gray-300 dark:border-zinc-700"></div>
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="px-2 bg-gray-200 dark:bg-zinc-900 text-slate-500 dark:text-zinc-500">
+            <span className="px-2 bg-gray-200 dark:bg-zinc-900 text-slate-500 dark:text-zinc-400">
               {t.connection.orLoginWith || 'o inicia sesión con'}
             </span>
           </div>
