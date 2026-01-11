@@ -42,6 +42,7 @@ import {
   GiveawayStorage,
   ModeSelector,
   DurationPicker,
+  BotDetectionService,
   type RaffleMode,
   type GiveawayThread,
   type FinishedGiveaway,
@@ -552,8 +553,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       const data = await response.json();
       const allChatters: string[] = data.data?.map((c: { user_login: string }) => c.user_login) || [];
       
-      // Import BotDetectionService dynamically to filter bots
-      const { BotDetectionService } = await import('./services/BotDetectionService');
+      // Use BotDetectionService to filter bots
       const knownBots = BotDetectionService.getKnownBots();
       
       // Separate bots from regular chatters

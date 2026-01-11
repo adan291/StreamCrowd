@@ -18,10 +18,7 @@ const LazyJudgePanel = React.lazy(() => import('./JudgePanel'));
  */
 const LazyGiveawayHub = React.lazy(() => import('./GiveawayHub'));
 
-/**
- * Lazy load SpinnerWheel component
- */
-const LazySpinnerWheel = React.lazy(() => import('./SpinnerWheel'));
+import { SpinnerWheel } from './SpinnerWheel';
 
 export interface DynamicsPanelProps {
   // Navigation state
@@ -233,9 +230,7 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
               {renderBackButton()}
             </div>
             <div className="flex-1 min-h-0 p-4">
-              <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" /></div>}>
-                <LazySpinnerWheel />
-              </Suspense>
+              <SpinnerWheel />
             </div>
           </div>
         );
