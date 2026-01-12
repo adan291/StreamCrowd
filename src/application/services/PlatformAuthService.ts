@@ -14,6 +14,7 @@
 
 import type { Platform } from '../../../types/platform';
 import { TokenStorage, type PlatformCredentials } from './TokenStorage';
+import { GiveawayFirebaseService } from '../../infrastructure/firebase/GiveawayFirebaseService';
 
 // ============================================
 // Types
@@ -604,6 +605,20 @@ class PlatformAuthServiceImpl {
   }
 
   private notifyAuthChange(platform: Platform, credentials: PlatformCredentials | null): void {
+    // If Twitch login, configure Firebase service for giveaways
+    if (platform === 'twitch' && credentials) {
+      GiveawayFirebaseService.setStreamer(
+        credentials.userId,
+        credentials.username,
+        undefined, // profileImage - could be fetched separately
+        credentials.username.toLowerCase()
+      );
+      console.log('[PlatformAuthService] Firebase configured for streamer:', credentials.username);
+    } else if (platform === 'twitch' && !credentials) {
+      // Logout - cleanup Firebase
+      GiveawayFirebaseService.cleanup();
+    }
+
     const callbacks = this.authCallbacks.get(platform);
     if (callbacks) {
       callbacks.forEach(callback => {

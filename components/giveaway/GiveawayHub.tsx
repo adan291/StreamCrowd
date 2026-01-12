@@ -13,6 +13,8 @@ import { useI18n } from '../../i18n';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 import { useHistoryRecorder } from '../../hooks/useHistoryRecorder';
 import { useStreamNotifications } from '../../hooks/useStreamNotifications';
+import { useGiveawayCloud } from '../../hooks/useGiveawayCloud';
+import { GiveawayFirebaseService } from '../../src/infrastructure/firebase/GiveawayFirebaseService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { WizardStepper, useWizard } from '../ui/WizardStepper';
 import { WizardButton } from '../ui/WizardButton';
@@ -22,6 +24,7 @@ import { SoundSettings } from './SoundSettings';
 import { ChatSettings } from './ChatSettings';
 import { MultiWinnerConfig } from './MultiWinnerConfig';
 import { HistoryPanel } from './HistoryPanel';
+import { CloudSyncButton } from './CloudSyncButton';
 import { SchedulerService } from './services/SchedulerService';
 import { getChatCommandsService, DEFAULT_CHAT_COMMANDS_CONFIG } from './services/ChatCommands';
 import type { ChatCommandsConfig } from './services/ChatCommands';
@@ -143,6 +146,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   const raffle = useRaffle();
   const participants = useParticipants({ persistBlacklist: true });
   const threads = useThreads();
+  const cloud = useGiveawayCloud({ autoSync: true });
   const sync = useGiveawaySync({
     enableBroadcast: true,
     enableFirebase: true,
@@ -185,7 +189,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (threads.activeCount > 0 || raffle.isRunning) {
-        // Save backup
+        // Save backup to localStorage
         const backup: GiveawayExport = {
           version: 1,
           exportedAt: Date.now(),
@@ -193,6 +197,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           history: GiveawayStorage.getHistory(),
         };
         localStorage.setItem('giveaway_backup', JSON.stringify(backup));
+        
+        // Sync to cloud if enabled (fire and forget - can't await in beforeunload)
+        if (cloud.isReady && cloud.syncEnabled) {
+          threads.threads.forEach(thread => {
+            GiveawayFirebaseService.saveGiveaway(thread, true).catch(() => {});
+          });
+        }
         
         e.preventDefault();
         e.returnValue = `Tienes ${threads.activeCount} sorteo(s) activo(s). ¿Seguro que quieres salir?`;
@@ -202,7 +213,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [threads.activeCount, raffle.isRunning, threads.threads]);
+  }, [threads.activeCount, raffle.isRunning, threads.threads, cloud.isReady, cloud.syncEnabled]);
 
   // Check for backup on load
   useEffect(() => {
@@ -449,6 +460,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       startNow: raffle.config.timingConfig?.timingMode === 'instant',
     });
     
+    // Sync to cloud (Firebase)
+    if (cloud.isReady) {
+      cloud.saveToCloud(newThread, true).catch(err => {
+        console.error('[GiveawayHub] Error syncing to cloud:', err);
+      });
+    }
+    
     // Add existing participants to the new thread
     const existingParticipants = participants.getAll();
     if (existingParticipants.length > 0) {
@@ -466,7 +484,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     
     // Switch to active tab to see the new raffle
     setActiveTab('active');
-  }, [raffle, participants, triggerGiveawayStart, threads, editingThreadId]);
+  }, [raffle, participants, triggerGiveawayStart, threads, editingThreadId, cloud, sound]);
 
   const handleFinishRaffle = useCallback(() => {
     raffle.stop();
@@ -702,6 +720,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
           {/* Quick actions */}
           <div className="flex items-center gap-1">
+            <CloudSyncButton
+              isReady={cloud.isReady}
+              isSyncing={cloud.isSyncing}
+              syncStatus={cloud.syncStatus}
+              syncEnabled={cloud.syncEnabled}
+              lastSyncTime={cloud.lastSyncTime}
+              error={cloud.error}
+              onToggleSync={cloud.setSyncEnabled}
+              onManualSync={cloud.manualSync}
+            />
             <SoundSettings
               isEnabled={sound.isEnabled}
               volume={sound.volume}
@@ -1241,6 +1269,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                       participantCount: threads.getUniqueParticipantCount(thread),
                       prizeImages: thread.prizeImages,
                     });
+                    
+                    // Sync winner to cloud (Firebase)
+                    if (cloud.isReady) {
+                      cloud.updateInCloud(id, {
+                        winner: { oderId: '', username: winner },
+                        isActive: false,
+                        closedAt: Date.now(),
+                        participantCount: threads.getUniqueParticipantCount(thread),
+                      }).catch(err => console.error('[GiveawayHub] Error updating cloud:', err));
+                    }
                     
                     // Sync winner to overlay
                     sync.sync({

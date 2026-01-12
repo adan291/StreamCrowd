@@ -1,9 +1,20 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
+
+// Plugin para inyectar versión de build en index.html
+function buildVersionPlugin(): Plugin {
+  return {
+    name: 'build-version',
+    transformIndexHtml(html) {
+      const buildTime = Date.now().toString();
+      return html.replace(/__BUILD_TIME__/g, buildTime);
+    }
+  };
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
@@ -16,6 +27,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      buildVersionPlugin(),
       visualizer({
         filename: 'dist/bundle-report.html',
         open: false,
@@ -24,8 +36,8 @@ export default defineConfig(({ mode }) => {
         template: 'treemap',
       }),
       VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['ai-vision-icon.svg', 'ai-vision-icon.png', 'ai-vision-icon.ico'],
+        registerType: 'prompt', // Cambiado a prompt para control manual
+        includeAssets: ['ai-vision-icon.svg', 'ai-vision-icon.png', 'ai-vision-icon.ico', 'favicon.ico'],
         devOptions: {
           enabled: false
         },
@@ -33,12 +45,14 @@ export default defineConfig(({ mode }) => {
           // Limpiar caches viejos automáticamente
           cleanupOutdatedCaches: true,
           // NO pre-cachear JS - evita problemas de versiones
-          globPatterns: ['**/*.{css,html,ico,png,svg,woff2}'],
+          globPatterns: ['**/*.{ico,png,svg,woff2}'], // Quitamos CSS y HTML del precache
           // Saltar waiting y activar inmediatamente
           skipWaiting: true,
           clientsClaim: true,
           // Navegación siempre va a la red
           navigateFallback: null,
+          // Forzar que index.html siempre venga de la red
+          navigateFallbackDenylist: [/.*/],
           runtimeCaching: [
             {
               // JS files - SIEMPRE red primero, cache solo como fallback

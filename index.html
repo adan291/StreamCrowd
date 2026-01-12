@@ -83,6 +83,25 @@
     <!-- Auto-reload on cache/chunk errors (404 on JS/CSS files) -->
     <script>
       (function() {
+        var BUILD_VERSION = '__BUILD_TIME__'; // Se reemplaza en build
+        var STORED_VERSION_KEY = 'streamcrowd_version';
+        var RELOAD_KEY = 'streamcrowd_cache_cleared';
+        var RELOAD_TIME_KEY = 'streamcrowd_cache_cleared_time';
+        
+        // Verificar si hay nueva versión disponible
+        function checkForUpdates() {
+          var storedVersion = localStorage.getItem(STORED_VERSION_KEY);
+          if (storedVersion && storedVersion !== BUILD_VERSION && BUILD_VERSION !== '__BUILD_TIME__') {
+            console.log('[Update] Nueva versión detectada:', BUILD_VERSION, '(anterior:', storedVersion + ')');
+            clearCacheAndReload('Nueva versión disponible');
+            return true;
+          }
+          if (BUILD_VERSION !== '__BUILD_TIME__') {
+            localStorage.setItem(STORED_VERSION_KEY, BUILD_VERSION);
+          }
+          return false;
+        }
+        
         // DEVELOPMENT: Force unregister service workers on localhost
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           if ('serviceWorker' in navigator) {
@@ -92,7 +111,6 @@
                 registration.unregister();
               });
             });
-            // Also clear all caches in development
             if ('caches' in window) {
               caches.keys().then(function(names) {
                 names.forEach(function(name) {
@@ -104,28 +122,23 @@
           }
         }
         
-        var RELOAD_KEY = 'streamcrowd_cache_cleared';
-        var RELOAD_TIME_KEY = 'streamcrowd_cache_cleared_time';
         var hasReloaded = sessionStorage.getItem(RELOAD_KEY);
         var reloadTime = parseInt(sessionStorage.getItem(RELOAD_TIME_KEY) || '0', 10);
         var now = Date.now();
-        
-        // Solo permitir un reload cada 30 segundos para evitar loops
         var canReload = !hasReloaded || (now - reloadTime > 30000);
         
         function clearCacheAndReload(reason) {
           if (!canReload) {
-            console.error('[Cache] Already tried clearing cache recently, not reloading again. Reason:', reason);
+            console.error('[Cache] Ya se intentó limpiar cache recientemente. Razón:', reason);
             return;
           }
           
-          console.warn('[Cache] Clearing all caches due to:', reason);
+          console.warn('[Cache] Limpiando caches:', reason);
           sessionStorage.setItem(RELOAD_KEY, 'true');
           sessionStorage.setItem(RELOAD_TIME_KEY, String(now));
           
           var promises = [];
           
-          // Limpiar Service Workers
           if ('serviceWorker' in navigator) {
             promises.push(
               navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -134,7 +147,6 @@
             );
           }
           
-          // Limpiar todos los caches
           if ('caches' in window) {
             promises.push(
               caches.keys().then(function(names) {
@@ -144,57 +156,61 @@
           }
           
           Promise.all(promises).finally(function() {
-            console.log('[Cache] Cleared, reloading...');
+            console.log('[Cache] Limpiado, recargando...');
             window.location.reload(true);
           });
         }
         
-        // Limpiar flags después de carga exitosa
-        window.addEventListener('load', function() {
-          setTimeout(function() {
-            sessionStorage.removeItem(RELOAD_KEY);
-            sessionStorage.removeItem(RELOAD_TIME_KEY);
-          }, 3000);
-        });
+        // Verificar versión al cargar
+        if (!checkForUpdates()) {
+          // Limpiar flags después de carga exitosa
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              sessionStorage.removeItem(RELOAD_KEY);
+              sessionStorage.removeItem(RELOAD_TIME_KEY);
+            }, 3000);
+            
+            // Verificar actualizaciones del SW
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.addEventListener('controllerchange', function() {
+                console.log('[SW] Nuevo service worker activo, recargando...');
+                window.location.reload();
+              });
+            }
+          });
+        }
         
-        // Interceptar errores de recursos (scripts, stylesheets)
+        // Interceptar errores de recursos
         window.addEventListener('error', function(e) {
           var target = e.target;
-          
-          // Error en script o link (CSS)
           if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
             var src = target.src || target.href || '';
-            // Solo para archivos con hash (chunks de Vite)
             if (src.match(/[-\.][A-Za-z0-9]{8}\.(js|css)$/)) {
-              clearCacheAndReload('Failed to load chunk: ' + src);
+              clearCacheAndReload('Error cargando chunk: ' + src);
               return;
             }
           }
-          
-          // Error de módulo ES
           if (e.message && (e.message.includes('MIME type') || 
               e.message.includes('module script') ||
               e.message.includes('Failed to fetch dynamically imported module'))) {
-            clearCacheAndReload('Module error: ' + e.message);
+            clearCacheAndReload('Error de módulo: ' + e.message);
           }
         }, true);
         
-        // Interceptar fetch para detectar 404 en chunks dinámicos
+        // Interceptar fetch para detectar 404
         var originalFetch = window.fetch;
         window.fetch = function(url, options) {
           return originalFetch.apply(this, arguments).then(function(response) {
             var urlStr = typeof url === 'string' ? url : (url.url || '');
-            // Detectar 404 en chunks JS/CSS con hash
             if (response.status === 404 && urlStr.match(/[-\.][A-Za-z0-9]{8}\.(js|css)$/)) {
-              clearCacheAndReload('404 on chunk: ' + urlStr);
+              clearCacheAndReload('404 en chunk: ' + urlStr);
             }
             return response;
           });
         };
         
-        // Vite specific: detectar errores de import dinámico
         window.addEventListener('vite:preloadError', function(e) {
-          clearCacheAndReload('Vite preload error: ' + (e.payload && e.payload.message));
+          clearCacheAndReload('Vite preload error');
         });
       })();
     </script>

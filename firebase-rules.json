@@ -47,6 +47,26 @@
       }
     },
     
+    // Streamers data - profiles and giveaways
+    // Structure: /streamers/{twitchId}/profile, /streamers/{twitchId}/sorteos/{sorteoId}
+    "streamers": {
+      "$twitchId": {
+        // Profile: public read, write only by owner
+        "profile": {
+          ".read": true,
+          ".write": "auth != null"
+        },
+        // Sorteos: public read, write only by authenticated users
+        "sorteos": {
+          ".read": true,
+          "$sorteoId": {
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['id', 'name', 'isActive', 'createdAt'])"
+          }
+        }
+      }
+    },
+    
     // Default: deny all other access
     ".read": false,
     ".write": false
