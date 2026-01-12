@@ -149,22 +149,39 @@ export function useThreads(): UseThreadsReturn {
     let calculatedEndsAt: number | undefined;
     let shouldBeActive = startNow;
     
+    console.log('[createThread] Config received:', { startNow, timingConfig: JSON.stringify(timingConfig), timerDuration });
+    
     // Use timingConfig if provided
     if (timingConfig) {
       // Calculate start time
-      if (timingConfig.timingMode === 'scheduled' && timingConfig.scheduledStartDate && timingConfig.scheduledStartTime) {
-        const startDateTime = new Date(`${timingConfig.scheduledStartDate}T${timingConfig.scheduledStartTime}`);
+      if (timingConfig.timingMode === 'scheduled' && timingConfig.scheduledStartDate) {
+        // Default to 00:00 if no time specified
+        const startTime = timingConfig.scheduledStartTime || '00:00';
+        const startDateTime = new Date(`${timingConfig.scheduledStartDate}T${startTime}`);
         calculatedStartsAt = startDateTime.getTime();
         shouldBeActive = calculatedStartsAt <= now; // Only active if start time has passed
+        console.log('[createThread] Scheduled mode:', { 
+          scheduledStartDate: timingConfig.scheduledStartDate,
+          scheduledStartTime: startTime,
+          calculatedStartsAt, 
+          now, 
+          shouldBeActive,
+          isInFuture: calculatedStartsAt > now
+        });
       }
       
       // Calculate end time
       if (timingConfig.durationMode === 'fixed' && timingConfig.fixedDuration > 0) {
         const startTime = calculatedStartsAt || now;
         calculatedEndsAt = startTime + (timingConfig.fixedDuration * 1000);
-      } else if (timingConfig.durationMode === 'until' && timingConfig.endDate && timingConfig.endTime) {
-        const endDateTime = new Date(`${timingConfig.endDate}T${timingConfig.endTime}`);
+      } else if (timingConfig.durationMode === 'until' && timingConfig.endDate) {
+        // Default to 23:59 if no end time specified
+        const endTime = timingConfig.endTime || '23:59';
+        const endDateTime = new Date(`${timingConfig.endDate}T${endTime}`);
         calculatedEndsAt = endDateTime.getTime();
+      } else if (timingConfig.durationMode === 'manual') {
+        // No end time - manual finish
+        calculatedEndsAt = undefined;
       }
     } else {
       // Legacy: Calculate endsAt if timerDuration is provided and startNow is true
@@ -175,6 +192,13 @@ export function useThreads(): UseThreadsReturn {
         calculatedStartsAt = startsAt;
       }
     }
+    
+    console.log('[createThread] Final values:', { 
+      shouldBeActive, 
+      calculatedStartsAt, 
+      calculatedEndsAt,
+      willBeScheduled: !shouldBeActive && calculatedStartsAt && calculatedStartsAt > now
+    });
     
     const newThread: GiveawayThread = {
       id: generateId(),

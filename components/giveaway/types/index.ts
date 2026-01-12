@@ -220,7 +220,7 @@ export interface WinnerState {
 // ============================================
 
 export type TimingMode = 'instant' | 'scheduled';
-export type DurationMode = 'fixed' | 'until';
+export type DurationMode = 'fixed' | 'until' | 'manual';
 
 export interface RaffleTimingConfig {
   // Cuándo empieza

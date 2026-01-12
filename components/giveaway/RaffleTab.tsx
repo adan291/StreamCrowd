@@ -249,6 +249,16 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
   if (viewMode === 'compact') {
     return (
       <div className={`space-y-3 ${className}`}>
+        {/* Title input - compact */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange?.(e.target.value)}
+          disabled={isRunning}
+          placeholder="Título del sorteo..."
+          className="w-full px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+        />
+
         {/* Mode selector - horizontal compact */}
         <ModeSelector
           value={mode}

@@ -26,6 +26,8 @@ export interface ThreadsTabProps {
   onCloseWinner?: (id: string) => void;
   /** Callback to edit thread */
   onEdit?: (id: string) => void;
+  /** Callback to activate a scheduled thread immediately */
+  onActivateNow?: (id: string) => void;
   /** Get unique participant count for a thread */
   getUniqueCount?: (thread: GiveawayThread) => number;
   /** View mode: compact = list, expanded = grid */
@@ -36,6 +38,10 @@ export interface ThreadsTabProps {
   emptyMessage?: string;
   /** Callback to create new thread */
   onCreateThread?: () => void;
+  /** ID of thread currently spinning */
+  spinningThreadId?: string | null;
+  /** Current name being displayed during spin */
+  spinningName?: string;
 }
 
 // ============================================
@@ -49,11 +55,14 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
   onPickWinner,
   onCloseWinner,
   onEdit,
+  onActivateNow,
   getUniqueCount,
   viewMode = 'expanded',
   className = '',
   emptyMessage = 'No hay sorteos activos',
   onCreateThread,
+  spinningThreadId,
+  spinningName,
 }) => {
   const activeCount = threads.filter(t => t.isActive && !t.isPaused).length;
   const pausedCount = threads.filter(t => t.isPaused).length;
@@ -117,8 +126,11 @@ export const ThreadsTab: React.FC<ThreadsTabProps> = ({
               onPickWinner={onPickWinner}
               onCloseWinner={onCloseWinner}
               onEdit={onEdit}
+              onActivateNow={onActivateNow}
               getUniqueCount={getUniqueCount}
               compact={viewMode === 'compact'}
+              isSpinning={spinningThreadId === thread.id}
+              spinningName={spinningThreadId === thread.id ? spinningName : undefined}
             />
           ))}
         </div>

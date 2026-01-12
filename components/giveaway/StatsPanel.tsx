@@ -3,7 +3,7 @@
  * Displays giveaway statistics with export functionality
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Trophy, 
   Users, 
@@ -12,7 +12,9 @@ import {
   Download, 
   Trash2,
   BarChart3,
-  Clock
+  Clock,
+  FileJson,
+  FileSpreadsheet
 } from 'lucide-react';
 import { GiveawayStorage } from './services/GiveawayStorage';
 import type { GiveawayStats, RaffleMode } from './types';
@@ -65,10 +67,14 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({
   onClear,
   className = '',
 }) => {
+  // Force re-render after clearing
+  const [refreshKey, setRefreshKey] = useState(0);
+  
   // Load stats from storage if not provided
   const stats = useMemo(() => {
     return propStats || GiveawayStorage.getStats();
-  }, [propStats]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propStats, refreshKey]);
 
   // Calculate derived metrics
   const derivedStats = useMemo(() => {
@@ -153,7 +159,7 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({
   };
 
   const handleClear = () => {
-    if (confirm('¿Estás seguro de que quieres borrar todas las estadísticas?')) {
+    if (confirm('¿Estás seguro de que quieres borrar todas las estadísticas? Esta acción no se puede deshacer.')) {
       GiveawayStorage.saveStats({
         totalGiveaways: 0,
         totalParticipants: 0,
@@ -162,6 +168,8 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({
         byMode: { viewers: 0, keyword: 0, subs: 0 },
         lastUpdated: Date.now(),
       });
+      // Force re-render
+      setRefreshKey(prev => prev + 1);
       onClear?.();
       onRefresh?.();
     }
@@ -184,25 +192,27 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({
         <div className="flex gap-2">
           <button
             onClick={exportAsJSON}
-            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 
-                       hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-            title="Exportar JSON"
+            className="px-2 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 
+                       hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1.5 text-xs"
+            title="Exportar como JSON"
           >
-            <Download size={16} />
+            <FileJson size={14} />
+            <span className="hidden sm:inline">JSON</span>
           </button>
           <button
             onClick={exportAsCSV}
-            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 
-                       hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-            title="Exportar CSV"
+            className="px-2 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 
+                       hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors flex items-center gap-1.5 text-xs"
+            title="Exportar como CSV"
           >
-            <Download size={16} />
+            <FileSpreadsheet size={14} />
+            <span className="hidden sm:inline">CSV</span>
           </button>
           <button
             onClick={handleClear}
             className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 
                        hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-            title="Borrar estadísticas"
+            title="Borrar todas las estadísticas"
           >
             <Trash2 size={16} />
           </button>

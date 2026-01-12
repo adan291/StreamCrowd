@@ -38,12 +38,18 @@ export interface ActiveGiveawayCardProps {
   onCloseWinner?: (id: string) => void;
   /** Callback to edit thread */
   onEdit?: (id: string) => void;
+  /** Callback to activate a scheduled thread immediately */
+  onActivateNow?: (id: string) => void;
   /** Get unique participant count */
   getUniqueCount?: (thread: GiveawayThread) => number;
   /** Compact mode - horizontal layout */
   compact?: boolean;
   /** Custom class name */
   className?: string;
+  /** Is this card currently spinning/selecting winner */
+  isSpinning?: boolean;
+  /** Current name being displayed during spin animation */
+  spinningName?: string;
 }
 
 // ============================================
@@ -168,9 +174,12 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
   onPickWinner,
   onCloseWinner,
   onEdit,
+  onActivateNow,
   getUniqueCount,
   compact = false,
   className = '',
+  isSpinning = false,
+  spinningName = '',
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -197,7 +206,7 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
   // ============================================
   if (compact) {
     return (
-      <div className={`bg-white dark:bg-zinc-900 rounded-xl shadow-md overflow-hidden flex ${hasWinner ? 'ring-2 ring-yellow-500' : ''} ${className}`}>
+      <div className={`bg-white dark:bg-zinc-900 rounded-xl shadow-md overflow-hidden flex ${hasWinner ? 'ring-2 ring-yellow-500' : isSpinning ? 'ring-2 ring-purple-500 animate-pulse' : ''} ${className}`}>
         {/* Small image */}
         {hasImage && (
           <div className="w-20 h-20 flex-shrink-0">
@@ -212,12 +221,18 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-zinc-800 dark:text-white text-sm truncate">{thread.name}</h3>
               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${
-                hasWinner ? 'bg-yellow-500/20 text-yellow-600' : isWaiting ? 'bg-blue-500/20 text-blue-600' : isActive ? 'bg-green-500/20 text-green-600' : isPaused ? 'bg-yellow-500/20 text-yellow-600' : 'bg-zinc-500/20 text-zinc-500'
+                isSpinning ? 'bg-purple-500/20 text-purple-600 animate-pulse' : hasWinner ? 'bg-yellow-500/20 text-yellow-600' : isWaiting ? 'bg-blue-500/20 text-blue-600' : isActive ? 'bg-green-500/20 text-green-600' : isPaused ? 'bg-yellow-500/20 text-yellow-600' : 'bg-zinc-500/20 text-zinc-500'
               }`}>
-                {hasWinner ? '🏆 Ganador' : isWaiting ? 'Programado' : isActive ? 'Activo' : isPaused ? 'Pausado' : 'Fin'}
+                {isSpinning ? '🎲 Sorteando...' : hasWinner ? '🏆 Ganador' : isWaiting ? 'Programado' : isActive ? 'Activo' : isPaused ? 'Pausado' : 'Fin'}
               </span>
             </div>
-            {hasWinner ? (
+            {isSpinning ? (
+              <div className="flex items-center gap-2 mt-1 text-xs">
+                <span className="font-bold text-purple-600 dark:text-purple-400 animate-pulse">
+                  {spinningName || '...'}
+                </span>
+              </div>
+            ) : hasWinner ? (
               <div className="flex items-center gap-2 mt-1 text-xs">
                 <span className="font-bold text-yellow-600 dark:text-yellow-400">
                   {thread.winner?.username}
@@ -254,13 +269,23 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
             ) : (
               /* Normal actions */
               <>
-                {onTogglePause && !isExpired && (
+                {/* Iniciar ahora - solo para sorteos programados (isWaiting) */}
+                {onActivateNow && isWaiting && (
+                  <button 
+                    onClick={() => onActivateNow(thread.id)} 
+                    className="p-1.5 rounded-lg text-green-500 bg-green-500/20 hover:bg-green-500/30"
+                    title="Iniciar ahora"
+                  >
+                    <Play size={14} />
+                  </button>
+                )}
+                {onTogglePause && !isExpired && !isWaiting && (
                   <button onClick={() => onTogglePause(thread.id)} className={`p-1.5 rounded-lg ${isPaused ? 'text-green-500 hover:bg-green-500/10' : 'text-yellow-500 hover:bg-yellow-500/10'}`}>
                     {isPaused ? <Play size={14} /> : <Pause size={14} />}
                   </button>
                 )}
                 {/* Finalizar y sortear - solo si hay participantes y no ha expirado */}
-                {onPickWinner && uniqueCount > 0 && !isExpired && (
+                {onPickWinner && uniqueCount > 0 && !isExpired && !isWaiting && (
                   showFinishConfirm ? (
                     <div className="flex items-center gap-1 bg-orange-500/10 rounded-lg px-1">
                       <span className="text-[10px] text-orange-600 dark:text-orange-400 whitespace-nowrap">¿Sortear?</span>
@@ -391,8 +416,26 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
 
       {/* Content */}
       <div className="p-4">
+        {/* Spinning animation */}
+        {isSpinning && !hasWinner && (
+          <div className="space-y-4">
+            <div className="text-center py-6 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl animate-pulse">
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <Gift className="text-purple-500 animate-bounce" size={24} />
+                <span className="text-sm text-purple-500 font-medium">Seleccionando...</span>
+              </div>
+              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400 animate-pulse">
+                {spinningName || '...'}
+              </p>
+              <p className="text-sm text-zinc-500 mt-2">
+                {uniqueCount} participantes
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Winner display */}
-        {hasWinner ? (
+        {hasWinner && !isSpinning ? (
           <div className="space-y-4">
             <div className="text-center py-4 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-xl">
               <Trophy className="mx-auto text-yellow-500 mb-2" size={32} />
@@ -415,7 +458,7 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
               </button>
             )}
           </div>
-        ) : (
+        ) : !isSpinning ? (
           <>
             {/* Stats row */}
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -450,7 +493,18 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2">
-              {onTogglePause && !isExpired && (
+              {/* Iniciar ahora - solo para sorteos programados (isWaiting) */}
+              {onActivateNow && isWaiting && (
+                <button
+                  onClick={() => onActivateNow(thread.id)}
+                  className="flex-1 min-w-[100px] py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 bg-green-500 hover:bg-green-600 text-white transition-colors"
+                >
+                  <Play size={14} />
+                  Iniciar ahora
+                </button>
+              )}
+
+              {onTogglePause && !isExpired && !isWaiting && (
                 <button
                   onClick={() => onTogglePause(thread.id)}
                   className={`flex-1 min-w-[80px] py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-1.5 transition-colors ${
@@ -464,8 +518,8 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
                 </button>
               )}
 
-              {/* Finalizar y sortear - solo si hay participantes y no ha expirado */}
-              {onPickWinner && uniqueCount > 0 && !isExpired && (
+              {/* Finalizar y sortear - solo si hay participantes y no ha expirado y no está esperando */}
+              {onPickWinner && uniqueCount > 0 && !isExpired && !isWaiting && (
                 showFinishConfirm ? (
                   <div className="flex-1 min-w-[120px] py-2 px-3 rounded-xl bg-orange-500/10 flex items-center justify-center gap-2">
                     <AlertTriangle size={14} className="text-orange-500" />
@@ -581,7 +635,7 @@ export const ActiveGiveawayCard: React.FC<ActiveGiveawayCardProps> = ({
               </div>
             )}
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

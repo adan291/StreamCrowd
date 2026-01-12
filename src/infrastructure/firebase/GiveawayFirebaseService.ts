@@ -30,15 +30,15 @@ import {
 import { FirebaseAuthService } from '../auth/FirebaseAuthService';
 import type { GiveawayThread } from '../../../components/giveaway/index';
 
-// Firebase config
+// Firebase config - Uses environment variables (set in .env.local or Vercel)
 const FIREBASE_CONFIG = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "REDACTED_FIREBASE_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "twtich-vote-live.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://twtich-vote-live-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "twtich-vote-live",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "twtich-vote-live.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "779005710594",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:779005710594:web:8df44b0c02a57fc262b21b",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // ============================================
@@ -70,6 +70,20 @@ export interface GiveawayUpdateData {
 }
 
 // ============================================
+// Helper to remove undefined values (Firebase doesn't accept them)
+// ============================================
+
+function removeUndefined<T extends Record<string, unknown>>(obj: T): T {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result as T;
+}
+
+// ============================================
 // Service
 // ============================================
 
@@ -79,7 +93,38 @@ class GiveawayFirebaseServiceImpl {
   private initialized = false;
   private initPromise: Promise<void> | null = null;
   private currentStreamerId: string | null = null;
+  private currentStreamerName: string | null = null;
   private listeners: Map<string, () => void> = new Map();
+
+  constructor() {
+    // Restore streamer from localStorage on init
+    this.restoreStreamer();
+  }
+
+  private restoreStreamer(): void {
+    try {
+      const saved = localStorage.getItem('giveaway_firebase_streamer');
+      if (saved) {
+        const data = JSON.parse(saved);
+        this.currentStreamerId = data.id || null;
+        this.currentStreamerName = data.name || null;
+        console.log('[GiveawayFirebase] Restored streamer from storage:', this.currentStreamerId);
+      }
+    } catch {}
+  }
+
+  private saveStreamer(): void {
+    try {
+      if (this.currentStreamerId) {
+        localStorage.setItem('giveaway_firebase_streamer', JSON.stringify({
+          id: this.currentStreamerId,
+          name: this.currentStreamerName,
+        }));
+      } else {
+        localStorage.removeItem('giveaway_firebase_streamer');
+      }
+    } catch {}
+  }
 
   /**
    * Initialize Firebase connection
@@ -122,6 +167,8 @@ class GiveawayFirebaseServiceImpl {
   setStreamer(twitchId: string, displayName: string, profileImage?: string, channel?: string): void {
     console.log('[GiveawayFirebase] setStreamer called:', { twitchId, displayName, channel });
     this.currentStreamerId = twitchId;
+    this.currentStreamerName = displayName;
+    this.saveStreamer();
     FirebaseAuthService.linkPlatformId(twitchId);
     
     // Update profile in Firebase
@@ -180,25 +227,27 @@ class GiveawayFirebaseServiceImpl {
     try {
       const streamerProfile = await this.getStreamerProfile(this.currentStreamerId);
       
-      const firebaseGiveaway: FirebaseGiveaway = {
+      // Build giveaway object, removing undefined values
+      const firebaseGiveaway = removeUndefined({
         id: giveaway.id,
         name: giveaway.name,
-        keyword: giveaway.keyword,
+        keyword: giveaway.keyword || '',
         mode: giveaway.mode,
-        isActive: giveaway.isActive,
-        isPaused: giveaway.isPaused,
-        subscribersOnly: giveaway.subscribersOnly,
-        allowMultipleEntries: giveaway.allowMultipleEntries,
+        isActive: giveaway.isActive ?? false,
+        isPaused: giveaway.isPaused ?? false,
+        subscribersOnly: giveaway.subscribersOnly ?? false,
+        allowMultipleEntries: giveaway.allowMultipleEntries ?? false,
         createdAt: giveaway.createdAt,
-        closedAt: giveaway.closedAt,
-        winner: giveaway.winner,
-        prizeImages: giveaway.prizeImages,
-        endsAt: giveaway.endsAt,
+        closedAt: giveaway.closedAt || null,
+        winner: giveaway.winner || null,
+        prizeImages: giveaway.prizeImages || [],
+        endsAt: giveaway.endsAt || null,
+        startsAt: giveaway.startsAt || null,
         participantCount: giveaway.participants?.length || 0,
         isPublic,
         streamerId: this.currentStreamerId,
         streamerName: streamerProfile?.displayName || 'Unknown',
-      };
+      });
 
       console.log('[GiveawayFirebase] Saving to path:', `streamers/${this.currentStreamerId}/sorteos/${giveaway.id}`);
       
@@ -407,6 +456,8 @@ class GiveawayFirebaseServiceImpl {
     this.listeners.forEach((unsubscribe) => unsubscribe());
     this.listeners.clear();
     this.currentStreamerId = null;
+    this.currentStreamerName = null;
+    this.saveStreamer(); // Clear from localStorage
   }
 }
 

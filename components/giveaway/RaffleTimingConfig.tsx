@@ -18,7 +18,7 @@ import { Clock, Calendar, Play, Timer, CalendarClock, ChevronDown, ChevronUp, In
 // ============================================
 
 export type TimingMode = 'instant' | 'scheduled';
-export type DurationMode = 'fixed' | 'until';
+export type DurationMode = 'fixed' | 'until' | 'manual';
 
 export interface RaffleTimingConfig {
   // Cuándo empieza
@@ -28,7 +28,7 @@ export interface RaffleTimingConfig {
   
   // Cuánto dura
   durationMode: DurationMode;
-  fixedDuration: number; // en segundos
+  fixedDuration: number; // en segundos (0 = sin límite)
   endDate?: string;
   endTime?: string;
 }
@@ -153,14 +153,18 @@ export const RaffleTimingConfigComponent: React.FC<RaffleTimingConfigProps> = ({
     
     if (config.timingMode === 'instant') {
       parts.push('Empieza ahora');
-    } else if (config.scheduledStartDate && config.scheduledStartTime) {
-      parts.push(`Empieza ${formatDateTime(config.scheduledStartDate, config.scheduledStartTime)}`);
+    } else if (config.scheduledStartDate) {
+      const startTime = config.scheduledStartTime || '00:00';
+      parts.push(`Empieza ${formatDateTime(config.scheduledStartDate, startTime)}`);
     }
     
     if (config.durationMode === 'fixed') {
       parts.push(`dura ${formatDuration(config.fixedDuration)}`);
-    } else if (calculatedDuration) {
-      parts.push(`hasta ${formatDateTime(config.endDate!, config.endTime!)}`);
+    } else if (config.durationMode === 'until' && config.endDate) {
+      const endTime = config.endTime || '23:59';
+      parts.push(`hasta ${formatDateTime(config.endDate, endTime)}`);
+    } else if (config.durationMode === 'manual') {
+      parts.push('finalización manual');
     }
     
     return parts.join(', ');
@@ -192,7 +196,18 @@ export const RaffleTimingConfigComponent: React.FC<RaffleTimingConfigProps> = ({
             Ahora
           </button>
           <button
-            onClick={() => updateConfig({ timingMode: 'scheduled' })}
+            onClick={() => {
+              // Set default date to tomorrow and time to current time when switching to scheduled
+              const tomorrow = new Date();
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const defaultDate = tomorrow.toISOString().split('T')[0];
+              const defaultTime = new Date().toTimeString().slice(0, 5);
+              updateConfig({ 
+                timingMode: 'scheduled',
+                scheduledStartDate: config.scheduledStartDate || defaultDate,
+                scheduledStartTime: config.scheduledStartTime || defaultTime,
+              });
+            }}
             disabled={disabled}
             className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
               config.timingMode === 'scheduled'
@@ -265,7 +280,15 @@ export const RaffleTimingConfigComponent: React.FC<RaffleTimingConfigProps> = ({
             Duración fija
           </button>
           <button
-            onClick={() => updateConfig({ durationMode: 'until' })}
+            onClick={() => {
+              // Set default end date to today and time to 23:59 when switching to until mode
+              const defaultEndDate = config.scheduledStartDate || today;
+              updateConfig({ 
+                durationMode: 'until',
+                endDate: config.endDate || defaultEndDate,
+                endTime: config.endTime || '23:59',
+              });
+            }}
             disabled={disabled}
             className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
               config.durationMode === 'until'
@@ -274,9 +297,30 @@ export const RaffleTimingConfigComponent: React.FC<RaffleTimingConfigProps> = ({
             } disabled:opacity-50`}
           >
             <Calendar size={14} />
-            Hasta fecha/hora
+            Hasta fecha
+          </button>
+          <button
+            onClick={() => updateConfig({ durationMode: 'manual', fixedDuration: 0 })}
+            disabled={disabled}
+            className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+              config.durationMode === 'manual'
+                ? 'bg-white dark:bg-zinc-700 text-green-600 dark:text-green-400 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+            } disabled:opacity-50`}
+          >
+            <Play size={14} />
+            Manual
           </button>
         </div>
+
+        {/* Manual mode info */}
+        {config.durationMode === 'manual' && (
+          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl animate-in slide-in-from-top-2 duration-200">
+            <p className="text-xs text-green-600 dark:text-green-400">
+              El sorteo permanecerá activo hasta que lo finalices manualmente.
+            </p>
+          </div>
+        )}
 
         {/* Fixed duration */}
         {config.durationMode === 'fixed' && (

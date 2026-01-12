@@ -57,7 +57,8 @@ import {
 
 interface GiveawayHubProps {
   chatMessages: Array<{
-    oderId: string;
+    id?: string;
+    oderId?: string; // Legacy support
     username: string;
     message: string;
     timestamp?: number;
@@ -123,6 +124,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     return saved ? JSON.parse(saved) : DEFAULT_CHAT_COMMANDS_CONFIG;
   });
   const [lastWinner, setLastWinner] = useState<string | null>(null);
+  
+  // Spinning animation state for cards
+  const [spinningThreadId, setSpinningThreadId] = useState<string | null>(null);
+  const [spinningName, setSpinningName] = useState<string>('');
   
   // New Phase 4 state
   const [requirements, setRequirements] = useState<ParticipationRequirements>(() => {
@@ -244,14 +249,25 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
       const keyword = thread.keyword?.toLowerCase().trim() || '';
       
       chatMessages.forEach((msg) => {
-        if (!msg.timestamp || msg.timestamp <= thread.createdAt) return;
+        // Get message ID (support both id and oderId for compatibility)
+        const messageId = msg.id || msg.oderId;
         
-        // Check if already a participant (by oderId)
-        const alreadyParticipant = thread.participants.some(p => p.oderId === msg.oderId);
+        // Skip messages without required fields
+        if (!messageId || !msg.username) {
+          console.log('[GiveawayHub] Skipping message - missing id or username:', msg);
+          return;
+        }
+        
+        // Skip messages before thread was created (use < instead of <= to include same-millisecond messages)
+        if (msg.timestamp && msg.timestamp < thread.createdAt) return;
+        
+        // Check if already a participant (by messageId)
+        const alreadyParticipant = thread.participants.some(p => p.oderId === messageId);
         if (alreadyParticipant && !thread.allowMultipleEntries) return;
         
-        // Check if in blacklist (excluidos)
-        if (participants.blacklist.has(msg.username.toLowerCase())) return;
+        // Check if in blacklist (excluidos) - normalize username
+        const normalizedUsername = msg.username.toLowerCase().trim();
+        if (participants.blacklist.has(normalizedUsername)) return;
         
         // Check subs only filter
         if (thread.subscribersOnly && !msg.isSubscriber) return;
@@ -260,7 +276,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         let shouldAdd = false;
         
         if (thread.mode === 'keyword' && keyword) {
-          if (msg.message.toLowerCase().includes(keyword)) {
+          // Normalize message for comparison
+          const normalizedMessage = msg.message.toLowerCase().trim();
+          if (normalizedMessage.includes(keyword)) {
             shouldAdd = true;
           }
         } else if (thread.mode === 'viewers') {
@@ -271,10 +289,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         
         if (shouldAdd) {
           threads.addParticipant(thread.id, {
-            oderId: msg.oderId,
+            oderId: messageId,
             username: msg.username,
-            timestamp: msg.timestamp,
-            messageId: msg.oderId,
+            timestamp: msg.timestamp || Date.now(),
+            messageId: messageId,
           });
         }
       });
@@ -291,23 +309,35 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     const keyword = config.keyword.toLowerCase().trim();
 
     chatMessages.forEach((msg) => {
-      if (!msg.timestamp || msg.timestamp <= startTimeRef.current) return;
-      if (processedMessagesRef.current.has(msg.oderId)) return;
+      // Get message ID (support both id and oderId for compatibility)
+      const messageId = msg.id || msg.oderId;
+      
+      // Skip messages without required fields
+      if (!messageId || !msg.username) return;
+      
+      // Skip messages before raffle started (use < instead of <=)
+      if (msg.timestamp && msg.timestamp < startTimeRef.current) return;
+      
+      // Skip already processed messages
+      if (processedMessagesRef.current.has(messageId)) return;
 
-      // Check if in blacklist (excluidos)
-      if (participants.blacklist.has(msg.username.toLowerCase())) return;
+      // Check if in blacklist (excluidos) - normalize username
+      const normalizedUsername = msg.username.toLowerCase().trim();
+      if (participants.blacklist.has(normalizedUsername)) return;
 
       // Check subs only filter
       if (config.subsOnly && !msg.isSubscriber) return;
 
       if (mode === 'keyword' && keyword) {
-        if (msg.message.toLowerCase().includes(keyword)) {
+        // Normalize message for comparison
+        const normalizedMessage = msg.message.toLowerCase().trim();
+        if (normalizedMessage.includes(keyword)) {
           participants.add(msg.username, 'chat');
-          processedMessagesRef.current.add(msg.oderId);
+          processedMessagesRef.current.add(messageId);
         }
       } else if (mode === 'viewers') {
         participants.add(msg.username, 'chat');
-        processedMessagesRef.current.add(msg.oderId);
+        processedMessagesRef.current.add(messageId);
       }
     });
   }, [chatMessages, raffle.isRunning, raffle.mode, raffle.config, participants]);
@@ -411,12 +441,47 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     
     // If editing, update existing thread instead of creating new one
     if (editingThreadId) {
-      // Get duration from timingConfig (preferred) or timerDuration
-      const duration = raffle.config.useTimer 
-        ? (raffle.config.timingConfig?.fixedDuration || raffle.config.timerDuration || 0)
-        : undefined;
+      const timingConfig = raffle.config.timingConfig;
       const now = Date.now();
-      const newEndsAt = duration && duration > 0 ? now + (duration * 1000) : undefined;
+      
+      // Calculate startsAt and isActive based on timingConfig
+      let calculatedStartsAt: number | undefined;
+      let calculatedEndsAt: number | undefined;
+      let shouldBeActive = true;
+      
+      if (timingConfig && raffle.config.useTimer) {
+        // Calculate start time
+        if (timingConfig.timingMode === 'scheduled' && timingConfig.scheduledStartDate) {
+          const startTime = timingConfig.scheduledStartTime || '00:00';
+          const startDateTime = new Date(`${timingConfig.scheduledStartDate}T${startTime}`);
+          calculatedStartsAt = startDateTime.getTime();
+          shouldBeActive = calculatedStartsAt <= now; // Only active if start time has passed
+        }
+        
+        // Calculate end time
+        if (timingConfig.durationMode === 'fixed' && timingConfig.fixedDuration > 0) {
+          const startTime = calculatedStartsAt || now;
+          calculatedEndsAt = startTime + (timingConfig.fixedDuration * 1000);
+        } else if (timingConfig.durationMode === 'until' && timingConfig.endDate) {
+          const endTime = timingConfig.endTime || '23:59';
+          const endDateTime = new Date(`${timingConfig.endDate}T${endTime}`);
+          calculatedEndsAt = endDateTime.getTime();
+        }
+      } else if (raffle.config.useTimer) {
+        // Legacy: simple duration
+        const duration = raffle.config.timingConfig?.fixedDuration || raffle.config.timerDuration || 0;
+        if (duration > 0) {
+          calculatedEndsAt = now + (duration * 1000);
+        }
+      }
+      
+      console.log('[GiveawayHub] Editing thread:', {
+        editingThreadId,
+        timingConfig: JSON.stringify(timingConfig),
+        shouldBeActive,
+        calculatedStartsAt,
+        calculatedEndsAt,
+      });
       
       // Update the existing thread with all fields
       threads.updateThread(editingThreadId, {
@@ -425,27 +490,39 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         mode: raffle.mode,
         subscribersOnly: raffle.config.subsOnly,
         prizeImages: raffle.config.prizeImages,
-        timerDuration: duration,
-        endsAt: newEndsAt,
+        timerDuration: timingConfig?.fixedDuration || raffle.config.timerDuration,
+        timingConfig: raffle.config.useTimer ? timingConfig : undefined,
+        startsAt: calculatedStartsAt,
+        endsAt: calculatedEndsAt,
         timeRemaining: undefined, // Clear paused time since we're resuming
         subsConfig: raffle.config.subsConfig,
-        isActive: true,
+        isActive: shouldBeActive,
         isPaused: false,
       });
       
-      // Play start sound when restarting
-      sound.play('start');
+      // Play start sound only if starting now
+      if (shouldBeActive) {
+        sound.play('start');
+      }
       
       setEditingThreadId(null);
       raffle.reset();
       participants.clear();
-      setActiveTab('active');
+      setActiveTab(shouldBeActive ? 'active' : 'scheduled');
       return;
     }
 
     const duration = raffle.calculateDuration();
     triggerGiveawayStart?.();
     sound.play('start');
+    
+    // Log timing config for debugging
+    console.log('[GiveawayHub] Creating thread with:', {
+      timingConfig: JSON.stringify(raffle.config.timingConfig),
+      useTimer: raffle.config.useTimer,
+      startNow: raffle.config.timingConfig?.timingMode === 'instant',
+      duration,
+    });
     
     // Create an active thread
     const newThread = threads.createThread({
@@ -714,14 +791,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
               <Gift className="text-white" size={24} />
             </div>
-            <div>
-              <h2 className="font-bold text-lg text-zinc-800 dark:text-white">
-                {t.randomWinner?.title || 'Sorteos'}
-              </h2>
-              <p className="text-xs text-zinc-500">
-                {isConnected ? '● Conectado' : '○ Desconectado'}
-              </p>
-            </div>
+            <h2 className="font-bold text-lg text-zinc-800 dark:text-white">
+              {t.randomWinner?.title || 'Sorteos'}
+            </h2>
           </div>
 
           {/* Quick actions */}
@@ -811,7 +883,15 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         {/* Tabs */}
         <div className="flex gap-1.5 mt-4">
           <button
-            onClick={() => setActiveTab('raffle')}
+            onClick={() => {
+              setActiveTab('raffle');
+              // Clear editing state when clicking "Nuevo"
+              if (editingThreadId) {
+                setEditingThreadId(null);
+                raffle.reset();
+                participants.clear();
+              }
+            }}
             className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'raffle'
                 ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
@@ -957,6 +1037,20 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                     Configura las opciones del sorteo:
                   </p>
 
+                  {/* Title input */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-2">
+                      Título del sorteo
+                    </label>
+                    <input
+                      type="text"
+                      value={raffle.config.title || ''}
+                      onChange={(e) => raffle.updateConfig({ title: e.target.value })}
+                      placeholder="Ej: Sorteo de subs, Giveaway especial..."
+                      className="w-full px-4 py-3 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+
                   {/* Keyword input for keyword mode */}
                   {raffle.mode === 'keyword' && (
                     <div>
@@ -1070,6 +1164,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
 
                   {/* Summary */}
                   <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/20 space-y-3">
+                    {/* Title display */}
+                    {raffle.config.title && (
+                      <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 pb-2 border-b border-purple-500/20">
+                        {raffle.config.title}
+                      </div>
+                    )}
+                    
                     <div className="flex items-center gap-2">
                       <Gift size={16} className="text-purple-500" />
                       <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -1232,13 +1333,25 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           <ThreadsTab
             threads={[...threads.activeThreads, ...threads.finishedThreads]}
             viewMode={viewMode}
+            spinningThreadId={spinningThreadId}
+            spinningName={spinningName}
             onTogglePause={threads.togglePause}
-            onDelete={threads.deleteThread}
+            onDelete={(id) => {
+              threads.deleteThread(id);
+              // Also delete from Firebase
+              if (cloud.isReady && cloud.syncEnabled) {
+                cloud.deleteFromCloud(id);
+              }
+            }}
             onPickWinner={async (id) => {
               const thread = threads.threads.find(t => t.id === id);
               if (!thread || thread.participants.length === 0) return;
               
               const participantNames = thread.participants.map(p => p.username);
+              
+              // Start spinning animation in card
+              setSpinningThreadId(id);
+              setSpinningName('...');
               
               // Start spinning animation in overlay
               sync.sync({
@@ -1258,6 +1371,9 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                 const elapsed = Date.now() - startTime;
                 if (elapsed < animationDuration) {
                   const randomName = participantNames[Math.floor(Math.random() * participantNames.length)];
+                  // Update card animation
+                  setSpinningName(randomName);
+                  // Update overlay animation
                   sync.sync({
                     winner: null,
                     isSpinning: true,
@@ -1266,6 +1382,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                   });
                   setTimeout(animateNames, 80 + (elapsed / animationDuration) * 120); // Slow down over time
                 } else {
+                  // Stop card spinning
+                  setSpinningThreadId(null);
+                  setSpinningName('');
+                  
                   // Pick actual winner
                   const winner = threads.pickWinner(id, participants.blacklist);
                   if (winner && thread) {
@@ -1308,6 +1428,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             onCloseWinner={(id) => {
               threads.closeThread(id);
               setCurrentWinner(null);
+              // Delete from Firebase when closing winner
+              if (cloud.isReady && cloud.syncEnabled) {
+                cloud.deleteFromCloud(id);
+              }
               // Clear overlay winner state
               sync.sync({
                 winner: null,
@@ -1376,7 +1500,30 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             threads={threads.scheduledThreads}
             viewMode={viewMode}
             onTogglePause={threads.togglePause}
-            onDelete={threads.deleteThread}
+            onActivateNow={(id) => {
+              const now = Date.now();
+              // Calculate new endsAt based on duration
+              const thread = threads.threads.find(t => t.id === id);
+              let newEndsAt: number | undefined;
+              if (thread?.timerDuration) {
+                newEndsAt = now + (thread.timerDuration * 1000);
+              }
+              // Activate the thread immediately
+              threads.updateThread(id, {
+                isActive: true,
+                startsAt: undefined, // Clear scheduled start
+                endsAt: newEndsAt,
+              });
+              // Switch to active tab
+              setActiveTab('active');
+            }}
+            onDelete={(id) => {
+              threads.deleteThread(id);
+              // Also delete from Firebase
+              if (cloud.isReady && cloud.syncEnabled) {
+                cloud.deleteFromCloud(id);
+              }
+            }}
             onEdit={(id) => {
               const thread = threads.threads.find(t => t.id === id);
               if (thread) {
@@ -1475,6 +1622,10 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
             <button
               onClick={() => {
                 threads.closeThread(currentWinner.threadId);
+                // Delete from Firebase when closing winner
+                if (cloud.isReady && cloud.syncEnabled) {
+                  cloud.deleteFromCloud(currentWinner.threadId);
+                }
                 setCurrentWinner(null);
               }}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:opacity-90 transition-opacity"
