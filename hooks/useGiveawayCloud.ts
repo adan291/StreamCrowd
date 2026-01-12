@@ -112,8 +112,16 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
         
         // If we have user info, configure Firebase
         if (userId && username) {
+          // Try to get profile image
+          let profileImage: string | undefined;
+          try {
+            const avatarUrl = localStorage.getItem('twitch_avatar_url') || 
+                              localStorage.getItem('original_user_avatar');
+            if (avatarUrl) profileImage = avatarUrl;
+          } catch {}
+          
           console.log('[useGiveawayCloud] Found Twitch user, configuring Firebase:', { userId, username });
-          GiveawayFirebaseService.setStreamer(userId, username, undefined, username.toLowerCase());
+          GiveawayFirebaseService.setStreamer(userId, username, profileImage, username.toLowerCase());
         }
         
         const ready = GiveawayFirebaseService.isReady();
@@ -153,6 +161,13 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
   }, [isReady, syncEnabled]);
 
   const saveToCloud = useCallback(async (giveaway: GiveawayThread, isPublic: boolean = true): Promise<boolean> => {
+    console.log('[useGiveawayCloud] saveToCloud called:', { 
+      giveawayId: giveaway.id, 
+      name: giveaway.name,
+      isReady, 
+      syncEnabled 
+    });
+    
     if (!isReady || !syncEnabled) {
       console.warn('[useGiveawayCloud] Service not ready or sync disabled');
       return false;
@@ -168,13 +183,17 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
         await loadFromCloud();
         updateLastSync();
         setSyncStatus('synced');
+        console.log('[useGiveawayCloud] Save successful');
         return true;
       }
+      console.warn('[useGiveawayCloud] Save returned null');
       setSyncStatus('error');
+      setError('No se pudo guardar en la nube');
       return false;
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
       console.error('[useGiveawayCloud] Save error:', err);
-      setError('Error al guardar en la nube');
+      setError(`Error: ${errorMsg}`);
       setSyncStatus('error');
       return false;
     } finally {
@@ -221,11 +240,13 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
   }, [isReady, syncEnabled, updateLastSync]);
 
   const loadFromCloud = useCallback(async (): Promise<FirebaseGiveaway[]> => {
+    console.log('[useGiveawayCloud] loadFromCloud called, isReady:', isReady);
     if (!isReady) return [];
     
     setIsSyncing(true);
     try {
       const giveaways = await GiveawayFirebaseService.getMyGiveaways();
+      console.log('[useGiveawayCloud] Loaded from cloud:', giveaways.length, 'giveaways');
       setCloudGiveaways(giveaways);
       setError(null);
       return giveaways;

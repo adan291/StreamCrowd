@@ -143,8 +143,21 @@ class GiveawayFirebaseServiceImpl {
     await this.ensureInitialized();
     if (!this.database || !profile.twitchId) return;
 
+    // Remove undefined values (Firebase doesn't accept them)
+    const cleanProfile: Record<string, unknown> = {
+      twitchId: profile.twitchId,
+      displayName: profile.displayName,
+      channel: profile.channel,
+      updatedAt: profile.updatedAt,
+    };
+    
+    // Only add profileImage if it exists
+    if (profile.profileImage) {
+      cleanProfile.profileImage = profile.profileImage;
+    }
+
     const profileRef = ref(this.database, `streamers/${profile.twitchId}/profile`);
-    await set(profileRef, profile);
+    await set(profileRef, cleanProfile);
     console.log('[GiveawayFirebase] Profile updated:', profile.displayName);
   }
 
@@ -152,9 +165,15 @@ class GiveawayFirebaseServiceImpl {
    * Save a giveaway to Firebase
    */
   async saveGiveaway(giveaway: GiveawayThread, isPublic: boolean = true): Promise<string | null> {
+    console.log('[GiveawayFirebase] saveGiveaway called:', { id: giveaway.id, name: giveaway.name, isPublic });
+    
     await this.ensureInitialized();
     if (!this.database || !this.currentStreamerId) {
-      console.warn('[GiveawayFirebase] Cannot save: not initialized or no streamer set');
+      console.warn('[GiveawayFirebase] Cannot save: not initialized or no streamer set', {
+        hasDatabase: !!this.database,
+        currentStreamerId: this.currentStreamerId,
+        initialized: this.initialized
+      });
       return null;
     }
 
@@ -181,10 +200,12 @@ class GiveawayFirebaseServiceImpl {
         streamerName: streamerProfile?.displayName || 'Unknown',
       };
 
+      console.log('[GiveawayFirebase] Saving to path:', `streamers/${this.currentStreamerId}/sorteos/${giveaway.id}`);
+      
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveaway.id}`);
       await set(giveawayRef, firebaseGiveaway);
       
-      console.log('[GiveawayFirebase] Giveaway saved:', giveaway.name);
+      console.log('[GiveawayFirebase] Giveaway saved successfully:', giveaway.name);
       return giveaway.id;
     } catch (err) {
       console.error('[GiveawayFirebase] Error saving giveaway:', err);
@@ -231,20 +252,33 @@ class GiveawayFirebaseServiceImpl {
    * Get all giveaways for current streamer
    */
   async getMyGiveaways(): Promise<FirebaseGiveaway[]> {
+    console.log('[GiveawayFirebase] getMyGiveaways called, streamerId:', this.currentStreamerId);
     await this.ensureInitialized();
-    if (!this.database || !this.currentStreamerId) return [];
+    if (!this.database || !this.currentStreamerId) {
+      console.warn('[GiveawayFirebase] getMyGiveaways: not ready', { 
+        hasDatabase: !!this.database, 
+        streamerId: this.currentStreamerId 
+      });
+      return [];
+    }
 
     try {
-      const sorteosRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos`);
+      const path = `streamers/${this.currentStreamerId}/sorteos`;
+      console.log('[GiveawayFirebase] Reading from path:', path);
+      const sorteosRef = ref(this.database, path);
       const snapshot = await get(sorteosRef);
       
-      if (!snapshot.exists()) return [];
+      if (!snapshot.exists()) {
+        console.log('[GiveawayFirebase] No giveaways found at path');
+        return [];
+      }
       
       const giveaways: FirebaseGiveaway[] = [];
       snapshot.forEach((child) => {
         giveaways.push({ ...child.val(), id: child.key });
       });
       
+      console.log('[GiveawayFirebase] Found', giveaways.length, 'giveaways');
       return giveaways.sort((a, b) => b.createdAt - a.createdAt);
     } catch (err) {
       console.error('[GiveawayFirebase] Error getting giveaways:', err);

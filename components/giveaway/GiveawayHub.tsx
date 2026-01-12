@@ -461,10 +461,16 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     });
     
     // Sync to cloud (Firebase)
-    if (cloud.isReady) {
-      cloud.saveToCloud(newThread, true).catch(err => {
+    console.log('[GiveawayHub] Thread created:', newThread.id, 'cloud.isReady:', cloud.isReady, 'syncEnabled:', cloud.syncEnabled);
+    if (cloud.isReady && cloud.syncEnabled) {
+      console.log('[GiveawayHub] Calling saveToCloud...');
+      cloud.saveToCloud(newThread, true).then(success => {
+        console.log('[GiveawayHub] saveToCloud result:', success);
+      }).catch(err => {
         console.error('[GiveawayHub] Error syncing to cloud:', err);
       });
+    } else {
+      console.log('[GiveawayHub] Skipping cloud sync - not ready or disabled');
     }
     
     // Add existing participants to the new thread
@@ -1114,6 +1120,8 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
           <RaffleTab
             mode={raffle.mode}
             onModeChange={raffle.setMode}
+            title={raffle.config.title}
+            onTitleChange={(t) => raffle.updateConfig({ title: t })}
             keyword={raffle.config.keyword}
             onKeywordChange={(kw) => raffle.updateConfig({ keyword: kw })}
             useTimer={raffle.config.useTimer}

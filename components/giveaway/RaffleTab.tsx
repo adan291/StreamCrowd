@@ -32,6 +32,10 @@ export interface RaffleTabProps {
   mode: RaffleMode;
   onModeChange: (mode: RaffleMode) => void;
   
+  // Title
+  title?: string;
+  onTitleChange?: (title: string) => void;
+  
   // Config
   keyword: string;
   onKeywordChange: (keyword: string) => void;
@@ -151,6 +155,8 @@ export interface RaffleTabProps {
 export const RaffleTab: React.FC<RaffleTabProps> = ({
   mode,
   onModeChange,
+  title = '',
+  onTitleChange,
   keyword,
   onKeywordChange,
   useTimer,
@@ -371,6 +377,21 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
           size="sm"
           showDescriptions={false}
           direction="horizontal"
+        />
+      </div>
+
+      {/* Title input */}
+      <div>
+        <label className="block text-xs font-bold uppercase text-zinc-500 dark:text-zinc-400 mb-2">
+          Título del sorteo
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange?.(e.target.value)}
+          disabled={isRunning}
+          placeholder="Ej: Sorteo de subs, Giveaway especial..."
+          className="w-full px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
         />
       </div>
 
