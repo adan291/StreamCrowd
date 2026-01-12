@@ -144,7 +144,7 @@ class PlatformAuthServiceImpl {
     // Migrate legacy Twitch auth if exists and not already in TokenStorage
     await this.migrateLegacyTwitchAuth();
 
-    // Validate stored credentials on startup
+    // Validate stored credentials on startup and notify listeners
     const platforms: Platform[] = ['twitch', 'youtube', 'kick'];
     for (const platform of platforms) {
       if (TokenStorage.has(platform)) {
@@ -152,6 +152,13 @@ class PlatformAuthServiceImpl {
         if (!valid) {
           console.log(`[PlatformAuthService] Invalid credentials for ${platform}, clearing`);
           await TokenStorage.remove(platform);
+        } else {
+          // Notify listeners about existing valid credentials (important for Firebase setup)
+          const credentials = await TokenStorage.retrieve(platform);
+          if (credentials) {
+            console.log(`[PlatformAuthService] Found valid ${platform} credentials, notifying listeners`);
+            this.notifyAuthChange(platform, credentials);
+          }
         }
       }
     }

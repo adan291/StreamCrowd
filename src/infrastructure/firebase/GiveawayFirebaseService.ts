@@ -120,6 +120,7 @@ class GiveawayFirebaseServiceImpl {
    * Set the current streamer (call after Twitch login)
    */
   setStreamer(twitchId: string, displayName: string, profileImage?: string, channel?: string): void {
+    console.log('[GiveawayFirebase] setStreamer called:', { twitchId, displayName, channel });
     this.currentStreamerId = twitchId;
     FirebaseAuthService.linkPlatformId(twitchId);
     
@@ -131,6 +132,8 @@ class GiveawayFirebaseServiceImpl {
       channel: channel || displayName.toLowerCase(),
       updatedAt: Date.now(),
     }).catch(err => console.error('[GiveawayFirebase] Error updating profile:', err));
+    
+    console.log('[GiveawayFirebase] Streamer configured, isReady:', this.isReady());
   }
 
   /**

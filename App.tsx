@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { CollaborationPanel } from './components/CollaborationPanel';
 import { PollCreator } from './components/PollCreator';
@@ -1971,6 +1972,9 @@ const App: React.FC = () => {
           onClose={() => setShowCountdown(false)}
         />
       )}
+      
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 };

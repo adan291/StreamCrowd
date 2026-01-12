@@ -77,10 +77,49 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
   useEffect(() => {
     const checkReady = async () => {
       try {
+        // First ensure Firebase service is initialized
         await GiveawayFirebaseService.initialize();
+        
+        // Check if we have Twitch credentials and configure Firebase
+        const twitchAuth = localStorage.getItem('twitch_auth');
+        const twitchToken = localStorage.getItem('twitch_token');
+        const platformCreds = localStorage.getItem('platform_credentials_twitch');
+        
+        // Try to get user info from various sources
+        let userId: string | null = null;
+        let username: string | null = null;
+        
+        if (platformCreds) {
+          try {
+            const creds = JSON.parse(platformCreds);
+            userId = creds.userId;
+            username = creds.username;
+          } catch {}
+        }
+        
+        if (!userId && twitchAuth) {
+          try {
+            const auth = JSON.parse(twitchAuth);
+            userId = auth.user?.id || auth.userId;
+            username = auth.user?.login || auth.user?.name || auth.username;
+          } catch {}
+        }
+        
+        if (!userId) {
+          userId = localStorage.getItem('twitch_user_id');
+          username = localStorage.getItem('twitch_user_name') || localStorage.getItem('twitch_channel');
+        }
+        
+        // If we have user info, configure Firebase
+        if (userId && username) {
+          console.log('[useGiveawayCloud] Found Twitch user, configuring Firebase:', { userId, username });
+          GiveawayFirebaseService.setStreamer(userId, username, undefined, username.toLowerCase());
+        }
+        
         const ready = GiveawayFirebaseService.isReady();
         setIsReady(ready);
         setSyncStatus(ready ? 'idle' : 'offline');
+        console.log('[useGiveawayCloud] Service ready:', ready);
       } catch (err) {
         console.error('[useGiveawayCloud] Init error:', err);
         setError('Error al conectar con la nube');
@@ -93,14 +132,18 @@ export function useGiveawayCloud(options: UseGiveawayCloudOptions = {}): UseGive
     // Re-check periodically (in case user logs in later)
     const interval = setInterval(() => {
       const ready = GiveawayFirebaseService.isReady();
-      setIsReady(ready);
-      if (!ready && syncStatus !== 'offline') {
-        setSyncStatus('offline');
+      if (ready !== isReady) {
+        setIsReady(ready);
+        if (!ready && syncStatus !== 'offline') {
+          setSyncStatus('offline');
+        } else if (ready && syncStatus === 'offline') {
+          setSyncStatus('idle');
+        }
       }
     }, 2000);
     
     return () => clearInterval(interval);
-  }, [syncStatus]);
+  }, []);
 
   // Load giveaways when ready
   useEffect(() => {
