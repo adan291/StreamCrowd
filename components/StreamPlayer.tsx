@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, AlertTriangle, Share2, Check, Tv, ExternalLink, Play } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 
 interface StreamPlayerProps {
   channel: string;
@@ -8,6 +8,10 @@ interface StreamPlayerProps {
 
 export const StreamPlayer: React.FC<StreamPlayerProps> = ({ channel }) => {
   const { t } = useI18n();
+  
+  // Load navigation module for lazy loading
+  useTranslationModule('nav');
+  
   const [isLoaded, setIsLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
 

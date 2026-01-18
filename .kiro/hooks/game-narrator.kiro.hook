@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Game Narrator",
+  "description": "Recibe eventos de juegos y genera frases épicas o graciosas para narrar la acción",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Genera una narración épica o graciosa para este evento de juego y devuelve JSON: { \"speech\": \"frase narrativa\", \"tone\": \"western|epic|funny|dramatic\", \"duration\": segundos_estimados }. Evento: {input}"
+  }
+}

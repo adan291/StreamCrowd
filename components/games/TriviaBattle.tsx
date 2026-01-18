@@ -3,7 +3,7 @@ import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils, RefreshCw, Pause, X, Users } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Question {
@@ -595,6 +595,9 @@ const QUESTION_BANK: TriviaCategory[] = [
 type TriviaMode = 'category' | 'ai' | 'manual';
 
 export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [gameState, setGameState] = useState<'setup' | 'question' | 'results' | 'final' | 'paused'>('setup');
   const [triviaMode, setTriviaMode] = useState<TriviaMode>('category');
   const [questions, setQuestions] = useState<Question[]>([]);

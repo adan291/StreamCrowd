@@ -2,35 +2,53 @@
  * CloudSyncButton - Botón de sincronización con la nube
  * 
  * Muestra estado de sincronización y permite activar/desactivar sync
+ * Migrated to use Redux state management
+ * 
+ * @requirements 3.5, 3.6 - Cloud sync integration with Redux
  */
 
 import React, { useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
-import type { SyncStatus } from '../../hooks/useGiveawayCloud';
+import { useGiveaway } from '../../src/application/hooks/useGiveaway';
 
 interface CloudSyncButtonProps {
-  isReady: boolean;
-  isSyncing: boolean;
-  syncStatus: SyncStatus;
-  syncEnabled: boolean;
-  lastSyncTime: number | null;
-  error: string | null;
-  onToggleSync: (enabled: boolean) => void;
-  onManualSync: () => void;
+  // Optional props for backward compatibility
+  isReady?: boolean;
+  isSyncing?: boolean;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  syncEnabled?: boolean;
+  lastSyncTime?: number | null;
+  error?: string | null;
+  onToggleSync?: (enabled: boolean) => void;
+  onManualSync?: () => void;
 }
 
-export const CloudSyncButton: React.FC<CloudSyncButtonProps> = ({
-  isReady,
-  isSyncing,
-  syncStatus,
-  syncEnabled,
-  lastSyncTime,
-  error,
-  onToggleSync,
-  onManualSync,
-}) => {
+export const CloudSyncButton: React.FC<CloudSyncButtonProps> = (props) => {
   const [showMenu, setShowMenu] = useState(false);
+  
+  // Use Redux state if props not provided (new behavior)
+  const giveaway = useGiveaway();
+  
+  // Use props if provided (backward compatibility), otherwise use Redux state
+  const isReady = props.isReady ?? true; // Assume ready if using Redux
+  const isSyncing = props.isSyncing ?? false; // TODO: Add syncing state to Redux
+  const syncStatus = props.syncStatus ?? (giveaway.cloudSyncEnabled ? 'synced' : 'idle');
+  const syncEnabled = props.syncEnabled ?? giveaway.cloudSyncEnabled;
+  const lastSyncTime = props.lastSyncTime ?? (giveaway.lastSyncedAt ? new Date(giveaway.lastSyncedAt).getTime() : null);
+  const error = props.error ?? giveaway.error;
+  
+  const onToggleSync = props.onToggleSync ?? ((enabled: boolean) => {
+    if (enabled) {
+      giveaway.enableCloudSync();
+    } else {
+      giveaway.disableCloudSync();
+    }
+  });
+  
+  const onManualSync = props.onManualSync ?? (() => {
+    giveaway.updateLastSynced();
+  });
 
   const getStatusIcon = () => {
     if (!isReady) return <CloudOff size={16} className="text-zinc-400" />;

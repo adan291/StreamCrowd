@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Poll } from '../types';
 import { Trophy, Calendar, Hash, X, Download, RotateCcw, Gift, Users, Crown, Star, BarChart3 } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 import { FinishedGiveaway } from './GiveawayHub';
 
 interface PollHistoryProps {
@@ -15,6 +15,11 @@ type HistoryTab = 'polls' | 'giveaways';
 
 export const PollHistory: React.FC<PollHistoryProps> = ({ history, onClose, onLoadPoll, onDownloadPoll }) => {
   const { t } = useI18n();
+  
+  // Load poll and giveaway modules for lazy loading
+  useTranslationModule('poll');
+  useTranslationModule('giveaway');
+  
   const [activeTab, setActiveTab] = useState<HistoryTab>('polls');
   const [giveawayHistory, setGiveawayHistory] = useState<FinishedGiveaway[]>([]);
 

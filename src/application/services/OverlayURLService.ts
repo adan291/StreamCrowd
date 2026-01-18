@@ -3,7 +3,14 @@
  * 
  * Este servicio genera URLs que pueden ser usadas en OBS como Browser Source,
  * permitiendo mostrar overlays sin necesidad de configurar WebSocket.
+ * 
+ * SECURITY: URLs are generated with session IDs instead of tokens to prevent
+ * credential exposure in OBS Browser Source URLs.
+ * 
+ * @requirements 4.1, 4.6
  */
+
+import { getOverlaySessionService, type OverlayType as SessionOverlayType } from './OverlaySessionService';
 
 export interface OverlayType {
   id: string;
@@ -21,6 +28,7 @@ export interface OverlayOptions {
   height?: number;
   position?: 'top' | 'bottom' | 'center';
   channel?: string;
+  sessionId?: string; // Optional session ID for secure overlay access
 }
 
 /**
@@ -186,6 +194,15 @@ export const CHROMA_COLORS = {
 
 /**
  * Genera una URL de overlay para usar en OBS Browser Source
+ * 
+ * SECURITY: If a sessionId is provided in options, it will be used instead of
+ * generating overlay-specific parameters. This ensures tokens are never exposed in URLs.
+ * 
+ * @param typeId - The overlay type ID
+ * @param options - Optional configuration including sessionId for secure access
+ * @returns The complete overlay URL
+ * 
+ * @requirements 4.1, 4.6
  */
 export function generateOverlayURL(typeId: string, options: OverlayOptions = {}): string {
   const overlayType = OVERLAY_TYPES.find(t => t.id === typeId);
@@ -196,10 +213,16 @@ export function generateOverlayURL(typeId: string, options: OverlayOptions = {})
   const baseURL = typeof window !== 'undefined' ? window.location.origin : '';
   const params = new URLSearchParams();
   
-  // Parámetro principal del overlay
-  params.set(overlayType.urlParam, 'true');
+  // If sessionId is provided, use session-based URL (secure)
+  if (options.sessionId) {
+    params.set('sessionId', options.sessionId);
+    params.set('overlayType', typeId);
+  } else {
+    // Legacy mode: use overlay-specific parameters
+    params.set(overlayType.urlParam, 'true');
+  }
   
-  // Opciones adicionales
+  // Opciones adicionales (non-sensitive only)
   if (options.bg) {
     params.set('bg', options.bg);
   } else if (options.theme === 'transparent') {
@@ -213,6 +236,71 @@ export function generateOverlayURL(typeId: string, options: OverlayOptions = {})
   }
   
   return `${baseURL}/?${params.toString()}`;
+}
+
+/**
+ * Generates a secure overlay URL with session ID
+ * 
+ * This is the recommended way to generate overlay URLs as it ensures
+ * tokens and sensitive data are never exposed in the URL.
+ * 
+ * @param userId - The user ID creating the session
+ * @param typeId - The overlay type ID
+ * @param options - Optional configuration (theme, channel, etc.)
+ * @returns Object with sessionId and the complete URL
+ * 
+ * @requirements 4.1, 4.6
+ */
+export function generateSecureOverlayURL(
+  userId: string,
+  typeId: string,
+  options: Omit<OverlayOptions, 'sessionId'> = {}
+): { sessionId: string; url: string } {
+  const overlayType = OVERLAY_TYPES.find(t => t.id === typeId);
+  if (!overlayType) {
+    throw new Error(`Unknown overlay type: ${typeId}`);
+  }
+
+  // Map overlay type ID to session overlay type
+  const sessionType = mapToSessionOverlayType(typeId);
+  
+  // Create session
+  const sessionService = getOverlaySessionService();
+  const sessionId = sessionService.createSession(userId, sessionType);
+  
+  // Generate URL with session ID
+  const url = generateOverlayURL(typeId, { ...options, sessionId });
+  
+  return { sessionId, url };
+}
+
+/**
+ * Maps overlay type ID to session overlay type
+ */
+function mapToSessionOverlayType(typeId: string): SessionOverlayType {
+  // Map specific overlay types to session types
+  const typeMap: Record<string, SessionOverlayType> = {
+    'poll': 'poll',
+    'countdown': 'timer',
+    'spinner': 'poll',
+    'giveaway': 'giveaway',
+    'judge': 'poll',
+    'trivia': 'game',
+    'pium': 'game',
+    'roulette': 'game',
+    'fishing': 'game',
+    'potato': 'game',
+    'battleship': 'game',
+    'duckHunt': 'game',
+    'veoVeo': 'game',
+    'ppt': 'game',
+    'ahorcado': 'game',
+    'carrera': 'game',
+    'memoria': 'game',
+    'partyCo': 'game',
+  };
+  
+  return typeMap[typeId] || 'game';
 }
 
 /**
@@ -288,6 +376,10 @@ class OverlayURLService {
   
   generateURL(typeId: string, options?: OverlayOptions): string {
     return generateOverlayURL(typeId, options);
+  }
+  
+  generateSecureURL(userId: string, typeId: string, options?: Omit<OverlayOptions, 'sessionId'>): { sessionId: string; url: string } {
+    return generateSecureOverlayURL(userId, typeId, options);
   }
   
   getType(typeId: string): OverlayType | undefined {

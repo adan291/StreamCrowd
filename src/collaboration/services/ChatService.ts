@@ -1,5 +1,7 @@
 // Chat Service - Gestiona el chat entre moderadores
 import { ChatMessage } from '../../../types/collaboration';
+import { sanitizationService } from '../../infrastructure/security/SanitizationService';
+import { logService } from '../../infrastructure/logging/LogService';
 
 const MAX_MESSAGES = 500;
 const MAX_MESSAGE_LENGTH = 1000;
@@ -39,8 +41,23 @@ export class ChatService {
       return null;
     }
 
+    // Check for malicious content and log attempts
+    // Requirements: 6.4
+    if (sanitizationService.isMalicious(trimmedContent)) {
+      logService.warn('Malicious content detected in collaboration chat', {
+        userId,
+        userName,
+        content: trimmedContent.substring(0, 100), // Log first 100 chars only
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Sanitize content before storing
+    // Requirements: 6.1, 6.6
+    const sanitizedContent = sanitizationService.sanitizeChatMessage(trimmedContent);
+
     // Truncate if too long
-    const finalContent = trimmedContent.slice(0, this.maxMessageLength);
+    const finalContent = sanitizedContent.slice(0, this.maxMessageLength);
 
     // Parse mentions
     const mentions = this.parseMentions(finalContent);
@@ -65,11 +82,15 @@ export class ChatService {
   }
 
   sendSystemMessage(content: string): ChatMessage {
+    // Sanitize system message content as well
+    // Requirements: 6.1, 6.6
+    const sanitizedContent = sanitizationService.sanitizeHtml(content);
+
     const message: ChatMessage = {
       id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId: 'system',
       userName: 'Sistema',
-      content,
+      content: sanitizedContent,
       mentions: [],
       timestamp: Date.now(),
       isSystem: true

@@ -6,6 +6,8 @@ import { getTwitchService } from '../src/application/services/TwitchService';
 import { ChatCommandService } from '../src/application/services/ChatCommandService';
 import { getTwitchApiServiceAdapter } from '../src/application/adapters/TwitchApiServiceAdapter';
 import { getTwitchAdapter } from '../src/infrastructure/adapters/TwitchAdapter';
+import { sanitizationService } from '../src/infrastructure/security/SanitizationService';
+import { logService } from '../src/infrastructure/logging/LogService';
 
 // Local announcement message type
 interface LocalAnnouncement {
@@ -54,6 +56,7 @@ interface ChatFeedProps {
 
 export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, options, collaborationChannels = [], mainChannel, isConnected = false, authToken, broadcasterId, userId }) => {
   const { t } = useI18n();
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -65,6 +68,24 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
     const saved = localStorage.getItem('chat_settings');
     return saved ? { ...DEFAULT_CHAT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_CHAT_SETTINGS;
   });
+
+  /**
+   * Sanitize chat message and log malicious content attempts
+   * Requirements: 6.1, 6.4, 6.6
+   */
+  const sanitizeMessage = useCallback((message: string, username: string): string => {
+    // Check for malicious content before sanitization
+    if (sanitizationService.isMalicious(message)) {
+      logService.warn('Malicious content detected in chat message', {
+        username,
+        message: message.substring(0, 100), // Log first 100 chars only
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Sanitize the message (removes all HTML tags and escapes special characters)
+    return sanitizationService.sanitizeChatMessage(message);
+  }, []);
 
   // Function to add a local announcement
   const addLocalAnnouncement = useCallback((text: string, color: 'blue' | 'green' | 'orange' | 'purple' | 'primary', username: string) => {
@@ -470,7 +491,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
     <div 
       className="bg-white dark:bg-zinc-900 border-0 md:border border-zinc-200 dark:border-zinc-800 rounded-none md:rounded-xl h-full flex flex-col shadow-lg overflow-hidden relative"
       role="log"
-      aria-label={t.chat.liveChat}
+      aria-label={t.common.chat.liveChat}
       aria-live="polite"
     >
       {/* Header */}
@@ -478,7 +499,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
         <div className="p-1 sm:p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-md text-twitch-brand dark:text-twitch-light" aria-hidden="true">
           <MessageSquare size={14} />
         </div>
-        <span className="text-[10px] sm:text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{t.chat.liveChat}</span>
+        <span className="text-[10px] sm:text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">{t.common.chat.liveChat}</span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono" aria-live="off">
             {messages.length > 0 ? `${messages.length} msgs` : 'Ready'}
@@ -590,7 +611,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
         {combinedMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-2 opacity-50">
             <MessageSquare size={24} />
-            <span className="text-xs italic">{t.chat.waitingMessages}</span>
+            <span className="text-xs italic">{t.common.chat.waitingMessages}</span>
           </div>
         )}
         {combinedMessages.map((item, i) => {
@@ -635,7 +656,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                   )}
                 </div>
                 <p className="text-zinc-800 dark:text-zinc-200 text-sm font-medium">
-                  {ann.text}
+                  {sanitizationService.sanitizeHtml(ann.text)}
                 </p>
               </div>
             );
@@ -666,7 +687,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                 <div className="flex items-center gap-2">
                   <span className="text-base">{notif.icon}</span>
                   <span className="text-xs font-medium" style={{ color: colors.text }}>
-                    {notif.text}
+                    {sanitizationService.sanitizeHtml(notif.text)}
                   </span>
                   {notif.link && (
                     <a 
@@ -754,7 +775,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                 {hasVoted && previousVoteOption && (
                   <div 
                     className="inline-flex items-center gap-1 bg-zinc-200 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-300 dark:border-zinc-700/50 select-none opacity-80 shadow-sm"
-                    title={`${t.chat.votedFor}: ${previousVoteOption.label}`}
+                    title={`${t.common.chat.votedFor}: ${previousVoteOption.label}`}
                   >
                     {previousVoteOption.image ? (
                       <img src={previousVoteOption.image} className="w-3 h-3 rounded-full object-cover" alt="" />
@@ -767,7 +788,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
                 )}
 
                 <span className="text-zinc-800 dark:text-zinc-300 flex items-center gap-1 flex-wrap">
-                  {msg.message}
+                  {sanitizeMessage(msg.message, msg.username)}
                   
                   {currentMsgOption && !hasVoted && (
                     <span 
@@ -784,7 +805,7 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
 
                   {voteMatch && hasVoted && previousVoteOption && (
                     <span className="ml-1 flex items-center gap-1 text-[10px] text-zinc-400 italic">
-                      ({t.chat.alreadyRegistered})
+                      ({t.common.chat.alreadyRegistered})
                     </span>
                   )}
                 </span>
@@ -800,9 +821,9 @@ export const ChatFeed: React.FC<ChatFeedProps> = ({ messages, userVoteMap, optio
           <button 
             onClick={scrollToBottom}
             className="bg-twitch-brand hover:bg-twitch-light text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 transition-transform hover:scale-105 active:scale-95 border border-white/10"
-            aria-label={t.chat.newMessages}
+            aria-label={t.common.chat.newMessages}
           >
-            <ArrowDown size={14} aria-hidden="true" /> {t.chat.newMessages}
+            <ArrowDown size={14} aria-hidden="true" /> {t.common.chat.newMessages}
           </button>
         </div>
       )}

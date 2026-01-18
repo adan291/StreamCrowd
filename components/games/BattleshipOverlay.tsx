@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface Ship {
   id: string;
@@ -50,6 +51,8 @@ const SHIPS_CONFIG = [
 
 export const BattleshipOverlay: React.FC = () => {
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
+  const { gameState: syncedGameState } = useGameSync();
+  
   const [state, setState] = useState<BattleshipState>({
     gameState: 'setup',
     grid: null,
@@ -81,13 +84,6 @@ export const BattleshipOverlay: React.FC = () => {
     
     channelRef.current.onmessage = (event) => handleState(event.data);
     
-    // Subscribe to Firebase for real-time sync (works across browsers/OBS)
-    const unsubscribeFirebase = gameSync.subscribe((data) => {
-      if (data && data.type === 'battleship' && data.state) {
-        handleState({ ...data.state, type: 'battleship_state' });
-      }
-    });
-    
     // Also poll localStorage for legacy support
     const loadFromStorage = () => {
       try {
@@ -100,153 +96,175 @@ export const BattleshipOverlay: React.FC = () => {
     
     return () => {
       channelRef.current?.close();
-      unsubscribeFirebase();
       clearInterval(pollInterval);
     };
   }, []);
+
+  // Handle synced game state from hexagonal architecture
+  useEffect(() => {
+    if (syncedGameState && syncedGameState.gameType === 'battleship') {
+      // Convert the synced state to the expected format
+      const battleshipData = syncedGameState as any; // Type assertion for backward compatibility
+      if (battleshipData.type === 'battleship_state' || battleshipData.gameState) {
+        setState({
+          gameState: battleshipData.gameState || 'setup',
+          grid: battleshipData.grid || null,
+          ships: battleshipData.ships || [],
+          shots: battleshipData.shots || [],
+          lastShot: battleshipData.lastShot || null,
+          shipsRemaining: battleshipData.shipsRemaining || 5,
+          leaderboard: battleshipData.leaderboard || []
+        });
+      }
+    }
+  }, [syncedGameState]);
 
   const { gameState, grid, ships, lastShot, shipsRemaining, leaderboard } = state;
 
   // Waiting state
   if (gameState === 'setup' || !grid) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
-        <OverlayChromaKey {...chromaKeyProps} />
-        <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-6">
-          <div className="text-6xl mb-4">🚢</div>
-          <p className="text-white text-2xl font-bold">Hundir la Flota</p>
-          <p className="text-blue-300 text-lg mt-2">Preparando batalla...</p>
+      <GameOverlayWrapper gameName="Hundir la Flota" gameId="battleship">
+        <div className="h-screen w-screen flex items-center justify-center" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+          <OverlayChromaKey {...chromaKeyProps} />
+          <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-6">
+            <div className="text-6xl mb-4">🚢</div>
+            <p className="text-white text-2xl font-bold">Hundir la Flota</p>
+            <p className="text-blue-300 text-lg mt-2">Preparando batalla...</p>
+          </div>
         </div>
-      </div>
+      </GameOverlayWrapper>
     );
   }
 
   return (
-    <div className="h-screen w-screen p-4 overflow-hidden" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
-      <OverlayChromaKey {...chromaKeyProps} />
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-4xl">🚢</span>
-          <div>
-            <h1 className="text-white text-2xl font-bold">Hundir la Flota</h1>
-            <p className="text-blue-300 text-sm">Escribe coordenadas: A1, B5, J10...</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Ships remaining */}
-          <div className="bg-blue-800/50 rounded-xl px-4 py-2">
-            <span className="text-blue-300 text-sm">Barcos: </span>
-            <span className="text-white font-bold text-xl">{shipsRemaining}</span>
+    <GameOverlayWrapper gameName="Hundir la Flota" gameId="battleship">
+      <div className="h-screen w-screen p-4 overflow-hidden" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+        <OverlayChromaKey {...chromaKeyProps} />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <span className="text-4xl">🚢</span>
+            <div>
+              <h1 className="text-white text-2xl font-bold">Hundir la Flota</h1>
+              <p className="text-blue-300 text-sm">Escribe coordenadas: A1, B5, J10...</p>
+            </div>
           </div>
           
-          {/* Game state */}
-          <div className={`px-4 py-2 rounded-xl font-bold ${
-            gameState === 'finished' ? 'bg-yellow-500 text-black' : 'bg-green-500 text-white'
-          }`}>
-            {gameState === 'finished' ? '🏆 ¡VICTORIA!' : '⚔️ EN BATALLA'}
+          <div className="flex items-center gap-4">
+            {/* Ships remaining */}
+            <div className="bg-blue-800/50 rounded-xl px-4 py-2">
+              <span className="text-blue-300 text-sm">Barcos: </span>
+              <span className="text-white font-bold text-xl">{shipsRemaining}</span>
+            </div>
+            
+            {/* Game state */}
+            <div className={`px-4 py-2 rounded-xl font-bold ${
+              gameState === 'finished' ? 'bg-yellow-500 text-black' : 'bg-green-500 text-white'
+            }`}>
+              {gameState === 'finished' ? '🏆 ¡VICTORIA!' : '⚔️ EN BATALLA'}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex gap-6 justify-center">
-        {/* Grid */}
-        <div className="bg-blue-800/30 rounded-2xl p-4">
-          {/* Column headers */}
-          <div className="flex">
-            <div className="w-10 h-10" />
-            {LETTERS.map(letter => (
-              <div key={letter} className="w-10 h-10 flex items-center justify-center text-blue-300 font-bold">
-                {letter}
-              </div>
-            ))}
-          </div>
-          
-          {/* Grid rows */}
-          {grid.map((row, rowIdx) => (
-            <div key={rowIdx} className="flex">
-              <div className="w-10 h-10 flex items-center justify-center text-blue-300 font-bold">
-                {rowIdx + 1}
-              </div>
-              {row.map((cell, colIdx) => {
-                const showShip = gameState === 'finished' || cell.isHit;
-                
-                return (
-                  <div
-                    key={colIdx}
-                    className={`w-10 h-10 border border-blue-600/50 flex items-center justify-center text-xl transition-all ${
-                      cell.isHit && cell.hasShip ? 'bg-red-500 animate-pulse' :
-                      cell.isHit ? 'bg-blue-700' :
-                      showShip && cell.hasShip ? 'bg-zinc-600' : 'bg-blue-900/50'
-                    }`}
-                  >
-                    {cell.isHit && cell.hasShip && '💥'}
-                    {cell.isHit && !cell.hasShip && '💦'}
-                    {!cell.isHit && showShip && cell.hasShip && '🚢'}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        {/* Side panel */}
-        <div className="flex flex-col gap-4 w-64">
-          {/* Last shot */}
-          {lastShot && (
-            <div className={`rounded-xl p-4 ${lastShot.isHit ? 'bg-red-500/30' : 'bg-blue-500/30'}`}>
-              <p className="text-white text-sm mb-1">Último disparo:</p>
-              <p className="font-bold text-lg" style={{ color: lastShot.color }}>
-                {lastShot.username}
-              </p>
-              <p className="text-white text-xl">
-                {LETTERS[lastShot.col]}{lastShot.row + 1}: {lastShot.isHit ? '💥 ¡TOCADO!' : '💦 Agua'}
-              </p>
-            </div>
-          )}
-
-          {/* Ships status */}
-          <div className="bg-blue-800/30 rounded-xl p-3">
-            <p className="text-blue-300 text-xs mb-2 font-medium">Estado de barcos:</p>
-            <div className="space-y-1">
-              {ships.map((ship, i) => (
-                <div
-                  key={ship.id}
-                  className={`flex items-center justify-between px-2 py-1 rounded text-sm ${
-                    ship.sunk ? 'bg-red-500/30 text-red-400 line-through' : 'bg-blue-700/50 text-white'
-                  }`}
-                >
-                  <span>{SHIPS_CONFIG[i]?.name || `Barco ${i+1}`}</span>
-                  <span>{ship.hits}/{ship.size}</span>
+        <div className="flex gap-6 justify-center">
+          {/* Grid */}
+          <div className="bg-blue-800/30 rounded-2xl p-4">
+            {/* Column headers */}
+            <div className="flex">
+              <div className="w-10 h-10" />
+              {LETTERS.map(letter => (
+                <div key={letter} className="w-10 h-10 flex items-center justify-center text-blue-300 font-bold">
+                  {letter}
                 </div>
               ))}
             </div>
+            
+            {/* Grid rows */}
+            {grid.map((row, rowIdx) => (
+              <div key={rowIdx} className="flex">
+                <div className="w-10 h-10 flex items-center justify-center text-blue-300 font-bold">
+                  {rowIdx + 1}
+                </div>
+                {row.map((cell, colIdx) => {
+                  const showShip = gameState === 'finished' || cell.isHit;
+                  
+                  return (
+                    <div
+                      key={colIdx}
+                      className={`w-10 h-10 border border-blue-600/50 flex items-center justify-center text-xl transition-all ${
+                        cell.isHit && cell.hasShip ? 'bg-red-500 animate-pulse' :
+                        cell.isHit ? 'bg-blue-700' :
+                        showShip && cell.hasShip ? 'bg-zinc-600' : 'bg-blue-900/50'
+                      }`}
+                    >
+                      {cell.isHit && cell.hasShip && '💥'}
+                      {cell.isHit && !cell.hasShip && '💦'}
+                      {!cell.isHit && showShip && cell.hasShip && '🚢'}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
-          {/* Leaderboard */}
-          {leaderboard.length > 0 && (
+          {/* Side panel */}
+          <div className="flex flex-col gap-4 w-64">
+            {/* Last shot */}
+            {lastShot && (
+              <div className={`rounded-xl p-4 ${lastShot.isHit ? 'bg-red-500/30' : 'bg-blue-500/30'}`}>
+                <p className="text-white text-sm mb-1">Último disparo:</p>
+                <p className="font-bold text-lg" style={{ color: lastShot.color }}>
+                  {lastShot.username}
+                </p>
+                <p className="text-white text-xl">
+                  {LETTERS[lastShot.col]}{lastShot.row + 1}: {lastShot.isHit ? '💥 ¡TOCADO!' : '💦 Agua'}
+                </p>
+              </div>
+            )}
+
+            {/* Ships status */}
             <div className="bg-blue-800/30 rounded-xl p-3">
-              <p className="text-blue-300 text-xs mb-2 font-medium">🎯 Mejores tiradores:</p>
+              <p className="text-blue-300 text-xs mb-2 font-medium">Estado de barcos:</p>
               <div className="space-y-1">
-                {leaderboard.slice(0, 5).map(([oderId, data], i) => (
+                {ships.map((ship, i) => (
                   <div
-                    key={oderId}
-                    className="flex items-center justify-between px-2 py-1 rounded text-sm"
-                    style={{ backgroundColor: data.color + '30' }}
+                    key={ship.id}
+                    className={`flex items-center justify-between px-2 py-1 rounded text-sm ${
+                      ship.sunk ? 'bg-red-500/30 text-red-400 line-through' : 'bg-blue-700/50 text-white'
+                    }`}
                   >
-                    <span style={{ color: data.color }}>
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎯'} {data.username}
-                    </span>
-                    <span className="text-white font-bold">{data.hits}</span>
+                    <span>{SHIPS_CONFIG[i]?.name || `Barco ${i+1}`}</span>
+                    <span>{ship.hits}/{ship.size}</span>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+
+            {/* Leaderboard */}
+            {leaderboard.length > 0 && (
+              <div className="bg-blue-800/30 rounded-xl p-3">
+                <p className="text-blue-300 text-xs mb-2 font-medium">🎯 Mejores tiradores:</p>
+                <div className="space-y-1">
+                  {leaderboard.slice(0, 5).map(([oderId, data], i) => (
+                    <div
+                      key={oderId}
+                      className="flex items-center justify-between px-2 py-1 rounded text-sm"
+                      style={{ backgroundColor: data.color + '30' }}
+                    >
+                      <span style={{ color: data.color }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🎯'} {data.username}
+                      </span>
+                      <span className="text-white font-bold">{data.hits}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </GameOverlayWrapper>
   );
 };
 

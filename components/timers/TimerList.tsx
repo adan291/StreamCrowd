@@ -65,17 +65,17 @@ export const TimerList: React.FC<TimerListProps> = ({
           <Clock size={32} className="text-zinc-600" />
         </div>
         <h3 className="text-lg font-medium text-white mb-2">
-          {t.timers.noTimers}
+          {t.misc.timers.noTimers}
         </h3>
         <p className="text-sm text-zinc-400 mb-4 max-w-xs">
-          {t.timers.noTimersDescription}
+          {t.misc.timers.noTimersDescription}
         </p>
         <button
           onClick={onCreateTimer}
           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
         >
           <Plus size={18} />
-          {t.timers.createTimer}
+          {t.misc.timers.createTimer}
         </button>
       </div>
     );
@@ -87,7 +87,7 @@ export const TimerList: React.FC<TimerListProps> = ({
       {timersByGroup[''].length > 0 && (
         <div>
           <h4 className="text-sm font-medium text-zinc-400 mb-2 px-1">
-            {t.timers.generalGroup} ({timersByGroup[''].length})
+            {t.misc.timers.generalGroup} ({timersByGroup[''].length})
           </h4>
           <div className="space-y-2">
             {timersByGroup[''].map(timer => (
@@ -122,7 +122,7 @@ export const TimerList: React.FC<TimerListProps> = ({
               </h4>
               {!group.enabled && (
                 <span className="text-xs text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
-                  {t.timers.engineStopped}
+                  {t.misc.timers.engineStopped}
                 </span>
               )}
             </div>

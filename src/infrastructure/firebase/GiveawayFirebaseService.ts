@@ -28,6 +28,7 @@ import {
   equalTo
 } from 'firebase/database';
 import { FirebaseAuthService } from '../auth/FirebaseAuthService';
+import { getFirebaseRetryWrapper } from './FirebaseRetryWrapper';
 import type { GiveawayThread } from '../../../components/giveaway/index';
 
 // Firebase config - Uses environment variables (set in .env.local or Vercel)
@@ -95,6 +96,7 @@ class GiveawayFirebaseServiceImpl {
   private currentStreamerId: string | null = null;
   private currentStreamerName: string | null = null;
   private listeners: Map<string, () => void> = new Map();
+  private retryWrapper = getFirebaseRetryWrapper();
 
   constructor() {
     // Restore streamer from localStorage on init
@@ -204,7 +206,10 @@ class GiveawayFirebaseServiceImpl {
     }
 
     const profileRef = ref(this.database, `streamers/${profile.twitchId}/profile`);
-    await set(profileRef, cleanProfile);
+    await this.retryWrapper.write(
+      () => set(profileRef, cleanProfile),
+      `Update streamer profile for ${profile.twitchId}`
+    );
     console.log('[GiveawayFirebase] Profile updated:', profile.displayName);
   }
 
@@ -225,7 +230,10 @@ class GiveawayFirebaseServiceImpl {
     }
 
     try {
-      const streamerProfile = await this.getStreamerProfile(this.currentStreamerId);
+      const streamerProfile = await this.retryWrapper.read(
+        () => this.getStreamerProfile(this.currentStreamerId!),
+        `Get streamer profile for ${this.currentStreamerId}`
+      );
       
       // Build giveaway object, removing undefined values
       const firebaseGiveaway = removeUndefined({
@@ -252,7 +260,10 @@ class GiveawayFirebaseServiceImpl {
       console.log('[GiveawayFirebase] Saving to path:', `streamers/${this.currentStreamerId}/sorteos/${giveaway.id}`);
       
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveaway.id}`);
-      await set(giveawayRef, firebaseGiveaway);
+      await this.retryWrapper.write(
+        () => set(giveawayRef, firebaseGiveaway),
+        `Save giveaway ${giveaway.id}`
+      );
       
       console.log('[GiveawayFirebase] Giveaway saved successfully:', giveaway.name);
       return giveaway.id;
@@ -271,10 +282,13 @@ class GiveawayFirebaseServiceImpl {
 
     try {
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveawayId}`);
-      await update(giveawayRef, {
-        ...updates,
-        updatedAt: Date.now(),
-      });
+      await this.retryWrapper.write(
+        () => update(giveawayRef, {
+          ...updates,
+          updatedAt: Date.now(),
+        }),
+        `Update giveaway ${giveawayId}`
+      );
       console.log('[GiveawayFirebase] Giveaway updated:', giveawayId);
     } catch (err) {
       console.error('[GiveawayFirebase] Error updating giveaway:', err);
@@ -290,7 +304,10 @@ class GiveawayFirebaseServiceImpl {
 
     try {
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveawayId}`);
-      await remove(giveawayRef);
+      await this.retryWrapper.write(
+        () => remove(giveawayRef),
+        `Delete giveaway ${giveawayId}`
+      );
       console.log('[GiveawayFirebase] Giveaway deleted:', giveawayId);
     } catch (err) {
       console.error('[GiveawayFirebase] Error deleting giveaway:', err);
@@ -315,7 +332,11 @@ class GiveawayFirebaseServiceImpl {
       const path = `streamers/${this.currentStreamerId}/sorteos`;
       console.log('[GiveawayFirebase] Reading from path:', path);
       const sorteosRef = ref(this.database, path);
-      const snapshot = await get(sorteosRef);
+      
+      const snapshot = await this.retryWrapper.read(
+        () => get(sorteosRef),
+        `Get giveaways for streamer ${this.currentStreamerId}`
+      );
       
       if (!snapshot.exists()) {
         console.log('[GiveawayFirebase] No giveaways found at path');
@@ -348,7 +369,10 @@ class GiveawayFirebaseServiceImpl {
 
     try {
       const profileRef = ref(this.database, `streamers/${twitchId}/profile`);
-      const snapshot = await get(profileRef);
+      const snapshot = await this.retryWrapper.read(
+        () => get(profileRef),
+        `Get streamer profile for ${twitchId}`
+      );
       return snapshot.exists() ? snapshot.val() : null;
     } catch (err) {
       console.error('[GiveawayFirebase] Error getting profile:', err);
@@ -365,7 +389,10 @@ class GiveawayFirebaseServiceImpl {
 
     try {
       const sorteosRef = ref(this.database, `streamers/${twitchId}/sorteos`);
-      const snapshot = await get(sorteosRef);
+      const snapshot = await this.retryWrapper.read(
+        () => get(sorteosRef),
+        `Get public giveaways for streamer ${twitchId}`
+      );
       
       if (!snapshot.exists()) return [];
       

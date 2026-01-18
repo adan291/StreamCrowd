@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Skull, Heart } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 const GAME_CHANNEL = 'ahorcado_sync';
 const STORAGE_KEY_AHORCADO = 'ahorcado_state';
 
 export const AhorcadoOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<any>({
     gameState: 'setup',
@@ -74,76 +77,78 @@ export const AhorcadoOverlay: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
-      <OverlayChromaKey {...chromaKeyProps} />
-      {state.gameState === 'setup' && (
-        <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
-          <Skull size={48} className="text-red-400 mx-auto mb-2" />
-          <p className="text-white text-2xl font-bold">Ahorcado</p>
-          <p className="text-zinc-400">Preparando...</p>
-        </div>
-      )}
-
-      {state.gameState === 'playing' && (
-        <div className="w-full max-w-xl space-y-4">
-          <div className="bg-black/60 backdrop-blur rounded-xl p-4">
-            {renderHangman()}
-            <div className="flex justify-center gap-1 mt-2">
-              {[...Array(state.maxErrors)].map((_, i) => (
-                <Heart
-                  key={i}
-                  size={24}
-                  className={i < state.maxErrors - state.errors ? 'text-red-500 fill-red-500' : 'text-zinc-600'}
-                />
-              ))}
-            </div>
+    <GameOverlayWrapper gameName="Ahorcado" gameId="ahorcado">
+      <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+        <OverlayChromaKey {...chromaKeyProps} />
+        {state.gameState === 'setup' && (
+          <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-4">
+            <Skull size={48} className="text-red-400 mx-auto mb-2" />
+            <p className="text-white text-2xl font-bold">Ahorcado</p>
+            <p className="text-zinc-400">Preparando...</p>
           </div>
+        )}
 
-          <div className="bg-gradient-to-r from-purple-500/80 to-pink-500/80 backdrop-blur rounded-2xl p-6 text-center">
-            <p className="text-white text-3xl font-mono tracking-[0.3em] mb-2">
-              {state.displayWord}
+        {state.gameState === 'playing' && (
+          <div className="w-full max-w-xl space-y-4">
+            <div className="bg-black/60 backdrop-blur rounded-xl p-4">
+              {renderHangman()}
+              <div className="flex justify-center gap-1 mt-2">
+                {[...Array(state.maxErrors)].map((_, i) => (
+                  <Heart
+                    key={i}
+                    size={24}
+                    className={i < state.maxErrors - state.errors ? 'text-red-500 fill-red-500' : 'text-zinc-600'}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-purple-500/80 to-pink-500/80 backdrop-blur rounded-2xl p-6 text-center">
+              <p className="text-white text-3xl font-mono tracking-[0.3em] mb-2">
+                {state.displayWord}
+              </p>
+              {state.hint && (
+                <p className="text-zinc-200 text-sm">💡 {state.hint}</p>
+              )}
+            </div>
+
+            <div className="bg-black/60 backdrop-blur rounded-xl p-3">
+              <p className="text-zinc-400 text-xs mb-2">Letras usadas:</p>
+              <div className="flex flex-wrap gap-1 justify-center">
+                {state.guessedLetters?.map((letter: string) => (
+                  <span key={letter} className="w-8 h-8 flex items-center justify-center rounded bg-zinc-700 text-white font-bold">
+                    {letter.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-center text-zinc-300 bg-black/40 rounded-lg px-4 py-2">
+              <span className="text-yellow-400">!letra X</span> para adivinar
             </p>
-            {state.hint && (
-              <p className="text-zinc-200 text-sm">💡 {state.hint}</p>
+          </div>
+        )}
+
+        {(state.gameState === 'won' || state.gameState === 'lost') && (
+          <div className={`text-center backdrop-blur rounded-2xl p-8 ${state.gameState === 'won' ? 'bg-green-500/80' : 'bg-red-500/80'}`}>
+            {state.gameState === 'won' ? (
+              <>
+                <Trophy size={64} className="text-yellow-300 mx-auto mb-4" />
+                <p className="text-white text-2xl font-bold">¡El chat ganó!</p>
+              </>
+            ) : (
+              <>
+                <Skull size={64} className="text-white mx-auto mb-4" />
+                <p className="text-white text-2xl font-bold">¡El chat perdió!</p>
+              </>
             )}
+            <p className="text-white text-xl mt-4">
+              La palabra era: <span className="font-bold text-yellow-300">{state.secretWord}</span>
+            </p>
           </div>
-
-          <div className="bg-black/60 backdrop-blur rounded-xl p-3">
-            <p className="text-zinc-400 text-xs mb-2">Letras usadas:</p>
-            <div className="flex flex-wrap gap-1 justify-center">
-              {state.guessedLetters?.map((letter: string) => (
-                <span key={letter} className="w-8 h-8 flex items-center justify-center rounded bg-zinc-700 text-white font-bold">
-                  {letter.toUpperCase()}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-center text-zinc-300 bg-black/40 rounded-lg px-4 py-2">
-            <span className="text-yellow-400">!letra X</span> para adivinar
-          </p>
-        </div>
-      )}
-
-      {(state.gameState === 'won' || state.gameState === 'lost') && (
-        <div className={`text-center backdrop-blur rounded-2xl p-8 ${state.gameState === 'won' ? 'bg-green-500/80' : 'bg-red-500/80'}`}>
-          {state.gameState === 'won' ? (
-            <>
-              <Trophy size={64} className="text-yellow-300 mx-auto mb-4" />
-              <p className="text-white text-2xl font-bold">¡El chat ganó!</p>
-            </>
-          ) : (
-            <>
-              <Skull size={64} className="text-white mx-auto mb-4" />
-              <p className="text-white text-2xl font-bold">¡El chat perdió!</p>
-            </>
-          )}
-          <p className="text-white text-xl mt-4">
-            La palabra era: <span className="font-bold text-yellow-300">{state.secretWord}</span>
-          </p>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </GameOverlayWrapper>
   );
 };
 

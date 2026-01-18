@@ -9,6 +9,8 @@ import { ChatSettingsPopover } from './ui/ChatSettingsPopover';
 import { useActivityConfig } from '../hooks/useActivityConfig';
 import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
 import { useLastPlayedGame } from '../hooks/useLastPlayedGame';
+import { ErrorBoundary } from '../src/presentation/components/shared/ErrorBoundary';
+import { GameErrorFallback } from '../src/presentation/components/shared/GameErrorFallback';
 
 // Lazy loaded game components
 const LazyGames = {
@@ -100,6 +102,8 @@ interface GameLoaderProps {
 
 const GameLoader: React.FC<GameLoaderProps> = ({ gameId, chatMessages, isConnected, authToken, mainChannel }) => {
   const GameComponent = LazyGames[gameId];
+  const gameInfo = GAMES.find(g => g.id === gameId);
+  const gameName = gameInfo?.name || 'Unknown Game';
   
   if (!GameComponent) {
     return <div className="p-4 text-center text-zinc-500">Juego no encontrado</div>;
@@ -108,21 +112,43 @@ const GameLoader: React.FC<GameLoaderProps> = ({ gameId, chatMessages, isConnect
   // Special handling for carrera which needs extra props
   if (gameId === 'carrera') {
     return (
-      <Suspense fallback={<GameLoadingSpinner />}>
-        <GameComponent 
-          chatMessages={chatMessages} 
-          isConnected={isConnected} 
-          authToken={authToken}
-          channelName={mainChannel}
-        />
-      </Suspense>
+      <ErrorBoundary 
+        feature={`game-${gameId}`}
+        fallback={
+          <GameErrorFallback
+            error={new Error(`Error loading ${gameName}`)}
+            gameName={gameName}
+            onReset={() => window.location.reload()}
+          />
+        }
+      >
+        <Suspense fallback={<GameLoadingSpinner />}>
+          <GameComponent 
+            chatMessages={chatMessages} 
+            isConnected={isConnected} 
+            authToken={authToken}
+            channelName={mainChannel}
+          />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <Suspense fallback={<GameLoadingSpinner />}>
-      <GameComponent chatMessages={chatMessages} isConnected={isConnected} />
-    </Suspense>
+    <ErrorBoundary 
+      feature={`game-${gameId}`}
+      fallback={
+        <GameErrorFallback
+          error={new Error(`Error loading ${gameName}`)}
+          gameName={gameName}
+          onReset={() => window.location.reload()}
+        />
+      }
+    >
+      <Suspense fallback={<GameLoadingSpinner />}>
+        <GameComponent chatMessages={chatMessages} isConnected={isConnected} />
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
@@ -183,125 +209,136 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
   };
 
   const content = (
-    <div className={`${isEmbedded ? 'h-full' : ''} flex flex-col`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl">
-            <Gamepad2 className="text-white" size={20} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              {t.games?.title || 'Stream Games'}
-            </h2>
-            <p className="text-xs text-zinc-500">
-              {t.games?.subtitle || 'Interactive games for your stream'}
-            </p>
-          </div>
-        </div>
-        {!isEmbedded && onClose && (
-          <button
-            onClick={onClose}
-            className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        )}
-        {/* Chat & Sound Settings */}
-        <ChatSettingsPopover
-          config={chatConfig.config}
-          onConfigChange={chatConfig.updateConfig}
-          activityType="game"
+    <ErrorBoundary 
+      feature="games"
+      fallback={
+        <GameErrorFallback
+          error={new Error('Error loading games')}
+          gameName="Games"
+          onReset={() => window.location.reload()}
         />
-        <SoundSettingsPopover
-          config={sound.config}
-          onConfigChange={sound.setConfig}
-          onTestSound={() => sound.play('winner')}
-          showVoteOption={false}
-          showMilestoneOption={false}
-        />
-      </div>
-
-      {/* Category Selector + Game Tabs */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0">
-        <div className="flex items-center gap-2 p-2">
-          {/* Category Dropdown */}
-          <div className="relative">
+      }
+    >
+      <div className={`${isEmbedded ? 'h-full' : ''} flex flex-col`}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl">
+              <Gamepad2 className="text-white" size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                {t.games?.title || 'Stream Games'}
+              </h2>
+              <p className="text-xs text-zinc-500">
+                {t.games?.subtitle || 'Interactive games for your stream'}
+              </p>
+            </div>
+          </div>
+          {!isEmbedded && onClose && (
             <button
-              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r ${currentCategory.color} text-white transition-all hover:opacity-90`}
+              onClick={onClose}
+              className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
             >
-              {currentCategory.icon}
-              <span className="hidden sm:inline">{currentCategory.name}</span>
-              <ChevronDown size={14} className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+              <X size={20} />
             </button>
-            
-            {showCategoryDropdown && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowCategoryDropdown(false)}
-                />
-                <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-20 min-w-[180px]">
-                  {CATEGORIES.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleSelectCategory(cat.id)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
-                        activeCategory === cat.id 
-                          ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white' 
-                          : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/50'
-                      }`}
-                    >
-                      <span className={`p-1 rounded bg-gradient-to-r ${cat.color} text-white`}>
-                        {cat.icon}
-                      </span>
-                      {cat.name}
-                      <span className="ml-auto text-xs text-zinc-400">
-                        {GAMES.filter(g => g.category === cat.id).length}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          )}
+          {/* Chat & Sound Settings */}
+          <ChatSettingsPopover
+            config={chatConfig.config}
+            onConfigChange={chatConfig.updateConfig}
+            activityType="game"
+          />
+          <SoundSettingsPopover
+            config={sound.config}
+            onConfigChange={sound.setConfig}
+            onTestSound={() => sound.play('winner')}
+            showVoteOption={false}
+            showMilestoneOption={false}
+          />
+        </div>
 
-          {/* Game Tabs for current category */}
-          <div className="flex-1 flex gap-1 overflow-x-auto">
-            {sortedGamesInCategory.map((game) => (
+        {/* Category Selector + Game Tabs */}
+        <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0">
+          <div className="flex items-center gap-2 p-2">
+            {/* Category Dropdown */}
+            <div className="relative">
               <button
-                key={game.id}
-                onClick={() => handleSelectGame(game.id)}
-                className={`flex items-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${
-                  activeGame === game.id
-                    ? 'bg-white dark:bg-zinc-800 text-twitch-brand shadow-sm'
-                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/50'
-                }`}
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-r ${currentCategory.color} text-white transition-all hover:opacity-90`}
               >
-                {game.icon}
-                <span>{game.name}</span>
-                {isLastPlayed(game.id) && activeGame !== game.id && (
-                  <Clock size={10} className="text-amber-500" title="Último jugado" />
-                )}
-                <span className="text-[9px] opacity-50 hidden sm:inline">{game.cmd}</span>
+                {currentCategory.icon}
+                <span className="hidden sm:inline">{currentCategory.name}</span>
+                <ChevronDown size={14} className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
               </button>
-            ))}
+              
+              {showCategoryDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowCategoryDropdown(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden z-20 min-w-[180px]">
+                    {CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleSelectCategory(cat.id)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                          activeCategory === cat.id 
+                            ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white' 
+                            : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700/50'
+                        }`}
+                      >
+                        <span className={`p-1 rounded bg-gradient-to-r ${cat.color} text-white`}>
+                          {cat.icon}
+                        </span>
+                        {cat.name}
+                        <span className="ml-auto text-xs text-zinc-400">
+                          {GAMES.filter(g => g.category === cat.id).length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Game Tabs for current category */}
+            <div className="flex-1 flex gap-1 overflow-x-auto">
+              {sortedGamesInCategory.map((game) => (
+                <button
+                  key={game.id}
+                  onClick={() => handleSelectGame(game.id)}
+                  className={`flex items-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${
+                    activeGame === game.id
+                      ? 'bg-white dark:bg-zinc-800 text-twitch-brand shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-white/50 dark:hover:bg-zinc-800/50'
+                  }`}
+                >
+                  {game.icon}
+                  <span>{game.name}</span>
+                  {isLastPlayed(game.id) && activeGame !== game.id && (
+                    <Clock size={10} className="text-amber-500" title="Último jugado" />
+                  )}
+                  <span className="text-[9px] opacity-50 hidden sm:inline">{game.cmd}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Game Content - Now using lazy loading */}
-      <div className="flex-1 overflow-y-auto">
-        <GameLoader 
-          gameId={activeGame} 
-          chatMessages={chatMessages} 
-          isConnected={isConnected}
-          authToken={authToken}
-          mainChannel={mainChannel}
-        />
+        {/* Game Content - Now using lazy loading */}
+        <div className="flex-1 overflow-y-auto">
+          <GameLoader 
+            gameId={activeGame} 
+            chatMessages={chatMessages} 
+            isConnected={isConnected}
+            authToken={authToken}
+            mainChannel={mainChannel}
+          />
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 
   if (isEmbedded) {

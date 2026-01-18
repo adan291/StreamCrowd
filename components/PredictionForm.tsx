@@ -16,6 +16,8 @@ import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
 import type { PredictionFormData, ValidationResult } from '../types/twitch';
 import { PREDICTION_CONSTRAINTS } from '../types/twitch';
+import { PredictionFormSchema } from '../src/domain/schemas/formSchemas';
+import { safeValidateInput } from '../src/domain/schemas/securitySchemas';
 
 // ============================================
 // Types
@@ -134,7 +136,8 @@ export const PredictionForm: React.FC<PredictionFormProps> = ({
   }, [outcomes]);
 
   /**
-   * Handle form submission
+   * Handle form submission with Zod validation
+   * @requirements 5.1, 5.2 - Validate with Zod before submission
    */
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,15 +148,22 @@ export const PredictionForm: React.FC<PredictionFormProps> = ({
       duration,
     };
     
-    const validation = validatePredictionForm(formData);
+    // Validate with Zod schema
+    const result = safeValidateInput(PredictionFormSchema, formData);
     
-    if (!validation.valid) {
-      setValidationErrors(validation.errors);
+    if (!result.success) {
+      // Extract user-friendly error messages from Zod errors
+      const errors = result.errors.issues.map((issue) => {
+        const field = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${field}${issue.message}`;
+      });
+      setValidationErrors(errors);
       return;
     }
     
+    // Clear errors and submit validated data
     setValidationErrors([]);
-    await onSubmit(formData);
+    await onSubmit(result.data);
   }, [title, outcomes, duration, onSubmit]);
 
   /**

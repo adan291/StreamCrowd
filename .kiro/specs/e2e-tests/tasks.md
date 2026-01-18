@@ -6,6 +6,7 @@
 - [x] 1.3 Crear `tests/e2e/global-setup.ts`
 - [x] 1.4 Configurar reporters (HTML, JSON, JUnit)
 - [x] 1.5 Añadir scripts en package.json
+- [ ] 1.6 Instalar browsers de Playwright (`npx playwright install`)
 - **Validates**: Requirement 1.1-1.5
 
 ## Task 2: Crear fixtures y data factories
@@ -121,17 +122,32 @@
 - [x] 17.3 Configurar reportes
 - **Validates**: Requirement 1.5
 
+## Task 18: Validación y refinamiento de tests existentes
+- [ ] 18.1 Ejecutar tests existentes y identificar fallos
+- [ ] 18.2 Refinar selectores en tests de polls
+- [ ] 18.3 Mejorar robustez de tests de UI
+- [ ] 18.4 Validar cobertura de flujos críticos
+- [ ] 18.5 Documentar casos edge conocidos
+- **Validates**: Requirement 1 (Cobertura y mantenibilidad)
+
 ---
 
 ## Resumen
 
 | Categoría | Tareas | Subtareas |
 |-----------|--------|-----------|
-| Setup | 2 | 8 |
+| Setup | 2 | 9 |
 | Page Objects | 2 | 9 |
 | Mocks | 1 | 3 |
 | Test Specs | 11 | 40 |
 | CI/CD | 1 | 3 |
-| **Total** | **17** | **63** |
+| Validación | 1 | 5 |
+| **Total** | **18** | **69** |
 
 **Estimación**: 3-4 semanas
+
+**Estado Actual**: 
+- ✅ Configuración base completada
+- ✅ Tests implementados 
+- ❌ Browsers de Playwright no instalados
+- 🔄 Necesita validación y refinamiento

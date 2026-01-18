@@ -99,14 +99,14 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-400">
-          {t.timers.groupsDescription}
+          {t.misc.timers.groupsDescription}
         </p>
         <button
           onClick={openCreateForm}
           className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg transition-colors"
         >
           <Plus size={16} />
-          {t.timers.createGroup}
+          {t.misc.timers.createGroup}
         </button>
       </div>
 
@@ -115,7 +115,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-medium text-white">
-              {editingGroup ? t.timers.editGroup : t.timers.createGroup}
+              {editingGroup ? t.misc.timers.editGroup : t.misc.timers.createGroup}
             </h4>
             <button
               onClick={closeForm}
@@ -127,12 +127,12 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-zinc-300 mb-1">{t.timers.groupName}</label>
+              <label className="block text-sm text-zinc-300 mb-1">{t.misc.timers.groupName}</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={t.timers.timerNamePlaceholder}
+                placeholder={t.misc.timers.timerNamePlaceholder}
                 maxLength={30}
                 className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 autoFocus
@@ -140,7 +140,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm text-zinc-300 mb-2">{t.timers.groupColor}</label>
+              <label className="block text-sm text-zinc-300 mb-2">{t.misc.timers.groupColor}</label>
               <div className="flex flex-wrap gap-2">
                 {GROUP_COLORS.map(c => (
                   <button
@@ -163,14 +163,14 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
                 onClick={closeForm}
                 className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
               >
-                {t.timers.cancel}
+                {t.misc.timers.cancel}
               </button>
               <button
                 type="submit"
                 disabled={!name.trim()}
                 className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors"
               >
-                {t.timers.save}
+                {t.misc.timers.save}
               </button>
             </div>
           </form>
@@ -186,13 +186,13 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
               <FolderOpen size={16} className="text-zinc-400" />
             </div>
             <div>
-              <span className="font-medium text-white">{t.timers.generalGroup}</span>
+              <span className="font-medium text-white">{t.misc.timers.generalGroup}</span>
               <span className="text-xs text-zinc-500 ml-2">
-                {interpolate(t.timers.groupTimerCount, { count: ungroupedCount })}
+                {interpolate(t.misc.timers.groupTimerCount, { count: ungroupedCount })}
               </span>
             </div>
           </div>
-          <span className="text-xs text-zinc-500">{t.timers.timerNoGroup}</span>
+          <span className="text-xs text-zinc-500">{t.misc.timers.timerNoGroup}</span>
         </div>
 
         {/* Custom groups */}
@@ -214,7 +214,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
                 }`}
                 role="switch"
                 aria-checked={group.enabled}
-                aria-label={t.timers.toggleGroup}
+                aria-label={t.misc.timers.toggleGroup}
               >
                 <span
                   className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
@@ -231,7 +231,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
               <div>
                 <span className="font-medium text-white">{group.name}</span>
                 <span className="text-xs text-zinc-500 ml-2">
-                  {interpolate(t.timers.groupTimerCount, { count: getTimerCount(group.id) })}
+                  {interpolate(t.misc.timers.groupTimerCount, { count: getTimerCount(group.id) })}
                 </span>
               </div>
             </div>
@@ -241,7 +241,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
               <button
                 onClick={() => openEditForm(group)}
                 className="p-1.5 text-zinc-400 hover:text-white transition-colors rounded"
-                aria-label={t.timers.edit}
+                aria-label={t.misc.timers.edit}
               >
                 <Pencil size={14} />
               </button>
@@ -252,7 +252,7 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
                     ? 'text-red-400 bg-red-500/10'
                     : 'text-zinc-400 hover:text-red-400'
                 }`}
-                aria-label={deleteConfirm === group.id ? t.timers.deleteGroupConfirm : t.timers.delete}
+                aria-label={deleteConfirm === group.id ? t.misc.timers.deleteGroupConfirm : t.misc.timers.delete}
               >
                 <Trash2 size={14} />
               </button>
@@ -264,8 +264,8 @@ export const TimerGroups: React.FC<TimerGroupsProps> = ({
         {groups.length === 0 && (
           <div className="text-center py-8 text-zinc-500">
             <FolderOpen size={32} className="mx-auto mb-2 opacity-50" />
-            <p className="text-sm">{t.timers.noGroups}</p>
-            <p className="text-xs">{t.timers.noGroupsDescription}</p>
+            <p className="text-sm">{t.misc.timers.noGroups}</p>
+            <p className="text-xs">{t.misc.timers.noGroupsDescription}</p>
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface Ball {
   id: string;
@@ -35,6 +36,8 @@ const SOURCE_WIDTH = 700;
 const SOURCE_HEIGHT = 380;
 
 export const PiumOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [scores, setScores] = useState<[string, number][]>([]);
   
@@ -406,21 +409,23 @@ export const PiumOverlay: React.FC = () => {
   const activeBalls = ballsRef.current.filter(b => !b.pocketed).length;
 
   return (
-    <div className="w-screen h-screen overflow-hidden" style={{ backgroundColor: bgColor }}>
-      <OverlayChromaKey {...chromaKeyProps} />
-      
-      <canvas ref={canvasRef} className="w-full h-full" />
-      
-      {activeBalls === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-black/70 backdrop-blur-sm rounded-xl px-8 py-5 text-center">
-            <p className="text-white text-xl font-bold">🎱 Billar Chat</p>
-            <p className="text-white/70 mt-2">Escribe en el chat para ser una bola</p>
-            <p className="text-yellow-400 text-sm mt-1">!pium para disparar</p>
+    <GameOverlayWrapper gameName="Billar" gameId="pium">
+      <div className="w-screen h-screen overflow-hidden" style={{ backgroundColor: bgColor }}>
+        <OverlayChromaKey {...chromaKeyProps} />
+        
+        <canvas ref={canvasRef} className="w-full h-full" />
+        
+        {activeBalls === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-black/70 backdrop-blur-sm rounded-xl px-8 py-5 text-center">
+              <p className="text-white text-xl font-bold">🎱 Billar Chat</p>
+              <p className="text-white/70 mt-2">Escribe en el chat para ser una bola</p>
+              <p className="text-yellow-400 text-sm mt-1">!pium para disparar</p>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </GameOverlayWrapper>
   );
 };
 

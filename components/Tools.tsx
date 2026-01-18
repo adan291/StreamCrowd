@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { X, Wrench, Keyboard, ChevronRight, Globe, Sun, Moon, Check, RotateCcw, GraduationCap, Bell, Eye } from 'lucide-react';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationConfigPanel } from './NotificationConfigPanel';
-import { useI18n, Locale } from '../i18n';
+import { Locale } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
+import { useTheme } from '../src/application/hooks/useTheme';
 
 interface ToolsProps {
   onClose: () => void;
-  theme: 'light' | 'dark';
-  onToggleTheme: () => void;
   /** Callback to restart the onboarding tutorial */
   onRestartTutorial?: () => void;
   /** AI Vision mascot visibility */
@@ -23,8 +23,10 @@ const languages: { code: Locale; name: string; flag: string }[] = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
 ];
 
-export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onRestartTutorial, showAIVision, onToggleAIVision }) => {
+export const Tools: React.FC<ToolsProps> = ({ onClose, onRestartTutorial, showAIVision, onToggleAIVision }) => {
   const { t, locale, setLocale } = useI18n();
+  const { theme, toggleTheme } = useTheme();
+  const { isLoaded: overlayModuleLoaded, isLoading: overlayModuleLoading } = useTranslationModule('overlay');
   const currentLang = languages.find((l) => l.code === locale);
   const [activeSection, setActiveSection] = useState<ToolSection>('main');
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
@@ -138,7 +140,7 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => theme === 'dark' && onToggleTheme()}
+                onClick={() => theme === 'dark' && toggleTheme()}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg transition-all ${
                   theme === 'light'
                     ? 'bg-yellow-500 text-white'
@@ -146,11 +148,13 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
                 }`}
               >
                 <Sun size={18} />
-                <span className="font-medium text-sm">{t.overlay.light}</span>
+                <span className="font-medium text-sm">
+                  {overlayModuleLoaded ? t.overlay?.light : 'Claro'}
+                </span>
                 {theme === 'light' && <Check size={16} />}
               </button>
               <button
-                onClick={() => theme === 'light' && onToggleTheme()}
+                onClick={() => theme === 'light' && toggleTheme()}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg transition-all ${
                   theme === 'dark'
                     ? 'bg-indigo-500 text-white'
@@ -158,7 +162,9 @@ export const Tools: React.FC<ToolsProps> = ({ onClose, theme, onToggleTheme, onR
                 }`}
               >
                 <Moon size={18} />
-                <span className="font-medium text-sm">{t.overlay.dark}</span>
+                <span className="font-medium text-sm">
+                  {overlayModuleLoaded ? t.overlay?.dark : 'Oscuro'}
+                </span>
                 {theme === 'dark' && <Check size={16} />}
               </button>
             </div>

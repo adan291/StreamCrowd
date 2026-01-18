@@ -93,6 +93,19 @@ export type {
   ErrorCode,
 } from './errorHandling';
 
+// Retry logic utilities
+export {
+  DEFAULT_RETRY_OPTIONS,
+  calculateBackoffDelay,
+  withRetry as withRetryLogic,
+  useRetry,
+} from './retryLogic';
+
+export type {
+  RetryOptions,
+  UseRetryState,
+} from './retryLogic';
+
 // Encryption utilities
 export {
   encryptSensitiveData,

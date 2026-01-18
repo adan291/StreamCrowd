@@ -665,7 +665,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
             />
           ))}
         </div>
-        <p className="text-xs text-zinc-400 mb-2 font-bold">{t.spinner.winnerTextColor}</p>
+        <p className="text-xs text-zinc-400 mb-2 font-bold">{t.misc.spinner.winnerTextColor}</p>
         <div className="flex gap-1 mb-3">
           {OVERLAY_TEXT_COLORS.map((color) => (
             <button 

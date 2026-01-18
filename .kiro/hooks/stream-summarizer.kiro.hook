@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Stream Summarizer",
+  "description": "Procesa estadísticas del stream al final de la sesión para crear resúmenes automáticos",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Crea un resumen del stream basado en estas estadísticas y devuelve JSON: { \"summary\": \"resumen del stream\", \"tweet\": \"tweet sugerido\", \"highlights\": [\"momento1\", \"momento2\"], \"stats\": { \"followers\": número, \"engagement\": porcentaje } }. Estadísticas: {input}"
+  }
+}

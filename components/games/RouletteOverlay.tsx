@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface Bet {
   visitorId: string;
@@ -19,6 +20,8 @@ const ROULETTE_NUMBERS = [
 const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
 
 export const RouletteOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, setBgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [result, setResult] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
@@ -179,54 +182,56 @@ export const RouletteOverlay: React.FC = () => {
   const size = wheelSize === 'large' ? 450 : 350;
 
   return (
-    <div 
-      className="min-h-screen w-full flex flex-col items-center justify-center p-4" 
-      style={{ backgroundColor: bgColor }}
-    >
-      <OverlayChromaKey {...chromaKeyProps} />
+    <GameOverlayWrapper gameName="Ruleta" gameId="roulette">
+      <div 
+        className="min-h-screen w-full flex flex-col items-center justify-center p-4" 
+        style={{ backgroundColor: bgColor }}
+      >
+        <OverlayChromaKey {...chromaKeyProps} />
 
-      {/* Roulette Wheel */}
-      <div className="relative">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
-          <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[30px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
-        </div>
-        <canvas
-          ref={canvasRef}
-          width={size}
-          height={size}
-          className="drop-shadow-2xl"
-        />
-      </div>
-
-      {/* Result */}
-      {showResult && result !== null && (
-        <div className="mt-6 animate-bounce">
-          <div
-            className="inline-block px-10 py-5 rounded-2xl shadow-2xl"
-            style={{ backgroundColor: getNumberColor(result) }}
-          >
-            <span className="text-white font-bold text-4xl">{result}</span>
+        {/* Roulette Wheel */}
+        <div className="relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
+            <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[30px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" />
           </div>
-          {winners.length > 0 && (
-            <div className="mt-3 bg-green-500/80 rounded-xl px-6 py-3 text-center">
-              <p className="text-white font-bold">🎉 ¡{winners.length} ganador(es)!</p>
-              <p className="text-white/90 text-sm">
-                {winners.map(w => w.username).join(', ')}
-              </p>
-            </div>
-          )}
+          <canvas
+            ref={canvasRef}
+            width={size}
+            height={size}
+            className="drop-shadow-2xl"
+          />
         </div>
-      )}
 
-      {!showResult && !isSpinningRef.current && (
-        <div className="mt-6 bg-black/50 rounded-xl px-6 py-3 text-center">
-          <p className="text-white/70">Esperando giro...</p>
-          {bets.length > 0 && (
-            <p className="text-white/50 text-sm">{bets.length} apuestas registradas</p>
-          )}
-        </div>
-      )}
-    </div>
+        {/* Result */}
+        {showResult && result !== null && (
+          <div className="mt-6 animate-bounce">
+            <div
+              className="inline-block px-10 py-5 rounded-2xl shadow-2xl"
+              style={{ backgroundColor: getNumberColor(result) }}
+            >
+              <span className="text-white font-bold text-4xl">{result}</span>
+            </div>
+            {winners.length > 0 && (
+              <div className="mt-3 bg-green-500/80 rounded-xl px-6 py-3 text-center">
+                <p className="text-white font-bold">🎉 ¡{winners.length} ganador(es)!</p>
+                <p className="text-white/90 text-sm">
+                  {winners.map(w => w.username).join(', ')}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!showResult && !isSpinningRef.current && (
+          <div className="mt-6 bg-black/50 rounded-xl px-6 py-3 text-center">
+            <p className="text-white/70">Esperando giro...</p>
+            {bets.length > 0 && (
+              <p className="text-white/50 text-sm">{bets.length} apuestas registradas</p>
+            )}
+          </div>
+        )}
+      </div>
+    </GameOverlayWrapper>
   );
 };
 

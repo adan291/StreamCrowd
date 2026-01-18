@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Roadmap Orchestrator",
+  "description": "Analyzes project status files and suggests prioritized technical tasks for the next coding session, focusing on pending items and missing minigames",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Actúa como Roadmap Orchestrator. Antes de responder a la consulta del usuario:\n\n1. Lee y analiza `RESUMEN_ESTADO_ACTUAL.md` para entender el estado actual del proyecto\n2. Revisa `DASHBOARD_PROGRESO.md` para identificar tareas marcadas como \"Pendiente\"\n3. Consulta el README.md para verificar el progreso de los \"+13 minijuegos\" mencionados\n4. Identifica hooks que falten para completar funcionalidades\n\nLuego proporciona:\n- Una lista de 3-5 tareas técnicas priorizadas para la siguiente sesión\n- Justificación breve de por qué cada tarea es prioritaria\n- Estimación de complejidad (Baja/Media/Alta)\n\nDespués de esta análisis, procede a responder la consulta original del usuario."
+  }
+}

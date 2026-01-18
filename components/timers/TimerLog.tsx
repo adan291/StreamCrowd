@@ -71,10 +71,10 @@ export const TimerLog: React.FC<TimerLogProps> = ({
           <Clock size={32} className="text-zinc-600" />
         </div>
         <h3 className="text-lg font-medium text-white mb-2">
-          {t.timers.noLogEntries}
+          {t.misc.timers.noLogEntries}
         </h3>
         <p className="text-sm text-zinc-400 max-w-xs">
-          {t.timers.logDescription}
+          {t.misc.timers.logDescription}
         </p>
       </div>
     );
@@ -85,14 +85,14 @@ export const TimerLog: React.FC<TimerLogProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-400">
-          {t.timers.logDescription} ({log.length})
+          {t.misc.timers.logDescription} ({log.length})
         </p>
         <button
           onClick={onClear}
           className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-red-400 transition-colors"
         >
           <Trash2 size={12} />
-          {t.timers.clearLog}
+          {t.misc.timers.clearLog}
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export const TimerLog: React.FC<TimerLogProps> = ({
                 
                 {entry.error && (
                   <p className="text-xs text-red-400 ml-6 mt-1">
-                    {t.timers.logError}: {entry.error}
+                    {t.misc.timers.logError}: {entry.error}
                   </p>
                 )}
               </div>

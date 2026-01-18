@@ -34,7 +34,8 @@ export { useOverlaySync, useOverlayReceiver } from './useOverlaySync';
 export type { 
   UseOverlaySyncOptions, 
   UseOverlaySyncReturn,
-  OverlaySyncMessage,
+  OverlayStateData,
+  FeatureFlags
 } from './useOverlaySync';
 
 export { useHistoryManager } from './useHistoryManager';
@@ -225,3 +226,66 @@ export type {
   AnalyticsSession,
   PollSummary,
 } from '../src/application/hooks/useAnalyticsService';
+
+// ==================== AI Integration Hooks ====================
+export { useKiroBridge } from './useKiroBridge';
+export type { 
+  UseKiroBridgeReturn,
+  KiroRequest,
+  KiroResponse,
+} from './useKiroBridge';
+
+export { useVoiceSynthesis } from './useVoiceSynthesis';
+export type { 
+  UseVoiceSynthesisReturn,
+  VoiceConfig,
+} from './useVoiceSynthesis';
+
+export { useLocalModerator } from './useLocalModerator';
+export type { 
+  UseLocalModeratorReturn,
+  ChatMessage,
+  ModerationResult,
+} from './useLocalModerator';
+
+export { useThemeOrchestrator } from './useThemeOrchestrator';
+export type { 
+  UseThemeOrchestratorReturn,
+  ThemeConfig,
+  MoodType,
+} from './useThemeOrchestrator';
+
+// ==================== Self-Sustained AI Hooks ====================
+export { useOfflineAI } from './useOfflineAI';
+export type {
+  ChatAnalysisResult,
+  GameNarrationResult,
+  ClipSuggestionResult,
+  StreamSummaryResult,
+} from './useOfflineAI';
+
+export { useSmartModerator } from './useSmartModerator';
+export type {
+  ModerationRule,
+  UserBehavior,
+} from './useSmartModerator';
+
+export { useAdvancedOverlaySync } from './useAdvancedOverlaySync';
+export type {
+  UseAdvancedOverlaySyncReturn,
+  SyncOptions,
+} from './useAdvancedOverlaySync';
+
+export { useIntelligentVoice } from './useIntelligentVoice';
+export type {
+  UseIntelligentVoiceReturn,
+  VoicePersonality,
+  SpeechRequest,
+} from './useIntelligentVoice';
+
+export { usePerformanceOptimizer } from './usePerformanceOptimizer';
+export type {
+  UsePerformanceOptimizerReturn,
+  PerformanceMetrics,
+  OptimizationSettings,
+} from './usePerformanceOptimizer';

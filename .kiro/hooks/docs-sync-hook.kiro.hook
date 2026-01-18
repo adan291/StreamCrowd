@@ -1,0 +1,33 @@
+{
+  "enabled": true,
+  "name": "Auto Documentation Sync",
+  "description": "Monitors TypeScript source files, React components, configuration files, and other key project files. When changes are detected, automatically asks the agent to review and update relevant documentation in README.md or the /docs folder to keep documentation synchronized with code changes.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "*.ts",
+      "*.tsx",
+      "*.js",
+      "*.jsx",
+      "*.json",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "firebase.json",
+      "vercel.json",
+      "eslint.config.js",
+      "playwright.config.ts",
+      "src/**/*",
+      "components/**/*",
+      "hooks/**/*",
+      "types/**/*",
+      "config/**/*",
+      "i18n/**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file has been modified. Please review the changes and update the relevant documentation in either README.md or the appropriate files in the /docs folder. Focus on updating API documentation, feature descriptions, configuration guides, or architectural notes that may be affected by these code changes. Ensure the documentation accurately reflects the current implementation."
+  }
+}

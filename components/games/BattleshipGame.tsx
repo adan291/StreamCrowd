@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Ship, Target, Trophy, ExternalLink, Crosshair } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Ship {
@@ -48,6 +48,9 @@ const SHIPS_CONFIG = [
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
 export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+  
   const [gameState, setGameState] = useState<'setup' | 'playing' | 'finished'>('setup');
   const [grid, setGrid] = useState<Cell[][]>(() => createEmptyGrid());
   const [ships, setShips] = useState<Ship[]>([]);
@@ -76,7 +79,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
     return () => channelRef.current?.close();
   }, []);
 
-  const syncToOverlay = useCallback(() => {
+  const syncToOverlay = useCallback(async () => {
     const state = {
       type: 'battleship_state',
       gameState,
@@ -91,9 +94,32 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
     try {
       localStorage.setItem(STORAGE_KEY_BATTLESHIP, JSON.stringify(state));
     } catch { /* ignore */ }
-    // Sync to Firebase for OBS Browser Source
-    gameSync.update('battleship', state).catch(() => {});
-  }, [gameState, grid, ships, shots, lastShot, shipsRemaining, leaderboard]);
+    
+    // Use hexagonal architecture game sync
+    try {
+      await publishGameState({
+        gameType: 'battleship',
+        isActive: gameState === 'playing',
+        players: Array.from(leaderboard.entries()).map(([id, player]) => ({
+          id,
+          username: player.username,
+          score: player.hits,
+          isActive: true,
+          joinedAt: Date.now() - shots.filter(s => s.username === player.username).length * 1000,
+        })),
+        currentRound: shots.length,
+        settings: {
+          gameState,
+          shipsRemaining,
+          gridSize: GRID_SIZE,
+        },
+        lastUpdate: Date.now(),
+        ...state, // Include all original data for backward compatibility
+      });
+    } catch (error) {
+      console.warn('Failed to sync game state:', error);
+    }
+  }, [gameState, grid, ships, shots, lastShot, shipsRemaining, leaderboard, publishGameState]);
 
   useEffect(() => {
     syncToOverlay();

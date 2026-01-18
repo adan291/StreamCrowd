@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Firebase Schema Manager",
+  "description": "Validates Firestore schemas and suggests security rules when Firebase-related files are modified",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "types.ts",
+      "types/*.ts",
+      "firebase-rules.json",
+      "src/infrastructure/sync/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Act as Firebase Schema Manager: 1) Define Zod schemas for each Firestore collection (polls, games, overlays, state) ensuring field names match types.ts definitions, 2) Validate existing Firebase sync code against type definitions, 3) Suggest security rules for firebase-rules.json based on the data models and access patterns, 4) Check for any schema inconsistencies between TypeScript types and Firestore usage. Focus on maintaining data integrity and proper validation for the overlay synchronization system."
+  }
+}

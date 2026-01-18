@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Chat Brain Analyzer",
+  "description": "Analiza mensajes del chat buscando picos de emoción, preguntas frecuentes o toxicidad y devuelve acciones recomendadas",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analiza estos mensajes de chat y devuelve un JSON con: { \"action\": \"alert|hype|moderate|question\", \"mood\": \"hype|calm|toxic|confused\", \"response\": \"texto de respuesta sugerida\", \"confidence\": 0.0-1.0 }. Mensajes: {input}"
+  }
+}

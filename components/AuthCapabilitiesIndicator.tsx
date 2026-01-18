@@ -22,7 +22,7 @@ import {
   TrendingUp,
   Gift
 } from 'lucide-react';
-import { useAuth, AuthCapabilities, AuthMode } from '../src/application/hooks/useAuth';
+import { useAuth as useTwitchAuth, AuthCapabilities, AuthMode } from '../src/application/hooks/useTwitchAuth';
 import { openTwitchOAuthPopup } from '../src/infrastructure/auth/TwitchOAuth';
 import { getTwitchService } from '../src/application/services/TwitchService';
 
@@ -114,7 +114,7 @@ export const AuthCapabilitiesIndicator: React.FC<AuthCapabilitiesIndicatorProps>
   className = '',
   onReconnect,
 }) => {
-  const { mode, capabilities, isAuthenticated, authState, setOAuthAuth } = useAuth();
+  const { mode, capabilities, isAuthenticated, authState, setOAuthAuth } = useTwitchAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isReauthenticating, setIsReauthenticating] = useState(false);
   

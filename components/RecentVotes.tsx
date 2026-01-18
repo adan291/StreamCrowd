@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { VoteRecord } from '../types';
 import { Activity } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 
 interface RecentVotesProps {
   votes: VoteRecord[];
@@ -10,6 +10,10 @@ interface RecentVotesProps {
 
 export const RecentVotes: React.FC<RecentVotesProps> = ({ votes, options }) => {
   const { t } = useI18n();
+  
+  // Load poll module for lazy loading
+  useTranslationModule('poll');
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const prevVotesLength = useRef(votes.length);
 

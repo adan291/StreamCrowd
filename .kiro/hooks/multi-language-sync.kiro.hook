@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Multi-language Sync",
+  "description": "Automatically generates translation keys in Spanish and English JSON files when new UI components are created, maintaining the friendly and professional tone defined in the AI Mascot personality",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "components/**/*.tsx",
+      "src/**/*.tsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new UI component has been created. Please:\n\n1. Analyze the component for user-facing text that needs translation\n2. Generate appropriate translation keys following the existing i18n structure\n3. Add the keys to both `i18n/locales/es/*.ts` and `i18n/locales/en/*.ts` files\n4. Ensure translations maintain the friendly and professional tone defined in the AI Mascot personality\n5. Follow the existing naming conventions and organization patterns in the translation files\n6. Validate that all new keys are properly typed in the i18n system\n\nFocus on text that users will see: labels, buttons, messages, tooltips, and error messages. Skip internal/technical strings that don't need translation."
+  }
+}

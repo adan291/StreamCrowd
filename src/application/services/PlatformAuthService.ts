@@ -4,17 +4,21 @@
  * This service manages OAuth authentication for Twitch, YouTube, and Kick platforms.
  * It handles:
  * - OAuth flow initiation (popup-based)
+ * - PKCE flow for Twitch (secure authorization code flow)
  * - Callback handling without page reload
  * - Token validation and refresh
  * - Credential storage via TokenStorage
  * 
  * @module src/application/services/PlatformAuthService
+ * @requirements 2.3, 2.4, 2.6 - PKCE OAuth flow for Twitch
  * @requirements 3.1, 3.2, 3.3, 4.3, 4.4, 4.5, 4.6 - Authentication without page reload
  */
 
 import type { Platform } from '../../../types/platform';
 import { TokenStorage, type PlatformCredentials } from './TokenStorage';
 import { GiveawayFirebaseService } from '../../infrastructure/firebase/GiveawayFirebaseService';
+import { PkceFlow, type PkceChallenge } from '../../infrastructure/auth/PkceFlow';
+import { TwitchAdapter } from '../../infrastructure/adapters/TwitchAdapter';
 
 // ============================================
 // Types
@@ -122,7 +126,8 @@ const OAUTH_ENDPOINTS: Record<Platform, { authorize: string; token: string; vali
 
 class PlatformAuthServiceImpl {
   private authCallbacks = new Map<Platform, Set<AuthCallback>>();
-  private pendingAuth: { platform: Platform; popup: Window | null; state: string } | null = null;
+  private pendingAuth: { platform: Platform; popup: Window | null; state: string; pkceChallenge?: PkceChallenge } | null = null;
+  private pkceFlows = new Map<string, PkceFlow>(); // Store PKCE flows by state
   private initialized = false;
 
   constructor() {
@@ -270,6 +275,9 @@ class PlatformAuthServiceImpl {
   /**
    * Initiate OAuth flow for a platform
    * Opens a popup window for authentication
+   * Uses PKCE for Twitch (authorization code flow)
+   * 
+   * **Validates: Requirements 2.1, 2.2, 2.3**
    */
   async initiateAuth(platform: Platform): Promise<void> {
     await this.initialize();
@@ -277,7 +285,23 @@ class PlatformAuthServiceImpl {
     // Generate state for CSRF protection
     const state = this.generateState();
     const redirectUri = this.getRedirectUri(platform);
-    const authUrl = PlatformAuthServiceImpl.buildAuthUrl(platform, state, redirectUri);
+    
+    let authUrl: string;
+    let pkceChallenge: PkceChallenge | undefined;
+    
+    // Use PKCE for Twitch
+    if (platform === 'twitch') {
+      const pkceFlow = new PkceFlow();
+      pkceChallenge = await pkceFlow.generateChallenge();
+      
+      // Store the PKCE flow for later token exchange
+      this.pkceFlows.set(state, pkceFlow);
+      
+      authUrl = TwitchAdapter.buildAuthUrl(state, redirectUri, pkceChallenge);
+      console.log('[PlatformAuthService] Initiating Twitch OAuth with PKCE');
+    } else {
+      authUrl = PlatformAuthServiceImpl.buildAuthUrl(platform, state, redirectUri);
+    }
 
     // Open popup
     const popup = window.open(
@@ -288,17 +312,21 @@ class PlatformAuthServiceImpl {
 
     if (!popup) {
       console.error('[PlatformAuthService] Popup blocked');
+      // Clean up PKCE flow if popup was blocked
+      this.pkceFlows.delete(state);
       this.notifyAuthChange(platform, null);
       return;
     }
 
-    this.pendingAuth = { platform, popup, state };
+    this.pendingAuth = { platform, popup, state, pkceChallenge };
 
     // Poll for popup close (fallback if message doesn't arrive)
     const pollTimer = setInterval(() => {
       if (popup.closed) {
         clearInterval(pollTimer);
         if (this.pendingAuth?.platform === platform) {
+          // Clean up PKCE flow if popup was closed without completing
+          this.pkceFlows.delete(state);
           this.pendingAuth = null;
         }
       }
@@ -307,6 +335,9 @@ class PlatformAuthServiceImpl {
 
   /**
    * Handle OAuth callback from popup or redirect
+   * Supports both implicit flow (token) and authorization code flow with PKCE
+   * 
+   * **Validates: Requirements 2.3, 2.4**
    */
   async handleAuthCallback(platform: Platform, params: URLSearchParams): Promise<AuthResult> {
     await this.initialize();
@@ -319,10 +350,18 @@ class PlatformAuthServiceImpl {
       return { success: false, error: errorDescription };
     }
 
-    // Get access token (implicit flow)
+    const state = params.get('state');
+    
+    // Check for authorization code (PKCE flow for Twitch)
+    const code = params.get('code');
+    if (code && platform === 'twitch' && state) {
+      return this.handlePkceCallback(platform, code, state);
+    }
+
+    // Get access token (implicit flow for other platforms)
     const accessToken = params.get('access_token');
     if (!accessToken) {
-      return { success: false, error: 'No access token received' };
+      return { success: false, error: 'No access token or authorization code received' };
     }
 
     // Get additional token info
@@ -358,6 +397,69 @@ class PlatformAuthServiceImpl {
     } catch (err) {
       console.error(`[PlatformAuthService] Error processing auth for ${platform}:`, err);
       return { success: false, error: 'Failed to process authentication' };
+    }
+  }
+  
+  /**
+   * Handle PKCE authorization code callback for Twitch
+   * Exchanges the authorization code for tokens using the stored code verifier
+   * 
+   * **Validates: Requirements 2.3, 2.4**
+   */
+  private async handlePkceCallback(platform: Platform, code: string, state: string): Promise<AuthResult> {
+    // Get the PKCE flow for this state
+    const pkceFlow = this.pkceFlows.get(state);
+    if (!pkceFlow) {
+      console.error('[PlatformAuthService] No PKCE flow found for state:', state);
+      return { success: false, error: 'PKCE verification failed - no matching flow found' };
+    }
+    
+    try {
+      const codeVerifier = pkceFlow.getCodeVerifier();
+      const redirectUri = this.getRedirectUri(platform);
+      
+      // Exchange authorization code for tokens
+      const tokenResponse = await TwitchAdapter.exchangeCodeForTokens(code, codeVerifier, redirectUri);
+      
+      // Clean up PKCE flow
+      this.pkceFlows.delete(state);
+      pkceFlow.clear();
+      
+      if (!tokenResponse) {
+        return { success: false, error: 'Failed to exchange authorization code for tokens' };
+      }
+      
+      // Fetch user info with the new access token
+      const userInfo = await this.fetchUserInfo(platform, tokenResponse.accessToken);
+      if (!userInfo) {
+        return { success: false, error: 'Failed to fetch user info' };
+      }
+      
+      const credentials: PlatformCredentials = {
+        platform,
+        accessToken: tokenResponse.accessToken,
+        refreshToken: tokenResponse.refreshToken,
+        expiresAt: Date.now() + tokenResponse.expiresIn * 1000,
+        username: userInfo.username,
+        userId: userInfo.userId,
+        scopes: tokenResponse.scope,
+      };
+      
+      // Store credentials
+      await TokenStorage.store(platform, credentials);
+      
+      // Notify listeners
+      this.notifyAuthChange(platform, credentials);
+      
+      console.log(`[PlatformAuthService] PKCE auth successful for ${platform}:`, userInfo.username);
+      return { success: true, credentials };
+    } catch (err) {
+      // Clean up PKCE flow on error
+      this.pkceFlows.delete(state);
+      pkceFlow.clear();
+      
+      console.error(`[PlatformAuthService] Error in PKCE callback for ${platform}:`, err);
+      return { success: false, error: 'Failed to complete PKCE authentication' };
     }
   }
 
@@ -538,7 +640,16 @@ class PlatformAuthServiceImpl {
       return;
     }
 
-    const { type, platform, params } = event.data || {};
+    const data = event.data || {};
+    
+    // Handle new Twitch PKCE callback format
+    if (data.type === 'twitch_oauth_callback') {
+      this.handleTwitchOAuthCallback(data);
+      return;
+    }
+    
+    // Handle legacy oauth_callback format
+    const { type, platform, params } = data;
     if (type !== 'oauth_callback' || !platform || !params) {
       return;
     }
@@ -562,6 +673,62 @@ class PlatformAuthServiceImpl {
 
     // Process callback
     this.handleAuthCallback(platform as Platform, urlParams);
+  }
+  
+  /**
+   * Handle Twitch OAuth callback (supports both PKCE and implicit flow)
+   * 
+   * **Validates: Requirements 2.3, 2.4**
+   */
+  private handleTwitchOAuthCallback(data: {
+    type: string;
+    code?: string;
+    accessToken?: string;
+    state?: string;
+    error?: string;
+    errorDescription?: string;
+    isPkce?: boolean;
+  }): void {
+    // Verify we have a pending Twitch auth
+    if (this.pendingAuth?.platform !== 'twitch') {
+      console.warn('[PlatformAuthService] Received Twitch callback but no pending Twitch auth');
+      return;
+    }
+    
+    // Verify state matches
+    if (data.state !== this.pendingAuth.state) {
+      console.warn('[PlatformAuthService] State mismatch in Twitch OAuth callback');
+      return;
+    }
+    
+    // Close popup
+    this.pendingAuth.popup?.close();
+    const pendingState = this.pendingAuth.state;
+    this.pendingAuth = null;
+    
+    // Handle errors
+    if (data.error) {
+      console.error('[PlatformAuthService] Twitch OAuth error:', data.errorDescription || data.error);
+      this.notifyAuthChange('twitch', null);
+      // Clean up PKCE flow
+      this.pkceFlows.delete(pendingState);
+      return;
+    }
+    
+    // Build URL params for handleAuthCallback
+    const params = new URLSearchParams();
+    params.set('state', data.state || '');
+    
+    if (data.code) {
+      // PKCE flow - authorization code
+      params.set('code', data.code);
+    } else if (data.accessToken) {
+      // Implicit flow - access token (legacy)
+      params.set('access_token', data.accessToken);
+    }
+    
+    // Process callback
+    this.handleAuthCallback('twitch', params);
   }
 
   private async fetchUserInfo(platform: Platform, accessToken: string): Promise<{ username: string; userId: string } | null> {

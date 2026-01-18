@@ -215,6 +215,46 @@ Añade `&channel=TU_CANAL` para conexión automática.
 
 ---
 
+## 🔍 Linting
+
+StreamCrowd uses ESLint with circular import detection to maintain code quality and prevent dependency cycles.
+
+### Available Commands
+
+```bash
+npm run lint              # Run ESLint on all files
+npm run lint:fix          # Auto-fix linting issues
+npm run lint:check-cycles # Check specifically for circular imports
+```
+
+### Circular Import Detection
+
+The project is configured with `eslint-plugin-import` to detect and prevent circular dependencies:
+
+- **`import/no-cycle`**: Detects circular imports with unlimited depth
+- **`import/no-self-import`**: Prevents files from importing themselves
+
+These rules help maintain a clean dependency graph and prevent runtime issues caused by circular dependencies.
+
+### Configuration
+
+ESLint configuration is in `eslint.config.js` (ESLint 9 flat config format). Key settings:
+
+```javascript
+{
+  plugins: {
+    import: importPlugin,
+  },
+  rules: {
+    // Circular import detection - CRITICAL for architecture
+    'import/no-cycle': ['error', { maxDepth: Infinity, ignoreExternal: true }],
+    'import/no-self-import': 'error',
+  }
+}
+```
+
+---
+
 ## 🧪 Testing
 
 ```bash

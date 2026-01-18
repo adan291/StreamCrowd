@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Architecture & Clean Code Validator",
+  "description": "Validates that file changes adhere to hexagonal architecture rules, prevent circular imports, and maintain TypeScript strict mode compliance",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "components/**/*.tsx",
+      "hooks/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the edited file for architecture compliance:\n\n1. **Layer Validation**: Ensure Domain layer (src/domain/) has NO imports from Application or Infrastructure layers\n2. **Circular Imports**: Check for any circular import patterns that violate the dependency rules\n3. **TypeScript Strict**: Verify no usage of 'any' type and strict TypeScript compliance\n4. **Hexagonal Architecture**: Confirm proper separation between:\n   - Domain (pure business logic)\n   - Application (services and orchestration) \n   - Infrastructure (external integrations)\n   - Components (presentation layer)\n5. **Import Patterns**: Validate that imports follow the correct dependency flow: Presentation → Application → Domain ← Infrastructure\n\nProvide a code review report indicating:\n- ✅ Architecture compliance status\n- ⚠️ Any violations found with specific line references\n- 💡 Suggestions for fixes if violations exist\n- 📋 Summary of adherence to ARCHITECTURE.md principles\n\nFocus on maintaining the hexagonal architecture integrity and preventing technical debt."
+  }
+}

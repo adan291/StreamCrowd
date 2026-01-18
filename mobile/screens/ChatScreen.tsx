@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { MobileAppState, MobileMessage, MobileChatMessage } from '../../types/mobile';
+import { sanitizationService } from '../../src/infrastructure/security/SanitizationService';
+import { logService } from '../../src/infrastructure/logging/LogService';
 
 /**
  * ChatScreen - Moderator chat view and messaging
@@ -136,6 +138,24 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  /**
+   * Sanitize chat message and log malicious content attempts
+   * Requirements: 6.1, 6.4, 6.6
+   */
+  const sanitizedMessage = React.useMemo(() => {
+    // Check for malicious content before sanitization
+    if (sanitizationService.isMalicious(message.message)) {
+      logService.warn('Malicious content detected in mobile chat message', {
+        username: message.displayName,
+        message: message.message.substring(0, 100), // Log first 100 chars only
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Sanitize the message (removes all HTML tags and escapes special characters)
+    return sanitizationService.sanitizeChatMessage(message.message);
+  }, [message.message, message.displayName]);
+
   return (
     <div className="flex gap-2">
       {/* Badges */}
@@ -159,7 +179,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({ message }) => {
           </span>
           <span className="text-xs text-zinc-600">{formatTime(message.timestamp)}</span>
         </div>
-        <p className="text-zinc-300 text-sm break-words">{message.message}</p>
+        <p className="text-zinc-300 text-sm break-words">{sanitizedMessage}</p>
       </div>
     </div>
   );

@@ -33,6 +33,8 @@ import { useActivitySound } from '../hooks/useActivitySound';
 import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
 import type { TwitchPoll } from '../src/application/services/TwitchPollService';
 import type { NotificationType } from './Notification';
+import { PollFormSchema } from '../src/domain/schemas/formSchemas';
+import { safeValidateInput } from '../src/domain/schemas/securitySchemas';
 
 // ============================================
 // Types
@@ -69,6 +71,7 @@ const PollForm: React.FC<PollFormProps> = ({ onSubmit, isLoading, disabled }) =>
   const [title, setTitle] = useState('');
   const [choices, setChoices] = useState(['', '']);
   const [duration, setDuration] = useState(60);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const handleAddChoice = () => {
     if (choices.length < 5) {
@@ -92,13 +95,28 @@ const PollForm: React.FC<PollFormProps> = ({ onSubmit, isLoading, disabled }) =>
     e.preventDefault();
     
     const validChoices = choices.filter(c => c.trim());
-    if (!title.trim() || validChoices.length < 2) return;
-
-    await onSubmit({
+    const formData = {
       title: title.trim(),
       choices: validChoices,
       duration,
-    });
+    };
+
+    // Validate with Zod schema
+    const result = safeValidateInput(PollFormSchema, formData);
+    
+    if (!result.success) {
+      // Extract user-friendly error messages from Zod errors
+      const errors = result.errors.issues.map((issue) => {
+        const field = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${field}${issue.message}`;
+      });
+      setValidationErrors(errors);
+      return;
+    }
+
+    // Clear errors and submit validated data
+    setValidationErrors([]);
+    await onSubmit(result.data);
 
     // Reset form
     setTitle('');
@@ -110,6 +128,20 @@ const PollForm: React.FC<PollFormProps> = ({ onSubmit, isLoading, disabled }) =>
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+          <div className="flex items-start gap-2 text-red-500 dark:text-red-400">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <div className="text-sm space-y-1">
+              {validationErrors.map((error, i) => (
+                <p key={i}>{error}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Title */}
       <div>
         <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">

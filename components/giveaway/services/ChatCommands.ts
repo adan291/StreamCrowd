@@ -3,7 +3,7 @@
  * Handles chat commands for giveaway system
  */
 
-import type { GiveawayThread } from '../types';
+import type { GiveawayThread } from '../types/index';
 
 // ============================================
 // TYPES

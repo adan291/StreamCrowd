@@ -8,6 +8,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Info, Clock, MessageSquare, Hash, FolderOpen } from 'lucide-react';
 import type { Timer, TimerGroup, TimerFormData } from '../../types/timers';
 import { useI18n } from '../../i18n';
+import { TimerFormSchema } from '../../src/domain/schemas/formSchemas';
+import { safeValidateInput } from '../../src/domain/schemas/securitySchemas';
 
 interface TimerFormProps {
   timer?: Timer;
@@ -35,13 +37,13 @@ export const TimerForm: React.FC<TimerFormProps> = ({
   const isEditing = !!timer;
 
   const VARIABLES = [
-    { name: '$(channel)', description: t.timers.variables.channel },
-    { name: '$(game)', description: t.timers.variables.game },
-    { name: '$(uptime)', description: t.timers.variables.uptime },
-    { name: '$(viewers)', description: t.timers.variables.viewers },
-    { name: '$(followers)', description: t.timers.variables.followers },
-    { name: '$(date)', description: t.timers.variables.date },
-    { name: '$(time)', description: t.timers.variables.time },
+    { name: '$(channel)', description: t.misc.timers.variables.channel },
+    { name: '$(game)', description: t.misc.timers.variables.game },
+    { name: '$(uptime)', description: t.misc.timers.variables.uptime },
+    { name: '$(viewers)', description: t.misc.timers.variables.viewers },
+    { name: '$(followers)', description: t.misc.timers.variables.followers },
+    { name: '$(date)', description: t.misc.timers.variables.date },
+    { name: '$(time)', description: t.misc.timers.variables.time },
   ];
 
   // Validate form
@@ -49,36 +51,60 @@ export const TimerForm: React.FC<TimerFormProps> = ({
     const newErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      newErrors.name = t.timers.nameRequired;
+      newErrors.name = t.misc.timers.nameRequired;
     }
 
     if (!message.trim()) {
-      newErrors.message = t.timers.messageRequired;
+      newErrors.message = t.misc.timers.messageRequired;
     }
 
     if (intervalMinutes < 1) {
-      newErrors.interval = t.timers.intervalMin;
+      newErrors.interval = t.misc.timers.intervalMin;
     } else if (intervalMinutes > 120) {
-      newErrors.interval = t.timers.intervalMax;
+      newErrors.interval = t.misc.timers.intervalMax;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle submit
+  // Handle submit with Zod validation
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validate()) return;
-
-    onSave({
+    // Prepare form data
+    const formData = {
       name: name.trim(),
       message: message.trim(),
+      interval: intervalMinutes * 60, // Convert to seconds for schema
+      enabled,
+    };
+
+    // Validate with Zod schema
+    const result = safeValidateInput(TimerFormSchema, formData);
+    
+    if (!result.success) {
+      // Extract errors by field
+      const newErrors: Record<string, string> = {};
+      result.errors.issues.forEach((issue) => {
+        const field = issue.path[0]?.toString();
+        if (field) {
+          newErrors[field] = issue.message;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
+
+    // Clear errors and save with validated data
+    setErrors({});
+    onSave({
+      name: result.data.name,
+      message: result.data.message,
       intervalMinutes,
       minChatLines,
       groupId,
-      enabled
+      enabled: result.data.enabled
     });
   };
 
@@ -91,7 +117,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-white">
-          {isEditing ? t.timers.editTimer : t.timers.createTimer}
+          {isEditing ? t.misc.timers.editTimer : t.misc.timers.createTimer}
         </h3>
         <button
           onClick={onCancel}
@@ -107,13 +133,13 @@ export const TimerForm: React.FC<TimerFormProps> = ({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
             <Hash size={14} />
-            {t.timers.timerName}
+            {t.misc.timers.timerName}
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={t.timers.timerNamePlaceholder}
+            placeholder={t.misc.timers.timerNamePlaceholder}
             maxLength={50}
             className={`w-full px-3 py-2 bg-zinc-800 border rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
               errors.name ? 'border-red-500' : 'border-zinc-700'
@@ -131,7 +157,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
           <div className="flex items-center justify-between mb-1">
             <label className="flex items-center gap-2 text-sm font-medium text-zinc-300">
               <MessageSquare size={14} />
-              {t.timers.timerMessage}
+              {t.misc.timers.timerMessage}
             </label>
             <button
               type="button"
@@ -139,13 +165,13 @@ export const TimerForm: React.FC<TimerFormProps> = ({
               className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300"
             >
               <Info size={12} />
-              {t.timers.variablesTitle}
+              {t.misc.timers.variablesTitle}
             </button>
           </div>
           
           {showVariables && (
             <div className="mb-2 p-2 bg-zinc-800/50 rounded-lg border border-zinc-700">
-              <p className="text-xs text-zinc-400 mb-2">{t.timers.variablesHelp}</p>
+              <p className="text-xs text-zinc-400 mb-2">{t.misc.timers.variablesHelp}</p>
               <div className="flex flex-wrap gap-1">
                 {VARIABLES.map(v => (
                   <button
@@ -165,7 +191,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={t.timers.timerMessagePlaceholder}
+            placeholder={t.misc.timers.timerMessagePlaceholder}
             maxLength={500}
             rows={3}
             className={`w-full px-3 py-2 bg-zinc-800 border rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none ${
@@ -188,7 +214,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
             <Clock size={14} />
-            {t.timers.timerInterval}
+            {t.misc.timers.timerInterval}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -217,7 +243,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
             <MessageSquare size={14} />
-            {t.timers.timerMinLines}
+            {t.misc.timers.timerMinLines}
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -238,7 +264,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
             />
           </div>
           <p className="text-xs text-zinc-500 mt-1">
-            {t.timers.timerMinLinesHelp}
+            {t.misc.timers.timerMinLinesHelp}
           </p>
         </div>
 
@@ -246,14 +272,14 @@ export const TimerForm: React.FC<TimerFormProps> = ({
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
             <FolderOpen size={14} />
-            {t.timers.timerGroup}
+            {t.misc.timers.timerGroup}
           </label>
           <select
             value={groupId || ''}
             onChange={(e) => setGroupId(e.target.value || null)}
             className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
-            <option value="">{t.timers.timerNoGroup}</option>
+            <option value="">{t.misc.timers.timerNoGroup}</option>
             {groups.map(group => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -264,7 +290,7 @@ export const TimerForm: React.FC<TimerFormProps> = ({
 
         {/* Enabled */}
         <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
-          <span className="text-sm text-zinc-300">{t.timers.timerEnabled}</span>
+          <span className="text-sm text-zinc-300">{t.misc.timers.timerEnabled}</span>
           <button
             type="button"
             onClick={() => setEnabled(!enabled)}
@@ -289,13 +315,13 @@ export const TimerForm: React.FC<TimerFormProps> = ({
             onClick={onCancel}
             className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
           >
-            {t.timers.cancel}
+            {t.misc.timers.cancel}
           </button>
           <button
             type="submit"
             className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors font-medium"
           >
-            {t.timers.save}
+            {t.misc.timers.save}
           </button>
         </div>
       </form>

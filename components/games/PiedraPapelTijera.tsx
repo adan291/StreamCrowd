@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Swords, Timer } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {
@@ -25,6 +25,9 @@ const CHOICES = ['piedra', 'papel', 'tijera'] as const;
 const EMOJIS = { piedra: '🪨', papel: '📄', tijera: '✂️' };
 
 export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [gameState, setGameState] = useState<'waiting' | 'choosing' | 'reveal' | 'finished'>('waiting');
   const [players, setPlayers] = useState<Map<string, Player>>(new Map());
   const [round, setRound] = useState(1);

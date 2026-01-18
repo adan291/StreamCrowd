@@ -40,13 +40,13 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
   const processFile = (file: File) => {
     // 1. Validate Type
     if (!file.type.startsWith('image/')) {
-        onNotification('error', t.gallery.uploadHint);
+        onNotification('error', t.misc.gallery.uploadHint);
         return;
     }
 
     // 2. Validate Size
     if (file.size > MAX_FILE_SIZE) {
-        onNotification('error', t.gallery.maxSize);
+        onNotification('error', t.misc.gallery.maxSize);
         return;
     }
     
@@ -169,7 +169,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Grid size={16} className="text-twitch-brand dark:text-twitch-light" />
-                    <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">{t.gallery.title}</span>
+                    <span className="text-xs sm:text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase tracking-wider">{t.misc.gallery.title}</span>
                 </div>
                 <div className="flex gap-1.5 sm:gap-2">
                      <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-1.5 text-zinc-500 hover:text-black dark:hover:text-white rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="Cambiar Vista">
@@ -181,7 +181,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                         className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-2 sm:px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 sm:gap-2 transition-colors border border-zinc-300 dark:border-zinc-700 shadow-sm"
                     >
                         {isProcessing ? <Loader2 size={14} className="animate-spin"/> : <Upload size={14} />}
-                        <span className="hidden xs:inline">{t.gallery.upload}</span>
+                        <span className="hidden xs:inline">{t.misc.gallery.upload}</span>
                     </button>
                 </div>
             </div>
@@ -267,8 +267,8 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ assets, onAdd, onDel
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3">
                     <ImageIcon size={48} className="opacity-20" />
                     <p className="text-xs text-center max-w-[200px] leading-relaxed">
-                        {t.gallery.dragDrop}<br/>
-                        <span className="opacity-70">{t.gallery.uploadHint}</span>
+                        {t.misc.gallery.dragDrop}<br/>
+                        <span className="opacity-70">{t.misc.gallery.uploadHint}</span>
                     </p>
                 </div>
             ) : filteredAssets.length === 0 ? (

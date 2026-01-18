@@ -8,9 +8,11 @@
  * 
  * @requirements 2.3 - THE TwitchAdapter SHALL implement `IStreamEventProvider` to emit stream events
  * @requirements 4.1 - THE TwitchAdapter SHALL handle connection, disconnection, and reconnection with exponential backoff
+ * @requirements 2.3, 2.4, 2.6 - THE TwitchAdapter SHALL use PKCE flow for OAuth authentication
  */
 
 import tmi from 'tmi.js';
+import { PkceFlow, type PkceChallenge } from '../auth/PkceFlow';
 import type { 
   IChatProvider, 
   IMultiChannelProvider,
@@ -868,22 +870,95 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   }
   
   /**
-   * Build the Twitch OAuth authorization URL
+   * Build the Twitch OAuth authorization URL with PKCE support
    * @param state - CSRF protection state string
    * @param redirectUri - OAuth redirect URI (must match Twitch Dev Console)
+   * @param pkceChallenge - Optional PKCE challenge for secure authorization code flow
    * @returns Authorization URL
+   * 
+   * **Validates: Requirements 2.2, 2.3**
    */
-  static buildAuthUrl(state: string, redirectUri: string): string {
+  static buildAuthUrl(state: string, redirectUri: string, pkceChallenge?: PkceChallenge): string {
     const params = new URLSearchParams({
       client_id: TWITCH_CLIENT_ID,
       redirect_uri: redirectUri,
-      response_type: 'token',
+      response_type: pkceChallenge ? 'code' : 'token', // Use code flow with PKCE, token flow without
       scope: TwitchAdapter.getRequiredScopes().join(' '),
       state: state,
       force_verify: 'false',
     });
     
+    // Add PKCE parameters if provided
+    if (pkceChallenge) {
+      params.set('code_challenge', pkceChallenge.codeChallenge);
+      params.set('code_challenge_method', pkceChallenge.codeChallengeMethod);
+    }
+    
     return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;
+  }
+  
+  /**
+   * Exchange authorization code for tokens using PKCE
+   * @param code - Authorization code from OAuth callback
+   * @param codeVerifier - PKCE code verifier used to generate the challenge
+   * @param redirectUri - OAuth redirect URI (must match the one used in authorization request)
+   * @returns Token response or null if exchange failed
+   * 
+   * **Validates: Requirements 2.3, 2.4**
+   */
+  static async exchangeCodeForTokens(
+    code: string,
+    codeVerifier: string,
+    redirectUri: string
+  ): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresIn: number;
+    tokenType: string;
+    scope: string[];
+  } | null> {
+    try {
+      const response = await fetch('https://id.twitch.tv/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: TWITCH_CLIENT_ID,
+          code: code,
+          code_verifier: codeVerifier,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[TwitchAdapter] Token exchange failed:', response.status, errorData);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      return {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresIn: data.expires_in,
+        tokenType: data.token_type,
+        scope: data.scope || [],
+      };
+    } catch (error) {
+      console.error('[TwitchAdapter] Error exchanging code for tokens:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Create a new PKCE flow instance for OAuth authentication
+   * @returns PkceFlow instance
+   */
+  static createPkceFlow(): PkceFlow {
+    return new PkceFlow();
   }
   
   /**

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Cell, ResponsiveContainer, LabelList } fro
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { pollSync } from '../src/infrastructure/sync/FirebaseSync';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
+import { ErrorBoundary } from '../src/presentation/components/shared/ErrorBoundary';
 
 interface PollOption {
   id: number;
@@ -156,17 +157,19 @@ export const PollOverlay: React.FC = () => {
   // No poll active and no winner to show
   if ((!question || options.length === 0) && !showWinner) {
     return (
-      <div 
-        className="w-screen h-screen flex items-center justify-center"
-        style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
-      >
-        <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
-        <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-6">
-          <div className="text-5xl mb-4">📊</div>
-          <p className="text-white text-xl font-bold">Esperando encuesta...</p>
-          <p className="text-zinc-400 text-sm mt-2">Crea una encuesta en el panel principal</p>
+      <ErrorBoundary feature="poll-overlay">
+        <div 
+          className="w-screen h-screen flex items-center justify-center"
+          style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
+        >
+          <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
+          <div className="text-center bg-black/60 backdrop-blur rounded-xl px-8 py-6">
+            <div className="text-5xl mb-4">📊</div>
+            <p className="text-white text-xl font-bold">Esperando encuesta...</p>
+            <p className="text-zinc-400 text-sm mt-2">Crea una encuesta en el panel principal</p>
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
     );
   }
 
@@ -177,125 +180,127 @@ export const PollOverlay: React.FC = () => {
     const confettiColors = ['#facc15', '#a855f7', '#22c55e', '#3b82f6', '#ef4444', '#f97316'];
     
     return (
-      <div 
-        className="w-screen h-screen flex items-center justify-center p-8 overflow-hidden"
-        style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
-      >
-        <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
-        
-        {/* Confetti animation */}
-        <style>{`
-          @keyframes confetti-fall {
-            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(var(--rotation)); opacity: 0; }
-          }
-          @keyframes winner-pulse {
-            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px ${winner.color}80); }
-            50% { transform: scale(1.05); filter: drop-shadow(0 0 40px ${winner.color}); }
-          }
-          @keyframes trophy-bounce {
-            0%, 100% { transform: translateY(0) rotate(-5deg); }
-            25% { transform: translateY(-20px) rotate(5deg); }
-            50% { transform: translateY(0) rotate(-5deg); }
-            75% { transform: translateY(-10px) rotate(5deg); }
-          }
-          @keyframes sparkle {
-            0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
-            50% { opacity: 1; transform: scale(1) rotate(180deg); }
-          }
-          .confetti-particle {
-            position: fixed;
-            top: -20px;
-            left: var(--x);
-            width: 10px;
-            height: 10px;
-            animation: confetti-fall var(--duration) ease-in-out var(--delay) infinite;
-          }
-          .winner-card {
-            animation: winner-pulse 2s ease-in-out infinite;
-          }
-          .trophy-icon {
-            animation: trophy-bounce 1.5s ease-in-out infinite;
-          }
-          .sparkle {
-            animation: sparkle 1.5s ease-in-out infinite;
-          }
-        `}</style>
-        
-        {/* Confetti particles */}
-        <div className="fixed inset-0 pointer-events-none z-0">
-          {Array.from({ length: 50 }).map((_, i) => (
-            <Confetti key={i} color={confettiColors[i % confettiColors.length]} />
-          ))}
+      <ErrorBoundary feature="poll-overlay">
+        <div 
+          className="w-screen h-screen flex items-center justify-center p-8 overflow-hidden"
+          style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
+        >
+          <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
+          
+          {/* Confetti animation */}
+          <style>{`
+            @keyframes confetti-fall {
+              0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+              100% { transform: translateY(100vh) rotate(var(--rotation)); opacity: 0; }
+            }
+            @keyframes winner-pulse {
+              0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px ${winner.color}80); }
+              50% { transform: scale(1.05); filter: drop-shadow(0 0 40px ${winner.color}); }
+            }
+            @keyframes trophy-bounce {
+              0%, 100% { transform: translateY(0) rotate(-5deg); }
+              25% { transform: translateY(-20px) rotate(5deg); }
+              50% { transform: translateY(0) rotate(-5deg); }
+              75% { transform: translateY(-10px) rotate(5deg); }
+            }
+            @keyframes sparkle {
+              0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+              50% { opacity: 1; transform: scale(1) rotate(180deg); }
+            }
+            .confetti-particle {
+              position: fixed;
+              top: -20px;
+              left: var(--x);
+              width: 10px;
+              height: 10px;
+              animation: confetti-fall var(--duration) ease-in-out var(--delay) infinite;
+            }
+            .winner-card {
+              animation: winner-pulse 2s ease-in-out infinite;
+            }
+            .trophy-icon {
+              animation: trophy-bounce 1.5s ease-in-out infinite;
+            }
+            .sparkle {
+              animation: sparkle 1.5s ease-in-out infinite;
+            }
+          `}</style>
+          
+          {/* Confetti particles */}
+          <div className="fixed inset-0 pointer-events-none z-0">
+            {Array.from({ length: 50 }).map((_, i) => (
+              <Confetti key={i} color={confettiColors[i % confettiColors.length]} />
+            ))}
+          </div>
+          
+          <div className="text-center relative z-10">
+            {/* Trophy with animation */}
+            <div className="trophy-icon inline-block mb-6">
+              <div className="relative">
+                <Trophy className="text-yellow-400 w-24 h-24 mx-auto" />
+                <Sparkles className="sparkle absolute -top-2 -right-2 text-yellow-300 w-8 h-8" style={{ animationDelay: '0s' }} />
+                <Sparkles className="sparkle absolute -bottom-2 -left-2 text-yellow-300 w-6 h-6" style={{ animationDelay: '0.5s' }} />
+                <Sparkles className="sparkle absolute top-1/2 -right-4 text-yellow-300 w-5 h-5" style={{ animationDelay: '1s' }} />
+              </div>
+            </div>
+            
+            {/* Winner announcement */}
+            <p className="text-yellow-400 text-3xl font-black mb-4 tracking-wider">
+              🎉 ¡GANADOR! 🎉
+            </p>
+            
+            {/* Question */}
+            <p className="text-zinc-400 text-lg mb-4">{winnerQuestion}</p>
+            
+            {/* Winner card */}
+            <div 
+              className="winner-card inline-block text-5xl font-black mb-6 px-12 py-6 rounded-3xl border-4"
+              style={{ 
+                backgroundColor: winner.color + '30',
+                borderColor: winner.color,
+                color: winner.color,
+                textShadow: `0 0 30px ${winner.color}80`
+              }}
+            >
+              {winner.label}
+            </div>
+            
+            {/* Stats */}
+            <div className="flex items-center justify-center gap-6 text-white text-2xl bg-black/60 backdrop-blur rounded-2xl px-8 py-4">
+              <div className="flex items-center gap-2">
+                <span className="text-4xl font-black" style={{ color: winner.color }}>{winner.votes}</span>
+                <span className="text-zinc-400">votos</span>
+              </div>
+              <div className="w-px h-8 bg-zinc-600" />
+              <div className="flex items-center gap-2">
+                <span className="text-4xl font-black text-yellow-400">{winnerPercentage}%</span>
+                <span className="text-zinc-400">del total</span>
+              </div>
+            </div>
+            
+            {/* All results */}
+            <div className="mt-6 flex justify-center gap-3 flex-wrap">
+              {winnerOptions
+                .slice()
+                .sort((a, b) => b.votes - a.votes)
+                .map((opt, idx) => {
+                  const pct = winnerTotalVotes > 0 ? Math.round((opt.votes / winnerTotalVotes) * 100) : 0;
+                  const isWinner = opt.id === winner.id;
+                  return (
+                    <div 
+                      key={opt.id}
+                      className={`px-4 py-2 rounded-xl border ${isWinner ? 'border-yellow-400 bg-yellow-400/20' : 'border-zinc-700 bg-black/50'}`}
+                    >
+                      <span className="font-bold mr-2" style={{ color: opt.color }}>+{opt.id + 1}</span>
+                      <span className="text-white">{opt.label}</span>
+                      <span className="text-zinc-400 ml-2">({opt.votes} - {pct}%)</span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
         </div>
-        
-        <div className="text-center relative z-10">
-          {/* Trophy with animation */}
-          <div className="trophy-icon inline-block mb-6">
-            <div className="relative">
-              <Trophy className="text-yellow-400 w-24 h-24 mx-auto" />
-              <Sparkles className="sparkle absolute -top-2 -right-2 text-yellow-300 w-8 h-8" style={{ animationDelay: '0s' }} />
-              <Sparkles className="sparkle absolute -bottom-2 -left-2 text-yellow-300 w-6 h-6" style={{ animationDelay: '0.5s' }} />
-              <Sparkles className="sparkle absolute top-1/2 -right-4 text-yellow-300 w-5 h-5" style={{ animationDelay: '1s' }} />
-            </div>
-          </div>
-          
-          {/* Winner announcement */}
-          <p className="text-yellow-400 text-3xl font-black mb-4 tracking-wider">
-            🎉 ¡GANADOR! 🎉
-          </p>
-          
-          {/* Question */}
-          <p className="text-zinc-400 text-lg mb-4">{winnerQuestion}</p>
-          
-          {/* Winner card */}
-          <div 
-            className="winner-card inline-block text-5xl font-black mb-6 px-12 py-6 rounded-3xl border-4"
-            style={{ 
-              backgroundColor: winner.color + '30',
-              borderColor: winner.color,
-              color: winner.color,
-              textShadow: `0 0 30px ${winner.color}80`
-            }}
-          >
-            {winner.label}
-          </div>
-          
-          {/* Stats */}
-          <div className="flex items-center justify-center gap-6 text-white text-2xl bg-black/60 backdrop-blur rounded-2xl px-8 py-4">
-            <div className="flex items-center gap-2">
-              <span className="text-4xl font-black" style={{ color: winner.color }}>{winner.votes}</span>
-              <span className="text-zinc-400">votos</span>
-            </div>
-            <div className="w-px h-8 bg-zinc-600" />
-            <div className="flex items-center gap-2">
-              <span className="text-4xl font-black text-yellow-400">{winnerPercentage}%</span>
-              <span className="text-zinc-400">del total</span>
-            </div>
-          </div>
-          
-          {/* All results */}
-          <div className="mt-6 flex justify-center gap-3 flex-wrap">
-            {winnerOptions
-              .slice()
-              .sort((a, b) => b.votes - a.votes)
-              .map((opt, idx) => {
-                const pct = winnerTotalVotes > 0 ? Math.round((opt.votes / winnerTotalVotes) * 100) : 0;
-                const isWinner = opt.id === winner.id;
-                return (
-                  <div 
-                    key={opt.id}
-                    className={`px-4 py-2 rounded-xl border ${isWinner ? 'border-yellow-400 bg-yellow-400/20' : 'border-zinc-700 bg-black/50'}`}
-                  >
-                    <span className="font-bold mr-2" style={{ color: opt.color }}>+{opt.id + 1}</span>
-                    <span className="text-white">{opt.label}</span>
-                    <span className="text-zinc-400 ml-2">({opt.votes} - {pct}%)</span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      </div>
+      </ErrorBoundary>
     );
   }
 
@@ -312,16 +317,17 @@ export const PollOverlay: React.FC = () => {
 
   // Active poll with bar chart
   return (
-    <div 
-      className="w-screen h-screen flex flex-col p-6"
-      style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
-    >
-      <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
-      
-      {/* Header */}
-      <div className="bg-black/70 backdrop-blur rounded-2xl px-6 py-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
+    <ErrorBoundary feature="poll-overlay">
+      <div 
+        className="w-screen h-screen flex flex-col p-6"
+        style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}
+      >
+        <SettingsButton bgColor={bgColor} setBgColor={setBgColor} showSettings={showSettings} setShowSettings={setShowSettings} />
+        
+        {/* Header */}
+        <div className="bg-black/70 backdrop-blur rounded-2xl px-6 py-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
             <span className="text-xs font-bold text-purple-400 uppercase tracking-wider bg-purple-500/20 px-2 py-0.5 rounded">
               Encuesta Activa
             </span>
@@ -437,7 +443,8 @@ export const PollOverlay: React.FC = () => {
             })}
         </div>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

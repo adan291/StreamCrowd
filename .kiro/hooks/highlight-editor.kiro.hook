@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Highlight Editor",
+  "description": "Analiza logs del chat de los últimos 2 minutos y sugiere títulos para clips de Twitch",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analiza estos logs de chat de los últimos 2 minutos y sugiere un título para clip de Twitch. Devuelve JSON: { \"title\": \"título sugerido\", \"confidence\": 0.0-1.0, \"keywords\": [\"palabra1\", \"palabra2\"], \"moment\": \"descripción del momento\" }. Logs: {input}"
+  }
+}

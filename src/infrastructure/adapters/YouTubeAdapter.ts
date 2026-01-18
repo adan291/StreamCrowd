@@ -2,16 +2,18 @@
  * YouTubeAdapter - Platform adapter for YouTube Live
  * 
  * Implements the IPlatformAdapter interface for YouTube Live streaming.
- * Handles OAuth 2.0 authentication, chat reading via YouTube Live API,
+ * Handles OAuth 2.0 authentication with PKCE support, chat reading via YouTube Live API,
  * message sending, and rate limit handling with queue.
  * 
  * @requirements 4.1 - YouTube platform support
- * @requirements 4.2 - OAuth 2.0 authentication
+ * @requirements 4.2 - OAuth 2.0 authentication with PKCE
  * @requirements 4.3 - Read YouTube Live chat messages in real-time
  * @requirements 4.4 - Send messages to YouTube Live chat
  * @requirements 4.7 - Handle rate limits with queue
+ * @requirements 2.6 - PKCE support for all OAuth providers
  */
 
+import { PkceFlow, type PkceChallenge } from '../auth/PkceFlow';
 import type {
   Platform,
   PlatformConnectionStatus,
@@ -292,10 +294,18 @@ export class YouTubeAdapter implements IPlatformAdapter {
   // ============================================
   
   /**
-   * Build OAuth authorization URL
+   * Build OAuth authorization URL with optional PKCE support
    * @requirements 4.2 - OAuth 2.0 authentication
+   * @requirements 2.6 - PKCE support for all OAuth providers
+   * 
+   * **Validates: Requirements 2.2, 2.3, 2.6**
    */
-  static buildAuthUrl(clientId: string, redirectUri: string, state: string): string {
+  static buildAuthUrl(
+    clientId: string, 
+    redirectUri: string, 
+    state: string,
+    pkceChallenge?: PkceChallenge
+  ): string {
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -306,11 +316,18 @@ export class YouTubeAdapter implements IPlatformAdapter {
       state,
     });
     
+    // Add PKCE parameters if provided
+    if (pkceChallenge) {
+      params.set('code_challenge', pkceChallenge.codeChallenge);
+      params.set('code_challenge_method', pkceChallenge.codeChallengeMethod);
+    }
+    
     return `${YOUTUBE_AUTH_URL}?${params.toString()}`;
   }
   
   /**
-   * Exchange authorization code for tokens
+   * Exchange authorization code for tokens (without PKCE - legacy support)
+   * @deprecated Use exchangeCodeForTokensWithPkce for secure token exchange
    */
   static async exchangeCodeForTokens(
     code: string,
@@ -342,6 +359,86 @@ export class YouTubeAdapter implements IPlatformAdapter {
       refreshToken: data.refresh_token,
       expiresIn: data.expires_in,
     };
+  }
+  
+  /**
+   * Exchange authorization code for tokens using PKCE
+   * @param code - Authorization code from OAuth callback
+   * @param clientId - Google OAuth client ID
+   * @param codeVerifier - PKCE code verifier used to generate the challenge
+   * @param redirectUri - OAuth redirect URI (must match the one used in authorization request)
+   * @param clientSecret - Optional client secret (required for web apps, not for native apps with PKCE)
+   * @returns Token response or throws error if exchange failed
+   * 
+   * **Validates: Requirements 2.3, 2.4, 2.6**
+   */
+  static async exchangeCodeForTokensWithPkce(
+    code: string,
+    clientId: string,
+    codeVerifier: string,
+    redirectUri: string,
+    clientSecret?: string
+  ): Promise<{ 
+    accessToken: string; 
+    refreshToken: string; 
+    expiresIn: number;
+    tokenType: string;
+    scope: string;
+  }> {
+    const params = new URLSearchParams({
+      code,
+      client_id: clientId,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    });
+    
+    // Add client_secret if provided (required for web apps)
+    if (clientSecret) {
+      params.set('client_secret', clientSecret);
+    }
+    
+    const response = await fetch(YOUTUBE_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[YouTubeAdapter] Token exchange failed:', response.status, errorData);
+      throw new Error(`Failed to exchange code for tokens: ${errorData.error_description || response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+      tokenType: data.token_type,
+      scope: data.scope,
+    };
+  }
+  
+  /**
+   * Create a new PKCE flow instance for OAuth authentication
+   * @returns PkceFlow instance
+   * 
+   * **Validates: Requirements 2.1, 2.6**
+   */
+  static createPkceFlow(): PkceFlow {
+    return new PkceFlow();
+  }
+  
+  /**
+   * Generate a random state string for CSRF protection
+   */
+  static generateOAuthState(): string {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
   
   /**

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, RotateCcw, Settings, ExternalLink, Timer, Users, Trash2 } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Bet {
@@ -43,6 +43,9 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
   const channelRef = useRef<BroadcastChannel | null>(null);
   const rotationRef = useRef(0);
   
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+  
   // OBS Triggers
   const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
 
@@ -57,15 +60,40 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
     return () => channelRef.current?.close();
   }, []);
 
-  const syncToOverlay = useCallback((data: any) => {
+  const syncToOverlay = useCallback(async (data: any) => {
     // Sync via BroadcastChannel (same browser)
     channelRef.current?.postMessage(data);
     // Also save to localStorage for cross-browser (OBS)
     try {
       localStorage.setItem(STORAGE_KEY_ROULETTE, JSON.stringify(data));
     } catch { /* ignore */ }
-    gameSync.update('roulette', data).catch(() => {});
-  }, []);
+    
+    // Use hexagonal architecture game sync
+    try {
+      await publishGameState({
+        gameType: 'casino-roulette',
+        isActive: data.isSpinning || data.bettingOpen,
+        players: data.bets?.map((bet: Bet) => ({
+          id: bet.visitorId,
+          username: bet.username,
+          score: bet.number,
+          isActive: true,
+          joinedAt: bet.timestamp,
+          color: bet.color,
+        })) || [],
+        currentRound: data.result || 0,
+        settings: {
+          autoSpinEnabled: data.autoSpinEnabled,
+          autoSpinInterval: data.autoSpinInterval,
+          bettingOpen: data.bettingOpen,
+        },
+        lastUpdate: Date.now(),
+        ...data, // Include all original data for backward compatibility
+      });
+    } catch (error) {
+      console.warn('Failed to sync game state:', error);
+    }
+  }, [publishGameState]);
 
   // Process chat messages for bets
   useEffect(() => {

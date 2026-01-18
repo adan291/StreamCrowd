@@ -4,7 +4,7 @@ import { ChatFeed } from './ChatFeed';
 import { StreamPlayer } from './StreamPlayer';
 import { CollaborationPanel } from './CollaborationPanel';
 import { MessageSquare, Tv, Users, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 
 interface ToolWithChatProps {
   children: React.ReactNode;
@@ -31,6 +31,10 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
   isConnected = true,
 }) => {
   const { t } = useI18n();
+  
+  // Navigation module is already loaded as core, no need for lazy loading
+  // useTranslationModule('nav'); // Removed - nav is core module
+  
   const [showPanel, setShowPanel] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'stream' | 'collab'>('chat');
   const [panelMode, setPanelMode] = useState<'tabs' | 'split'>('tabs');

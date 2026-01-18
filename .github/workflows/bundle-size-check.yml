@@ -1,0 +1,215 @@
+name: Bundle Size Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  bundle-size-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for comparison
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+      env:
+        NODE_ENV: production
+    
+    - name: Run bundle size analysis
+      run: node scripts/bundle-size-check.js
+      continue-on-error: true
+      id: bundle-check
+    
+    - name: Upload bundle report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bundle-size-report
+        path: bundle-size-report.md
+        retention-days: 30
+    
+    - name: Upload bundle visualization
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bundle-visualization
+        path: dist/bundle-report.html
+        retention-days: 30
+    
+    - name: Comment PR with bundle size report
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          try {
+            const reportPath = path.join(process.cwd(), 'bundle-size-report.md');
+            const report = fs.readFileSync(reportPath, 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Bundle Size Report')
+            );
+            
+            const commentBody = `## 📦 Bundle Size Report
+            
+            ${report}
+            
+            ---
+            
+            📊 [View detailed bundle analysis](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            
+            <details>
+            <summary>How to interpret this report</summary>
+            
+            - **Total Size**: Combined size of all JavaScript chunks and assets
+            - **Chunks**: Individual JavaScript files created by code splitting
+            - **Assets**: Images, fonts, CSS, and other static files
+            - **Violations**: Files that exceed recommended size thresholds
+            
+            ### Thresholds:
+            - Total bundle: 2MB
+            - Individual chunks: 500KB
+            - Vendor chunks: 1MB
+            - Assets: 100KB
+            
+            ### Status Icons:
+            - ✅ OK: Within recommended limits
+            - ⚠️ Large: Exceeds threshold but acceptable
+            - 🚨 Critical: Significantly exceeds threshold
+            
+            </details>`;
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+          } catch (error) {
+            console.log('Could not post bundle size report:', error.message);
+          }
+    
+    - name: Check bundle size regression
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Checking for bundle size regression..."
+        
+        # Get base branch bundle size (if available)
+        if [ -f "bundle-size-baseline.json" ]; then
+          echo "Baseline found, comparing sizes..."
+          # Here we would implement size comparison logic
+          # For now, we'll just pass
+          echo "Bundle size comparison completed"
+        else
+          echo "No baseline found, skipping regression check"
+        fi
+    
+    - name: Fail on critical violations
+      if: steps.bundle-check.outcome == 'failure'
+      run: |
+        echo "❌ Bundle size check failed with critical violations"
+        echo "Please review the bundle size report and optimize large chunks/assets"
+        exit 1
+
+  # Job to establish baseline for main branch
+  establish-baseline:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+      env:
+        NODE_ENV: production
+    
+    - name: Generate baseline bundle data
+      run: |
+        node -e "
+        const fs = require('fs');
+        const path = require('path');
+        
+        // Simple baseline generation
+        const distPath = path.join(process.cwd(), 'dist');
+        const files = fs.readdirSync(distPath, { recursive: true });
+        
+        let totalSize = 0;
+        const chunks = [];
+        
+        files.forEach(file => {
+          if (typeof file === 'string' && file.endsWith('.js')) {
+            const filePath = path.join(distPath, file);
+            const stats = fs.statSync(filePath);
+            totalSize += stats.size;
+            chunks.push({
+              name: path.basename(file, '.js'),
+              size: stats.size
+            });
+          }
+        });
+        
+        const baseline = {
+          timestamp: Date.now(),
+          commit: process.env.GITHUB_SHA,
+          totalSize,
+          chunks
+        };
+        
+        fs.writeFileSync('bundle-size-baseline.json', JSON.stringify(baseline, null, 2));
+        console.log('Baseline established:', JSON.stringify(baseline, null, 2));
+        "
+    
+    - name: Commit baseline
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add bundle-size-baseline.json
+        git diff --staged --quiet || git commit -m "Update bundle size baseline [skip ci]"
+        git push

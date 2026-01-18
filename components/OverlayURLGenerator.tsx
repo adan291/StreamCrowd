@@ -18,15 +18,17 @@ import {
   Palette,
   Eye,
   Info,
+  Shield,
 } from 'lucide-react';
 import { 
   OVERLAY_TYPES, 
   CHROMA_COLORS,
-  generateOverlayURL,
+  generateSecureOverlayURL,
   getOverlaysByCategory,
   type OverlayType,
   type OverlayOptions,
 } from '../src/application/services/OverlayURLService';
+import { AuthService } from '../src/application/services/AuthService';
 
 interface OverlayURLGeneratorProps {
   onNotification?: (type: 'success' | 'info' | 'error', message: string) => void;
@@ -49,6 +51,7 @@ export const OverlayURLGenerator: React.FC<OverlayURLGeneratorProps> = ({
   const [showInstructions, setShowInstructions] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>('Dinámicas');
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Obtener el tipo de overlay seleccionado
   const selectedOverlay = useMemo(() => 
@@ -56,10 +59,18 @@ export const OverlayURLGenerator: React.FC<OverlayURLGeneratorProps> = ({
     [selectedType]
   );
 
-  // Generar la URL
+  // Generar la URL con session ID (segura)
   const generatedURL = useMemo(() => {
     try {
-      return generateOverlayURL(selectedType, options);
+      const userId = AuthService.getUserId();
+      if (!userId) {
+        // If no user is authenticated, show a message
+        return '';
+      }
+      
+      const { sessionId, url } = generateSecureOverlayURL(userId, selectedType, options);
+      setCurrentSessionId(sessionId);
+      return url;
     } catch {
       return '';
     }
@@ -212,20 +223,43 @@ export const OverlayURLGenerator: React.FC<OverlayURLGeneratorProps> = ({
 
       {/* URL generada */}
       <div className="space-y-2">
+        {/* Security notice */}
+        {generatedURL && (
+          <div className="flex items-start gap-2 p-2 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-lg">
+            <Shield size={14} className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-green-700 dark:text-green-300">
+              <strong>URL Segura:</strong> Esta URL usa un ID de sesión temporal y no expone tus tokens de autenticación.
+            </div>
+          </div>
+        )}
+        
+        {!generatedURL && (
+          <div className="flex items-start gap-2 p-2 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg">
+            <Info size={14} className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-yellow-700 dark:text-yellow-300">
+              Debes estar autenticado para generar URLs de overlay.
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={generatedURL}
             readOnly
+            placeholder={generatedURL ? '' : 'Autenticación requerida'}
             className="flex-1 px-3 py-2 text-xs font-mono bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg truncate"
             onClick={(e) => (e.target as HTMLInputElement).select()}
           />
           <button
             onClick={copyURL}
+            disabled={!generatedURL}
             className={`p-2 rounded-lg transition-all ${
               copied
                 ? 'bg-green-500 text-white'
-                : 'bg-purple-500 hover:bg-purple-600 text-white'
+                : generatedURL
+                ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500 cursor-not-allowed'
             }`}
             title={copied ? 'Copiado!' : 'Copiar URL'}
           >
@@ -233,7 +267,12 @@ export const OverlayURLGenerator: React.FC<OverlayURLGeneratorProps> = ({
           </button>
           <button
             onClick={openPreview}
-            className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors"
+            disabled={!generatedURL}
+            className={`p-2 rounded-lg transition-colors ${
+              generatedURL
+                ? 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400'
+                : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+            }`}
             title="Abrir preview"
           >
             <ExternalLink size={16} />

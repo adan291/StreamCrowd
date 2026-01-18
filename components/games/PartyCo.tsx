@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { loadAIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 // Tipos de pruebas del Party & Co
@@ -1428,6 +1428,9 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
 
 // ========== COMPONENTE PRINCIPAL ==========
 export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   // Estados del juego
   const [gameState, setGameState] = useState<'lobby' | 'playing' | 'paused' | 'final'>('lobby');
   const [players, setPlayers] = useState<Map<string, Player>>(new Map());

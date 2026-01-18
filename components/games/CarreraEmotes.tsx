@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Upload, Loader2, Sparkles } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 import { getTwitchService } from '../../src/application/services/TwitchService';
 import { AuthService } from '../../src/application/services/AuthService';
@@ -239,6 +239,9 @@ const loadEmotesFromStorage = (): { emote: string; name: string; url?: string }[
 };
 
 export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isConnected = true, authToken, channelName: propChannelName }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [gameState, setGameState] = useState<'setup' | 'betting' | 'racing' | 'finished'>('setup');
   const [racers, setRacers] = useState<Racer[]>([]);
   const [winner, setWinner] = useState<Racer | null>(null);

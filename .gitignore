@@ -7,10 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build outputs
 dist
 dist-ssr
+build
 *.local
+
+# Cache
+.cache
+.parcel-cache
+.vite
+
+# Test outputs
+coverage
+test-results
+playwright-report
+.playwright
 
 # Environment files (IMPORTANT: Never commit secrets!)
 .env
@@ -31,9 +46,27 @@ dist-ssr
 *.sw?
 
 # Electron build artifacts
-electron/
 release/
 *.exe
 *.dmg
 *.AppImage
 *.snap
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

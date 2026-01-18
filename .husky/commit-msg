@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Validate commit message format
+# Format: type(scope): message
+# Example: feat(polls): add new voting mode
+
+npx --no -- commitlint --edit ${1}

@@ -1,194 +1,203 @@
 /**
- * useOverlaySync - Reusable hook for overlay synchronization
- * 
- * Provides a standardized way to sync state between main app and overlay windows
- * using BroadcastChannel API. Reduces code duplication across overlay components.
- * 
- * @example
- * // In overlay component
- * const { state, bgColor, sendMessage } = useOverlaySync<GameState>('game_sync', initialState);
- * 
- * // In main component
- * const { sendMessage } = useOverlaySync<GameState>('game_sync', initialState);
- * sendMessage({ type: 'update', data: newState });
+ * Legacy useOverlaySync hook with migration support
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useLocalStorage } from './useLocalStorage';
+import type { OverlaySyncService } from '@/src/application/services/OverlaySyncService';
+import type { OverlayState, OverlayType } from '@/src/domain/entities/OverlayState';
+import type { ConnectionStatus, SyncMetrics } from '@/src/domain/ports/IOverlaySync';
+import { DependencyFactory } from '@/src/infrastructure/factories/DependencyFactory';
 
-// Re-export overlay mode hook for convenience
-export { useOverlayMode, OVERLAY_BG_COLORS } from './useOverlayMode';
-
-/**
- * Message types for overlay communication
- */
-export interface OverlaySyncMessage<T = unknown> {
-  type: 'sync' | 'request_sync' | 'update' | 'reset' | string;
-  data?: T;
-  timestamp?: number;
+// Legacy interface for backward compatibility
+interface OverlayStateData {
+  currentPoll?: any;
+  currentGiveaway?: any;
+  currentGame?: any;
+  currentPrediction?: any;
+  theme?: string;
+  mood?: 'hype' | 'calm' | 'toxic' | 'confused';
+  lastUpdate?: number;
 }
 
-/**
- * Options for useOverlaySync hook
- */
-export interface UseOverlaySyncOptions<T> {
-  /** Initial state value */
-  initialState: T;
-  /** Whether to request sync on mount (default: true for overlays) */
-  requestSyncOnMount?: boolean;
-  /** Callback when state is updated from remote */
-  onStateUpdate?: (newState: T, prevState: T) => void;
-  /** Custom message handler for non-standard messages */
-  onMessage?: (message: OverlaySyncMessage<T>) => void;
-}
-
-/**
- * Return type for useOverlaySync hook
- */
-export interface UseOverlaySyncReturn<T> {
-  /** Current synchronized state */
-  state: T;
-  /** Update local state (does not broadcast) */
-  setState: (value: T | ((prev: T) => T)) => void;
-  /** Send message to all connected windows */
-  sendMessage: (message: OverlaySyncMessage<T>) => void;
-  /** Broadcast current state to all windows */
-  broadcastState: () => void;
-  /** Request state sync from main window */
-  requestSync: () => void;
-  /** Whether channel is connected */
+// Enhanced interface with new features
+interface UseOverlaySyncReturn {
+  state: OverlayStateData;
+  updateState: (updates: Partial<OverlayStateData>) => Promise<void>;
   isConnected: boolean;
+  error: string | null;
+  reconnect: () => void;
+  connectionStatus: ConnectionStatus;
+  metrics: SyncMetrics | null;
+  healthCheck: () => Promise<boolean>;
+}
+
+// Options interface for configuration
+interface UseOverlaySyncOptions {
+  channelId?: string;
+  useEnhancedSync?: boolean;
+  enableMonitoring?: boolean;
+  autoReconnect?: boolean;
+  debounceMs?: number;
+}
+
+// Feature flags interface for gradual rollout
+interface FeatureFlags {
+  useEnhancedSync?: boolean;
+  enablePerformanceMonitoring?: boolean;
+  enableAuditLogging?: boolean;
+  enableNetworkPrioritization?: boolean;
 }
 
 /**
- * Hook for synchronizing state between main app and overlay windows
- * 
- * @param channelName - Unique name for the BroadcastChannel
- * @param options - Configuration options
- * @returns Sync utilities and state
+ * Enhanced useOverlaySync hook with backward compatibility and migration support
  */
-export function useOverlaySync<T>(
-  channelName: string,
-  options: UseOverlaySyncOptions<T>
-): UseOverlaySyncReturn<T> {
-  const {
-    initialState,
-    requestSyncOnMount = true,
-    onStateUpdate,
-    onMessage,
-  } = options;
+export function useOverlaySync(
+  options?: UseOverlaySyncOptions | string
+): UseOverlaySyncReturn {
+  const config: UseOverlaySyncOptions = typeof options === 'string' 
+    ? { channelId: options }
+    : options || {};
 
-  const [state, setState] = useState<T>(initialState);
+  const [state, setState] = useState<OverlayStateData>({});
   const [isConnected, setIsConnected] = useState(false);
-  const channelRef = useRef<BroadcastChannel | null>(null);
-  const stateRef = useRef<T>(state);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+  const [error, setError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<SyncMetrics | null>(null);
+  const [localChannelId] = useLocalStorage('channelId', '');
+  const [overlaySync, setOverlaySync] = useState<OverlaySyncService | null>(null);
+  
+  const activeChannelId = config.channelId || localChannelId;
 
-  // Keep stateRef in sync
+  // Initialize overlay sync service
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+    let mounted = true;
+    
+    const initializeService = async () => {
+      try {
+        const service = await DependencyFactory.getInstance().getOverlaySyncService();
+        if (mounted) {
+          setOverlaySync(service);
+          setError(null);
+        }
+      } catch (err) {
+        if (mounted) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to initialize sync service';
+          setError(errorMessage);
+          console.error('[useOverlaySync] Service initialization failed:', err);
+        }
+      }
+    };
 
-  // Send message to all connected windows
-  const sendMessage = useCallback((message: OverlaySyncMessage<T>) => {
-    if (channelRef.current) {
-      channelRef.current.postMessage({
-        ...message,
-        timestamp: Date.now(),
-      });
-    }
+    initializeService();
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Broadcast current state
-  const broadcastState = useCallback(() => {
-    sendMessage({ type: 'sync', data: stateRef.current });
-  }, [sendMessage]);
-
-  // Request sync from main window
-  const requestSync = useCallback(() => {
-    sendMessage({ type: 'request_sync' });
-  }, [sendMessage]);
-
-  // Initialize BroadcastChannel
-  useEffect(() => {
-    try {
-      channelRef.current = new BroadcastChannel(channelName);
-      setIsConnected(true);
-
-      channelRef.current.onmessage = (event: MessageEvent<OverlaySyncMessage<T>>) => {
-        const message = event.data;
-
-        switch (message.type) {
-          case 'sync':
-          case 'update':
-            if (message.data !== undefined) {
-              const prevState = stateRef.current;
-              setState(message.data);
-              onStateUpdate?.(message.data, prevState);
-            }
-            break;
-
-          case 'request_sync':
-            // Respond with current state
-            broadcastState();
-            break;
-
-          case 'reset':
-            setState(initialState);
-            break;
-
-          default:
-            // Pass to custom handler
-            onMessage?.(message);
-        }
-      };
-
-      channelRef.current.onmessageerror = () => {
-        console.warn(`[useOverlaySync] Message error on channel: ${channelName}`);
-      };
-
-      // Request sync on mount if enabled
-      if (requestSyncOnMount) {
-        requestSync();
-      }
-
-    } catch (error) {
-      console.error(`[useOverlaySync] Failed to create channel: ${channelName}`, error);
-      setIsConnected(false);
+  const healthCheck = useCallback(async (): Promise<boolean> => {
+    if (!overlaySync) {
+      return false;
     }
 
-    return () => {
-      channelRef.current?.close();
-      channelRef.current = null;
-      setIsConnected(false);
-    };
-  }, [channelName, initialState, requestSyncOnMount, broadcastState, requestSync, onStateUpdate, onMessage]);
+    try {
+      const status = overlaySync.getConnectionStatus();
+      return status === 'connected';
+    } catch (error) {
+      console.error('[useOverlaySync] Health check failed:', error);
+      return false;
+    }
+  }, [overlaySync]);
+
+  const reconnect = useCallback(async () => {
+    setError(null);
+    setIsConnected(false);
+    setConnectionStatus('reconnecting');
+    
+    if (!overlaySync) {
+      setError('Sync service not available');
+      setConnectionStatus('error');
+      return;
+    }
+
+    try {
+      const status = overlaySync.getConnectionStatus();
+      setConnectionStatus(status);
+      setIsConnected(status === 'connected');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Reconnection failed';
+      setError(errorMessage);
+      setConnectionStatus('error');
+    }
+  }, [overlaySync]);
+
+  const updateState = useCallback(async (updates: Partial<OverlayStateData>) => {
+    if (!activeChannelId) {
+      throw new Error('No channel ID available');
+    }
+
+    if (!overlaySync) {
+      throw new Error('Sync service not initialized');
+    }
+
+    try {
+      const legacyState: OverlayState = {
+        id: `legacy_${activeChannelId}_${Date.now()}`,
+        type: 'poll' as OverlayType,
+        channelId: activeChannelId,
+        version: 1,
+        data: {
+          ...state,
+          ...updates,
+          lastUpdate: Date.now()
+        },
+        updatedAt: Date.now(),
+        isActive: true,
+      };
+
+      await overlaySync.updateOverlayState(legacyState);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update state';
+      console.error('[useOverlaySync] Update failed:', err);
+      setError(errorMessage);
+      throw err;
+    }
+  }, [activeChannelId, overlaySync, state]);
 
   return {
     state,
-    setState,
-    sendMessage,
-    broadcastState,
-    requestSync,
+    updateState,
     isConnected,
+    error,
+    reconnect,
+    connectionStatus,
+    metrics,
+    healthCheck,
   };
 }
 
 /**
- * Simplified hook for overlay components that only need to receive state
- * 
- * @param channelName - Unique name for the BroadcastChannel
- * @param initialState - Initial state value
- * @returns Current state and background color
+ * Legacy useOverlayReceiver hook for backward compatibility
+ * This is a simplified version that just receives state updates
  */
-export function useOverlayReceiver<T>(
-  channelName: string,
-  initialState: T
-): { state: T; isConnected: boolean } {
-  const { state, isConnected } = useOverlaySync<T>(channelName, {
-    initialState,
-    requestSyncOnMount: true,
-  });
-
-  return { state, isConnected };
+export function useOverlayReceiver(channelId?: string): {
+  state: OverlayStateData;
+  isConnected: boolean;
+  error: string | null;
+} {
+  const { state, isConnected, error } = useOverlaySync({ channelId });
+  
+  return {
+    state,
+    isConnected,
+    error,
+  };
 }
 
-export default useOverlaySync;
+export type { 
+  UseOverlaySyncOptions, 
+  UseOverlaySyncReturn,
+  OverlayStateData,
+  FeatureFlags
+};

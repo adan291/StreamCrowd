@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, ExternalLink, Fish, Anchor, Trophy, RotateCcw } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
+import { useGame } from '../../src/application/hooks/useGame';
 
 interface CaughtFish {
   id: string;
@@ -44,6 +45,12 @@ const RARITY_COLORS = {
 const RARITY_POINTS = { common: 10, rare: 25, epic: 50, legendary: 100 };
 
 export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnected = true }) => {
+  // Use Redux for game state management
+  const { activeGame, startGame: startReduxGame, updateScore, endGame: endReduxGame } = useGame();
+  
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+  
   const [isActive, setIsActive] = useState(true);
   const [isFishing, setIsFishing] = useState(false);
   const [hookPosition, setHookPosition] = useState({ x: 300, y: 50 });
@@ -74,7 +81,7 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
     return () => channelRef.current?.close();
   }, []);
 
-  const syncToOverlay = useCallback(() => {
+  const syncToOverlay = useCallback(async () => {
     const state = {
       type: 'fishing_state',
       fish: fishRef.current,
@@ -87,8 +94,33 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
     try {
       localStorage.setItem(STORAGE_KEY_FISHING, JSON.stringify(state));
     } catch { /* ignore */ }
-    gameSync.update('fishing', state).catch(() => {});
-  }, [hookPosition, hookDepth, isFishing, lastCatch, totalPoints]);
+    
+    // Use hexagonal architecture game sync
+    try {
+      await publishGameState({
+        gameType: 'chat-fishing',
+        isActive: isActive,
+        players: caughtFish.map(fish => ({
+          id: fish.id,
+          username: fish.username,
+          score: fish.points,
+          isActive: true,
+          joinedAt: fish.timestamp,
+        })),
+        currentRound: fishCount,
+        settings: {
+          isFishing,
+          totalPoints,
+          hookPosition,
+          hookDepth,
+        },
+        lastUpdate: Date.now(),
+        ...state, // Include all original data for backward compatibility
+      });
+    } catch (error) {
+      console.warn('Failed to sync game state:', error);
+    }
+  }, [hookPosition, hookDepth, isFishing, lastCatch, totalPoints, publishGameState, isActive, caughtFish, fishCount]);
 
   useEffect(() => {
     syncToOverlay();
@@ -152,6 +184,10 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
         
         fishRef.current = fishRef.current.filter(f => f.id !== fish.id);
         setFishCount(fishRef.current.length);
+        
+        // Update Redux store with catch score
+        updateScore(fish.id, fish.username, RARITY_POINTS[fish.rarity]);
+        
         return caught;
       }
     }
@@ -400,6 +436,9 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
   }, [hookPosition, hookDepth, isFishing]);
 
   const resetGame = () => {
+    // End game in Redux
+    endReduxGame();
+    
     setCaughtFish([]);
     setTotalPoints(0);
     setLastCatch(null);
@@ -423,8 +462,12 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
             const newState = !isActive;
             setIsActive(newState);
             if (newState) {
+              // Start game in Redux
+              startReduxGame('fishing');
               triggerGameStart();
             } else {
+              // End game in Redux
+              endReduxGame();
               triggerGameEnd();
             }
           }}

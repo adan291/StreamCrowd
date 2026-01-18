@@ -1,140 +1,174 @@
 /**
- * useAuth Hook
+ * useAuth Hook (Redux-based)
  * 
- * React hook for accessing authentication state and capabilities.
- * Provides reactive updates when auth state changes.
+ * Custom hook that encapsulates Redux logic for authentication feature.
+ * Provides a clean API for components to interact with auth state.
  * 
- * @module src/application/hooks/useAuth
+ * @requirements 9.3
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  AuthService, 
-  AuthState, 
-  AuthCapabilities, 
-  AuthMode,
-  getAuthToken,
-  canAccessTwitchAPI,
-} from '../services/AuthService';
+import { useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from '../state/hooks';
+import {
+  loginStart,
+  loginSuccess,
+  loginFailure,
+  logout,
+  updateUser,
+  updateToken,
+  tokenExpired,
+  clearError,
+  selectUser,
+  selectToken,
+  selectIsAuthenticated,
+  selectAuthLoading,
+  selectAuthError,
+  selectUserId,
+  selectUsername,
+  selectUserAvatar,
+  selectUserPlatform,
+  selectAuthStatus,
+  type User,
+} from '../state/slices/authSlice';
 
 export interface UseAuthReturn {
-  /** Current authentication state */
-  authState: AuthState;
-  /** Current authentication mode */
-  mode: AuthMode;
-  /** Whether user is authenticated with OAuth */
-  isAuthenticated: boolean;
-  /** Whether connected (OAuth or anonymous) */
-  isConnected: boolean;
-  /** Current capabilities */
-  capabilities: AuthCapabilities;
-  /** OAuth token (null if not authenticated) */
+  // State
+  user: User | null;
   token: string | null;
-  /** User/Broadcaster ID */
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
   userId: string | null;
-  /** Channel name */
-  channelName: string | null;
-  /** Check if a specific capability is available */
-  hasCapability: (capability: keyof AuthCapabilities) => boolean;
-  /** Set OAuth authentication */
-  setOAuthAuth: (params: {
-    token: string;
-    userId?: string;
-    channelName?: string;
-    scopes?: string[];
-    expiresIn?: number;
-  }) => void;
-  /** Set anonymous connection */
-  setAnonymousAuth: (channelName: string) => void;
-  /** Update user ID */
-  setUserId: (userId: string) => void;
-  /** Update channel name */
-  setChannelName: (channelName: string) => void;
-  /** Update scopes */
-  setScopes: (scopes: string[]) => void;
-  /** Clear authentication */
-  clearAuth: () => void;
+  username: string | null;
+  userAvatar: string | null;
+  userPlatform: 'twitch' | 'youtube' | 'firebase' | null;
+  authStatus: {
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    hasError: boolean;
+    error: string | null;
+  };
+
+  // Actions
+  loginStart: () => void;
+  loginSuccess: (user: User, token: string) => void;
+  loginFailure: (error: string) => void;
+  logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
+  updateToken: (token: string) => void;
+  tokenExpired: () => void;
+  clearError: () => void;
 }
 
 /**
- * Hook for accessing and managing authentication state
+ * Custom hook for authentication state management
+ * 
+ * Encapsulates Redux logic and provides a clean API for components.
  * 
  * @example
  * ```tsx
- * const { isAuthenticated, capabilities, token } = useAuth();
+ * const { user, isAuthenticated, loginSuccess, logout } = useAuth();
  * 
- * if (capabilities.canReadChatters) {
- *   // Safe to call chatters API
- *   const chatters = await getChatters(token);
+ * // Login
+ * loginSuccess(
+ *   { id: '123', username: 'user', platform: 'twitch' },
+ *   'access_token_here'
+ * );
+ * 
+ * // Check authentication
+ * if (isAuthenticated) {
+ *   console.log('User is logged in:', user?.username);
  * }
+ * 
+ * // Logout
+ * logout();
  * ```
+ * 
+ * @requirements 9.3 - Encapsulate Redux logic
  */
 export function useAuth(): UseAuthReturn {
-  const [authState, setAuthState] = useState<AuthState>(AuthService.getState());
+  const dispatch = useAppDispatch();
 
-  // Subscribe to auth state changes
-  useEffect(() => {
-    const unsubscribe = AuthService.subscribe((newState) => {
-      setAuthState(newState);
-    });
-    return unsubscribe;
-  }, []);
+  // Select state using memoized selectors
+  const user = useAppSelector(selectUser);
+  const token = useAppSelector(selectToken);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isLoading = useAppSelector(selectAuthLoading);
+  const error = useAppSelector(selectAuthError);
+  const userId = useAppSelector(selectUserId);
+  const username = useAppSelector(selectUsername);
+  const userAvatar = useAppSelector(selectUserAvatar);
+  const userPlatform = useAppSelector(selectUserPlatform);
+  const authStatus = useAppSelector(selectAuthStatus);
 
-  const hasCapability = useCallback((capability: keyof AuthCapabilities): boolean => {
-    return AuthService.hasCapability(capability);
-  }, []);
+  // Action creators wrapped in useCallback for stability
+  const handleLoginStart = useCallback(() => {
+    dispatch(loginStart());
+  }, [dispatch]);
 
-  const setOAuthAuth = useCallback((params: {
-    token: string;
-    userId?: string;
-    channelName?: string;
-    scopes?: string[];
-    expiresIn?: number;
-  }) => {
-    AuthService.setOAuthAuth(params);
-  }, []);
+  const handleLoginSuccess = useCallback(
+    (user: User, token: string) => {
+      dispatch(loginSuccess({ user, token }));
+    },
+    [dispatch]
+  );
 
-  const setAnonymousAuth = useCallback((channelName: string) => {
-    AuthService.setAnonymousAuth(channelName);
-  }, []);
+  const handleLoginFailure = useCallback(
+    (errorMsg: string) => {
+      dispatch(loginFailure(errorMsg));
+    },
+    [dispatch]
+  );
 
-  const setUserId = useCallback((userId: string) => {
-    AuthService.setUserId(userId);
-  }, []);
+  const handleLogout = useCallback(() => {
+    dispatch(logout());
+  }, [dispatch]);
 
-  const setChannelName = useCallback((channelName: string) => {
-    AuthService.setChannelName(channelName);
-  }, []);
+  const handleUpdateUser = useCallback(
+    (updates: Partial<User>) => {
+      dispatch(updateUser(updates));
+    },
+    [dispatch]
+  );
 
-  const setScopes = useCallback((scopes: string[]) => {
-    AuthService.setScopes(scopes);
-  }, []);
+  const handleUpdateToken = useCallback(
+    (newToken: string) => {
+      dispatch(updateToken(newToken));
+    },
+    [dispatch]
+  );
 
-  const clearAuth = useCallback(() => {
-    AuthService.clear();
-  }, []);
+  const handleTokenExpired = useCallback(() => {
+    dispatch(tokenExpired());
+  }, [dispatch]);
+
+  const handleClearError = useCallback(() => {
+    dispatch(clearError());
+  }, [dispatch]);
 
   return {
-    authState,
-    mode: authState.mode,
-    isAuthenticated: AuthService.isAuthenticated(),
-    isConnected: AuthService.isConnected(),
-    capabilities: AuthService.getCapabilities(),
-    token: authState.token,
-    userId: authState.userId,
-    channelName: authState.channelName,
-    hasCapability,
-    setOAuthAuth,
-    setAnonymousAuth,
-    setUserId,
-    setChannelName,
-    setScopes,
-    clearAuth,
+    // State
+    user,
+    token,
+    isAuthenticated,
+    isLoading,
+    error,
+    userId,
+    username,
+    userAvatar,
+    userPlatform,
+    authStatus,
+
+    // Actions
+    loginStart: handleLoginStart,
+    loginSuccess: handleLoginSuccess,
+    loginFailure: handleLoginFailure,
+    logout: handleLogout,
+    updateUser: handleUpdateUser,
+    updateToken: handleUpdateToken,
+    tokenExpired: handleTokenExpired,
+    clearError: handleClearError,
   };
 }
-
-// Re-export utilities
-export { getAuthToken, canAccessTwitchAPI };
-export type { AuthState, AuthCapabilities, AuthMode };
 
 export default useAuth;

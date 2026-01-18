@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Fish, Trophy } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface SwimmingFish {
   id: string;
@@ -33,6 +34,8 @@ const RARITY_COLORS = {
 };
 
 export const FishingOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<FishingState>({
     fish: [],
@@ -197,36 +200,38 @@ export const FishingOverlay: React.FC = () => {
   }, [state.hook]);
 
   return (
-    <div className="w-screen h-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
-      <OverlayChromaKey {...chromaKeyProps} />
-      <canvas
-        ref={canvasRef}
-        width={700}
-        height={400}
-        className="w-full h-full"
-      />
-      
-      {/* Score */}
-      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur rounded-xl px-4 py-2 flex items-center gap-2">
-        <Trophy size={20} className="text-yellow-400" />
-        <span className="text-white font-bold text-xl">{state.totalPoints} pts</span>
-      </div>
-      
-      {/* Fish count */}
-      <div className="absolute top-4 left-4 bg-black/60 backdrop-blur rounded-xl px-4 py-2 flex items-center gap-2">
-        <Fish size={20} className="text-blue-400" />
-        <span className="text-white font-bold">{fishRef.current.length} peces</span>
-      </div>
-      
-      {/* Last catch */}
-      {state.lastCatch && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-green-500/80 backdrop-blur rounded-xl px-6 py-3 animate-bounce">
-          <p className="text-white font-bold text-lg text-center">
-            🎣 ¡{state.lastCatch.username}! +{state.lastCatch.points} pts
-          </p>
+    <GameOverlayWrapper gameName="Pesca" gameId="fishing">
+      <div className="w-screen h-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+        <OverlayChromaKey {...chromaKeyProps} />
+        <canvas
+          ref={canvasRef}
+          width={700}
+          height={400}
+          className="w-full h-full"
+        />
+        
+        {/* Score */}
+        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur rounded-xl px-4 py-2 flex items-center gap-2">
+          <Trophy size={20} className="text-yellow-400" />
+          <span className="text-white font-bold text-xl">{state.totalPoints} pts</span>
         </div>
-      )}
-    </div>
+        
+        {/* Fish count */}
+        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur rounded-xl px-4 py-2 flex items-center gap-2">
+          <Fish size={20} className="text-blue-400" />
+          <span className="text-white font-bold">{fishRef.current.length} peces</span>
+        </div>
+        
+        {/* Last catch */}
+        {state.lastCatch && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-green-500/80 backdrop-blur rounded-xl px-6 py-3 animate-bounce">
+            <p className="text-white font-bold text-lg text-center">
+              🎣 ¡{state.lastCatch.username}! +{state.lastCatch.points} pts
+            </p>
+          </div>
+        )}
+      </div>
+    </GameOverlayWrapper>
   );
 };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Bomb, Timer, Trophy, RotateCcw, Users, ExternalLink } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Player {
@@ -23,6 +23,9 @@ const GAME_CHANNEL = 'hot_potato_sync';
 const STORAGE_KEY_POTATO = 'hot_potato_state';
 
 export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+  
   const [gameState, setGameState] = useState<'waiting' | 'playing' | 'exploded'>('waiting');
   const [players, setPlayers] = useState<Player[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -45,7 +48,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     return () => channelRef.current?.close();
   }, []);
 
-  const syncToOverlay = useCallback(() => {
+  const syncToOverlay = useCallback(async () => {
     const state = {
       type: 'potato_state',
       gameState,
@@ -59,8 +62,33 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     try {
       localStorage.setItem(STORAGE_KEY_POTATO, JSON.stringify(state));
     } catch { /* ignore */ }
-    gameSync.update('potato', state).catch(() => {});
-  }, [gameState, players, currentHolder, timeLeft, loser, round]);
+    
+    // Use hexagonal architecture game sync
+    try {
+      await publishGameState({
+        gameType: 'hot-potato',
+        isActive: gameState === 'playing',
+        players: players.map(player => ({
+          id: player.id,
+          username: player.username,
+          score: leaderboard.get(player.id) || 0,
+          isActive: player.id !== loser?.id,
+          joinedAt: player.joinedAt,
+        })),
+        currentRound: round,
+        settings: {
+          gameState,
+          bombTime,
+          timeLeft,
+          currentHolder: currentHolder?.username,
+        },
+        lastUpdate: Date.now(),
+        ...state, // Include all original data for backward compatibility
+      });
+    } catch (error) {
+      console.warn('Failed to sync game state:', error);
+    }
+  }, [gameState, players, currentHolder, timeLeft, loser, round, publishGameState, leaderboard, bombTime]);
 
   // Sync state changes to overlay
   useEffect(() => {

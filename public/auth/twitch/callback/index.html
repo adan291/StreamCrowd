@@ -73,14 +73,32 @@
 
   <script>
     (function() {
-      // Parse the URL fragment
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
+      /**
+       * Twitch OAuth Callback Handler
+       * Supports both:
+       * - Implicit flow (access_token in URL fragment)
+       * - Authorization code flow with PKCE (code in query params)
+       * 
+       * **Validates: Requirements 2.3, 2.4**
+       */
       
-      const accessToken = params.get('access_token');
-      const error = params.get('error');
-      const errorDescription = params.get('error_description');
-      const state = params.get('state');
+      // Parse URL fragment (for implicit flow - access_token)
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      
+      // Parse query params (for PKCE flow - authorization code)
+      const queryParams = new URLSearchParams(window.location.search);
+      
+      // Check for authorization code (PKCE flow)
+      const code = queryParams.get('code');
+      const state = queryParams.get('state') || hashParams.get('state');
+      
+      // Check for access token (implicit flow - legacy)
+      const accessToken = hashParams.get('access_token');
+      
+      // Check for errors
+      const error = queryParams.get('error') || hashParams.get('error');
+      const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
       
       function showError(message) {
         document.getElementById('spinner').style.display = 'none';
@@ -96,17 +114,36 @@
         return;
       }
       
-      // Send result to opener
+      // Handle PKCE flow (authorization code)
+      if (code) {
+        window.opener.postMessage({
+          type: 'twitch_oauth_callback',
+          code: code,
+          state: state,
+          isPkce: true,
+        }, window.location.origin);
+        
+        // Close popup quickly
+        setTimeout(function() { window.close(); }, 150);
+        return;
+      }
+      
+      // Handle implicit flow (access token - legacy)
       if (accessToken) {
         window.opener.postMessage({
           type: 'twitch_oauth_callback',
           accessToken: accessToken,
           state: state,
+          isPkce: false,
         }, window.location.origin);
         
         // Close popup quickly
         setTimeout(function() { window.close(); }, 150);
-      } else if (error) {
+        return;
+      }
+      
+      // Handle errors
+      if (error) {
         window.opener.postMessage({
           type: 'twitch_oauth_callback',
           error: error,
@@ -116,10 +153,12 @@
         
         showError(errorDescription || 'Authentication was denied.');
         setTimeout(function() { window.close(); }, 2000);
-      } else {
-        showError('No authentication data received.');
-        setTimeout(function() { window.close(); }, 2000);
+        return;
       }
+      
+      // No valid data received
+      showError('No authentication data received.');
+      setTimeout(function() { window.close(); }, 2000);
     })();
   </script>
 </body>

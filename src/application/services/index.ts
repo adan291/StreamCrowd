@@ -86,3 +86,16 @@ export * from './MacroService';
 
 // Logger
 export * from './LoggerService';
+
+// Security services
+export * from './OverlaySessionService';
+export * from './SessionService';
+
+// Overlay state management
+export * from './OverlayStateManager';
+export * from './OverlaySyncService';
+export * from './PerformanceMonitor';
+export * from './ErrorRecoverySystem';
+
+// Health monitoring
+export * from './HealthCheckService';

@@ -3,6 +3,12 @@
 ## Overview
 Implementar suite completa de tests end-to-end usando Playwright para validar flujos críticos de la aplicación.
 
+**Estado Actual (Enero 2025)**: 
+- ✅ Playwright instalado y configurado
+- ✅ Tests básicos implementados
+- ❌ Browsers no instalados (`npx playwright install` pendiente)
+- 🔄 Tests necesitan validación y refinamiento
+
 ## Functional Requirements
 
 ### 1. Configuración de Playwright

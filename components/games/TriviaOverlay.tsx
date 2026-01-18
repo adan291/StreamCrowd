@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Trophy, Check } from 'lucide-react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface Question {
   question: string;
@@ -31,6 +32,8 @@ const GAME_CHANNEL = 'trivia_battle_sync';
 const STORAGE_KEY_TRIVIA = 'trivia_battle_state';
 
 export const TriviaOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<TriviaState>({
     gameState: 'setup',
@@ -81,7 +84,8 @@ export const TriviaOverlay: React.FC = () => {
   const totalAnswers = state.answerCounts.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
+    <GameOverlayWrapper gameName="Trivia" gameId="trivia">
+      <div className="w-screen h-screen overflow-hidden flex flex-col items-center justify-center p-8" style={{ backgroundColor: bgColor }}>
       <OverlayChromaKey {...chromaKeyProps} />
       {/* Setup/Waiting */}
       {state.gameState === 'setup' && (
@@ -220,6 +224,7 @@ export const TriviaOverlay: React.FC = () => {
         </div>
       )}
     </div>
+    </GameOverlayWrapper>
   );
 };
 

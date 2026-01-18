@@ -6,6 +6,8 @@ import { Wifi, Loader2, KeyRound, Link as LinkIcon, AlertCircle, XCircle, Shield
 import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
 import { openTwitchOAuthPopup, TwitchOAuthError } from '../src/infrastructure/auth/TwitchOAuth';
+import { ConnectionFormSchema } from '../src/domain/schemas/formSchemas';
+import { safeValidateInput } from '../src/domain/schemas/securitySchemas';
 
 interface ConnectionPanelProps {
   status: ConnectionStatus;
@@ -125,18 +127,35 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (token) {
-        const cleanToken = token.trim();
-        const tokenRegex = /^(oauth:)?[a-zA-Z0-9_]{30,}$/i;
-        if (!tokenRegex.test(cleanToken)) {
-            setLocalError(t.connection.errorTokenInvalid);
-            return;
+    // Prepare form data
+    const formData = {
+      channel: channel.trim(),
+      token: token.trim() || '',
+      userId: undefined,
+    };
+
+    // Validate with Zod schema
+    const result = safeValidateInput(ConnectionFormSchema, formData);
+    
+    if (!result.success) {
+      // Extract first error message
+      const firstError = result.errors.issues[0];
+      if (firstError) {
+        const field = firstError.path[0];
+        if (field === 'channel') {
+          setLocalError(firstError.message);
+        } else if (field === 'token') {
+          setLocalError(firstError.message);
+        } else {
+          setLocalError(firstError.message);
         }
+      }
+      return;
     }
 
-    if (validateChannel(channel)) {
-        onConnect(channel.trim(), token.trim() || undefined);
-    }
+    // Clear errors and connect with validated data
+    setLocalError(null);
+    onConnect(result.data.channel, result.data.token || undefined, result.data.userId);
   };
 
   useEffect(() => {

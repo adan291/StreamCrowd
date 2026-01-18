@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OverlayChromaKey, useOverlayChromaKey } from './OverlayChromaKey';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
+import { GameOverlayWrapper } from './GameOverlayWrapper';
 
 interface Duck {
   id: string;
@@ -28,6 +29,8 @@ const CANVAS_HEIGHT = 500;
 const DUCK_SIZE = 50;
 
 export const DuckHuntOverlay: React.FC = () => {
+  const { gameState: syncedGameState } = useGameSync();
+
   const { bgColor, chromaKeyProps } = useOverlayChromaKey('transparent');
   const [state, setState] = useState<DuckHuntState>({
     ducks: [],
@@ -190,7 +193,8 @@ export const DuckHuntOverlay: React.FC = () => {
   const aliveDucks = ducks.filter((d: Duck) => d.isAlive).length;
 
   return (
-    <div className="h-screen w-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
+    <GameOverlayWrapper gameName="Patos" gameId="duckhunt">
+      <div className="h-screen w-screen overflow-hidden relative" style={{ backgroundColor: bgColor === 'transparent' ? 'transparent' : bgColor }}>
       <OverlayChromaKey {...chromaKeyProps} />
       {/* Canvas */}
       <canvas
@@ -248,7 +252,8 @@ export const DuckHuntOverlay: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </GameOverlayWrapper>
   );
 };
 

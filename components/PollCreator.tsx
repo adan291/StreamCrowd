@@ -9,7 +9,7 @@ import { Tooltip } from './Tooltip';
 import { NotificationType } from './Notification';
 import { LivePoll } from './LivePoll';
 import { ModerationConfigForm } from './ModerationConfigForm';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 import { TwitchMessage } from '../types';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useOBSTriggers } from '../src/application/hooks/useOBSTriggers';
@@ -22,9 +22,10 @@ import { useActivityConfig } from '../hooks/useActivityConfig';
 import { getDefaultChatSettings, type ChatSettingsConfig } from './ui/ChatSettingsPanel';
 import { useActivitySound } from '../hooks/useActivitySound';
 import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ErrorBoundary } from '../src/presentation/components/shared/ErrorBoundary';
+import { usePoll } from '../src/application/hooks/usePoll';
 
 interface PollCreatorProps {
-  onCreate: (title: string, question: string, options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[], maxVotes?: number, duration?: number, progressBarColor?: string, limitIndicatorColor?: string, moderationConfig?: ModerationConfig, votePrefix?: string, voteMatchMode?: 'exact' | 'partial') => void;
   onNotification?: (type: NotificationType, message: string) => void;
   mediaLibrary?: MediaAsset[];
   onAddAsset?: (asset: MediaAsset) => void;
@@ -41,9 +42,15 @@ interface PollCreatorProps {
   isConnected?: boolean;
 }
 
-export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
+export const PollCreator: React.FC<PollCreatorProps> = ({ onNotification, mediaLibrary = [], onAddAsset, moderationConfig = DEFAULT_MODERATION_CONFIG, onModerationConfigChange, chatMessages = [], sidebarHidden = false, onClearChatMessages, userVoteMap = new Map(), collaborationChannels = [], mainChannel, onAddCollaborator, onRemoveCollaborator, isConnected = true }) => {
   const { t } = useI18n();
   const { triggerPollStart } = useOBSTriggers();
+  
+  // Load poll module for lazy loading (will be cached after first load)
+  useTranslationModule('poll');
+  
+  // Use Redux-based poll hook instead of prop drilling
+  const { createPoll: createPollAction } = usePoll();
   
   // Sound settings
   const sound = useActivitySound({
@@ -309,22 +316,17 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       // Modo rápido: crear encuesta directamente
       // Apply default voteKeys (1, 2, 3...) if empty
       const finalOptions = preset.options.map((opt, i) => ({
-        ...opt,
-        voteKey: opt.voteKey?.trim() || String(i + 1)
+        id: String(i + 1),
+        text: opt.label,
+        votes: 0,
       }));
       
-      onCreate(
-        t.poll.liveTitle, 
-        question || preset.question, 
-        finalOptions, 
-        undefined, 
-        undefined, 
-        progressBarColor, 
-        limitIndicatorColor, 
-        localModerationConfig, 
-        prefix, 
-        'exact'
-      );
+      // Use Redux action - pollSlice expects simplified Poll structure
+      createPollAction({
+        title: t.poll.liveTitle,
+        options: finalOptions,
+      });
+      
       if (onNotification) onNotification('success', t.poll.quickPollCreated || '¡Encuesta rápida creada!');
     } else {
       // Modo normal: solo setear valores
@@ -477,13 +479,19 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
     const dur = duration !== '' ? parseInt(duration, 10) : undefined;
     const prefix = votePrefix.trim() || '+';
     
-    // Apply default voteKeys (1, 2, 3...) if empty
+    // Apply default voteKeys (1, 2, 3...) if empty and convert to poll options format
     const finalOptions = options.map((opt, i) => ({
-      ...opt,
-      voteKey: opt.voteKey?.trim() || String(i + 1)
+      id: opt.voteKey?.trim() || String(i + 1),
+      text: opt.label,
+      votes: 0,
     }));
     
-    onCreate(title.trim() || t.poll.liveTitle, question, finalOptions, max, dur, progressBarColor, limitIndicatorColor, localModerationConfig, prefix, 'exact');
+    // Use Redux action - pollSlice expects simplified Poll structure
+    createPollAction({
+      title: title.trim() || t.poll.liveTitle,
+      options: finalOptions,
+    });
+    
     setShowConfirm(false);
     
     // OBS Trigger: Poll start
@@ -656,8 +664,9 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
   previewPoll.totalVotes = previewPoll.options.reduce((acc, curr) => acc + curr.votes, 0);
 
   return (
-    <>
-      <div className="h-full flex flex-col relative p-3 sm:p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
+    <ErrorBoundary feature="poll-creator">
+      <>
+        <div className="h-full flex flex-col relative p-3 sm:p-4 md:p-6 bg-zinc-50 dark:bg-black/10 overflow-y-auto custom-scrollbar pb-20 md:pb-6">
         <div className={`flex justify-between items-center mb-4 sm:mb-6 shrink-0 transition-all duration-300 ${sidebarHidden ? 'pt-12 md:pt-0' : ''}`}>
           <h3 className="text-base sm:text-xl font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
             <span className="bg-twitch-brand w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-xs sm:text-sm text-white shadow-lg shadow-twitch-brand/30">🛠️</span>
@@ -1356,8 +1365,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                     <LivePoll 
                         poll={previewPoll} 
                         voteHistory={[]} 
-                        onStop={()=>{}} 
-                        onReset={()=>{}} 
                         variant="preview"
                         theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
                     />
@@ -1503,5 +1510,6 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
       )}
 
     </>
+    </ErrorBoundary>
   );
 };

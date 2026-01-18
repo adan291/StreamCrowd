@@ -3,7 +3,7 @@ import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, ExternalLink, Camera, Eye, EyeOff, Plus, Trash2, Check, Sparkles, Loader2 } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface MemoryObject {
@@ -22,6 +22,9 @@ const GAME_CHANNEL = 'memoria_irl_sync';
 const STORAGE_KEY_MEMORIA = 'memoria_irl_state';
 
 export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [gameState, setGameState] = useState<'setup' | 'viewing' | 'guessing' | 'results'>('setup');
   const [imageUrl, setImageUrl] = useState<string>('');
   const [objects, setObjects] = useState<MemoryObject[]>([]);

@@ -34,19 +34,7 @@ export interface DynamicsPanelProps {
   onAddCollaborator: (channel: string) => void;
   onRemoveCollaborator: (channel: string) => void;
   
-  // PollCreator specific props
-  onCreatePoll: (
-    title: string,
-    question: string,
-    options: { label: string; color: string; icon?: string; image?: string; voteKey?: string }[],
-    maxVotes?: number,
-    duration?: number,
-    progressBarColor?: string,
-    limitIndicatorColor?: string,
-    moderationConfig?: ModerationConfig,
-    votePrefix?: string,
-    voteMatchMode?: 'exact' | 'partial'
-  ) => void;
+  // PollCreator specific props (onCreate removed - now uses Redux)
   onNotification: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   mediaLibrary: MediaAsset[];
   onAddAsset: (asset: MediaAsset) => void;
@@ -72,7 +60,6 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
   mainChannel,
   onAddCollaborator,
   onRemoveCollaborator,
-  onCreatePoll,
   onNotification,
   mediaLibrary,
   onAddAsset,
@@ -153,7 +140,6 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
             </div>
             <div className="flex-1 min-h-0">
               <PollCreator
-                onCreate={onCreatePoll}
                 onNotification={onNotification}
                 mediaLibrary={mediaLibrary}
                 onAddAsset={onAddAsset}

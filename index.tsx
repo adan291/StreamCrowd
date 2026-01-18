@@ -1,9 +1,12 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
 import App from './App';
 import { I18nProvider } from './i18n';
 import { ThemeProvider } from './context';
+import { store, persistor } from './src/application/state/store';
 
 // Handle OAuth callback BEFORE rendering React
 // Check if URL has access_token in fragment (regardless of path)
@@ -54,10 +57,14 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ThemeProvider>
-      <I18nProvider>
-        <App />
-      </I18nProvider>
-    </ThemeProvider>
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <ThemeProvider>
+          <I18nProvider>
+            <App />
+          </I18nProvider>
+        </ThemeProvider>
+      </PersistGate>
+    </Provider>
   </React.StrictMode>
 );

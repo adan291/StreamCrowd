@@ -119,6 +119,7 @@ export function ModeratorChat({ className = '' }: ModeratorChatProps) {
   };
 
   // Render message content with highlighted mentions (safe version)
+  // Note: Messages are already sanitized by ChatService before storage (Requirements: 6.1, 6.6)
   const renderMessageContent = (message: ChatMessage) => {
     const content = message.content;
     

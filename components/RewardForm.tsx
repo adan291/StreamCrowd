@@ -28,6 +28,8 @@ import { Tooltip } from './Tooltip';
 import { useI18n } from '../i18n';
 import type { RewardFormData, ValidationResult, TwitchReward } from '../types/twitch';
 import { REWARD_CONSTRAINTS } from '../types/twitch';
+import { RewardFormSchema } from '../src/domain/schemas/formSchemas';
+import { safeValidateInput } from '../src/domain/schemas/securitySchemas';
 
 // ============================================
 // Types
@@ -171,7 +173,8 @@ export const RewardForm: React.FC<RewardFormProps> = ({
   }, [initialData]);
 
   /**
-   * Handle form submission
+   * Handle form submission with Zod validation
+   * @requirements 5.1, 5.2 - Validate with Zod before submission
    */
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,15 +194,22 @@ export const RewardForm: React.FC<RewardFormProps> = ({
       maxPerUserPerStream: maxPerUserPerStreamEnabled ? maxPerUserPerStream : undefined,
     };
     
-    const validation = validateRewardForm(formData);
+    // Validate with Zod schema
+    const result = safeValidateInput(RewardFormSchema, formData);
     
-    if (!validation.valid) {
-      setValidationErrors(validation.errors);
+    if (!result.success) {
+      // Extract user-friendly error messages from Zod errors
+      const errors = result.errors.issues.map((issue) => {
+        const field = issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${field}${issue.message}`;
+      });
+      setValidationErrors(errors);
       return;
     }
     
+    // Clear errors and submit validated data
     setValidationErrors([]);
-    await onSubmit(formData);
+    await onSubmit(result.data);
   }, [
     title, cost, prompt, backgroundColor, isUserInputRequired, isEnabled,
     globalCooldownEnabled, globalCooldownSeconds,

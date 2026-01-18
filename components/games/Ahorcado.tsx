@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Trophy, RotateCcw, Skull, Heart, Sparkles, Loader2, RefreshCw, Globe, Timer, Settings } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface AhorcadoProps {
@@ -185,6 +185,9 @@ const STORAGE_KEY_AHORCADO = 'ahorcado_state';
 const MAX_ERRORS = 6;
 
 export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [gameState, setGameState] = useState<'setup' | 'playing' | 'won' | 'lost'>('setup');
   const [secretWord, setSecretWord] = useState('');
   const [hint, setHint] = useState('');

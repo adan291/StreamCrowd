@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
 import { Eye, Play, Trophy, RotateCcw, ExternalLink, Check, X, HelpCircle } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
+import { useGame } from '../../src/application/hooks/useGame';
 
 interface Player {
   oderId: string;
@@ -22,6 +23,12 @@ const GAME_CHANNEL = 'veoveo_sync';
 const STORAGE_KEY_VEOVEO = 'veoveo_state';
 
 export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
+  // Use Redux for game state management
+  const { activeGame, startGame: startReduxGame, updateScore, endGame: endReduxGame } = useGame();
+  
   const [gameState, setGameState] = useState<'setup' | 'playing' | 'revealed'>('setup');
   const [secretWord, setSecretWord] = useState('');
   const [hint, setHint] = useState('');
@@ -85,13 +92,20 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
         setPlayers(prev => {
           const newPlayers = new Map(prev);
           const existing = newPlayers.get(oderId) as Player | undefined;
+          const newScore = (existing?.score || 0) + (isCorrect ? 100 : 0);
           newPlayers.set(oderId, {
             oderId,
             username: msg.username,
             color: msg.color || '#a970ff',
-            score: (existing?.score || 0) + (isCorrect ? 100 : 0),
+            score: newScore,
             guesses: (existing?.guesses || 0) + 1
           });
+          
+          // Update Redux store with player score
+          if (isCorrect) {
+            updateScore(oderId, msg.username, newScore);
+          }
+          
           return newPlayers;
         });
         
@@ -108,6 +122,10 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
 
   const startGame = () => {
     if (!secretWord.trim() || !hint.trim()) return;
+    
+    // Start game in Redux
+    startReduxGame('veoVeo', { secretWord, hint });
+    
     setGameState('playing');
     setGuesses([]);
     setWinner(null);
@@ -127,6 +145,9 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
   };
 
   const resetGame = () => {
+    // End game in Redux
+    endReduxGame();
+    
     setGameState('setup');
     setSecretWord('');
     setHint('');

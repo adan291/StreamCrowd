@@ -1,0 +1,277 @@
+/**
+ * English (EN) Macros Translations
+ * 
+ * Macros system translations for automation functionality.
+ * 
+ * @see REQ-1.1: Traducciones divididas en archivos por dominio
+ * @see REQ-1.2: Cada archivo de traducción no debe exceder 500 líneas
+ * @see REQ-3.2: Traducciones de features cargadas bajo demanda
+ */
+
+import type { MacrosTranslations } from '../../types';
+
+/**
+ * Macros English translations
+ * Automation system with triggers, actions, and conditions
+ */
+export const macros: MacrosTranslations = {
+  title: 'Macros',
+  subtitle: 'Custom automations',
+  newMacro: 'New',
+  editMacro: 'Edit Macro',
+  createMacro: 'Create macro',
+  noMacros: 'No macros configured',
+  noMacrosDescription: 'Create your first macro to automate actions',
+  searchPlaceholder: 'Search macros...',
+  macroCount: 'macro configured',
+  macroCountPlural: 'macros configured',
+  
+  // Basic Info
+  basicInfo: 'Basic information',
+  name: 'Name',
+  namePlaceholder: 'Ex: Welcome greeting',
+  description: 'Description',
+  descriptionPlaceholder: 'Describe what this macro does...',
+  enabled: 'Enabled',
+  cooldown: 'Cooldown',
+  cooldownSeconds: 'sec',
+  
+  // Triggers
+  trigger: 'Trigger',
+  triggerTypes: {
+    chat_command: 'Command',
+    chat_keyword: 'Keyword',
+    schedule: 'Scheduled',
+    event: 'Event',
+    manual: 'Manual',
+  },
+  triggerDescriptions: {
+    chat_command: 'Triggered by a specific command (e.g., !raid)',
+    chat_keyword: 'Triggered when a keyword appears in chat',
+    schedule: 'Runs at time intervals',
+    event: 'Triggered by stream events (follows, raids, etc.)',
+    manual: 'Manually executed from the interface',
+  },
+  triggerConfig: {
+    command: 'Command',
+    commandPlaceholder: '!command',
+    commandHint: 'Command must start with ! (e.g., !raid, !hello)',
+    caseSensitive: 'Case sensitive',
+    minRole: 'Minimum role',
+    keywords: 'Keywords',
+    keywordsPlaceholder: 'hello, greeting, welcome',
+    keywordsHint: 'Separate multiple words with commas',
+    matchAll: 'All words (AND)',
+    scheduleType: 'Schedule type',
+    interval: 'Interval',
+    intervalMinutes: 'Interval (minutes)',
+    cron: 'Cron',
+    cronPlaceholder: '*/30 * * * *',
+    cronHint: 'Format: minute hour day month weekday',
+    eventType: 'Event type',
+    minValue: 'Minimum value (optional)',
+    minValuePlaceholder: 'Minimum bits or viewers',
+    hotkey: 'Keyboard shortcut (optional)',
+    hotkeyPlaceholder: 'Ctrl+Shift+M',
+    showInQuickActions: 'Show in quick actions',
+  },
+  eventTypes: {
+    follower: 'New follower',
+    raid: 'Raid received',
+    subscription: 'New subscription',
+    bits: 'Bits received',
+    host: 'Host received',
+    poll_ended: 'Poll ended',
+    prediction_resolved: 'Prediction resolved',
+  },
+  userRoles: {
+    viewer: 'Any user',
+    subscriber: 'Subscribers',
+    moderator: 'Moderators',
+    broadcaster: 'Broadcaster only',
+  },
+  
+  // Actions
+  actions: 'Actions',
+  addAction: 'Add',
+  selectActionType: 'Select action type:',
+  noActions: 'No actions configured',
+  noActionsDescription: 'Add actions for your macro to do something',
+  actionTypes: {
+    send_chat_message: 'Send message',
+    change_scene: 'Change scene',
+    toggle_source: 'Toggle source',
+    play_sound: 'Play sound',
+    start_poll: 'Start poll',
+    start_prediction: 'Start prediction',
+    send_notification: 'Send notification',
+    set_variable: 'Set variable',
+    delay: 'Wait',
+  },
+  actionConfig: {
+    message: 'Message',
+    messagePlaceholder: 'Type the message to send...',
+    platform: 'Platform',
+    allPlatforms: 'All platforms',
+    sceneName: 'Scene name',
+    sceneNamePlaceholder: 'Ex: Gaming, Just Chatting',
+    sourceName: 'Source name',
+    sourceNamePlaceholder: 'Ex: Webcam, Alert Box',
+    sourceAction: 'Action',
+    show: 'Show',
+    hide: 'Hide',
+    toggle: 'Toggle',
+    soundId: 'Sound ID',
+    soundIdPlaceholder: 'Soundboard sound ID',
+    volume: 'Volume',
+    pollTitle: 'Poll title',
+    pollTitlePlaceholder: 'What game should we play?',
+    pollOptions: 'Options',
+    pollDuration: 'Duration (seconds)',
+    predictionTitle: 'Prediction title',
+    predictionTitlePlaceholder: 'Who will win?',
+    predictionOutcomes: 'Outcomes',
+    predictionDuration: 'Duration (seconds)',
+    notificationChannels: 'Channels',
+    notificationTitle: 'Title',
+    notificationTitlePlaceholder: 'Notification title',
+    notificationMessage: 'Message',
+    notificationMessagePlaceholder: 'Notification content...',
+    variableName: 'Variable name',
+    variableNamePlaceholder: 'my_variable',
+    variableOperation: 'Operation',
+    variableValue: 'Value',
+    variableValuePlaceholder: 'Value or number',
+    operationSet: 'Set',
+    operationIncrement: 'Increment',
+    operationDecrement: 'Decrement',
+    delaySeconds: 'Wait seconds',
+    delayBefore: 'Delay before execution',
+    delayBeforeHint: 'Wait time before executing this action',
+    requiresOBS: 'Requires OBS WebSocket connection',
+  },
+  
+  // Conditions
+  condition: 'Condition',
+  conditionOptional: 'optional',
+  addCondition: 'Add condition',
+  removeCondition: 'Remove condition',
+  addMoreConditions: 'Add more conditions (group)',
+  conditionHint: 'Add a condition to execute this action only when met',
+  availableVariables: 'Available variables',
+  combineWith: 'Combine with:',
+  operators: {
+    equals: 'Equals',
+    not_equals: 'Not equals',
+    greater: 'Greater than',
+    less: 'Less than',
+    contains: 'Contains',
+    not_contains: 'Does not contain',
+  },
+  logicalOperators: {
+    and: 'AND',
+    or: 'OR',
+  },
+  
+  // Variables
+  variables: {
+    username: 'User who triggered',
+    displayName: 'User display name',
+    message: 'Chat message',
+    platform: 'Source platform',
+    timestamp: 'Current timestamp',
+    viewers: 'Current viewers',
+    followers: 'Total followers',
+    uptime: 'Stream uptime',
+    game: 'Current game',
+    title: 'Stream title',
+  },
+  
+  // Manager
+  filters: 'Filters',
+  filterAll: 'All',
+  filterEnabled: 'Enabled',
+  filterDisabled: 'Disabled',
+  pauseAll: 'Pause all',
+  resumeAll: 'Resume all',
+  allPaused: 'All macros are paused',
+  allPausedHint: 'Click to resume',
+  resume: 'Resume',
+  duplicate: 'Duplicate',
+  execute: 'Execute macro',
+  deleteConfirm: 'Delete macro',
+  deleteConfirmMessage: 'Are you sure you want to delete the macro "{name}"? This action cannot be undone.',
+  
+  // Card
+  executions: 'executions',
+  lastExecution: 'Last execution',
+  ago: 'ago',
+  errorLastExecution: 'Error in last execution',
+  
+  // Execution Log
+  executionLog: 'Execution Log',
+  executionLogSubtitle: 'executions',
+  noExecutions: 'No executions',
+  noExecutionsHint: 'Macro executions will appear here',
+  allMacros: 'All macros',
+  filterByStatus: 'Filter by status',
+  statusAll: 'All',
+  statusSuccess: 'Successful',
+  statusFailed: 'Failed',
+  successful: 'successful',
+  failed: 'failed',
+  skipped: 'skipped',
+  clearLog: 'Clear log',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  
+  // Import/Export
+  importExport: 'Import/Export',
+  export: 'Export',
+  import: 'Import',
+  exportDescription: 'Export your macros as JSON file',
+  importDescription: 'Import macros from JSON file',
+  selectMacros: 'Select macros',
+  selectAll: 'Select all',
+  deselectAll: 'Deselect all',
+  exportSelected: 'Export selected',
+  importFile: 'Select file',
+  dragDropFile: 'Drag a file here or click to select',
+  importMode: 'Import mode',
+  modeMerge: 'Merge',
+  modeMergeDesc: 'Add new macros without removing existing ones',
+  modeReplace: 'Replace',
+  modeReplaceDesc: 'Replace all existing macros',
+  importSuccess: 'Macros imported successfully',
+  importError: 'Error importing macros',
+  exportSuccess: 'Macros exported successfully',
+  exportError: 'Error exporting macros',
+  noMacrosToExport: 'No macros to export',
+  
+  // Validation
+  validation: {
+    nameRequired: 'Name is required',
+    triggerRequired: 'Trigger is required',
+    actionsRequired: 'At least one action is required',
+    commandRequired: 'Command is required',
+    keywordsRequired: 'At least one keyword is required',
+    intervalRequired: 'Interval is required',
+    cronRequired: 'Cron expression is required',
+    eventTypeRequired: 'Event type is required',
+    moreErrors: 'more errors',
+  },
+  
+  // Messages
+  messages: {
+    macroCreated: 'Macro created successfully',
+    macroUpdated: 'Macro updated successfully',
+    macroDeleted: 'Macro deleted successfully',
+    macroDuplicated: 'Macro duplicated successfully',
+    macroExecuted: 'Macro executed',
+    macroError: 'Error executing macro',
+    saving: 'Saving...',
+    saveChanges: 'Save changes',
+  },
+};
+
+export default macros;

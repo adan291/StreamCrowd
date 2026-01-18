@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, RotateCcw, Trophy, ExternalLink, Crosshair } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 interface Duck {
@@ -31,6 +31,9 @@ const CANVAS_HEIGHT = 400;
 const DUCK_SIZE = 40;
 
 export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+  
   const [isActive, setIsActive] = useState(true);
   const [score, setScore] = useState(0);
   const [shotsFired, setShotsFired] = useState(0);
@@ -53,7 +56,7 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     return () => channelRef.current?.close();
   }, []);
 
-  const syncToOverlay = useCallback(() => {
+  const syncToOverlay = useCallback(async () => {
     const state = {
       type: 'duckhunt_state',
       ducks: ducksRef.current,
@@ -64,8 +67,32 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
     try {
       localStorage.setItem(STORAGE_KEY_DUCKHUNT, JSON.stringify(state));
     } catch { /* ignore */ }
-    gameSync.update('duckhunt', state).catch(() => {});
-  }, [score, kills]);
+    
+    // Use hexagonal architecture game sync
+    try {
+      await publishGameState({
+        gameType: 'duck-hunt',
+        isActive: isActive,
+        players: kills.map((kill, index) => ({
+          id: `${kill.username}_${index}`,
+          username: kill.username,
+          score: 1, // Each kill is worth 1 point
+          isActive: true,
+          joinedAt: Date.now() - (kills.length - index) * 1000, // Approximate timestamp
+        })),
+        currentRound: duckCount,
+        settings: {
+          score,
+          shotsFired,
+          duckCount,
+        },
+        lastUpdate: Date.now(),
+        ...state, // Include all original data for backward compatibility
+      });
+    } catch (error) {
+      console.warn('Failed to sync game state:', error);
+    }
+  }, [score, kills, publishGameState, isActive, duckCount, shotsFired]);
 
   useEffect(() => {
     syncToOverlay();

@@ -1,0 +1,2038 @@
+# 📋 PLAN DE EJECUCIÓN TÉCNICA - StreamCrowd
+
+Voy a transformar los hallazgos de la revisión en documentación accionable y tareas concretas que tu equipo pueda ejecutar.
+
+---
+
+## 1️⃣ DOCUMENTO DE REQUISIMIENTOS (Functional & Technical Requirements)
+
+### **REQ-001: Consolidación de Estructura de Carpetas y Separación de Responsabilidades**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-001 |
+| **Categoría** | Arquitectura / Refactoring |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | `components/` contiene 100+ archivos sin estructura clara; lógica de aplicación mezclada con UI |
+| **Problema** | Imposible localizar código; difícil de testear; acoplamiento alto; imposible reutilizar lógica entre componentes |
+| **Objetivo** | Reorganizar carpetas siguiendo patrón feature-based + separación clara entre presentación y lógica |
+| **Impacto** | - Mejora mantenibilidad en 60%<br/>- Facilita testing de componentes<br/>- Permite reuso de lógica |
+
+**Requisitos Funcionales (RF):**
+- RF-001.1: El código debe organizarse por features (giveaway, poll, games, etc.)
+- RF-001.2: Cada feature debe ser auto-contenida y reutilizable
+- RF-001.3: La lógica de negocio debe estar separada de los componentes de presentación
+- RF-001.4: No debe haber dependencias circulares entre features
+
+**Requisitos Técnicos (RT):**
+- RT-001.1: Reorganizar `components/` en estructura:
+```
+components/
+  ├── shared/              # Botones, inputs, tooltips, etc.
+  ├── features/
+  │   ├── poll/
+  │   ├── giveaway/
+  │   ├── games/
+  │   │   ├── VeoVeo/
+  │   │   ├── Fishing/
+  │   │   └── ...
+  │   └── ...
+  └── layouts/
+```
+
+- RT-001.2: Mover servicios a `src/application/` por feature
+- RT-001.3: Crear custom hooks en `hooks/` para conectar componentes con servicios
+- RT-001.4: Establecer reglas de eslint para evitar imports cruzados entre features
+
+**Criterios de Aceptación:**
+- ✅ Todas las carpetas reorganizadas y imports actualizados
+- ✅ No hay imports circulares (verificable con `npm run lint`)
+- ✅ Cada feature puede importarse de forma independiente
+- ✅ Tests existentes continúan pasando
+- ✅ Documentación `STRUCTURE.md` creada con la nueva estructura
+
+**Dependencias:**
+- REQ-002 (Gestión de Estado) - necesita esta estructura
+- REQ-006 (Tests E2E) - mejorará con estructura clara
+
+---
+
+### **REQ-002: Centralización de Gestión de Estado Global**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-002 |
+| **Categoría** | State Management |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | Context API fragmentado, lógica de estado en componentes, prop drilling severo |
+| **Problema** | Re-renders innecesarios; inconsistencia de estado; difícil debuggear |
+| **Objetivo** | Implementar Redux Toolkit con estructura clara de slices por feature |
+| **Impacto** | - DevTools para debugging<br/>- Performance mejorado (selectors memoizados)<br/>- State predecible |
+
+**Requisitos Funcionales (RF):**
+- RF-002.1: Cada feature tiene su slice de estado (games, giveaway, poll, etc.)
+- RF-002.2: Estado global centralizado y accesible desde cualquier componente
+- RF-002.3: DevTools Redux funcional en desarrollo
+- RF-002.4: Persist de estado en localStorage (config, historial)
+
+**Requisitos Técnicos (RT):**
+- RT-002.1: Instalar Redux Toolkit: `npm install @reduxjs/toolkit react-redux`
+- RT-002.2: Crear estructura:
+```
+src/application/state/
+  ├── store.ts
+  ├── slices/
+  │   ├── giveawaySlice.ts
+  │   ├── pollSlice.ts
+  │   ├── gamesSlice.ts
+  │   ├── connectionSlice.ts (Twitch, OBS, Firebase)
+  │   ├── authSlice.ts
+  │   └── uiSlice.ts (temas, idioma, notificaciones)
+  └── hooks.ts (useAppDispatch, useAppSelector)
+```
+
+- RT-002.2: Migrar estado de Context API a Redux Slices
+- RT-002.3: Implementar `redux-persist` para persistencia
+- RT-002.4: Configurar selectors con `reselect` para memoización
+
+**Criterios de Aceptación:**
+- ✅ Redux Store configurado y conectado en App.tsx
+- ✅ Todos los slices creados y probados
+- ✅ DevTools funciona en navegador
+- ✅ Persist en localStorage funciona
+- ✅ No hay Context API para estado de aplicación (solo para temas/i18n)
+- ✅ Tests de slices y selectors con >80% cobertura
+
+**Dependencias:**
+- Requiere REQ-001 (estructura de carpetas)
+- REQ-003 (seguridad) - debe asegurar que tokens no se guardan en estado sin encriptar
+
+---
+
+### **REQ-003: Auditoría y Endurecimiento de Seguridad en Credenciales y OAuth**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-003 |
+| **Categoría** | Seguridad |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | Tokens en localStorage sin validación; posible exposición en overlays; sin encriptación |
+| **Problema** | Riesgo de exposición de credenciales; CSRF; XSS en overlays públicos |
+| **Objetivo** | Implementar OAuth2 con PKCE, validación de tokens, encriptación, y HttpOnly cookies |
+| **Impacto** | - Cumplimiento de seguridad OAuth2<br/>- Protección de tokens<br/>- Reducción de superficie de ataque |
+
+**Requisitos Funcionales (RF):**
+- RF-003.1: Los tokens de OAuth nunca viajan en URLs públicas (overlays)
+- RF-003.2: Los tokens se validan/refrescan al iniciar la aplicación
+- RF-003.3: Las sesiones expiran automáticamente
+- RF-003.4: Las credenciales se almacenan de forma segura (no plaintext en localStorage)
+- RF-003.5: Los overlays usan session IDs en lugar de tokens
+
+**Requisitos Técnicos (RT):**
+- RT-003.1: Implementar PKCE en flujo OAuth2:
+```typescript
+// Generar code_challenge y state
+  const codeVerifier = generateRandomString(128);
+  const codeChallenge = sha256(codeVerifier);
+```
+
+- RT-003.2: Usar HttpOnly + Secure cookies para refresh tokens:
+```typescript
+// Backend: Set-Cookie: refresh_token=...; HttpOnly; Secure; SameSite=Strict
+```
+
+- RT-003.3: Validar tokens al iniciar:
+```typescript
+// En App.tsx o useEffect inicial
+  const validateToken = async () => {
+    if (!token) return;
+    const isValid = await authService.validateToken(token);
+    if (!isValid) await authService.refreshToken();
+  };
+```
+
+- RT-003.4: Encriptar tokens sensibles en localStorage:
+```typescript
+import CryptoJS from 'crypto-js';
+
+  const encryptToken = (token: string, key: string) => {
+    return CryptoJS.AES.encrypt(token, key).toString();
+  };
+```
+
+- RT-003.5: Generar session IDs para overlays:
+```typescript
+// En lugar de: /overlay?token=abc123
+  // Usar: /overlay?sessionId=xyz789&expires=1234567890
+  // sessionId valida en backend/servidor
+```
+
+- RT-003.6: Auditar `firebase-rules.json` para permisos mínimos
+
+**Criterios de Aceptación:**
+- ✅ Análisis completo de `firebase-rules.json` documentado
+- ✅ PKCE implementado en todas las integraciones OAuth (Twitch, YouTube, etc.)
+- ✅ Tokens NO aparecen en URLs de overlays
+- ✅ Tests de validación de tokens pasan
+- ✅ Session management con expiración funciona
+- ✅ Report de seguridad actualizado
+
+**Dependencias:**
+- Requiere REQ-002 (estado para guardar sesiones)
+- REQ-004 (validación) - necesita validar entrada de usuarios
+
+---
+
+### **REQ-004: Implementación de Validación de Entrada y Sanitización**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-004 |
+| **Categoría** | Seguridad |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | Sin validación visible en integraciones; entrada de chat no sanitizada |
+| **Problema** | Riesgo de inyección SQL, XSS, CSRF |
+| **Objetivo** | Implementar validación en todas las capas (cliente + servidor) con schemas Zod |
+| **Impacto** | - Prevención de ataques de inyección<br/>- Mejor UX con errores validados<br/>- Type-safe en todo |
+
+**Requisitos Funcionales (RF):**
+- RF-004.1: Todas las entradas de usuario son validadas antes de usar
+- RF-004.2: Los mensajes del chat se sanitizan para evitar XSS
+- RF-004.3: Las URLs de overlays se validan contra whitelist
+- RF-004.4: Los parámetros de query se validan con tipos esperados
+
+**Requisitos Técnicos (RT):**
+- RT-004.1: Instalar `zod` y `@hookform/resolvers`:
+```shell script
+npm install zod @hookform/resolvers
+```
+
+- RT-004.2: Crear schemas centralizados:
+```typescript
+// src/domain/schemas/validation.ts
+  import { z } from 'zod';
+
+  export const TwitchMessageSchema = z.object({
+    username: z.string().min(1).max(25),
+    message: z.string().min(1).max(500),
+    timestamp: z.date(),
+  });
+
+  export const PollSchema = z.object({
+    title: z.string().min(1).max(100),
+    options: z.array(z.string()).min(2).max(5),
+  });
+```
+
+- RT-004.3: Implementar sanitización de HTML:
+```shell script
+npm install dompurify
+```
+```typescript
+import DOMPurify from 'dompurify';
+  const cleanMessage = DOMPurify.sanitize(userInput);
+```
+
+- RT-004.4: Validar en hooks:
+```typescript
+// hooks/useValidatedInput.ts
+  const useValidatedInput = (schema: z.ZodSchema) => {
+    const [errors, setErrors] = useState<string[]>([]);
+
+    const validate = (data: unknown) => {
+      try {
+        return schema.parse(data);
+      } catch (e) {
+        if (e instanceof z.ZodError) {
+          setErrors(e.errors.map(err => err.message));
+        }
+        return null;
+      }
+    };
+
+    return { validate, errors };
+  };
+```
+
+- RT-004.5: Implementar CORS y CSP headers en servidor
+
+**Criterios de Aceptación:**
+- ✅ Schemas Zod para todos los tipos principales
+- ✅ Validación en formularios con feedback de errores
+- ✅ Sanitización de mensajes de chat funciona
+- ✅ Tests de validación con casos límite (edge cases)
+- ✅ Report de seguridad XSS/CSRF actualizado
+
+**Dependencias:**
+- Requiere REQ-003 (tokens seguros)
+- REQ-005 (error handling) - manejo de errores de validación
+
+---
+
+### **REQ-005: Implementación de Error Boundaries y Manejo Global de Errores**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-005 |
+| **Categoría** | Reliability / Error Handling |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | Sin Error Boundaries; un juego fallando colapsa toda la app |
+| **Problema** | Falta de resiliencia; experiencia pobre del usuario; imposible debuggear |
+| **Objetivo** | Implementar Error Boundaries por feature, logging centralizado, y retry logic |
+| **Impacto** | - App sigue funcionando si un componente falla<br/>- Mejor debugging con logs centralizados<br/>- Mayor estabilidad |
+
+**Requisitos Funcionales (RF):**
+- RF-005.1: Si un juego crashea, otros juegos siguen funcionando
+- RF-005.2: Los errores se registran y reportan (logs centralizados)
+- RF-005.3: Las acciones fallidas se reintentan automáticamente
+- RF-005.4: El usuario ve un mensaje claro si algo falla
+- RF-005.5: Los errores se pueden exportar para debugging
+
+**Requisitos Técnicos (RT):**
+- RT-005.1: Crear Error Boundary genérico:
+```typescript
+// components/shared/ErrorBoundary.tsx
+  import React from 'react';
+
+  interface Props {
+    children: React.ReactNode;
+    feature?: string;
+    fallback?: React.ReactNode;
+  }
+
+  interface State {
+    hasError: boolean;
+    error: Error | null;
+  }
+
+  export class ErrorBoundary extends React.Component<Props, State> {
+    constructor(props: Props) {
+      super(props);
+      this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error): State {
+      return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+      console.error(`[${this.props.feature}]`, error, errorInfo);
+      // Enviar a servicio de logging
+      logService.error({
+        feature: this.props.feature,
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date(),
+      });
+    }
+
+    render() {
+      if (this.state.hasError) {
+        return this.props.fallback || (
+          <div className="p-4 bg-red-50 border border-red-200 rounded">
+            <p className="text-red-800">Error en {this.props.feature}</p>
+            <button onClick={() => this.setState({ hasError: false })}>
+              Reintentar
+            </button>
+          </div>
+        );
+      }
+
+      return this.props.children;
+    }
+  }
+```
+
+- RT-005.2: Wrappear features críticas:
+```typescript
+<ErrorBoundary feature="VeoVeo">
+    <VeoVeoGame />
+  </ErrorBoundary>
+```
+
+- RT-005.3: Crear servicio de logging centralizado:
+```typescript
+// src/infrastructure/logging/LogService.ts
+  import pino from 'pino';
+
+  export class LogService {
+    private logger = pino({
+      level: process.env.LOG_LEVEL || 'info',
+      transport: {
+        target: 'pino-pretty',
+        options: { colorize: true }
+      }
+    });
+
+    error(context: any) {
+      this.logger.error(context);
+      // Opcionalmente enviar a Sentry
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(context);
+      }
+    }
+
+    warn(context: any) {
+      this.logger.warn(context);
+    }
+
+    info(context: any) {
+      this.logger.info(context);
+    }
+  }
+```
+
+- RT-005.4: Implementar retry logic:
+```typescript
+// hooks/useRetry.ts
+  export const useRetry = (fn: () => Promise<any>, maxRetries = 3) => {
+    const [retrying, setRetrying] = useState(false);
+
+    const execute = async () => {
+      setRetrying(true);
+      let lastError;
+
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await fn();
+        } catch (error) {
+          lastError = error;
+          await new Promise(r => setTimeout(r, 1000 * (i + 1))); // exponential backoff
+        }
+      }
+
+      throw lastError;
+    };
+
+    return { execute, retrying };
+  };
+```
+
+- RT-005.5: Integración con Sentry (opcional pero recomendado):
+```shell script
+npm install @sentry/react
+```
+
+
+**Criterios de Aceptación:**
+- ✅ Error Boundaries implementados en 5+ features críticas
+- ✅ Logging centralizado funciona
+- ✅ Tests de ErrorBoundary con fallos simulados pasan
+- ✅ Retry logic funciona con exponential backoff
+- ✅ UI muestra errores de forma clara al usuario
+
+**Dependencias:**
+- Requiere REQ-001 (estructura clara)
+- REQ-006 (tests) - necesita tests para error scenarios
+
+---
+
+### **REQ-006: Refactorización y Reparación de Tests E2E con Playwright**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-006 |
+| **Categoría** | Testing / QA |
+| **Prioridad** | 🔴 CRÍTICA |
+| **Estado Actual** | Tests E2E con fallos reportados; selectores frágiles (.catch(() => false)); baja cobertura |
+| **Problema** | CI/CD poco confiable; bugs sin detección; cambios rompen tests sin saberlo |
+| **Objetivo** | Reescribir tests E2E con Page Object Model, data-testid, y buenas prácticas |
+| **Impacto** | - CI/CD confiable<br/>- Tests mantenibles<br/>- Mejor cobertura<br/>- Detección de regressiones |
+
+**Requisitos Funcionales (RF):**
+- RF-006.1: Tests E2E para flujos críticos (giveaway, poll, games)
+- RF-006.2: Tests deben ser independientes y reutilizables
+- RF-006.3: Tests deben pasar consistentemente (sin race conditions)
+- RF-006.4: Tests deben reportar errores claros
+
+**Requisitos Técnicos (RT):**
+- RT-006.1: Implementar Page Object Model:
+```typescript
+// tests/pages/BasePage.ts
+  import { Page } from '@playwright/test';
+
+  export abstract class BasePage {
+    constructor(protected page: Page) {}
+
+    async goto(path: string) {
+      await this.page.goto(`${process.env.BASE_URL}${path}`);
+      await this.waitForPageLoad();
+    }
+
+    protected async waitForPageLoad() {
+      await this.page.waitForLoadState('networkidle');
+    }
+  }
+
+  // tests/pages/GiveawayPage.ts
+  export class GiveawayPage extends BasePage {
+    async goto() {
+      await super.goto('/giveaway');
+    }
+
+    async createGiveaway(config: GiveawayConfig) {
+      const dynamicsNav = this.page.getByRole('button', { name: /dynamics/i });
+      await dynamicsNav.click();
+
+      const giveawayCard = this.page
+        .getByRole('button')
+        .filter({ hasText: /sorteos/i });
+      await giveawayCard.click({ timeout: 5000 });
+
+      // Llenar form
+      await this.page.getByTestId('giveaway-title').fill(config.title);
+      await this.page.getByTestId('giveaway-submit').click();
+
+      // Esperar confirmación
+      await this.page.getByTestId('giveaway-success').isVisible();
+    }
+
+    async selectWinner() {
+      await this.page.getByTestId('giveaway-select-winner').click();
+      await this.page.getByTestId('giveaway-winner-modal').isVisible();
+    }
+  }
+```
+
+- RT-006.2: Añadir `data-testid` a componentes críticos:
+```typescript
+// En componentes
+  <button data-testid="giveaway-submit" onClick={handleSubmit}>
+    Crear Sorteo
+  </button>
+```
+
+- RT-006.3: Reescribir tests existentes:
+```typescript
+// tests/e2e/giveaway.spec.ts
+  import { test, expect } from '@playwright/test';
+  import { GiveawayPage } from '../pages/GiveawayPage';
+
+  test.describe('Giveaway', () => {
+    let page: GiveawayPage;
+
+    test.beforeEach(async ({ page: p }) => {
+      page = new GiveawayPage(p);
+      await page.goto();
+    });
+
+    test('should create a giveaway', async () => {
+      await page.createGiveaway({
+        title: 'Test Giveaway',
+        participants: 100,
+      });
+
+      // Verificación
+      await expect(p.getByTestId('giveaway-active')).toBeVisible();
+    });
+
+    test('should select winner without errors', async () => {
+      await page.createGiveaway({ title: 'Test' });
+      await page.selectWinner();
+
+      await expect(p.getByTestId('giveaway-winner-modal')).toBeVisible();
+    });
+  });
+```
+
+- RT-006.4: Configurar Playwright para stabilidad:
+```typescript
+// playwright.config.ts
+  export default defineConfig({
+    testDir: './tests/e2e',
+    use: {
+      baseURL: process.env.BASE_URL || 'http://localhost:5173',
+      trace: 'on-first-retry',
+      screenshot: 'only-on-failure',
+      video: 'retain-on-failure',
+    },
+    webServer: {
+      command: 'npm run dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+    },
+    retries: process.env.CI ? 2 : 0,
+  });
+```
+
+- RT-006.5: Crear fixtures para juegos:
+```typescript
+// tests/fixtures/gameFixtures.ts
+  export const veoVeoFixture = {
+    setup: async (page: Page) => {
+      await page.goto('/games/veo-veo');
+      await page.getByTestId('veo-veo-start').click();
+      await page.waitForTimeout(1000);
+    },
+    guess: async (page: Page, answer: string) => {
+      await page.getByTestId('veo-veo-input').fill(answer);
+      await page.getByTestId('veo-veo-submit').click();
+    },
+  };
+```
+
+
+**Criterios de Aceptación:**
+- ✅ Page Object Model implementado para 5+ páginas
+- ✅ `data-testid` añadidos a todos los elementos testables
+- ✅ Tests E2E reescritos sin `.catch(() => false)`
+- ✅ Tests pasan consistentemente (0 flakiness)
+- ✅ Cobertura de tests documentada
+- ✅ CI ejecuta tests automáticamente
+
+**Dependencias:**
+- Requiere REQ-001 (estructura clara) - facilita localizar componentes
+- REQ-005 (error handling) - necesita manejar errores en tests
+
+---
+
+### **REQ-007: Code Splitting y Optimización de Overlays**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-007 |
+| **Categoría** | Performance |
+| **Prioridad** | 🟡 ALTA |
+| **Estado Actual** | 15+ overlays cargan toda la aplicación; sin code splitting |
+| **Problema** | Cargas lentas en OBS; alto uso de CPU; pobre experiencia del streamer |
+| **Objetivo** | Implementar code splitting por overlay con lazy loading y tree shaking |
+| **Impacto** | - Bundle size reducido 60-80%<br/>- Carga más rápida en OBS<br/>- Menor uso de CPU |
+
+**Requisitos Funcionales (RF):**
+- RF-007.1: Cada overlay carga independientemente del resto
+- RF-007.2: Los overlays cargan <2 segundos en OBS
+- RF-007.3: No se cargan recursos no necesarios para cada overlay
+- RF-007.4: El bundle principal no incluye código de overlays
+
+**Requisitos Técnicos (RT):**
+- RT-007.1: Configurar Vite para code splitting:
+```typescript
+// vite.config.ts
+  export default defineConfig({
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'overlay-poll': ['./components/features/poll/PollOverlay.tsx'],
+            'overlay-spinner': ['./components/features/poll/SpinnerOverlay.tsx'],
+            'overlay-giveaway': ['./components/features/giveaway/GiveawayOverlay.tsx'],
+            'overlay-judge': ['./components/features/judge/JudgePanelOverlay.tsx'],
+            // ... más overlays
+            'vendor': ['react', 'react-dom'],
+          },
+        },
+      },
+    },
+  });
+```
+
+- RT-007.2: Crear componentes overlay lazy-loaded:
+```typescript
+// components/OverlayRouter.tsx
+  import { lazy, Suspense } from 'react';
+
+  const PollOverlay = lazy(() => import('./overlays/PollOverlay'));
+  const SpinnerOverlay = lazy(() => import('./overlays/SpinnerOverlay'));
+  const GiveawayOverlay = lazy(() => import('./overlays/GiveawayOverlay'));
+
+  export const OverlayRouter = ({ type }: { type: string }) => {
+    const getOverlay = () => {
+      switch (type) {
+        case 'poll': return <PollOverlay />;
+        case 'spinner': return <SpinnerOverlay />;
+        case 'giveaway': return <GiveawayOverlay />;
+        default: return null;
+      }
+    };
+
+    return (
+      <Suspense fallback={<LoadingOverlay />}>
+        {getOverlay()}
+      </Suspense>
+    );
+  };
+```
+
+- RT-007.3: Crear página overlay minimalista:
+```typescript
+// src/pages/Overlay.tsx
+  import { useSearchParams } from 'react-router-dom';
+  import { OverlayRouter } from '../components/OverlayRouter';
+
+  export const OverlayPage = () => {
+    const [params] = useSearchParams();
+    const type = params.get('type');
+
+    return (
+      <div className="overlay-container">
+        <OverlayRouter type={type} />
+      </div>
+    );
+  };
+```
+
+- RT-007.4: Implementar prefetch para overlays frecuentes:
+```typescript
+// En App.tsx
+  useEffect(() => {
+    // Prefetch overlays que se usan frecuentemente
+    import('./overlays/PollOverlay');
+    import('./overlays/SpinnerOverlay');
+  }, []);
+```
+
+- RT-007.5: Medir rendimiento con Lighthouse/WebVitals:
+```shell script
+npm install web-vitals
+```
+```typescript
+import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+
+  getCLS(console.log);
+  getFID(console.log);
+  getFCP(console.log);
+  getLCP(console.log);
+  getTTFB(console.log);
+```
+
+
+**Criterios de Aceptación:**
+- ✅ Vite configurado con manualChunks para overlays
+- ✅ Cada overlay es un chunk separado (<100KB)
+- ✅ Overlays cargan en <2s en conexión 4G simulada
+- ✅ Lighthouse score >85 en overlays
+- ✅ Bundle analysis report generado
+
+**Dependencias:**
+- Requiere REQ-001 (estructura clara)
+- REQ-008 (sincronización) - optimizar datos en tiempo real
+
+---
+
+### **REQ-008: Optimización de Sincronización de Estado en Tiempo Real**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-008 |
+| **Categoría** | Performance |
+| **Prioridad** | 🟡 ALTA |
+| **Estado Actual** | WebSocket, Socket.io, Firebase sin debouncing/throttling; UI lag en chat activo |
+| **Problema** | Demasiados updates; re-renders costosos; CPU spike en OBS |
+| **Objetivo** | Implementar debouncing, throttling, batch updates y request deduplication |
+| **Impacto** | - UI más fluida<br/>- Menor uso de CPU en OBS<br/>- Mejor responsiveness |
+
+**Requisitos Funcionales (RF):**
+- RF-008.1: Los updates de UI no críticos se debounce (>100ms)
+- RF-008.2: Los datos de chat se throttle (máx 1 update/200ms)
+- RF-008.3: Las requests a APIs se deduplican (no enviar 2x simultáneamente)
+- RF-008.4: Los updates se batch cuando es posible
+- RF-008.5: El lag perceptible es <100ms en chat activo
+
+**Requisitos Técnicos (RT):**
+- RT-008.1: Crear hooks de debounce/throttle:
+```typescript
+// hooks/useDebounce.ts
+  import { useEffect, useState } from 'react';
+
+  export const useDebounce = <T,>(value: T, delay: number = 500): T => {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+
+      return () => clearTimeout(handler);
+    }, [value, delay]);
+
+    return debouncedValue;
+  };
+
+  // hooks/useThrottle.ts
+  export const useThrottle = <T,>(value: T, interval: number = 200): T => {
+    const [throttledValue, setThrottledValue] = useState<T>(value);
+    const lastUpdated = useRef<number>(Date.now());
+
+    useEffect(() => {
+      const now = Date.now();
+      if (now >= lastUpdated.current + interval) {
+        lastUpdated.current = now;
+        setThrottledValue(value);
+      }
+    }, [value, interval]);
+
+    return throttledValue;
+  };
+```
+
+- RT-008.2: Aplicar en listeners de chat:
+```typescript
+// En componente de chat
+  const messages = useThrottle(incomingMessages, 200);
+
+  useEffect(() => {
+    // Actualizar UI solo cada 200ms
+    renderMessages(messages);
+  }, [messages]);
+```
+
+- RT-008.3: Implementar request deduplication:
+```typescript
+// src/infrastructure/api/RequestDeduplicator.ts
+  export class RequestDeduplicator {
+    private pending = new Map<string, Promise<any>>();
+
+    async execute<T>(
+      key: string,
+      fn: () => Promise<T>
+    ): Promise<T> {
+      if (this.pending.has(key)) {
+        return this.pending.get(key)!;
+      }
+
+      const promise = fn().finally(() => {
+        this.pending.delete(key);
+      });
+
+      this.pending.set(key, promise);
+      return promise;
+    }
+  }
+
+  // Uso:
+  const deduplicator = new RequestDeduplicator();
+
+  const fetchUser = (userId: string) => {
+    return deduplicator.execute(`user-${userId}`, () =>
+      api.getUser(userId)
+    );
+  };
+```
+
+- RT-008.4: Usar React 18 features para batch updates:
+```typescript
+import { flushSync } from 'react-dom';
+
+  // En listeners
+  socket.on('message', (message) => {
+    // Updates no-críticos se batchean automáticamente
+    setMessages(prev => [...prev, message]);
+    setMessageCount(prev => prev + 1);
+
+    // Si necesitas flush inmediato:
+    flushSync(() => {
+      setUrgentData(data);
+    });
+  });
+```
+
+- RT-008.5: Usar `useDeferredValue` para updates no-críticos:
+```typescript
+import { useDeferredValue } from 'react';
+
+  export const ChatList = ({ messages }: Props) => {
+    // Buscar/filtrar no es crítico, puede esperar
+    const deferredMessages = useDeferredValue(messages);
+
+    return (
+      <div>
+        {deferredMessages.map((msg) => (
+          <ChatMessage key={msg.id} message={msg} />
+        ))}
+      </div>
+    );
+  };
+```
+
+- RT-008.6: Implementar reconnection exponential backoff:
+```typescript
+// src/infrastructure/websocket/WebSocketManager.ts
+  export class WebSocketManager {
+    private reconnectAttempts = 0;
+    private maxReconnectAttempts = 5;
+
+    private reconnect() {
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        return;
+      }
+
+      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+
+      setTimeout(() => {
+        this.reconnectAttempts++;
+        this.connect();
+      }, delay);
+    }
+  }
+```
+
+
+**Criterios de Aceptación:**
+- ✅ Hooks de debounce/throttle implementados
+- ✅ Request deduplication funciona
+- ✅ ChatList no causa lag (verificable con DevTools)
+- ✅ Tests de rendimiento pasan (Lighthouse >85)
+- ✅ CPU usage en OBS <20% en chat activo
+
+**Dependencias:**
+- Requiere REQ-002 (estado centralizado)
+- REQ-007 (overlays optimizados)
+
+---
+
+### **REQ-009: Auditoría y Consolidación de Dependencias**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-009 |
+| **Categoría** | Mantenibilidad |
+| **Prioridad** | 🟡 MEDIA |
+| **Estado Actual** | 40+ dependencias; algunas sin propósito claro (@mediapipe, electron-builder, etc.) |
+| **Problema** | Bundle inflado; vulnerabilidades potenciales; dificultad de mantenimiento |
+| **Objetivo** | Auditar todas las dependencias, documentar propósito, eliminar innecesarias |
+| **Impacto** | - Bundle size reducido 15-20%<br/>- Mantenimiento más fácil<br/>- Menos vulnerabilidades |
+
+**Requisitos Funcionales (RF):**
+- RF-009.1: Cada dependencia tiene propósito documentado
+- RF-009.2: No hay dependencias duplicadas o conflictivas
+- RF-009.3: Todas las dependencias están actualizadas a versiones seguras
+
+**Requisitos Técnicos (RT):**
+- RT-009.1: Auditar dependencias:
+```shell script
+npm audit          # Buscar vulnerabilidades
+  npm ls             # Ver árbol de dependencias
+  npm outdated       # Ver versiones desactualizadas
+```
+
+- RT-009.2: Eliminar dependencias no usadas:
+```shell script
+npm prune          # Limpiar node_modules
+  # Revisar manualmente cada una:
+  npm ls @mediapipe/hands     # ¿Dónde se usa?
+  npm ls electron-builder     # ¿Se usa Electron?
+```
+
+- RT-009.3: Crear documento de dependencias:
+```markdown
+# DEPENDENCIES.md
+
+  ## Críticas (aplicación no funciona sin ellas)
+  - react 19.2.1: Framework UI principal
+  - typescript 5.8.2: Tipado estático
+  - vite 7.2.7: Build tool
+
+  ## Integraciones
+  - firebase 12.7.0: Backend + auth
+  - tmi.js 1.8.5: Chat de Twitch
+  - socket.io-client 4.8.3: Real-time sync
+  - obs-websocket-js 5.0.7: Control de OBS
+
+  ## Utilidades
+  - tailwindcss 4.1.17: Estilos
+  - recharts 3.5.1: Gráficos
+  - lucide-react 0.556.0: Iconos
+
+  ## Testing
+  - @playwright/test 1.57.0: E2E testing
+  - vitest 4.0.15: Unit tests
+  - @testing-library/react 16.3.0: Utilidades de testing
+
+  ## Candidatas a Eliminar
+  - @mediapipe/hands: ¿Se usa en qué feature?
+  - electron-builder: Revisar si Electron se mantiene activo
+```
+
+- RT-009.4: Actualizar dependencias:
+```shell script
+# Revisar y actualizar menores/patches
+  npm update
+
+  # Para updates mayores, revisar CHANGELOG
+  npm install package@latest
+  npm test
+```
+
+
+**Criterios de Aceptación:**
+- ✅ `DEPENDENCIES.md` creado y documentado
+- ✅ Dependencias sin uso eliminadas
+- ✅ Vulnerabilidades críticas parcheadas
+- ✅ npm audit pasa sin warnings críticos
+- ✅ Bundle size documentado y reducido
+
+**Dependencias:**
+- Puede ejecutarse en paralelo con otros cambios
+
+---
+
+### **REQ-010: Refactorización y Consolidación de i18n (Internacionalización)**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-010 |
+| **Categoría** | Mantenibilidad / UX |
+| **Prioridad** | 🟡 MEDIA |
+| **Estado Actual** | Carpeta `i18n/` existe pero fragmentada; strings hardcodeados en componentes |
+| **Problema** | Difícil mantener traducciones; inconsistencia entre idiomas; cambios de copy requieren refactor |
+| **Objetivo** | Centralizar todas las traducciones con namespaces por feature |
+| **Impacto** | - Traducción consistente<br/>- Fácil añadir idiomas<br/>- UX mejorada |
+
+**Requisitos Funcionales (RF):**
+- RF-010.1: Todos los strings son traducibles (no hardcodeados)
+- RF-010.2: El usuario puede cambiar idioma sin recargar
+- RF-010.3: Las traducciones se cargan dinámicamente
+
+**Requisitos Técnicos (RT):**
+- RT-010.1: Estructurar i18n:
+```
+i18n/
+  ├── locales/
+  │   ├── en/
+  │   │   ├── common.json
+  │   │   ├── games.json
+  │   │   ├── giveaway.json
+  │   │   └── poll.json
+  │   └── es/
+  │       ├── common.json
+  │       ├── games.json
+  │       ├── giveaway.json
+  │       └── poll.json
+  └── i18n.ts              # Configuración
+```
+
+- RT-010.2: Configurar react-i18next:
+```shell script
+npm install i18next react-i18next
+```
+```typescript
+// i18n/i18n.ts
+  import i18n from 'i18next';
+  import { initReactI18next } from 'react-i18next';
+
+  import enCommon from './locales/en/common.json';
+  import esCommon from './locales/es/common.json';
+  import enGames from './locales/en/games.json';
+  import esGames from './locales/es/games.json';
+
+  const resources = {
+    en: { common: enCommon, games: enGames },
+    es: { common: esCommon, games: esGames },
+  };
+
+  i18n.use(initReactI18next).init({
+    resources,
+    lng: localStorage.getItem('language') || 'es',
+    ns: ['common', 'games'],
+    defaultNS: 'common',
+    interpolation: { escapeValue: false },
+  });
+
+  export default i18n;
+```
+
+- RT-010.3: Usar en componentes:
+```typescript
+import { useTranslation } from 'react-i18next';
+
+  export const PollCreator = () => {
+    const { t } = useTranslation('poll');
+
+    return (
+      <div>
+        <h1>{t('title')}</h1>  {/* Leer de poll.json */}
+        <button>{t('common:create')}</button>  {/* Leer de common.json */}
+      </div>
+    );
+  };
+```
+
+- RT-010.4: Migrar strings hardcodeados:
+```shell script
+grep -r '"' components/ --include="*.tsx" > hardcoded_strings.txt
+  # Revisar y mover a JSON
+```
+
+
+**Criterios de Aceptación:**
+- ✅ Estructura i18n reorganizada
+- ✅ Todos los strings en JSON (no hardcodeados)
+- ✅ Cambio de idioma funciona sin recargar
+- ✅ Nuevos idiomas pueden añadirse fácilmente
+- ✅ Cobertura de strings >95%
+
+**Dependencias:**
+- Puede ejecutarse en paralelo
+
+---
+
+### **REQ-011: Configuración de CI/CD y Automatización**
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | REQ-011 |
+| **Categoría** | DevOps / Proceso |
+| **Prioridad** | 🟡 MEDIA |
+| **Estado Actual** | Sin CI/CD visible; tests no ejecutan automáticamente |
+| **Problema** | Cambios rompen cosas sin saberlo; bugs en producción |
+| **Objetivo** | Implementar GitHub Actions para lint, tests, build, deploy |
+| **Impacto** | - Calidad consistente<br/>- Deployment seguro<br/>- Menos bugs en producción |
+
+**Requisitos Funcionales (RF):**
+- RF-011.1: Cada PR ejecuta lint, tests, y build
+- RF-011.2: Solo se puede mergear si todo pasa
+- RF-011.3: Deployment automático a staging/production
+- RF-011.4: Logs y reports accesibles
+
+**Requisitos Técnicos (RT):**
+- RT-011.1: Crear workflow GitHub Actions:
+```yaml
+# .github/workflows/ci.yml
+  name: CI
+
+  on:
+    push:
+      branches: [main, develop]
+    pull_request:
+      branches: [main, develop]
+
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+
+        - name: Setup Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: '18'
+            cache: 'npm'
+
+        - name: Install dependencies
+          run: npm ci
+
+        - name: Lint
+          run: npm run lint
+
+        - name: Type check
+          run: npm run type-check
+
+        - name: Unit tests
+          run: npm run test:unit
+
+        - name: E2E tests
+          run: npm run test:e2e
+
+        - name: Build
+          run: npm run build
+
+        - name: Upload coverage
+          uses: codecov/codecov-action@v3
+          with:
+            files: ./coverage/coverage-final.json
+```
+
+- RT-011.2: Configurar branch protection:
+  - Require status checks to pass
+  - Require code reviews
+  - Dismiss stale PR approvals
+- RT-011.3: Setup de husky para git hooks:
+```shell script
+npm install husky --save-dev
+  npx husky install
+  npx husky add .husky/pre-commit "npm run lint-staged"
+  npx husky add .husky/pre-push "npm run test:unit"
+```
+
+- RT-011.4: Configurar lint-staged:
+```json
+// package.json
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"]
+  }
+```
+
+
+**Criterios de Aceptación:**
+- ✅ GitHub Actions workflow ejecutando
+- ✅ Branch protection en main
+- ✅ Pre-commit hooks ejecutan lint
+- ✅ Coverage report generado en cada PR
+- ✅ Deploy automático funciona
+
+**Dependencias:**
+- Requiere REQ-006 (tests E2E)
+- Requiere REQ-005 (error handling)
+
+---
+
+## 2️⃣ DOCUMENTO DE DISEÑO TÉCNICO
+
+### **DES-001: Arquitectura Refactorizada (Feature-Based + Hexagonal)**
+
+**Solución Propuesta:**
+Reorganizar el proyecto en una estructura clara que separe:
+1. **Domain Layer**: Entidades, tipos, reglas de negocio (independiente de frameworks)
+2. **Application Layer**: Casos de uso, servicios, orquestación
+3. **Infrastructure Layer**: APIs, bases de datos, integraciones externas
+4. **Presentation Layer**: Componentes React, hooks, estado global
+5. **Ports & Adapters**: Interfaces que conectan capas
+
+**Cambios en la Arquitectura:**
+
+```
+ANTES (Actual):
+components/
+├── Tools.tsx (100 líneas, lógica + UI)
+├── LivePoll.tsx
+├── GiveawayHub.tsx
+├── StreamGames.tsx
+├── games/ (13 juegos sin estructura)
+└── ... 100+ más sin organización
+
+DESPUÉS (Propuesto):
+src/
+├── domain/
+│   ├── entities/
+│   │   ├── Poll.ts
+│   │   ├── Giveaway.ts
+│   │   ├── Game.ts
+│   │   └── User.ts
+│   ├── services/
+│   │   ├── PollDomainService.ts (lógica pura)
+│   │   ├── GiveawayDomainService.ts
+│   │   └── GameDomainService.ts
+│   └── types/
+│       └── index.ts (tipos compartidos)
+│
+├── application/
+│   ├── state/
+│   │   ├── store.ts (Redux)
+│   │   └── slices/
+│   │       ├── pollSlice.ts
+│   │       ├── giveawaySlice.ts
+│   │       ├── gamesSlice.ts
+│   │       └── authSlice.ts
+│   ├── services/
+│   │   ├── PollService.ts (casos de uso)
+│   │   ├── GiveawayService.ts
+│   │   └── GameService.ts
+│   └── hooks/
+│       ├── usePoll.ts
+│       ├── useGiveaway.ts
+│       └── useGame.ts
+│
+├── infrastructure/
+│   ├── adapters/
+│   │   ├── TwitchAdapter.ts
+│   │   ├── FirebaseAdapter.ts
+│   │   ├── OBSAdapter.ts
+│   │   └── WebSocketAdapter.ts
+│   ├── repositories/
+│   │   ├── PollRepository.ts
+│   │   ├── GiveawayRepository.ts
+│   │   └── UserRepository.ts
+│   ├── api/
+│   │   ├── twitchApi.ts
+│   │   ├── firebaseApi.ts
+│   │   └── RequestDeduplicator.ts
+│   ├── logging/
+│   │   └── LogService.ts
+│   └── persistence/
+│       └── StorageManager.ts
+│
+└── presentation/
+    ├── components/
+    │   ├── shared/
+    │   │   ├── Button.tsx
+    │   │   ├── Tooltip.tsx
+    │   │   ├── ErrorBoundary.tsx
+    │   │   └── LoadingSpinner.tsx
+    │   ├── features/
+    │   │   ├── poll/
+    │   │   │   ├── PollCreator.tsx
+    │   │   │   ├── PollOverlay.tsx
+    │   │   │   ├── PollResult.tsx
+    │   │   │   └── usePoll.ts
+    │   │   ├── giveaway/
+    │   │   │   ├── GiveawayHub.tsx
+    │   │   │   ├── GiveawayForm.tsx
+    │   │   │   ├── GiveawayOverlay.tsx
+    │   │   │   └── useGiveaway.ts
+    │   │   ├── games/
+    │   │   │   ├── GameSelector.tsx
+    │   │   │   ├── VeoVeo/
+    │   │   │   │   ├── VeoVeoGame.tsx
+    │   │   │   │   ├── VeoVeoOverlay.tsx
+    │   │   │   │   └── useVeoVeo.ts
+    │   │   │   ├── Fishing/
+    │   │   │   ├── Roulette/
+    │   │   │   └── ... (otros)
+    │   │   └── ...
+    │   ├── layouts/
+    │   │   ├── MainLayout.tsx
+    │   │   ├── OverlayLayout.tsx
+    │   │   └── AdminLayout.tsx
+    │   └── pages/
+    │       ├── HomePage.tsx
+    │       ├── DashboardPage.tsx
+    │       └── OverlayPage.tsx
+    └── providers/
+        ├── AppProvider.tsx (Redux + i18n + otros)
+        └── ErrorProvider.tsx
+
+types/
+├── api.ts
+├── domain.ts
+└── state.ts
+```
+
+
+**Flujo de Datos:**
+
+```
+User Action → Component (PollCreator.tsx)
+    ↓
+Custom Hook (usePoll.ts)
+    ↓
+Redux Dispatch (pollSlice.ts)
+    ↓
+Application Service (PollService.ts)
+    ↓
+Domain Service (PollDomainService.ts) - Lógica pura
+    ↓
+Repository (PollRepository.ts) - Acceso a datos
+    ↓
+Adapter (TwitchAdapter.ts) - Integración externa
+    ↓
+Update Redux State
+    ↓
+Component Re-render
+```
+
+
+**Ventajas:**
+- ✅ Separación clara de responsabilidades
+- ✅ Testeable en todas las capas
+- ✅ Independencia de framework (domain puede reutilizarse)
+- ✅ Fácil de extender con nuevos features
+- ✅ No hay acoplamiento entre features
+
+**Trade-offs:**
+- ⚠️ Más archivos y carpetas (inicialmente confuso)
+- ⚠️ Más boilerplate en servicios/adapters
+- ⚠️ Curva de aprendizaje para nuevos developers
+
+---
+
+### **DES-002: State Management con Redux Toolkit**
+
+**Solución Propuesta:**
+Centralizar todo el estado de aplicación (no UI) en Redux con structure clara de slices.
+
+**Cambios Esperados:**
+
+```typescript
+// ANTES: State fragmentado
+// context/PollContext.tsx
+// context/GiveawayContext.tsx
+// context/GameContext.tsx
+// + state local en componentes
+// → Imposible sincronizar
+
+// DESPUÉS: Redux centralizado
+// src/application/state/slices/
+├── pollSlice.ts
+├── giveawaySlice.ts
+├── gamesSlice.ts
+├── authSlice.ts
+├── connectionSlice.ts
+└── uiSlice.ts
+
+// Estructura de cada slice:
+// pollSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+interface PollState {
+  active: Poll | null;
+  history: Poll[];
+  isCreating: boolean;
+  error: string | null;
+}
+
+const initialState: PollState = {
+  active: null,
+  history: [],
+  isCreating: false,
+  error: null,
+};
+
+const pollSlice = createSlice({
+  name: 'poll',
+  initialState,
+  reducers: {
+    createPoll: (state, action: PayloadAction<Poll>) => {
+      state.active = action.payload;
+    },
+    addVote: (state, action: PayloadAction<{ optionId: string; count: number }>) => {
+      if (state.active) {
+        state.active.votes[action.payload.optionId] += action.payload.count;
+      }
+    },
+    endPoll: (state) => {
+      if (state.active) {
+        state.history.push(state.active);
+        state.active = null;
+      }
+    },
+  },
+});
+
+export const { createPoll, addVote, endPoll } = pollSlice.actions;
+export default pollSlice.reducer;
+```
+
+
+**Integración con Componentes:**
+
+```typescript
+// components/features/poll/PollCreator.tsx
+import { useAppDispatch, useAppSelector } from '../../../application/state/hooks';
+import { createPoll } from '../../../application/state/slices/pollSlice';
+
+export const PollCreator = () => {
+  const dispatch = useAppDispatch();
+  const { isCreating, error } = useAppSelector(state => state.poll);
+
+  const handleCreatePoll = (pollData: PollConfig) => {
+    dispatch(createPoll(pollData));
+  };
+
+  return (
+    <form onSubmit={handleCreatePoll}>
+      {/* formulario */}
+      {error && <ErrorMessage message={error} />}
+      {isCreating && <LoadingSpinner />}
+    </form>
+  );
+};
+```
+
+
+**Persistencia y Rehydración:**
+
+```typescript
+// src/application/state/store.ts
+import { configureStore } from '@reduxjs/toolkit';
+import { persistStore, persistReducer } from 'redux-persist';
+import storage from 'redux-persist/lib/storage';
+
+const persistConfig = {
+  key: 'streamcrowd',
+  storage,
+  whitelist: ['poll', 'giveaway', 'auth'], // qué persistir
+  blacklist: ['ui', 'connection'], // qué no persistir
+};
+
+const persistedReducer = persistReducer(persistConfig, rootReducer);
+
+export const store = configureStore({
+  reducer: persistedReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['persist/PERSIST'],
+      },
+    }),
+});
+
+export const persistor = persistStore(store);
+```
+
+
+---
+
+### **DES-003: Error Handling y Resiliencia**
+
+**Solución Propuesta:**
+Implementar Error Boundaries, logging centralizado, y retry logic.
+
+**Cambios Esperados:**
+
+```typescript
+// components/shared/ErrorBoundary.tsx
+import React from 'react';
+import { logService } from '../../../infrastructure/logging/LogService';
+
+interface Props {
+  children: React.ReactNode;
+  feature?: string;
+  onError?: (error: Error) => void;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+  errorCount: number;
+}
+
+export class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorCount: 0 };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error, errorCount: 1 };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Log error
+    logService.error({
+      feature: this.props.feature,
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Notificar app
+    this.props.onError?.(error);
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-fallback">
+          <h2>Error en {this.props.feature}</h2>
+          <p>{this.state.error?.message}</p>
+          <button onClick={this.handleRetry}>Reintentar</button>
+          {this.state.errorCount > 2 && (
+            <p className="text-gray-500">
+              Si el error persiste, contacta a soporte
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Uso en features:
+<ErrorBoundary feature="VeoVeo">
+  <VeoVeoGame />
+</ErrorBoundary>
+```
+
+
+**Logging Centralizado:**
+
+```typescript
+// src/infrastructure/logging/LogService.ts
+import pino from 'pino';
+
+export class LogService {
+  private logger = pino({
+    level: import.meta.env.MODE === 'production' ? 'warn' : 'debug',
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: import.meta.env.MODE !== 'production',
+        singleLine: false,
+      },
+    },
+  });
+
+  error(context: Record<string, any>) {
+    this.logger.error(context);
+    // Opcionalmente: Sentry.captureException(context);
+  }
+
+  warn(context: Record<string, any>) {
+    this.logger.warn(context);
+  }
+
+  info(context: Record<string, any>) {
+    this.logger.info(context);
+  }
+
+  debug(context: Record<string, any>) {
+    this.logger.debug(context);
+  }
+}
+
+export const logService = new LogService();
+```
+
+
+**Retry Logic:**
+
+```typescript
+// src/application/utils/retryLogic.ts
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    backoffMultiplier?: number;
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = 3,
+    initialDelayMs = 1000,
+    maxDelayMs = 30000,
+    backoffMultiplier = 2,
+  } = options;
+
+  let lastError: Error;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+
+      if (attempt === maxAttempts) break;
+
+      const delay = Math.min(
+        initialDelayMs * Math.pow(backoffMultiplier, attempt - 1),
+        maxDelayMs
+      );
+
+      logService.warn({
+        message: `Retry attempt ${attempt}/${maxAttempts}`,
+        error: lastError.message,
+        nextRetryIn: `${delay}ms`,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+}
+
+// Uso:
+const user = await withRetry(() => twitchApi.getUser(userId));
+```
+
+
+---
+
+### **DES-004: Code Splitting y Optimización de Bundle**
+
+**Solución Propuesta:**
+Separar overlays en chunks, lazy load features no críticas.
+
+**Cambios en vite.config.ts:**
+
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    visualizer({ open: true }), // Visualizar bundle
+  ],
+
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor code
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-redux': ['@reduxjs/toolkit', 'react-redux'],
+
+          // Overlays (cada uno es un chunk)
+          'overlay-poll': ['./src/presentation/components/features/poll/PollOverlay.tsx'],
+          'overlay-spinner': ['./src/presentation/components/features/poll/SpinnerOverlay.tsx'],
+          'overlay-giveaway': ['./src/presentation/components/features/giveaway/GiveawayOverlay.tsx'],
+          'overlay-judge': ['./src/presentation/components/features/judge/JudgePanelOverlay.tsx'],
+          'overlay-games': ['./src/presentation/components/features/games'],
+
+          // Features principales
+          'feature-poll': ['./src/presentation/components/features/poll'],
+          'feature-giveaway': ['./src/presentation/components/features/giveaway'],
+          'feature-games': ['./src/presentation/components/features/games'],
+        },
+      },
+    },
+
+    chunkSizeWarningLimit: 1000, // 1MB chunks
+
+    // Code splitting
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+      },
+    },
+  },
+
+  // Optimización de imports
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@reduxjs/toolkit',
+      'react-redux',
+    ],
+  },
+});
+```
+
+
+**Lazy Loading en componentes:**
+
+```typescript
+// src/presentation/components/OverlayRouter.tsx
+import { lazy, Suspense } from 'react';
+
+// Lazy load cada overlay
+const PollOverlay = lazy(() => import('./features/poll/PollOverlay'));
+const SpinnerOverlay = lazy(() => import('./features/poll/SpinnerOverlay'));
+const GiveawayOverlay = lazy(() => import('./features/giveaway/GiveawayOverlay'));
+const JudgePanelOverlay = lazy(() => import('./features/judge/JudgePanelOverlay'));
+
+interface Props {
+  type: string;
+  config?: any;
+}
+
+export const OverlayRouter: React.FC<Props> = ({ type, config }) => {
+  const getOverlay = () => {
+    switch (type) {
+      case 'poll': return <PollOverlay {...config} />;
+      case 'spinner': return <SpinnerOverlay {...config} />;
+      case 'giveaway': return <GiveawayOverlay {...config} />;
+      case 'judge': return <JudgePanelOverlay {...config} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <Suspense fallback={<LoadingOverlay />}>
+      {getOverlay()}
+    </Suspense>
+  );
+};
+
+const LoadingOverlay = () => (
+  <div className="flex items-center justify-center w-full h-full bg-black/50">
+    <div className="animate-spin">⏳</div>
+  </div>
+);
+```
+
+
+---
+
+## 3️⃣ PLAN DE TAREAS (Backlog Ejecutable)
+
+### **FASE 1: Preparación y Foundation (Semana 1)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|----|-----------|-------|------------|------|-----|
+| **TASK-001** | Crear estructura de carpetas base | Reorganizar `src/` y `components/` según nueva arquitectura | 1. Crear carpetas domain, application, infrastructure, presentation<br/>2. Crear ficheros index.ts vacíos<br/>3. Documentar en `STRUCTURE.md` | L | Refactor | ✅ Carpetas creadas, index.ts presentes, STRUCTURE.md documentado |
+| **TASK-002** | Configurar ESLint para evitar imports circulares | Instalar plugin y configurar reglas | 1. `npm install eslint-plugin-import --save-dev`<br/>2. Configurar en `.eslintrc`<br/>3. Ejecutar `npm run lint` sin errores | M | DevOps | ✅ ESLint pasa, no hay imports circulares |
+| **TASK-003** | Instalar y configurar Redux Toolkit | Setup inicial de Redux con persistencia | 1. `npm install @reduxjs/toolkit react-redux redux-persist`<br/>2. Crear `src/application/state/store.ts`<br/>3. Crear hook wrapper `useAppDispatch` y `useAppSelector`<br/>4. Conectar en App.tsx | M | Feature | ✅ Redux funciona, DevTools activo, persistencia OK |
+| **TASK-004** | Documentar y validar dependencias | Auditar todas las dependencias del proyecto | 1. Ejecutar `npm audit`, `npm outdated`, `npm ls`<br/>2. Crear `DEPENDENCIES.md`<br/>3. Identificar y listar dependencias a eliminar<br/>4. Actualizar vulnerabilidades críticas | M | Audit | ✅ DEPENDENCIES.md creado, vulnerabilidades parcheadas, unused deps documentadas |
+| **TASK-005** | Instalar herramientas de validación y seguridad | Setup Zod, DOMPurify, etc. | 1. `npm install zod @hookform/resolvers dompurify`<br/>2. Crear carpeta `src/domain/schemas/`<br/>3. Crear fichero `validation.ts` de ejemplo | S | DevOps | ✅ Paquetes instalados, schema de ejemplo creado |
+
+**Parallelizable:** TASK-002, TASK-004, TASK-005
+
+---
+
+### **FASE 2: Seguridad (Semana 1-2)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-006** | Auditar firebase-rules.json y reforzar | Revisar permisos y aplicar principio de mínimo privilegio | 1. Leer `firebase-rules.json` completo<br/>2. Documentar permisos actuales<br/>3. Identificar riesgos (ej: read/write sin validación)<br/>4. Refactorizar rules restrictivas<br/>5. Testing en emulador Firebase | L | Security | ✅ Rules.json refactorizado, riesgos documentados, tests en emulador pasan |
+| **TASK-007** | Implementar PKCE en OAuth2 (Twitch, YouTube, etc.) | Flujo OAuth seguro | 1. Crear `src/infrastructure/auth/PkceFlow.ts`<br/>2. Implementar code verifier/challenge generation<br/>3. Actualizar TwitchAdapter para usar PKCE<br/>4. Tests de PKCE flow | L | Security | ✅ PKCE implementado, tests pasan, tokens no en URL |
+| **TASK-008** | Mover tokens a HttpOnly cookies | Almacenamiento seguro de refresh tokens | 1. Configurar backend para set-cookie HttpOnly<br/>2. Actualizar API client para leer de cookies<br/>3. Eliminar tokens de localStorage<br/>4. Tests de cookies seguras | M | Security | ✅ Tokens en HttpOnly cookies, localStorage limpio |
+| **TASK-009** | Implementar session management para overlays | Session IDs en lugar de tokens | 1. Crear `src/application/services/SessionService.ts`<br/>2. Generar session IDs con expiración<br/>3. Validar session en overlays<br/>4. Eliminar tokens de URLs overlay | M | Security | ✅ SessionService funciona, overlays usan session IDs |
+| **TASK-010** | Crear validación de entrada con Zod | Schemas para datos críticos | 1. Crear schemas en `src/domain/schemas/` para:<br/>   - Poll, Giveaway, Game, User, Message<br/>2. Tests para cada schema<br/>3. Documentar uso en README | M | Security | ✅ Schemas creados, tests >80% cobertura |
+| **TASK-011** | Implementar sanitización de mensajes | Prevenir XSS en chat | 1. Crear hook `useSanitizedInput`<br/>2. Integrar DOMPurify en ChatList<br/>3. Tests de XSS prevention<br/>4. Documentar sanitización | M | Security | ✅ ChatList sanitiza mensajes, tests de XSS pasan |
+
+**Parallelizable:** TASK-006 (backend), TASK-007, TASK-010, TASK-011
+
+---
+
+### **FASE 3: Refactorización de Código (Semana 2-3)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-012** | Migrar Polling a Redux | Mover estado de poll a Redux | 1. Crear `src/application/state/slices/pollSlice.ts`<br/>2. Crear `src/application/services/PollService.ts`<br/>3. Crear hook `src/application/hooks/usePoll.ts`<br/>4. Refactorizar `PollCreator.tsx`, `LivePoll.tsx`, `PollOverlay.tsx`<br/>5. Tests de pollSlice | L | Refactor | ✅ Poll en Redux, componentes refactorizados, tests pasan |
+| **TASK-013** | Migrar Giveaway a Redux | Mover estado de giveaway a Redux | 1. Crear `giveawaySlice.ts`<br/>2. Crear `GiveawayService.ts`<br/>3. Crear hook `useGiveaway.ts`<br/>4. Refactorizar `GiveawayHub.tsx` y componentes related<br/>5. Tests | L | Refactor | ✅ Giveaway en Redux, componentes refactorizados |
+| **TASK-014** | Migrar Games a Redux | Centralizar estado de juegos | 1. Crear `gamesSlice.ts` con sub-features (veoVeo, fishing, etc.)<br/>2. Crear servicios por juego<br/>3. Refactorizar componentes de games<br/>4. Tests | L | Refactor | ✅ Games en Redux, todos los juegos refactorizados |
+| **TASK-015** | Migrar Auth a Redux | Centralizar estado de autenticación | 1. Crear `authSlice.ts`<br/>2. Crear `AuthService.ts`<br/>3. Refactorizar componentes de auth<br/>4. Integrar con token refresh | M | Refactor | ✅ Auth en Redux, login/logout flujos funcionales |
+| **TASK-016** | Crear capa de Servicios de Aplicación | Abstraer lógica de negocio | 1. Para cada feature (poll, giveaway, game, etc.):<br/>   - Crear `src/application/services/FeatureService.ts`<br/>   - Implementar casos de uso<br/>   - Inyectar dependencias (adapters, repositories)<br/>2. Tests de servicios | L | Refactor | ✅ Servicios creados, tests >80%, inyección de dependencias funciona |
+| **TASK-017** | Crear capa de Repositories | Abstraer acceso a datos | 1. Crear `src/infrastructure/repositories/` para:<br/>   - PollRepository, GiveawayRepository, UserRepository<br/>2. Implementar CRUD básico<br/>3. Tests con datos mock | M | Refactor | ✅ Repositories creados, tests pasan |
+| **TASK-018** | Consolidar componentes UI shared | Crear librería de componentes base | 1. Mover Button, Tooltip, etc. a `components/shared/`<br/>2. Crear `Button.stories.tsx` con Storybook (opcional)<br/>3. Documentar props en JSDoc<br/>4. Tests de componentes | M | Refactor | ✅ Shared components organizados, documentados, testados |
+| **TASK-019** | Reorganizar features en `components/features/` | Estructurar por feature | 1. Crear estructura `features/poll/`, `features/giveaway/`, etc.<br/>2. Mover componentes<br/>3. Actualizar imports<br/>4. Verificar sin imports circulares | L | Refactor | ✅ Features reorganizadas, imports correctos, linting pasa |
+
+**Parallelizable:** TASK-012, TASK-013, TASK-014, TASK-015 (pueden hacerse en paralelo)
+
+---
+
+### **FASE 4: Error Handling y Resiliencia (Semana 2-3)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-020** | Crear ErrorBoundary genérico | Componente reutilizable para capturar errores | 1. Implementar `components/shared/ErrorBoundary.tsx`<br/>2. Configurar logging de errores<br/>3. Crear fallback UI<br/>4. Tests de ErrorBoundary | M | Feature | ✅ ErrorBoundary funciona, fallback se muestra, errores se loguean |
+| **TASK-021** | Crear LogService centralizado | Logging con Pino + Sentry (opcional) | 1. Instalar `pino` y `pino-pretty`<br/>2. Crear `src/infrastructure/logging/LogService.ts`<br/>3. Tests de LogService<br/>4. Integrar con ErrorBoundary | M | Feature | ✅ LogService funciona, logs en consola, structured logging |
+| **TASK-022** | Implementar retry logic | Hook/utility para reintentos con backoff | 1. Crear `src/application/utils/retryLogic.ts`<br/>2. Crear hook `useRetry.ts`<br/>3. Integrar en llamadas críticas (API)<br/>4. Tests con simulated failures | M | Feature | ✅ Retry logic funciona, exponential backoff correcto, tests pasan |
+| **TASK-023** | Wrappear features críticas con ErrorBoundary | Añadir boundaries a games, giveaway, etc. | 1. Identificar 5+ features críticas<br/>2. Wrappear cada una: `<ErrorBoundary feature="VeoVeo"><VeoVeoGame /></ErrorBoundary>`<br/>3. Tests de fallos simulados<br/>4. Documentar en README | L | Refactor | ✅ 5+ features wrappadas, tests de recuperación pasan |
+| **TASK-024** | Crear archivo de configuración de errores | Enums y constantes para tipos de errores | 1. Crear `src/domain/errors/AppErrors.ts`<br/>2. Definir tipos: NetworkError, ValidationError, AuthError, etc.<br/>3. Crear custom Error classes | S | Feature | ✅ Error types definidos, usados en aplicación |
+
+**Parallelizable:** TASK-020, TASK-021, TASK-022
+
+---
+
+### **FASE 5: Testing y Calidad (Semana 3-4)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-025** | Implementar Page Object Model en Playwright | Tests E2E mantenibles | 1. Crear `tests/pages/BasePage.ts`<br/>2. Crear page objects para: GiveawayPage, PollPage, GamePage<br/>3. Implementar Page Object Methods<br/>4. Documentar uso | L | Testing | ✅ POM implementado, tests usan POM, refactorización del 50% tests existentes |
+| **TASK-026** | Añadir data-testid a componentes críticos | Selectores estables para E2E | 1. Auditar componentes frecuentemente usados en tests<br/>2. Añadir `data-testid` a: buttons, forms, modals, lists<br/>3. Verifica ausencia de hardcoded selectors en tests | L | Testing | ✅ 100+ data-testid añadidos, cero tests con CSS selectors frágiles |
+| **TASK-027** | Reescribir tests E2E problemáticos | Eliminar flakiness | 1. Revisar `playwright-errors-report.json`<br/>2. Reescribir cada test problemático<br/>3. Eliminar `.catch(() => false)` - usar waits explícitos<br/>4. Ejecutar tests 10x para verificar consistencia | L | Testing | ✅ Tests reescritos, 0 flakiness, todos pasan consistentemente |
+| **TASK-028** | Crear fixtures de testing por feature | Reutilizable test setup | 1. Crear `tests/fixtures/` con:<br/>   - veoVeoFixture.ts, giveawayFixture.ts, etc.<br/>2. Fixtures incluyen setup + helpers<br/>3. Tests usan fixtures | M | Testing | ✅ 5+ fixtures creados, tests reutilizan |
+| **TASK-029** | Configurar cobertura de tests | Medir y reportar | 1. Instalar `@vitest/coverage-v8`<br/>2. Configurar `vitest.config.ts` con coverage<br/>3. Ejecutar `npm run test:coverage`<br/>4. Generar report HTML<br/>5. Documentar target (80%+ critical code) | M | DevOps | ✅ Coverage report generado, >80% en código crítico |
+| **TASK-030** | Crear tests unitarios para slices Redux | Testing de reducers y actions | 1. Para cada slice (poll, giveaway, games, auth):<br/>   - Crear `{feature}Slice.test.ts`<br/>   - Tests de reducers, selectors, actions<br/>2. Cobertura >90% | L | Testing | ✅ Tests para todos los slices, cobertura >90% |
+| **TASK-031** | Crear tests para servicios de aplicación | Testing de lógica de negocio | 1. Para cada servicio:<br/>   - Crear `{feature}Service.test.ts`<br/>   - Mock dependencies (repositories, adapters)<br/>   - Tests de casos normales y edge cases<br/>2. Cobertura >80% | L | Testing | ✅ Tests para servicios, edge cases cubiertos |
+| **TASK-032** | Crear tests para validación (Zod) | Testing de schemas | 1. Crear `src/domain/schemas/schemas.test.ts`<br/>2. Tests para valid/invalid inputs<br/>3. Tests para edge cases (strings vacíos, valores negativos, etc.)<br/>4. Cobertura >90% | M | Testing | ✅ Schema tests creados, edge cases cubiertos |
+
+**Parallelizable:** Algunos tests pueden crearse en paralelo con refactorización
+
+---
+
+### **FASE 6: Performance y Optimización (Semana 3-4)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-033** | Configurar code splitting en Vite | Chunks para overlays y features | 1. Actualizar `vite.config.ts` con `manualChunks`<br/>2. Crear chunks para: poll, giveaway, games, overlays<br/>3. Ejecutar `npm run build`<br/>4. Analizar con `rollup-plugin-visualizer` | L | Performance | ✅ vite.config.ts actualizado, chunks creados, visualizer muestra tamaños |
+| **TASK-034** | Implementar lazy loading de overlays | React.lazy + Suspense | 1. Crear `OverlayRouter.tsx` con lazy imports<br/>2. Implementar fallback LoadingOverlay<br/>3. Tests de lazy loading<br/>4. Verificar chunks separados en build | M | Performance | ✅ Overlays lazy-loaded, cada uno <100KB, Suspense fallback funciona |
+| **TASK-035** | Crear hooks de debounce/throttle | Optimización de updates en tiempo real | 1. Crear `hooks/useDebounce.ts`<br/>2. Crear `hooks/useThrottle.ts`<br/>3. Tests con timers fake<br/>4. Documentar uso | M | Performance | ✅ Hooks creados, tests pasan, documentados |
+| **TASK-036** | Implementar request deduplication | Evitar requests duplicadas | 1. Crear `src/infrastructure/api/RequestDeduplicator.ts`<br/>2. Integrar en API clients (Twitch, Firebase)<br/>3. Tests de deduplication | M | Performance | ✅ Deduplicator funciona, requests no duplicadas |
+| **TASK-037** | Aplicar debouncing en chat listeners | Reducir updates en tiempo real | 1. Aplicar `useThrottle` en listeners WebSocket<br/>2. Tests de throttling<br/>3. Medir CPU usage antes/después | M | Performance | ✅ Chat throttled, CPU usage reducido, tests pasan |
+| **TASK-038** | Usar React 18 batch updates y useDeferredValue | Optimizar rendering | 1. Implementar `useDeferredValue` en ChatList, GiveawayList<br/>2. Tests de deferred rendering<br/>3. Medir performance con DevTools | M | Performance | ✅ Deferring implementado, rendering no-bloqueante |
+| **TASK-039** | Configurar prefetch de overlays frecuentes | Carga anticipada | 1. En App.tsx, precargar overlays más usados<br/>2. Tests de prefetch<br/>3. Medir load time mejorado | S | Performance | ✅ Prefetch funciona, Time to Interactive mejorado |
+| **TASK-040** | Crear y analizar bundle report | Visualizar peso de aplicación | 1. Instalar `rollup-plugin-visualizer`<br/>2. Ejecutar build con visualizer<br/>3. Documentar tamaños por chunk<br/>4. Identificar opportunidades de reducción | M | Analysis | ✅ Bundle report generado, sizes documentados |
+
+**Parallelizable:** TASK-033, TASK-035, TASK-036
+
+---
+
+### **FASE 7: CI/CD y Automatización (Semana 4)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-041** | Crear GitHub Actions CI workflow | Tests automáticos en PR | 1. Crear `.github/workflows/ci.yml`<br/>2. Configurar: lint, type-check, unit tests, E2E tests, build<br/>3. Configurar artifacts y caching<br/>4. Tests en workflow | L | DevOps | ✅ Workflow creado, ejecuta en cada PR, reporta resultados |
+| **TASK-042** | Configurar branch protection | Requerir checks en main | 1. En GitHub: Settings → Branches<br/>2. Requerir status checks (lint, tests)<br/>3. Requerir code reviews<br/>4. Dismiss stale approvals | S | DevOps | ✅ Branch protection configurada, no se puede mergear sin tests verdes |
+| **TASK-043** | Implementar Husky pre-commit hooks | Lint antes de commit | 1. Instalar `husky` y `lint-staged`<br/>2. Crear `.husky/pre-commit`<br/>3. Configurar en package.json<br/>4. Tests | M | DevOps | ✅ Husky instalado, pre-commit ejecuta lint, commits limpios |
+| **TASK-044** | Implementar Husky pre-push hooks | Tests antes de push | 1. Crear `.husky/pre-push`<br/>2. Configurar para ejecutar tests unitarios<br/>3. Tests | S | DevOps | ✅ Pre-push ejecuta tests, push bloqueado si fallan |
+| **TASK-045** | Crear deployment workflow a staging | Deploy automático en PR merge a develop | 1. Crear `.github/workflows/deploy-staging.yml`<br/>2. Configurar deploy a Vercel/Firebase<br/>3. Notificaciones de deploy<br/>4. Tests | L | DevOps | ✅ Deploy automático a staging, notificaciones funcionan |
+| **TASK-046** | Configurar code coverage reporting | Codecov integration | 1. Integrar Codecov en CI<br/>2. Requerir cobertura mínima (80%)<br/>3. Reportes en PRs<br/>4. Tests | M | DevOps | ✅ Codecov integrado, cobertura reportada en PRs |
+
+---
+
+### **FASE 8: Internacionalización (i18n) (Semana 4)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-047** | Reorganizar estructura i18n | Namespaces por feature | 1. Crear estructura de carpetas i18n/locales/es, en/...<br/>2. Crear JSON files: common.json, games.json, giveaway.json<br/>3. Documentar estructura | M | i18n | ✅ Estructura creada, archivos JSON existentes |
+| **TASK-048** | Configurar react-i18next | Integración I18n en app | 1. Instalar `i18next` y `react-i18next`<br/>2. Crear `i18n/i18n.ts`<br/>3. Conectar en App.tsx<br/>4. Verificar idioma se lee de localStorage | M | i18n | ✅ i18n configurado, DevTools muestra traducciones |
+| **TASK-049** | Migrar strings hardcodeados a JSON | Extraer todas las strings | 1. Grep de strings en components: `grep -r '"[A-Z]' components/`<br/>2. Extraer a JSON archivos correspondientes<br/>3. Reemplazar con `useTranslation` calls<br/>4. Tests de strings traducidas | L | i18n | ✅ 100% strings en JSON, no hay hardcodes, tests pasan |
+| **TASK-050** | Crear LanguageSelector funcional | UI para cambiar idioma | 1. Mejorar `LanguageSelector.tsx` existente<br/>2. Guardar selección en localStorage<br/>3. Tests de cambio de idioma<br/>4. Sin recargar página | M | i18n | ✅ LanguageSelector funciona, cambio sin recargar |
+
+---
+
+### **FASE 9: Documentación Final (Semana 4)**
+
+| ID | Tarea | Descripción | Pasos | Estimación | Tipo | DoD |
+|----|-------|-----------|-------|------------|------|-----|
+| **TASK-051** | Actualizar README.md | Documentación de desarrollo | 1. Descripción de nueva arquitectura<br/>2. Guía de setup local<br/>3. Comandos npm (dev, build, test)<br/>4. Contribución guidelines | M | Docs | ✅ README actualizado, claro para nuevo dev |
+| **TASK-052** | Crear ARCHITECTURE.md definitivo | Documentación arquitectónica | 1. Describir capas (domain, application, infrastructure)<br/>2. Flujos de datos<br/>3. Decisiones arquitectónicas<br/>4. Ejemplos de cómo agregar feature | L | Docs | ✅ ARCHITECTURE.md completo, ejemplos incluidos |
+| **TASK-053** | Crear SECURITY.md | Documentación de seguridad | 1. PKCE flow explanation<br/>2. Token management<br/>3. Input validation approach<br/>4. Checklist de seguridad | M | Docs | ✅ SECURITY.md creado, guidelines claros |
+| **TASK-054** | Crear TESTING.md | Guía de testing | 1. Cómo escribir tests unitarios<br/>2. Cómo escribir tests E2E (POM)<br/>3. Cobertura expectations<br/>4. Ejemplos | M | Docs | ✅ TESTING.md creado, ejemplos claros |
+| **TASK-055** | Crear PERFORMANCE.md | Guía de performance | 1. Code splitting strategy<br/>2. Lazy loading approach<br/>3. Debounce/throttle patterns<br/>4. Lighthouse targets | M | Docs | ✅ PERFORMANCE.md creado, targets documentados |
+| **TASK-056** | Crear CONTRIBUTING.md | Guía para contribuidores | 1. Workflow de desarrollo (branch names, commits)<br/>2. PR requirements<br/>3. Code style (ESLint, Prettier)<br/>4. Feature development checklist | M | Docs | ✅ CONTRIBUTING.md creado, claro y práctico |
+
+---
+
+## 4️⃣ ROADMAP DE EJECUCIÓN
+
+### **Timeline Recomendado (4 Semanas)**
+
+```
+SEMANA 1 (Foundation + Seguridad Inicial)
+├─ TASK-001: Estructura de carpetas (L)
+├─ TASK-002: ESLint circulares (M)
+├─ TASK-003: Redux setup (M)
+├─ TASK-004: Audit dependencias (M)
+├─ TASK-005: Instalar herramientas (S)
+├─ TASK-006: Auditar firebase (L) [Paralelo]
+├─ TASK-007: PKCE OAuth (L) [Paralelo]
+├─ TASK-010: Schemas Zod (M) [Paralelo]
+└─ TASK-011: Sanitización (M) [Paralelo]
+
+SEMANA 2 (Refactorización + Seguridad II)
+├─ TASK-012: Poll a Redux (L)
+├─ TASK-013: Giveaway a Redux (L) [Paralelo]
+├─ TASK-014: Games a Redux (L) [Paralelo]
+├─ TASK-015: Auth a Redux (M) [Paralelo]
+├─ TASK-016: Servicios app (L) [Paralelo]
+├─ TASK-017: Repositories (M) [Paralelo]
+├─ TASK-008: HttpOnly cookies (M) [Paralelo]
+├─ TASK-009: Session management (M) [Paralelo]
+├─ TASK-020: ErrorBoundary (M) [Paralelo]
+└─ TASK-021: LogService (M) [Paralelo]
+
+SEMANA 3 (Refactorización II + Testing + Performance)
+├─ TASK-018: Shared components (M)
+├─ TASK-019: Features organization (L)
+├─ TASK-022: Retry logic (M) [Paralelo]
+├─ TASK-023: Wrap features con boundaries (L) [Paralelo]
+├─ TASK-025: Page Object Model (L) [Paralelo]
+├─ TASK-026: data-testid (L) [Paralelo]
+├─ TASK-027: Reescribir tests (L) [Paralelo]
+├─ TASK-033: Code splitting Vite (L) [Paralelo]
+├─ TASK-034: Lazy overlays (M) [Paralelo]
+├─ TASK-035: Debounce/throttle (M) [Paralelo]
+├─ TASK-036: Request dedup (M) [Paralelo]
+└─ TASK-040: Bundle report (M) [Paralelo]
+
+SEMANA 4 (Testing Final + DevOps + Docs)
+├─ TASK-028: Test fixtures (M)
+├─ TASK-029: Coverage setup (M)
+├─ TASK-030: Tests slices Redux (L)
+├─ TASK-031: Tests servicios (L)
+├─ TASK-032: Tests Zod (M)
+├─ TASK-037: Throttle chat (M) [Paralelo]
+├─ TASK-038: useDeferredValue (M) [Paralelo]
+├─ TASK-039: Prefetch (S) [Paralelo]
+├─ TASK-041: GitHub Actions CI (L) [Paralelo]
+├─ TASK-042: Branch protection (S) [Paralelo]
+├─ TASK-043: Husky pre-commit (M) [Paralelo]
+├─ TASK-044: Husky pre-push (S) [Paralelo]
+├─ TASK-045: Deploy staging (L) [Paralelo]
+├─ TASK-046: Codecov (M) [Paralelo]
+├─ TASK-047: i18n structure (M) [Paralelo]
+├─ TASK-048: react-i18next (M) [Paralelo]
+├─ TASK-049: Migrar strings (L) [Paralelo]
+├─ TASK-050: LanguageSelector (M) [Paralelo]
+├─ TASK-051-056: Documentación (L) [Paralelo]
+└─ REVIEW & QA
+```
+
+
+### **Dependencias Críticas**
+
+```
+TASK-001 (Estructura)
+    ↓
+TASK-003 (Redux) ← TASK-002 (ESLint)
+    ↓
+TASK-012/013/014/015 (Migrate a Redux)
+    ↓
+TASK-025/026 (Tests E2E mejoradores)
+    ↓
+TASK-041 (CI/CD)
+```
+
+
+### **Quick Wins (Impacto Alto, Esfuerzo Bajo)**
+
+1. **TASK-004**: Audit dependencias → Documentación útil (M)
+2. **TASK-002**: ESLint circulares → Prevención futura (M)
+3. **TASK-005**: Instalar herramientas → Setup para futuro (S)
+4. **TASK-024**: Error types → Usado en REST de app (S)
+5. **TASK-039**: Prefetch overlays → Performance visible (S)
+6. **TASK-043/044**: Husky hooks → Commits limpios (M)
+
+### **Riesgos por Fase**
+
+| Fase | Riesgo | Mitigación |
+|------|--------|-----------|
+| **1. Foundation** | Cambio de estructura rompe imports | Usar automated refactoring tools (IDE) |
+| **2. Redux** | Merge conflicts en múltiples ramas | Merge pronto, comunicación constante |
+| **3. Refactorización** | Bugs introducidos | Cobertura de tests previa, testing exhaustivo |
+| **4. Testing** | Tests flaky toman mucho tiempo | Usar POM + data-testid + waits explícitos |
+| **5. Performance** | Code splitting mal configurado | Testing en bundle análizer (visualizer) |
+| **6. CI/CD** | Falsos positivos en tests | Retirar flakiness antes de integrar CI |
+
+### **Cosas a NO hacer (Anti-patrones)**
+
+❌ No refactorizar sin tests previos
+❌ No mergear grandes cambios sin review
+❌ No hacer security hardening sin auditar primero
+❌ No optimizar performance sin medir
+❌ No añadir nuevas features durante esta fase
+❌ No cambiar multiple cosas a la vez en mismo PR
+
+### **DoD (Definition of Done) Global**
+
+Para que una semana se considere "completada":
+- ✅ Todos los tests (unit + E2E) pasan
+- ✅ ESLint sin errores
+- ✅ TypeScript sin errores (`npm run type-check`)
+- ✅ PR tiene 1+ reviews aprobadas
+- ✅ Cobertura no baja respecto a semana anterior
+- ✅ Performance scores no degradan
+- ✅ Documentación actualizada
+
+---
+
+## 📊 MATRIZ DE PRIORIZACIÓN
+
+```
+Impacto Alto + Esfuerzo Bajo → CRÍTICO (Hacer primero)
+- TASK-001 (Estructura)
+- TASK-003 (Redux)
+- TASK-006 (Firebase audit)
+- TASK-025/026 (Tests E2E)
+
+Impacto Alto + Esfuerzo Alto → IMPORTANTE (Después)
+- TASK-016 (Servicios app)
+- TASK-019 (Features org)
+- TASK-030/031 (Tests)
+- TASK-041 (CI/CD)
+
+Impacto Medio + Esfuerzo Bajo → HACER CUANDO TIEMPO
+- TASK-004 (Audit deps)
+- TASK-043/044 (Husky)
+
+Impacto Bajo + Esfuerzo Alto → POSTERGAR
+- Nada identificado; todos son valiosos
+```
+
+
+---
+
+## 🎯 CONCLUSIÓN Y PRÓXIMOS PASOS
+
+**Este plan transforma los problemas identificados en 56 tareas ejecutables**, organizadas en 9 fases con estimaciones claras.
+
+**Recomendación:**
+1. **Semana 1**: Ejecutar TASK-001 a TASK-011 en paralelo donde sea posible
+2. **Retrospectiva cada Lunes**: Ajustar plan según aprendizajes
+3. **Comunicación diaria**: Sincronización de bloqueantes
+4. **Pairing programming**: En tareas complejas (refactorización, seguridad)
+
+**Próximas Acciones:**
+- [ ] Crear proyecto GitHub con milestones por semana
+- [ ] Asignar tasks a developers
+- [ ] Crear branches para cada feature
+- [ ] Reunión de kick-off con el equipo
+
+¿Necesitas que profundice en alguna tarea específica o que cree un documento de estimación más detallado?

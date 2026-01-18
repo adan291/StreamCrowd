@@ -1,14 +1,18 @@
 /**
  * RandomWinnerOverlay - Overlay para OBS de sorteos
  * Muestra sorteos activos como tarjetas compactas con ganador integrado
+ * Migrated to use Redux state management
+ * 
+ * @requirements 3.5, 3.6 - Display giveaway state from Redux
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, Settings, Users, Clock, CalendarClock, Gift, Sparkles, Crown } from 'lucide-react';
 import { TwitchMessage } from '../types';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 import { useOverlayMode, OVERLAY_BG_COLORS } from '../hooks/useOverlayMode';
 import { giveawaySync } from '../src/infrastructure/sync/FirebaseSync';
+import { useGiveaway } from '../src/application/hooks/useGiveaway';
 
 interface RandomWinnerOverlayProps {
   chatMessages: TwitchMessage[];
@@ -55,7 +59,13 @@ export const RandomWinnerOverlay: React.FC<RandomWinnerOverlayProps> = ({
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
   const { t } = useI18n();
   
-  // Sync state
+  // Load giveaway module for lazy loading
+  useTranslationModule('giveaway');
+  
+  // Use Redux state for giveaway data
+  const giveaway = useGiveaway();
+  
+  // Sync state (for backward compatibility with BroadcastChannel)
   const [globalWinner, setGlobalWinner] = useState<string | null>(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [displayName, setDisplayName] = useState<string>('');
@@ -63,6 +73,29 @@ export const RandomWinnerOverlay: React.FC<RandomWinnerOverlayProps> = ({
   const [scheduledThreads, setScheduledThreads] = useState<ScheduledThreadSyncData[]>([]);
   
   const channelRef = useRef<BroadcastChannel | null>(null);
+
+  // Sync Redux state to local state for display
+  useEffect(() => {
+    if (giveaway.activeGiveaway) {
+      // Update display from Redux state
+      if (giveaway.winner) {
+        setGlobalWinner(giveaway.winner.username);
+        setDisplayName(giveaway.winner.username);
+        setIsSpinning(false);
+      } else if (giveaway.isSelecting) {
+        setIsSpinning(true);
+        setGlobalWinner(null);
+      } else {
+        setGlobalWinner(null);
+        setIsSpinning(false);
+        setDisplayName('');
+      }
+    } else {
+      setGlobalWinner(null);
+      setIsSpinning(false);
+      setDisplayName('');
+    }
+  }, [giveaway.activeGiveaway, giveaway.winner, giveaway.isSelecting]);
 
   // Setup BroadcastChannel for sync
   useEffect(() => {

@@ -70,14 +70,14 @@ export const TimerTemplates: React.FC<TimerTemplatesProps> = ({
 
   // Get translated category name
   const getCategoryName = (category: string): string => {
-    const key = category as keyof typeof t.timers.templateCategories;
-    return t.timers.templateCategories[key] || category;
+    const key = category as keyof typeof t.misc.timers.templateCategories;
+    return t.misc.timers.templateCategories[key] || category;
   };
 
   return (
     <div className="space-y-4">
       <div className="text-sm text-zinc-400 mb-4">
-        {t.timers.templatesDescription}
+        {t.misc.timers.templatesDescription}
       </div>
 
       {categories.map(category => {
@@ -125,7 +125,7 @@ export const TimerTemplates: React.FC<TimerTemplatesProps> = ({
                         onClick={() => onUseTemplate(template)}
                         className="px-2 py-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors"
                       >
-                        {t.timers.useTemplate}
+                        {t.misc.timers.useTemplate}
                       </button>
                     </div>
                     
@@ -134,8 +134,8 @@ export const TimerTemplates: React.FC<TimerTemplatesProps> = ({
                     </p>
                     
                     <div className="flex items-center gap-3 text-xs text-zinc-500">
-                      <span>{interpolate(t.timers.everyMinutes, { minutes: template.intervalMinutes })}</span>
-                      <span>{interpolate(t.timers.minLines, { lines: template.minChatLines })}</span>
+                      <span>{interpolate(t.misc.timers.everyMinutes, { minutes: template.intervalMinutes })}</span>
+                      <span>{interpolate(t.misc.timers.minLines, { lines: template.minChatLines })}</span>
                     </div>
                   </div>
                 ))}

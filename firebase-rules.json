@@ -1,73 +1,92 @@
 {
   "rules": {
-    // Overlay sync - authenticated users write to their own path
-    // Structure: /overlays/{uid}/{overlayType}
     "overlays": {
       "$uid": {
-        // Read: anyone can read (needed for overlay viewers in OBS)
-        ".read": true,
-        // Write: only the authenticated owner can write to their own path
-        ".write": "auth != null && auth.uid == $uid"
-      }
-    },
-    
-    // Broadcaster tokens - only authenticated users can access
-    // The linkedPlatformId stored client-side should match broadcasterId
-    // SECURITY: Only the broadcaster or their moderators can access tokens
-    "broadcaster_tokens": {
-      "$broadcasterId": {
-        // Allow read if authenticated and is the broadcaster or a moderator
-        ".read": "auth != null && (auth.uid == $broadcasterId || root.child('broadcaster_tokens').child($broadcasterId).child('moderators').hasChild(auth.uid))",
-        // Allow write only if authenticated and is the broadcaster
-        ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
-        ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'accessToken', 'storedAt'])"
-      }
-    },
-    
-    // Platform broadcaster tokens (multi-platform support)
-    // SECURITY: Same restrictions as broadcaster_tokens
-    "platform_broadcaster_tokens": {
-      "$platform": {
-        "$broadcasterId": {
-          // Allow read if authenticated and is the broadcaster or a moderator
-          ".read": "auth != null && (auth.uid == $broadcasterId || root.child('platform_broadcaster_tokens').child($platform).child($broadcasterId).child('moderators').hasChild(auth.uid))",
-          // Allow write only if authenticated and is the broadcaster
-          ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
-          ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'accessToken', 'storedAt'])"
+        "$overlayType": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.hasChildren(['type', 'updatedAt'])"
         }
       }
     },
     
-    // User-specific data (future use)
-    "users": {
-      "$uid": {
-        // Users can only read/write their own data
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+    "broadcaster_tokens": {
+      "$broadcasterId": {
+        ".read": "auth != null && auth.uid == $broadcasterId",
+        ".write": "auth != null && auth.uid == $broadcasterId",
+        ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'encryptedToken', 'storedAt']) && newData.child('broadcasterId').val() == $broadcasterId"
       }
     },
     
-    // Streamers data - profiles and giveaways
-    // Structure: /streamers/{twitchId}/profile, /streamers/{twitchId}/sorteos/{sorteoId}
+    "platform_broadcaster_tokens": {
+      "$platform": {
+        "$broadcasterId": {
+          ".read": "auth != null && auth.uid == $broadcasterId",
+          ".write": "auth != null && auth.uid == $broadcasterId",
+          ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'encryptedToken', 'storedAt']) && newData.child('broadcasterId').val() == $broadcasterId && newData.child('platform').val() == $platform"
+        }
+      }
+    },
+    
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['displayName', 'email', 'createdAt'])"
+      }
+    },
+    
     "streamers": {
       "$twitchId": {
-        // Profile: public read, write only by owner
         "profile": {
           ".read": true,
-          ".write": "auth != null"
+          ".write": "auth != null && auth.uid == $twitchId",
+          ".validate": "newData.hasChildren(['displayName', 'updatedAt'])"
         },
-        // Sorteos: public read, write only by authenticated users
         "sorteos": {
           ".read": true,
           "$sorteoId": {
-            ".write": "auth != null",
-            ".validate": "newData.hasChildren(['id', 'name', 'isActive', 'createdAt'])"
+            ".write": "auth != null && auth.uid == $twitchId",
+            ".validate": "newData.hasChildren(['id', 'name', 'isActive', 'createdAt', 'ownerId']) && newData.child('ownerId').val() == $twitchId"
           }
         }
       }
     },
     
-    // Default: deny all other access
+    "giveaways": {
+      "$giveawayId": {
+        ".read": "auth != null && data.child('ownerId').val() == auth.uid || data.child('public').val() == true",
+        ".write": "auth != null && (!data.exists() && newData.child('ownerId').val() == auth.uid || data.child('ownerId').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['title', 'ownerId', 'createdAt']) && newData.child('ownerId').isString() && newData.child('title').isString()"
+      }
+    },
+    
+    "polls": {
+      "$pollId": {
+        ".read": "auth != null && data.child('ownerId').val() == auth.uid || data.child('public').val() == true",
+        ".write": "auth != null && (!data.exists() && newData.child('ownerId').val() == auth.uid || data.child('ownerId').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['title', 'options', 'ownerId', 'createdAt']) && newData.child('ownerId').isString() && newData.child('title').isString()"
+      }
+    },
+    
+    "sessions": {
+      "$sessionId": {
+        ".read": "auth != null && data.child('userId').val() == auth.uid",
+        ".write": "auth != null && (!data.exists() && newData.child('userId').val() == auth.uid || data.child('userId').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['userId', 'overlayType', 'createdAt', 'expiresAt']) && newData.child('userId').isString() && newData.child('expiresAt').isNumber()"
+      },
+      ".indexOn": ["userId", "expiresAt"]
+    },
+    
+    "overlay_sessions": {
+      "$sessionId": {
+        ".read": true,
+        ".write": "auth != null && (!data.exists() && newData.child('ownerId').val() == auth.uid || data.child('ownerId').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['ownerId', 'overlayType', 'overlayData', 'createdAt', 'expiresAt']) && newData.child('ownerId').isString() && newData.child('expiresAt').isNumber() && newData.child('expiresAt').val() > now"
+      },
+      ".indexOn": ["ownerId", "expiresAt"]
+    },
+    
     ".read": false,
     ".write": false
   }

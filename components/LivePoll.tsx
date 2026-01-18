@@ -10,6 +10,8 @@ import { OBSOverlayUrl } from './OBSOverlayUrl';
 import { useI18n } from '../i18n';
 import { useActivitySound } from '../hooks/useActivitySound';
 import { SoundSettingsPopover } from './ui/SoundSettingsPopover';
+import { ErrorBoundary } from '../src/presentation/components/shared/ErrorBoundary';
+import { usePoll } from '../src/application/hooks/usePoll';
 
 interface OverlayStyles {
   textColor?: string;
@@ -22,8 +24,6 @@ interface OverlayStyles {
 interface LivePollProps {
   poll: Poll;
   voteHistory: VoteRecord[];
-  onStop: (auto?: boolean) => void;
-  onReset: () => void;
   onUpdate?: (title: string, question: string) => void;
   onSimulateVote?: () => void; 
   theme?: 'light' | 'dark';
@@ -40,8 +40,6 @@ interface LivePollProps {
 export const LivePoll: React.FC<LivePollProps> = ({ 
   poll, 
   voteHistory, 
-  onStop, 
-  onReset,
   onUpdate,
   onSimulateVote,
   theme = 'dark',
@@ -55,6 +53,9 @@ export const LivePoll: React.FC<LivePollProps> = ({
   forceShowModeration,
 }) => {
   const { t } = useI18n();
+  
+  // Use Redux-based poll hook instead of prop drilling
+  const { endPoll, resetPoll } = usePoll();
   // Helper for overlay font styles
   const getOverlayFontSize = (base: 'title' | 'label' | 'percent' | 'votes') => {
     const sizes = {
@@ -168,7 +169,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
            if (poll.totalVotes > 0) {
              setShowWinnerOverlay(true);
            }
-           onStop(true);
+           // Use Redux action instead of onStop prop
+           endPoll();
        } else {
            const interval = setInterval(() => {
                const newElapsed = Math.floor((Date.now() - poll.startTime) / 1000);
@@ -190,7 +192,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
                    if (poll.totalVotes > 0) {
                      setShowWinnerOverlay(true);
                    }
-                   onStop(true);
+                   // Use Redux action instead of onStop prop
+                   endPoll();
                    clearInterval(interval);
                }
            }, 1000);
@@ -319,7 +322,8 @@ export const LivePoll: React.FC<LivePollProps> = ({
 
   const handleStopClick = () => {
     if (showConfirmStop) {
-      onStop(false);
+      // Use Redux action instead of onStop prop
+      endPoll();
       setShowConfirmStop(false);
     } else {
       setShowConfirmStop(true);
@@ -469,14 +473,15 @@ export const LivePoll: React.FC<LivePollProps> = ({
          : 'text-lg sm:text-xl md:text-2xl';
 
   return (
-    <div className={containerClasses}>
-      <style>{`
-        @keyframes pulseGlow {
-           0%, 100% { filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.4)); }
-           50% { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
-        }
-        .winner-border {
-           box-shadow: 0 0 0 2px #facc15, 0 0 20px rgba(250, 204, 21, 0.3);
+    <ErrorBoundary feature="live-poll">
+      <div className={containerClasses}>
+        <style>{`
+          @keyframes pulseGlow {
+             0%, 100% { filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.4)); }
+             50% { filter: drop-shadow(0 0 15px rgba(250, 204, 21, 0.8)); }
+          }
+          .winner-border {
+             box-shadow: 0 0 0 2px #facc15, 0 0 20px rgba(250, 204, 21, 0.3);
            animation: pulseGlow 2s infinite;
         }
         .rank-list {
@@ -698,7 +703,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
                     {showConfirmStop ? <><AlertTriangle size={18} /> ¿Confirmar?</> : <><StopCircle size={18} /> Detener</>}
                   </Button>
                  ) : (
-                  <Button variant="secondary" onClick={onReset} size="sm"><RefreshCcw size={18} /> Nueva</Button>
+                  <Button variant="secondary" onClick={resetPoll} size="sm"><RefreshCcw size={18} /> Nueva</Button>
                  )
              )}
           </div>
@@ -1017,6 +1022,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
         </div>
       )}
 
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };

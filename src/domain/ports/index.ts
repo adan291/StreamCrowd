@@ -7,7 +7,7 @@
 
 // IChatProvider exports (excluding StreamEventCallback which is also in IStreamEventProvider)
 export type { 
-  ConnectionStatus,
+  ConnectionStatus as ChatConnectionStatus,
   MessageCallback,
   StatusCallback,
   ChatMessage,
@@ -16,7 +16,26 @@ export type {
 } from './IChatProvider';
 
 export * from './IOBSController';
-export * from './IOverlaySync';
+
+// Enhanced IOverlaySync exports
+export type {
+  OverlayType,
+  OverlayState,
+  ConnectionStatus,
+  SyncCallback,
+  SyncResult,
+  SyncSubscription,
+  SyncMetrics,
+  DiagnosticInfo,
+  IOverlaySync,
+  IBidirectionalSync,
+  SyncProviderConfig,
+  ISyncProviderFactory,
+  SyncProviderEvent,
+  ISyncProviderEventListener,
+  IEnhancedOverlaySync
+} from './IOverlaySync';
+
 export * from './IStorage';
 export * from './IStreamEventProvider';
 export * from './IAnalyticsProvider';

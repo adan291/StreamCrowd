@@ -4,6 +4,7 @@
  * Este módulo contiene:
  * - Entities: Modelos de datos y lógica de negocio
  * - Ports: Interfaces que definen contratos con el exterior
+ * - Errors: Custom error types for domain-specific error handling
  * 
  * REGLAS:
  * - NO importar nada de infrastructure/ o presentation/
@@ -13,6 +14,9 @@
 
 // Export entities (StreamEvent comes from here)
 export * from './entities';
+
+// Export error types
+export * from './errors';
 
 // Export ports (excluding StreamEvent which is already exported from entities)
 export type { 

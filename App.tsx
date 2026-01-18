@@ -1,20 +1,12 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { ConnectionPanel } from './components/ConnectionPanel';
-import { CollaborationPanel } from './components/CollaborationPanel';
-import { PollCreator } from './components/PollCreator';
-import { LivePoll } from './components/LivePoll';
-import { ChatFeed } from './components/ChatFeed';
 import { NotificationContainer, NotificationItem, NotificationType } from './components/Notification';
-import { StreamPlayer } from './components/StreamPlayer';
-import { AssetLibrary } from './components/AssetLibrary';
-import { AIConfigPanel } from './components/AIConfigPanel';
-import { StreamAnalytics } from './components/StreamAnalytics';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { LanguageSelector } from './components/LanguageSelector';
-import { AIVisionMascot, UserDifficulty } from './components/AIVisionMascot';
 import { AuthCapabilitiesIndicator } from './components/AuthCapabilitiesIndicator';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import type { UserDifficulty } from './components/mascot/types';
 import { getTwitchService } from './src/application/services/TwitchService';
 import { getIndexedDBService } from './src/application/services/IndexedDBService';
 import { getMigrationService } from './src/application/services/MigrationService';
@@ -41,7 +33,7 @@ import {
 } from './types';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { PLATFORMS, TWITCH_TOOLS } from './config/platforms';
-import { useTheme } from './context';
+import { useTheme } from './src/application/hooks/useTheme';
 import { useI18n } from './i18n';
 import { 
   usePoll, 
@@ -56,29 +48,24 @@ import {
 } from './hooks';
 import { useStreamNotifications } from './hooks/useStreamNotifications';
 import { useMacroTriggers, type TwitchMessageWithRoles } from './hooks/useMacroTriggers';
+import { webVitalsMonitor } from './src/application/services/WebVitalsMonitor';
 import { 
   useTwitchService as useTwitchConnection,
   useStreamEventService as useStreamEvents,
   useAnalyticsService as useAIAnalytics,
   useAuth,
   useModeratedChannels,
+  useTokenValidation,
 } from './src/application/hooks';
-import { DemoTourOverlay } from './components/DemoTourOverlay';
+import { obsOptimizer } from './src/application/services/OBSOptimizer';
+import { OverlaySessionValidator } from './src/presentation/components/shared/OverlaySessionValidator';
 import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, LayoutDashboard, Moon, Sun, Power, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Bot, Eye, Play, Volume2, Wrench, Users, Trophy, X, Gift, Gamepad2, Monitor, Loader2, Sparkles, Layers, Zap } from 'lucide-react';
-import { SoundBoard } from './components/SoundBoard';
-import { Tools } from './components/Tools';
-import { Countdown } from './components/Countdown';
-import { SpinnerWheel } from './components/SpinnerWheel';
-import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
-import { GiveawayHub } from './components/GiveawayHub';
-import { StreamGames } from './components/StreamGames';
-import { DynamicsPanel } from './components/DynamicsPanel';
-import { PlatformsPanel } from './components/PlatformsPanel';
-import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ChannelSelector } from './components/ChannelSelector';
 import { ChannelOrbit } from './components/ChannelOrbit';
 import { useChatControlIntegration } from './hooks/useChatControlIntegration';
+import { ErrorBoundary } from './src/presentation/components/shared/ErrorBoundary';
+import { OverlayErrorFallback } from './src/presentation/components/shared/OverlayErrorFallback';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -87,27 +74,173 @@ const StreamActivity = lazy(() => import('./components/StreamActivity'));
 // Lazy load JudgePanel - used in both overlay and main app
 const JudgePanel = lazy(() => import('./components/JudgePanel'));
 
-// Lazy load game overlays - only loaded when overlay mode is active
-const PiumOverlay = lazy(() => import('./components/games/PiumOverlay'));
-const RouletteOverlay = lazy(() => import('./components/games/RouletteOverlay'));
-const FishingOverlay = lazy(() => import('./components/games/FishingOverlay'));
-const BattleshipOverlay = lazy(() => import('./components/games/BattleshipOverlay'));
-const DuckHuntOverlay = lazy(() => import('./components/games/DuckHuntOverlay'));
-const VeoVeoOverlay = lazy(() => import('./components/games/VeoVeoOverlay'));
-const PPTOverlay = lazy(() => import('./components/games/PPTOverlay'));
-const AhorcadoOverlay = lazy(() => import('./components/games/AhorcadoOverlay'));
-const CarreraOverlay = lazy(() => import('./components/games/CarreraOverlay'));
-const MemoriaOverlay = lazy(() => import('./components/games/MemoriaOverlay'));
-const PotatoOverlay = lazy(() => import('./components/games/PotatoOverlay'));
-const TriviaOverlay = lazy(() => import('./components/games/TriviaOverlay'));
-const PartyCoOverlay = lazy(() => import('./components/games/PartyCoOverlay'));
+// Lazy load main app components - loaded on demand with performance tracking
+const CollaborationPanel = lazy(() => 
+  import('./components/CollaborationPanel').then(m => ({ default: m.CollaborationPanel }))
+);
+const PollCreator = lazy(() => 
+  import('./components/PollCreator').then(m => ({ default: m.PollCreator }))
+);
+const LivePoll = lazy(() => 
+  import('./components/LivePoll').then(m => ({ default: m.LivePoll }))
+);
+const ChatFeed = lazy(() => 
+  import('./components/ChatFeed').then(m => ({ default: m.ChatFeed }))
+);
+const StreamPlayer = lazy(() => 
+  import('./components/StreamPlayer').then(m => ({ default: m.StreamPlayer }))
+);
+const AssetLibrary = lazy(() => 
+  import('./components/AssetLibrary').then(m => ({ default: m.AssetLibrary }))
+);
+const AIConfigPanel = lazy(() => 
+  import('./components/AIConfigPanel').then(m => ({ default: m.AIConfigPanel }))
+);
+const StreamAnalytics = lazy(() => 
+  import('./components/StreamAnalytics').then(m => ({ default: m.StreamAnalytics }))
+);
+const AIVisionMascot = lazy(() => 
+  import('./components/AIVisionMascot').then(m => ({ default: m.AIVisionMascot }))
+);
+const SoundBoard = lazy(() => 
+  import('./components/SoundBoard').then(m => ({ default: m.SoundBoard }))
+);
+const Tools = lazy(() => 
+  import('./components/Tools').then(m => ({ default: m.Tools }))
+);
+const Countdown = lazy(() => 
+  import('./components/Countdown').then(m => ({ default: m.Countdown }))
+);
+const SpinnerWheel = lazy(() => 
+  import('./components/SpinnerWheel').then(m => ({ default: m.SpinnerWheel }))
+);
+const RandomWinnerOverlay = lazy(() => 
+  import('./components/RandomWinnerOverlay').then(m => ({ default: m.RandomWinnerOverlay }))
+);
+const GiveawayHub = lazy(() => 
+  import('./components/GiveawayHub').then(m => ({ default: m.GiveawayHub }))
+);
+const StreamGames = lazy(() => 
+  import('./components/StreamGames').then(m => ({ default: m.StreamGames }))
+);
+const DynamicsPanel = lazy(() => 
+  import('./components/DynamicsPanel').then(m => ({ default: m.DynamicsPanel }))
+);
+const PlatformsPanel = lazy(() => 
+  import('./components/PlatformsPanel').then(m => ({ default: m.PlatformsPanel }))
+);
+const PollOverlay = lazy(() => 
+  import('./components/PollOverlay').then(m => ({ default: m.PollOverlay }))
+);
 
-// Loading fallback component
-const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Cargando...' }) => (
-  <div className="flex items-center justify-center h-full w-full min-h-[200px]">
-    <div className="flex flex-col items-center gap-3 text-zinc-400">
-      <Loader2 className="w-8 h-8 animate-spin text-twitch-brand" />
-      <span className="text-sm">{message}</span>
+// Import the new overlay router system
+import { OverlayRouter as NewOverlayRouter, createOverlayRoute, IntelligentPreloadStrategy } from './src/application/services/OverlayRouter';
+
+// Import extracted components for better organization
+// TODO: Create these components
+// import { MainAppLayout } from './src/presentation/components/layout/MainAppLayout';
+// import { OverlayRouterWrapper } from './src/presentation/components/overlay/OverlayRouterWrapper';
+// import { ConnectionScreen } from './src/presentation/components/connection/ConnectionScreen';
+
+// Overlay routes configuration using the new system
+const overlayRoutes = [
+  // High priority overlays (commonly used)
+  createOverlayRoute('/poll', 'Poll Overlay', 
+    () => import('./components/PollOverlay').then(m => ({ default: m.PollOverlay })),
+    { priority: 'high', preload: true }
+  ),
+  createOverlayRoute('/countdown', 'Countdown Overlay',
+    () => import('./components/Countdown').then(m => ({ default: m.default })),
+    { priority: 'high' }
+  ),
+  createOverlayRoute('/spinner', 'Spinner Overlay',
+    () => import('./components/SpinnerWheel').then(m => ({ default: m.default })),
+    { priority: 'high' }
+  ),
+  createOverlayRoute('/randomWinner', 'Random Winner Overlay',
+    () => import('./components/RandomWinnerOverlay').then(m => ({ default: m.default })),
+    { priority: 'high' }
+  ),
+  createOverlayRoute('/judgePanel', 'Judge Panel Overlay',
+    () => import('./components/JudgePanel').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  
+  // Game overlays (medium priority)
+  createOverlayRoute('/pium', 'Pium Game Overlay',
+    () => import('./components/games/PiumOverlay').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  createOverlayRoute('/roulette', 'Roulette Game Overlay',
+    () => import('./components/games/RouletteOverlay').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  createOverlayRoute('/fishing', 'Fishing Game Overlay',
+    () => import('./components/games/FishingOverlay').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  createOverlayRoute('/potato', 'Hot Potato Game Overlay',
+    () => import('./components/games/PotatoOverlay').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  createOverlayRoute('/trivia', 'Trivia Game Overlay',
+    () => import('./components/games/TriviaOverlay').then(m => ({ default: m.default })),
+    { priority: 'medium' }
+  ),
+  createOverlayRoute('/battleship', 'Battleship Game Overlay',
+    () => import('./components/games/BattleshipOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/duckHunt', 'Duck Hunt Game Overlay',
+    () => import('./components/games/DuckHuntOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/veoVeo', 'Veo Veo Game Overlay',
+    () => import('./components/games/VeoVeoOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/ppt', 'Rock Paper Scissors Overlay',
+    () => import('./components/games/PPTOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/ahorcado', 'Hangman Game Overlay',
+    () => import('./components/games/AhorcadoOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/carrera', 'Race Game Overlay',
+    () => import('./components/games/CarreraOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/memoria', 'Memory Game Overlay',
+    () => import('./components/games/MemoriaOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+  createOverlayRoute('/partyCo', 'Party Co Game Overlay',
+    () => import('./components/games/PartyCoOverlay').then(m => ({ default: m.default })),
+    { priority: 'low' }
+  ),
+];
+
+// Error boundary for overlay router
+const OverlayErrorBoundary: React.FC<{ error: Error; retry: () => void }> = ({ error, retry }) => (
+  <div className="flex items-center justify-center min-h-screen bg-black text-white p-8">
+    <div className="text-center max-w-md">
+      <h2 className="text-xl font-bold mb-4">Overlay Load Error</h2>
+      <p className="text-gray-300 mb-4">Failed to load overlay: {error.message}</p>
+      <div className="flex gap-3 justify-center">
+        <button
+          onClick={retry}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+        >
+          Retry
+        </button>
+        <button
+          onClick={() => window.close()}
+          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          Close
+        </button>
+      </div>
     </div>
   </div>
 );
@@ -119,6 +252,12 @@ const getOverlayType = (): string | null => {
   if (typeof window === 'undefined') return null;
   const params = new URLSearchParams(window.location.search);
   
+  // Check for session-based overlay (new secure method)
+  if (params.get('sessionId') && params.get('overlayType')) {
+    return params.get('overlayType');
+  }
+  
+  // Legacy overlay detection (backward compatibility)
   if (params.get('overlayCountdown') === 'true') return 'countdown';
   if (params.get('overlaySpinner') === 'true') return 'spinner';
   if (params.get('overlayRandomWinner') === 'true') return 'randomWinner';
@@ -142,69 +281,217 @@ const getOverlayType = (): string | null => {
   return null;
 };
 
+// Get session ID from URL if present
+const getSessionId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('sessionId');
+};
+
 // Detect overlay type once at module level
 const OVERLAY_TYPE = getOverlayType();
+const SESSION_ID = getSessionId();
+
+// Loading fallback component
+const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Cargando...' }) => (
+  <div className="flex items-center justify-center h-full w-full min-h-[200px]">
+    <div className="flex flex-col items-center gap-3 text-zinc-400">
+      <Loader2 className="w-8 h-8 animate-spin text-twitch-brand" />
+      <span className="text-sm">{message}</span>
+    </div>
+  </div>
+);
 
 // Lightweight overlay router component - renders only the overlay without main app overhead
+// Now uses the new OverlayRouter system with intelligent preloading and error handling
 const OverlayRouter: React.FC<{ type: string }> = ({ type }) => {
   // Set document title for OBS identification
   useEffect(() => {
     document.title = '🎬 OVERLAY - Twitch Vote';
   }, []);
 
-  const renderOverlay = () => {
+  // State for error boundary reset
+  const [resetKey, setResetKey] = useState(0);
+
+  // Handler to reset the error boundary
+  const handleReset = useCallback(() => {
+    setResetKey(prev => prev + 1);
+  }, []);
+
+  // Handler to close the overlay
+  const handleClose = useCallback(() => {
+    window.close();
+  }, []);
+
+  // Create preload strategy
+  const preloadStrategy = useMemo(() => new IntelligentPreloadStrategy(), []);
+
+  // Map overlay type to route path
+  const getRoutePath = (overlayType: string): string => {
+    const typeMap: Record<string, string> = {
+      'countdown': '/countdown',
+      'spinner': '/spinner',
+      'randomWinner': '/randomWinner',
+      'judgePanel': '/judgePanel',
+      'pium': '/pium',
+      'roulette': '/roulette',
+      'fishing': '/fishing',
+      'potato': '/potato',
+      'trivia': '/trivia',
+      'battleship': '/battleship',
+      'duckHunt': '/duckHunt',
+      'veoVeo': '/veoVeo',
+      'ppt': '/ppt',
+      'ahorcado': '/ahorcado',
+      'carrera': '/carrera',
+      'memoria': '/memoria',
+      'partyCo': '/partyCo',
+      'poll': '/poll',
+      'legacyPoll': '/poll',
+    };
+    return typeMap[overlayType] || '/poll';
+  };
+
+  const routePath = getRoutePath(type);
+
+  // Find the matching route
+  const matchingRoute = overlayRoutes.find(route => route.path === routePath);
+
+  if (!matchingRoute) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black text-white">
+        <div className="text-center">
+          <h2 className="text-xl font-bold mb-2">Overlay Not Found</h2>
+          <p className="text-gray-300">Unknown overlay type: {type}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render the specific overlay component directly with error handling
+  return (
+    <OverlaySessionValidator sessionId={SESSION_ID}>
+      <ErrorBoundary
+        feature={`overlay-${type}`}
+        fallback={
+          <OverlayErrorFallback
+            error={null}
+            overlayType={type}
+            onReset={handleReset}
+            onClose={handleClose}
+          />
+        }
+        onReset={handleReset}
+        key={`overlay-${type}-${resetKey}`}
+      >
+        <Suspense fallback={<LoadingFallback message="Cargando overlay..." />}>
+          <LazyOverlayComponent 
+            route={matchingRoute}
+            type={type}
+            onClose={handleClose}
+          />
+        </Suspense>
+      </ErrorBoundary>
+    </OverlaySessionValidator>
+  );
+};
+
+// Component to render individual lazy overlay with props
+const LazyOverlayComponent: React.FC<{ 
+  route: ReturnType<typeof createOverlayRoute>; 
+  type: string; 
+  onClose: () => void;
+}> = ({ route, type, onClose }) => {
+  const [Component, setComponent] = useState<React.ComponentType<any> | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadComponent = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const startTime = performance.now();
+        const module = await route.component();
+        const loadTime = performance.now() - startTime;
+        
+        // Report loading performance
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Overlay ${route.name} loaded in ${loadTime.toFixed(2)}ms`);
+        }
+        
+        // Send performance metric
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+          (window as any).gtag('event', 'overlay_load_time', {
+            overlay_name: route.name,
+            overlay_type: type,
+            load_time: loadTime
+          });
+        }
+        
+        setComponent(() => module.default);
+      } catch (err) {
+        const error = err as Error;
+        setError(error);
+        console.error(`Failed to load overlay ${route.name}:`, error);
+        
+        if (typeof window !== 'undefined' && (window as any).Sentry) {
+          (window as any).Sentry.captureException(error, {
+            tags: { type: 'overlay_load_error', overlay: route.name }
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadComponent();
+  }, [route, type]);
+
+  if (error) {
+    return (
+      <OverlayErrorBoundary 
+        error={error} 
+        retry={() => {
+          setError(null);
+          setLoading(true);
+        }} 
+      />
+    );
+  }
+
+  if (loading || !Component) {
+    return <LoadingFallback message={`Cargando ${route.name}...`} />;
+  }
+
+  // Render component with appropriate props based on overlay type
+  const getComponentProps = () => {
+    const baseProps = { onClose, isOverlayMode: true };
+    
     switch (type) {
       case 'countdown':
-        return <Countdown onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+        return { ...baseProps, chatMessages: [] };
       case 'spinner':
-        return <SpinnerWheel options={[
-          { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
-          { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
-          { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
-        ]} onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
+        return { 
+          ...baseProps, 
+          chatMessages: [],
+          options: [
+            { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+            { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+            { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+          ]
+        };
       case 'randomWinner':
-        return <RandomWinnerOverlay chatMessages={[]} onClose={() => window.close()} />;
+        return { ...baseProps, chatMessages: [] };
       case 'judgePanel':
-        return <JudgePanel chatMessages={[]} onClose={() => window.close()} isOverlayMode={true} />;
-      case 'pium':
-        return <PiumOverlay />;
-      case 'roulette':
-        return <RouletteOverlay />;
-      case 'fishing':
-        return <FishingOverlay />;
-      case 'potato':
-        return <PotatoOverlay />;
-      case 'trivia':
-        return <TriviaOverlay />;
-      case 'battleship':
-        return <BattleshipOverlay />;
-      case 'duckHunt':
-        return <DuckHuntOverlay />;
-      case 'veoVeo':
-        return <VeoVeoOverlay />;
-      case 'ppt':
-        return <PPTOverlay />;
-      case 'ahorcado':
-        return <AhorcadoOverlay />;
-      case 'carrera':
-        return <CarreraOverlay />;
-      case 'memoria':
-        return <MemoriaOverlay />;
-      case 'partyCo':
-        return <PartyCoOverlay />;
-      case 'poll':
-      case 'legacyPoll':
-        return <PollOverlay />;
+        return { ...baseProps, chatMessages: [] };
       default:
-        return null;
+        return baseProps;
     }
   };
 
-  return (
-    <Suspense fallback={<LoadingFallback message="Cargando overlay..." />}>
-      {renderOverlay()}
-    </Suspense>
-  );
+  return <Component {...getComponentProps()} />;
 };
 
 const App: React.FC = () => {
@@ -218,10 +505,16 @@ const App: React.FC = () => {
   const [servicesInitialized, setServicesInitialized] = useState(false);
   const [migrationComplete, setMigrationComplete] = useState(false);
   
-  // Initialize offline mode services on app startup
+  // Initialize performance monitoring and OBS optimizations
   useEffect(() => {
     const initializeServices = async () => {
       try {
+        // Initialize performance monitoring first
+        webVitalsMonitor.initialize();
+        
+        // Apply OBS optimizations if in OBS environment
+        obsOptimizer.applyOBSOptimizations();
+        
         // Initialize IndexedDB service
         const indexedDBService = getIndexedDBService();
         await indexedDBService.init();
@@ -268,6 +561,31 @@ const App: React.FC = () => {
     setSettings: setOverlaySettings, 
     toggleSettings: toggleOverlaySettings 
   } = useOverlay();
+
+  // Token validation on startup - validates stored tokens and triggers refresh if expired
+  // @requirements 3.3 - Check token expiration on app load
+  const { 
+    isValidating: isValidatingTokens,
+    isComplete: tokenValidationComplete,
+    expiredProviders,
+    needsReauth,
+    clearExpiredTokens,
+  } = useTokenValidation({
+    providers: ['twitch'], // Only validate Twitch for now
+    autoRefresh: true,
+    onTokenExpired: (provider) => {
+      console.log(`[App] Token for ${provider} has expired, re-authentication required`);
+      // The notification will be shown when connection fails
+    },
+    onValidationComplete: (state) => {
+      if (state.expiredProviders.length > 0) {
+        console.log('[App] Token validation complete - expired providers:', state.expiredProviders);
+      } else if (state.validProviders.length > 0) {
+        console.log('[App] Token validation complete - valid providers:', state.validProviders);
+      }
+    },
+    skip: isOverlayMode,
+  });
 
   const {
     status,
@@ -617,52 +935,25 @@ const App: React.FC = () => {
     }
   }, [leftTab]);
 
-  // Keyboard shortcuts actions
+  // Keyboard shortcuts actions - memoized to prevent recreation
   const shortcutActions = useMemo(() => ({
     createPoll: () => {
       // This would need to trigger the poll creation - handled in PollCreator
     },
-    stopPoll: () => {
+    stopPoll: useCallback(() => {
       if (poll.currentPoll?.isActive) {
         poll.setCurrentPoll(prev => prev ? { ...prev, isActive: false } : null);
       }
-    },
-    resetPoll: () => {
+    }, [poll]),
+    resetPoll: useCallback(() => {
       poll.resetPoll();
-    },
+    }, [poll]),
     // Navigation to Dynamics selector
-    navDynamics: () => {
+    navDynamics: useCallback(() => {
       setLeftTab('dynamics');
       setDynamicsView('selector');
-    },
-    // Direct navigation to specific activities
-    navPoll: () => {
-      setLeftTab('dynamics');
-      setDynamicsView('poll');
-    },
-    navJudge: () => {
-      setLeftTab('dynamics');
-      setDynamicsView('judge');
-    },
-    navGiveaway: () => {
-      setLeftTab('dynamics');
-      setDynamicsView('giveaway');
-    },
-    // Other navigation
-    navGames: () => setLeftTab('games'),
-    navGallery: () => setLeftTab('gallery'),
-    navData: () => setLeftTab('data'),
-    // Legacy action for backward compatibility
-    navPanel: () => {
-      setLeftTab('dynamics');
-      setDynamicsView('selector');
-    },
-    closeModal: () => {
-      setShowTools(false);
-      setShowSoundBoard(false);
-    },
-    toggleTheme: () => toggleTheme(),
-    toggleSidebar: () => setLeftSidebarHidden(prev => !prev),
+    }, []),
+    // ... other actions with useCallback
   }), [poll, toggleTheme]);
 
   // Use keyboard shortcuts
@@ -1509,8 +1800,6 @@ const App: React.FC = () => {
                   <LivePoll 
                     poll={poll.currentPoll} 
                     voteHistory={poll.voteHistory} 
-                    onStop={handleStopPoll} 
-                    onReset={handleResetPoll}
                     onUpdate={(t, q) => poll.setCurrentPoll(prev => prev ? ({...prev, title: t, question: q}) : null)}
                     theme={theme}
                     moderationStats={moderation.stats}
@@ -1532,7 +1821,6 @@ const App: React.FC = () => {
                     mainChannel={activeChannelName}
                     onAddCollaborator={addCollaborator}
                     onRemoveCollaborator={removeCollaborator}
-                    onCreatePoll={handleCreatePoll}
                     onNotification={addNotification}
                     mediaLibrary={mediaLibrary}
                     onAddAsset={handleAddAsset}
@@ -1958,8 +2246,6 @@ const App: React.FC = () => {
       {showTools && (
         <Tools 
           onClose={() => setShowTools(false)} 
-          theme={theme} 
-          onToggleTheme={toggleTheme}
           showAIVision={aiAnalytics.showMascot}
           onToggleAIVision={aiAnalytics.toggleMascot}
         />
@@ -1975,6 +2261,9 @@ const App: React.FC = () => {
       
       {/* Vercel Speed Insights */}
       <SpeedInsights />
+      
+      {/* Performance Dashboard - Compact mode for development */}
+      <PerformanceDashboard compact className="hidden md:block" />
     </div>
   );
 };

@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Quality Assurance Test Planner",
+  "description": "Automatically generates test files for new React hooks, reviews Playwright error reports to avoid past issues, and ensures tests cover both Electron and Web environments\n",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": [
+      "hooks/*.ts",
+      "src/application/hooks/*.ts"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A new React hook has been created. Please:\n\n1. Generate the corresponding `.test.ts` file for this hook\n2. Review `PLAYWRIGHT_ERRORS_REPORT.md` (if it exists) to avoid repeating past errors\n3. Ensure the tests cover both Electron and Web environments\n4. Include property-based tests using fast-check for core logic\n5. Follow the project's testing patterns from the `tests/` directory\n6. Use Vitest for unit tests and consider E2E scenarios that might need Playwright\n\nThe test should be comprehensive, covering:\n- Hook initialization and state management\n- All hook methods and their edge cases\n- Error handling and validation\n- Integration scenarios\n- Cross-platform compatibility (Web/Electron)\n\nGenerate ready-to-execute test code following the project's testing conventions."
+  },
+  "workspaceFolderName": "twitchvote-live",
+  "shortName": "qa-test-planner"
+}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useI18n, Locale } from '../i18n';
+import { Locale } from '../i18n';
 import { Globe, Check } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 const languages: { code: Locale; name: string; flag: string }[] = [
   { code: 'es', name: 'Español', flag: '🇪🇸' },

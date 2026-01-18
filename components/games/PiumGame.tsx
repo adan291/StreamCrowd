@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
 import { Play, Pause, ExternalLink, Trash2, Volume2, VolumeX, Trophy, RotateCcw } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
-import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
+import { useGameSync } from '../../src/application/hooks/useGameSync';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 
 const STORAGE_KEY_PIUM = 'pium_game_state';
@@ -41,6 +41,9 @@ const CANVAS_WIDTH = 1400;
 const CANVAS_HEIGHT = 760;
 
 export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = true }) => {
+  // Game sync hook for hexagonal architecture
+  const { publishGameState } = useGameSync();
+
   const [isActive, setIsActive] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [scores, setScores] = useState<Map<string, number>>(new Map());

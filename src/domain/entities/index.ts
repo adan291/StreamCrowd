@@ -26,3 +26,5 @@ export type {
 export * from './StreamEvent';
 export * from './ModerationConfig';
 export * from './ChatMetrics';
+export * from './OverlayState';
+export * from './OverlayStateValidation';

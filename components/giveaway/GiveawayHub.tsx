@@ -31,25 +31,22 @@ import type { ChatCommandsConfig } from './services/ChatCommands';
 import type { ParticipationRequirements } from './types';
 
 // Import modular components and hooks
-import {
-  useRaffle,
-  useParticipants,
-  useThreads,
-  useGiveawaySync,
-  useWinnerAnimation,
-  useGiveawaySound,
-  RaffleTab,
-  ThreadsTab,
-  SubsConfigModal,
-  StatsPanel,
-  GiveawayStorage,
-  ModeSelector,
-  DurationPicker,
-  BotDetectionService,
-  type RaffleMode,
-  type GiveawayThread,
-  type FinishedGiveaway,
-} from './index';
+import { useRaffle } from './hooks/useRaffle';
+import type { RaffleState, RafflePhase } from './hooks/useRaffle';
+import { useParticipants } from './hooks/useParticipants';
+import { useThreads } from './hooks/useThreads';
+import { useGiveawaySync } from './hooks/useGiveawaySync';
+import { useWinnerAnimation } from './hooks/useWinnerAnimation';
+import { useGiveawaySound } from './hooks/useGiveawaySound';
+import { RaffleTab } from './RaffleTab';
+import { ThreadsTab } from './ThreadsTab';
+import { SubsConfigModal } from './modals/SubsConfigModal';
+import { StatsPanel } from './StatsPanel';
+import { GiveawayStorage } from './services/GiveawayStorage';
+import { ModeSelector } from './ModeSelector';
+import { DurationPicker } from './DurationPicker';
+import { BotDetectionService } from './services/BotDetectionService';
+import type { RaffleMode, GiveawayThread, FinishedGiveaway } from './types/index';
 
 // ============================================
 // TYPES

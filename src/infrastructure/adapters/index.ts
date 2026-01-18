@@ -6,6 +6,7 @@
  */
 
 export * from './FirebaseSyncAdapter';
+export * from './EnhancedFirebaseAdapter';
 export * from './LocalStorageAdapter';
 export * from './LocalStorageAlertAdapter';
 export * from './LocalStorageAnalyticsAdapter';

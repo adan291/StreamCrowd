@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Terminal, TrendingUp, Coins, Zap, ArrowLeft, Timer, Shield, CheckCircle, Users, Workflow, ChevronDown, ChevronUp, Train, Target, Bookmark } from 'lucide-react';
 import { ToolConfig } from '../config/platforms';
-import { useI18n } from '../i18n';
+import { useI18n, useTranslationModule } from '../i18n';
 import { BroadcasterAuthPanel } from './BroadcasterAuthPanel';
 import type { ChannelContext } from '../src/application/services/ModeratedChannelsService';
 
@@ -145,6 +145,7 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
   onNotification,
 }) => {
   const { t } = useI18n();
+  const { isLoaded: platformsModuleLoaded, isLoading: platformsModuleLoading } = useTranslationModule('platforms');
   const [showAuthPanel, setShowAuthPanel] = useState(false);
   const [showChannelDropdown, setShowChannelDropdown] = useState(false);
 
@@ -236,6 +237,19 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
       className="h-full flex flex-col p-4 sm:p-6 bg-zinc-50 dark:bg-black/10"
       aria-label={t.platforms?.twitchToolsDescription || 'Selector de herramientas de Twitch'}
     >
+      {/* Loading state while platforms module is loading */}
+      {platformsModuleLoading && (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-twitch-brand mx-auto mb-4"></div>
+            <p className="text-zinc-600 dark:text-zinc-400">{t.common?.loading || 'Cargando...'}</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Main content - only render when platforms module is loaded */}
+      {platformsModuleLoaded && (
+      <>
       {/* Back Button */}
       <button
         type="button"
@@ -400,6 +414,8 @@ export const TwitchToolSelector: React.FC<TwitchToolSelectorProps> = ({
           />
         ))}
       </div>
+      </>
+      )}
     </div>
   );
 };

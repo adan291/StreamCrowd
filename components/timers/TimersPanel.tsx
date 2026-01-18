@@ -112,12 +112,12 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
   // Announce engine state changes
   const handleStartEngine = useCallback(() => {
     startEngine();
-    announce(t.timers.engineStartedAnnouncement);
+    announce(t.misc.timers.engineStartedAnnouncement);
   }, [startEngine, announce, t]);
 
   const handleStopEngine = useCallback(() => {
     stopEngine();
-    announce(t.timers.engineStoppedAnnouncement);
+    announce(t.misc.timers.engineStoppedAnnouncement);
   }, [stopEngine, announce, t]);
 
   // Count chat lines for timer execution
@@ -267,9 +267,9 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Clock size={20} className="text-emerald-500" />
-              {t.timers.title}
+              {t.misc.timers.title}
             </h2>
-            <p className="text-xs text-zinc-500">{t.timers.subtitle}</p>
+            <p className="text-xs text-zinc-500">{t.misc.timers.subtitle}</p>
           </div>
 
           {/* Engine controls */}
@@ -277,14 +277,14 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
             {!isConnected && (
               <div className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-400 rounded text-xs">
                 <WifiOff size={12} />
-                {t.timers.notConnected}
+                {t.misc.timers.notConnected}
               </div>
             )}
             
             <button
               onClick={engineState.isRunning ? handleStopEngine : handleStartEngine}
               disabled={!isConnected}
-              aria-label={engineState.isRunning ? t.timers.stopEngine : t.timers.startEngine}
+              aria-label={engineState.isRunning ? t.misc.timers.stopEngine : t.misc.timers.startEngine}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 engineState.isRunning
                   ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
@@ -294,12 +294,12 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
               {engineState.isRunning ? (
                 <>
                   <Square size={14} />
-                  {t.timers.stopEngine}
+                  {t.misc.timers.stopEngine}
                 </>
               ) : (
                 <>
                   <Play size={14} />
-                  {t.timers.startEngine}
+                  {t.misc.timers.startEngine}
                 </>
               )}
             </button>
@@ -316,18 +316,18 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
               aria-hidden="true"
             />
             <span className="text-zinc-400">
-              {engineState.isRunning ? t.timers.engineRunning : t.timers.engineStopped}
+              {engineState.isRunning ? t.misc.timers.engineRunning : t.misc.timers.engineStopped}
             </span>
           </div>
           
           <div className="flex items-center gap-1.5 text-zinc-500">
             <MessageSquare size={12} aria-hidden="true" />
-            <span>{engineState.chatLineCount} {t.timers.chatLines}</span>
+            <span>{engineState.chatLineCount} {t.misc.timers.chatLines}</span>
           </div>
           
           <div className="flex items-center gap-1.5 text-zinc-500">
             <Clock size={12} aria-hidden="true" />
-            <span>{timers.filter(t => t.enabled).length} {t.timers.timerEnabled.toLowerCase()}</span>
+            <span>{timers.filter(t => t.enabled).length} {t.misc.timers.timerEnabled.toLowerCase()}</span>
           </div>
         </div>
       </div>
@@ -383,7 +383,7 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
         <button
           onClick={handleCreateTimer}
           className="absolute bottom-6 right-6 w-12 h-12 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
-          aria-label={t.timers.createTimer}
+          aria-label={t.misc.timers.createTimer}
         >
           <Plus size={24} />
         </button>
