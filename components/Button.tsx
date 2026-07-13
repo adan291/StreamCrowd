@@ -7,6 +7,8 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   loading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  /** Nueva prop: Añade un efecto de pulso para llamar la atención */
+  pulse?: boolean;
   /** Accessible label for icon-only buttons */
   'aria-label'?: string;
 }
@@ -17,6 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   size = 'md',
   fullWidth = false,
   loading = false,
+  pulse = false,
   leftIcon,
   rightIcon,
   className = '',
@@ -34,6 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
     disabled:opacity-60 disabled:cursor-not-allowed
     active:scale-[0.98]
+    ${pulse ? 'animate-pulse' : ''}
   `.trim().replace(/\s+/g, ' ');
 
   const sizeStyles = {

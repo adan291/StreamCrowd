@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "StreamCrowd Component Documentation Sync",
+      "trigger": "PostFileSave",
+      "description": "Mantiene sincronizada la documentación de componentes React cuando se modifican archivos .tsx",
+      "matcher": "components/.*\\\\.tsx$",
+      "action": {
+        "type": "agent",
+        "prompt": "Un componente React de StreamCrowd ha sido modificado. Ejecuta el siguiente flujo de trabajo:\n\n1. ANÁLISIS DEL COMPONENTE:\n   - Examina el archivo guardado para identificar: nuevas props, hooks utilizados, funcionalidades principales, dependencias\n   - Detecta si es un componente nuevo o una modificación de uno existente\n\n2. ACTUALIZACIÓN DE DOCUMENTACIÓN:\n   - Si existe un README.md en la carpeta del componente, actualízalo\n   - Si no existe, créalo con: propósito del componente, props y tipos, ejemplo de uso básico, dependencias importantes\n   - Actualiza el archivo ARCHITECTURE.md principal si el componente afecta la arquitectura general\n\n3. MANTENIMIENTO DE ÍNDICES:\n   - Actualiza los archivos index.ts para exportar correctamente el componente\n   - Verifica que no haya imports rotos en otros componentes\n\n4. ALERTAS IMPORTANTES:\n   - Si el cambio rompe la API pública del componente, crea un comentario TODO prominente\n   - Si detectas patrones que no siguen las convenciones del proyecto, sugiere mejoras\n\nPrioriza la claridad y mantén la documentación concisa pero completa."
+      }
+    }
+  ]
+}

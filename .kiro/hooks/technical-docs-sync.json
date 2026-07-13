@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "StreamCrowd Technical Documentation Sync",
+      "trigger": "PostFileSave",
+      "description": "Actualiza automáticamente la documentación técnica cuando se modifican hooks, servicios o configuraciones",
+      "matcher": "(hooks|config|services|utils)/.*\\\\.(ts|tsx)$",
+      "action": {
+        "type": "agent",
+        "prompt": "Se ha modificado un archivo técnico de StreamCrowd (hook, configuración, servicio o utilidad). Ejecuta:\n\n1. IDENTIFICACIÓN DEL CAMBIO:\n   - Analiza qué tipo de archivo técnico cambió (custom hook, configuración, servicio, utilidad)\n   - Identifica funcionalidades nuevas, modificadas o eliminadas\n   - Detecta cambios en interfaces públicas o APIs internas\n\n2. ACTUALIZACIÓN DE DOCUMENTACIÓN TÉCNICA:\n   - Para hooks: actualiza la documentación de parámetros, valores de retorno y ejemplos de uso\n   - Para configuraciones: actualiza la documentación de settings disponibles y sus efectos\n   - Para servicios: mantén actualizada la documentación de métodos públicos y integraciones\n   - Actualiza ARCHITECTURE.md si el cambio afecta el flujo de datos o la arquitectura\n\n3. REVISIÓN DE DEPENDENCIAS:\n   - Verifica si otros archivos necesitan actualización debido al cambio\n   - Sugiere actualizaciones en componentes que usen el hook/servicio modificado\n\n4. MANTENIMIENTO DE CONSISTENCIA:\n   - Asegúrate de que la nomenclatura sea consistente en toda la documentación\n   - Verifica que los ejemplos de código sigan funcionando con los cambios\n\nEnfócate en mantener la documentación técnica precisa y los ejemplos actualizados."
+      }
+    }
+  ]
+}

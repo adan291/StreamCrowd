@@ -23,6 +23,10 @@ export interface UseActivityConfigReturn<T> {
   resetConfig: () => void;
   exportConfig: () => string;
   importConfig: (json: string) => boolean;
+  /** Nueva funcionalidad: Crear un backup automático del config */
+  createBackup: () => string;
+  /** Nueva funcionalidad: Validar integridad del config actual */
+  validateConfig: () => boolean;
   isDefault: boolean;
 }
 
@@ -256,6 +260,21 @@ export function useActivityConfig<T extends object>(
     return false;
   }, [defaultConfig, version]);
 
+  // Create automatic backup with timestamp
+  const createBackup = useCallback(() => {
+    const backup = {
+      ...config,
+      _backupDate: new Date().toISOString(),
+      _backupVersion: version
+    };
+    return JSON.stringify(backup, null, 2);
+  }, [config, version]);
+
+  // Validate current config integrity
+  const validateConfig = useCallback(() => {
+    return validateConfigStructure(config, defaultConfig);
+  }, [config, defaultConfig]);
+
   // Check if config equals default
   const isDefault = deepEqual(config, defaultConfig);
 
@@ -265,6 +284,8 @@ export function useActivityConfig<T extends object>(
     resetConfig,
     exportConfig,
     importConfig,
+    createBackup,
+    validateConfig,
     isDefault,
   };
 }
