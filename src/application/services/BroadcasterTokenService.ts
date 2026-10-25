@@ -22,6 +22,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, set, get, onValue, off, Database } from 'firebase/database';
 import { FirebaseAuthService } from '../../infrastructure/auth/FirebaseAuthService';
+import { helixFetch } from '../../infrastructure/http/helixFetch';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
@@ -37,6 +38,8 @@ const FIREBASE_CONFIG = {
 };
 
 const FIREBASE_PATH = 'broadcaster_tokens';
+/** channel_moderators/<broadcasterId>/<modUserId> = true (written by the broadcaster) */
+const MODERATORS_PATH = 'channel_moderators';
 
 // ============================================
 // Types
@@ -292,8 +295,13 @@ class BroadcasterTokenServiceImpl {
     }
 
     try {
-      // Link the broadcaster ID to Firebase Auth for security rules
-      FirebaseAuthService.linkPlatformId(data.broadcasterId);
+      // The rules only let the broadcaster write broadcaster_tokens/<id>.
+      // Prove the identity with the token being stored (server-validated).
+      const verified = await FirebaseAuthService.signInWithTwitch(data.accessToken, data.broadcasterId);
+      if (!verified) {
+        console.error('[BroadcasterTokenService] Could not verify broadcaster identity (is /api/firebase-token configured?)');
+        return false;
+      }
       
       // Encrypt token with AES-GCM before storing in Firebase
       const encryptedToken = await encryptForFirebase(data.accessToken);
@@ -323,6 +331,12 @@ class BroadcasterTokenServiceImpl {
 
       this.notifyListeners();
       console.log('[BroadcasterTokenService] Token stored for:', data.broadcasterLogin);
+
+      // Publish the channel's moderator list: the rules let only these users
+      // read the stored token. Non-blocking; failure only affects moderators.
+      this.syncChannelModerators(data.broadcasterId, data.accessToken).catch(err =>
+        console.warn('[BroadcasterTokenService] Could not sync moderators:', err)
+      );
       return true;
     } catch (err) {
       console.error('[BroadcasterTokenService] Error storing token:', err);
@@ -388,10 +402,49 @@ class BroadcasterTokenServiceImpl {
   }
 
   /**
+   * Writes channel_moderators/<broadcasterId> = { <modUserId>: true } from
+   * Helix "Get Moderators" (scope moderation:read). The database rules use
+   * this list to decide which moderators may read the broadcaster token.
+   */
+  async syncChannelModerators(broadcasterId: string, accessToken: string): Promise<number> {
+    if (!this.database || FirebaseAuthService.getTwitchId() !== broadcasterId) return 0;
+
+    const moderators: Record<string, true> = {};
+    let cursor: string | undefined;
+    for (let page = 0; page < 20; page++) {
+      const url = new URL('https://api.twitch.tv/helix/moderation/moderators');
+      url.searchParams.set('broadcaster_id', broadcasterId);
+      url.searchParams.set('first', '100');
+      if (cursor) url.searchParams.set('after', cursor);
+
+      const response = await helixFetch(url.toString(), {
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': TWITCH_CLIENT_ID },
+      });
+      if (!response.ok) throw new Error(`Helix moderators HTTP ${response.status}`);
+
+      const body = await response.json() as { data?: Array<{ user_id: string }>; pagination?: { cursor?: string } };
+      for (const mod of body.data ?? []) {
+        if (/^\d+$/.test(mod.user_id)) moderators[mod.user_id] = true;
+      }
+      cursor = body.pagination?.cursor;
+      if (!cursor) break;
+    }
+
+    await set(ref(this.database, `${MODERATORS_PATH}/${broadcasterId}`), moderators);
+    return Object.keys(moderators).length;
+  }
+
+  /**
    * Eliminar token de un broadcaster
    */
   async removeBroadcasterToken(broadcasterId: string): Promise<void> {
     if (!this.database) return;
+    // Only the broadcaster may delete it (rules); moderators just drop the cache
+    if (FirebaseAuthService.getTwitchId() !== broadcasterId) {
+      this.tokensCache.delete(broadcasterId);
+      this.notifyListeners();
+      return;
+    }
 
     try {
       const tokenRef = ref(this.database, `${FIREBASE_PATH}/${broadcasterId}`);
@@ -504,16 +557,21 @@ class BroadcasterTokenServiceImpl {
         },
       });
 
-      if (!response.ok) {
-        // Token inválido - eliminarlo
+      if (response.status === 401) {
+        // Token inválido o revocado - eliminarlo
         await this.removeBroadcasterToken(broadcasterId);
         return { valid: false, error: 'Token expired or revoked' };
       }
 
+      if (!response.ok) {
+        // 429 / 5xx: error transitorio, NO borrar el token
+        return { valid: false, error: `Token validation temporarily unavailable (HTTP ${response.status})` };
+      }
+
       const data = await response.json();
       
-      // Actualizar scopes si cambiaron
-      if (data.scopes && this.database) {
+      // Actualizar scopes si cambiaron (solo el broadcaster puede escribir)
+      if (data.scopes && this.database && FirebaseAuthService.getTwitchId() === broadcasterId) {
         const tokenRef = ref(this.database, `${FIREBASE_PATH}/${broadcasterId}/scopes`);
         await set(tokenRef, data.scopes);
         

@@ -27,6 +27,7 @@ import {
   type OverlayType,
   type OverlayOptions,
 } from '../src/application/services/OverlayURLService';
+import { useOverlayOwner } from '../hooks/useOverlayOwner';
 
 interface OverlayURLGeneratorProps {
   onNotification?: (type: 'success' | 'info' | 'error', message: string) => void;
@@ -57,13 +58,15 @@ export const OverlayURLGenerator: React.FC<OverlayURLGeneratorProps> = ({
   );
 
   // Generar la URL
+  const owner = useOverlayOwner();
+
   const generatedURL = useMemo(() => {
     try {
-      return generateOverlayURL(selectedType, options);
+      return generateOverlayURL(selectedType, { ...options, owner: owner ?? undefined });
     } catch {
       return '';
     }
-  }, [selectedType, options]);
+  }, [selectedType, options, owner]);
 
   // Obtener overlays por categoría
   const overlaysByCategory = useMemo(() => getOverlaysByCategory(), []);

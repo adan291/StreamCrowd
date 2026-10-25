@@ -15,6 +15,8 @@
 import type { Platform } from '../../../types/platform';
 import { TokenStorage, type PlatformCredentials } from './TokenStorage';
 import { GiveawayFirebaseService } from '../../infrastructure/firebase/GiveawayFirebaseService';
+import { FirebaseAuthService } from '../../infrastructure/auth/FirebaseAuthService';
+import { helixFetch } from '../../infrastructure/http/helixFetch';
 
 // ============================================
 // Types
@@ -567,7 +569,7 @@ class PlatformAuthServiceImpl {
   private async fetchUserInfo(platform: Platform, accessToken: string): Promise<{ username: string; userId: string } | null> {
     try {
       if (platform === 'twitch') {
-        const response = await fetch('https://api.twitch.tv/helix/users', {
+        const response = await helixFetch('https://api.twitch.tv/helix/users', {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Client-Id': TWITCH_CLIENT_ID,
@@ -614,16 +616,23 @@ class PlatformAuthServiceImpl {
   private notifyAuthChange(platform: Platform, credentials: PlatformCredentials | null): void {
     // If Twitch login, configure Firebase service for giveaways
     if (platform === 'twitch' && credentials) {
-      GiveawayFirebaseService.setStreamer(
-        credentials.userId,
-        credentials.username,
-        undefined, // profileImage - could be fetched separately
-        credentials.username.toLowerCase()
-      );
+      // Verified Firebase identity first: the rules only let the owner write
+      // streamers/<twitchId>. setStreamer runs either way (it waits for it).
+      FirebaseAuthService.signInWithTwitch(credentials.accessToken, credentials.userId)
+        .catch(() => false)
+        .finally(() => {
+          GiveawayFirebaseService.setStreamer(
+            credentials.userId,
+            credentials.username,
+            undefined, // profileImage - could be fetched separately
+            credentials.username.toLowerCase()
+          );
+        });
       console.log('[PlatformAuthService] Firebase configured for streamer:', credentials.username);
     } else if (platform === 'twitch' && !credentials) {
-      // Logout - cleanup Firebase
+      // Logout - cleanup Firebase and drop the Twitch identity
       GiveawayFirebaseService.cleanup();
+      FirebaseAuthService.signOut().catch(() => {});
     }
 
     const callbacks = this.authCallbacks.get(platform);

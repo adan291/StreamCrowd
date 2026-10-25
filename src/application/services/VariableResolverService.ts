@@ -21,6 +21,7 @@ import type {
   VariableScope,
   VariableType 
 } from '../../../types/macros';
+import { evaluateArithmetic } from '../utils/mathExpression';
 
 /**
  * Stream data interface for stream variables
@@ -413,19 +414,8 @@ export class VariableResolverService implements IVariableResolver {
       return null;
     }
 
-    try {
-      // Use Function constructor for safe evaluation (no access to global scope)
-      // eslint-disable-next-line no-new-func
-      const result = new Function(`return (${sanitized})`)();
-      
-      if (typeof result !== 'number') {
-        return null;
-      }
-
-      return result;
-    } catch {
-      return null;
-    }
+    // Own parser instead of new Function: keeps 'unsafe-eval' out of the CSP
+    return evaluateArithmetic(sanitized);
   }
 
   /**

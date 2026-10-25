@@ -31,6 +31,8 @@ export class PluginManagerService {
     this.registry = registry || getPluginRegistryService();
     this.sandbox = sandbox || getPluginSandboxService();
     this.host = host || getPluginHostService();
+    // Connect sandboxed plugin calls (plugin-call messages) to the permission-gated host API
+    this.sandbox.setHostAPIFactory(plugin => this.host.createHostAPI(plugin));
   }
 
   // ============================================

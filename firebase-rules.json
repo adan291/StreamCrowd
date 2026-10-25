@@ -1,73 +1,88 @@
 {
   "rules": {
-    // Overlay sync - authenticated users write to their own path
-    // Structure: /overlays/{uid}/{overlayType}
+    // ------------------------------------------------------------------
+    // IDENTITY
+    // auth.uid          anonymous uid, or "twitch:<user_id>" after login
+    // auth.token.twitchId  set ONLY by /api/firebase-token after Twitch
+    //                      validates the user's token (custom token claim).
+    // Anonymous users never have auth.token.twitchId, so every rule below
+    // that compares it denies them.
+    // ------------------------------------------------------------------
+
+    // Overlay state shown on stream (polls, countdown, games...).
+    // Public read: OBS browser sources read it without logging in, using
+    // ?owner=<uid> in the overlay URL. Only the owner session writes.
     "overlays": {
       "$uid": {
-        // Read: anyone can read (needed for overlay viewers in OBS)
         ".read": true,
-        // Write: only the authenticated owner can write to their own path
         ".write": "auth != null && auth.uid == $uid"
       }
     },
-    
-    // Broadcaster tokens - only authenticated users can access
-    // The linkedPlatformId stored client-side should match broadcasterId
-    // SECURITY: Only the broadcaster or their moderators can access tokens
-    "broadcaster_tokens": {
+
+    // Moderators of a channel, published by the broadcaster from Helix
+    // ("Get Moderators"). Grants read access to the broadcaster token.
+    "channel_moderators": {
       "$broadcasterId": {
-        // Allow read if authenticated and is the broadcaster or a moderator
-        ".read": "auth != null && (auth.uid == $broadcasterId || root.child('broadcaster_tokens').child($broadcasterId).child('moderators').hasChild(auth.uid))",
-        // Allow write only if authenticated and is the broadcaster
-        ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
-        ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'accessToken', 'storedAt'])"
-      }
-    },
-    
-    // Platform broadcaster tokens (multi-platform support)
-    // SECURITY: Same restrictions as broadcaster_tokens
-    "platform_broadcaster_tokens": {
-      "$platform": {
-        "$broadcasterId": {
-          // Allow read if authenticated and is the broadcaster or a moderator
-          ".read": "auth != null && (auth.uid == $broadcasterId || root.child('platform_broadcaster_tokens').child($platform).child($broadcasterId).child('moderators').hasChild(auth.uid))",
-          // Allow write only if authenticated and is the broadcaster
-          ".write": "auth != null && (!data.exists() || data.child('broadcasterId').val() == $broadcasterId)",
-          ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'accessToken', 'storedAt'])"
+        ".read": "auth != null && auth.token.twitchId == $broadcasterId",
+        ".write": "auth != null && auth.token.twitchId == $broadcasterId",
+        "$moderatorId": {
+          ".validate": "newData.isBoolean() && $moderatorId.matches(/^[0-9]+$/)"
         }
       }
     },
-    
-    // User-specific data (future use)
+
+    // Broadcaster Twitch token, so moderators can run broadcaster-only
+    // actions (polls, predictions, raids). Owner writes/deletes; owner and
+    // listed moderators read.
+    "broadcaster_tokens": {
+      "$broadcasterId": {
+        ".read": "auth != null && auth.token.twitchId != null && (auth.token.twitchId == $broadcasterId || root.child('channel_moderators').child($broadcasterId).child(auth.token.twitchId).val() == true)",
+        ".write": "auth != null && auth.token.twitchId == $broadcasterId",
+        ".validate": "newData.hasChildren(['broadcasterId', 'broadcasterLogin', 'accessToken', 'storedAt']) && newData.child('broadcasterId').val() == $broadcasterId"
+      }
+    },
+
+    // Tokens for other platforms (YouTube, Kick). Their ids cannot be
+    // verified here, so each entry belongs to the verified Twitch account
+    // that stored it (ownerTwitchId). Twitch entries must be the owner's own.
+    "platform_broadcaster_tokens": {
+      "$platform": {
+        "$broadcasterId": {
+          ".read": "auth != null && auth.token.twitchId != null && data.child('ownerTwitchId').exists() && (data.child('ownerTwitchId').val() == auth.token.twitchId || root.child('channel_moderators').child(data.child('ownerTwitchId').val()).child(auth.token.twitchId).val() == true)",
+          ".write": "auth != null && auth.token.twitchId != null && ($platform != 'twitch' || $broadcasterId == auth.token.twitchId) && (!data.exists() || data.child('ownerTwitchId').val() == auth.token.twitchId || ($platform == 'twitch' && $broadcasterId == auth.token.twitchId))",
+          ".validate": "newData.hasChildren(['platform', 'broadcasterId', 'accessToken', 'storedAt', 'ownerTwitchId']) && newData.child('ownerTwitchId').val() == auth.token.twitchId && newData.child('platform').val() == $platform"
+        }
+      }
+    },
+
+    // Per-user private data (reserved).
     "users": {
       "$uid": {
-        // Users can only read/write their own data
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid"
       }
     },
-    
-    // Streamers data - profiles and giveaways
-    // Structure: /streamers/{twitchId}/profile, /streamers/{twitchId}/sorteos/{sorteoId}
+
+    // Public streamer pages: profile and giveaways. Anyone can read (the
+    // viewer site); only the verified streamer writes.
     "streamers": {
       "$twitchId": {
-        // Profile: public read, write only by owner
         "profile": {
           ".read": true,
-          ".write": "auth != null"
+          ".write": "auth != null && auth.token.twitchId == $twitchId",
+          ".validate": "newData.hasChildren(['twitchId', 'displayName', 'updatedAt']) && newData.child('twitchId').val() == $twitchId"
         },
-        // Sorteos: public read, write only by authenticated users
         "sorteos": {
           ".read": true,
           "$sorteoId": {
-            ".write": "auth != null",
+            ".write": "auth != null && auth.token.twitchId == $twitchId",
             ".validate": "newData.hasChildren(['id', 'name', 'isActive', 'createdAt'])"
           }
         }
       }
     },
-    
-    // Default: deny all other access
+
+    // Default: deny everything else
     ".read": false,
     ".write": false
   }

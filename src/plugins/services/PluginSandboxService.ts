@@ -19,6 +19,8 @@ export class PluginSandboxService {
   }> = new Map();
   private messageHandler: ((event: MessageEvent) => void) | null = null;
   private hostAPIFactory: ((plugin: Plugin) => PluginHostAPI) | null = null;
+  /** Host API instance per plugin (created with the sandbox, permission-gated) */
+  private hostAPIs: Map<string, PluginHostAPI> = new Map();
 
   constructor() {
     this.setupMessageListener();
@@ -51,6 +53,10 @@ export class PluginSandboxService {
     };
 
     this.sandboxes.set(plugin.id, sandbox);
+
+    if (this.hostAPIFactory) {
+      this.hostAPIs.set(plugin.id, this.hostAPIFactory(plugin));
+    }
 
     // Inject plugin code
     const html = this.createSandboxHTML(plugin);
@@ -86,6 +92,7 @@ export class PluginSandboxService {
 
     sandbox.status = 'destroyed';
     this.sandboxes.delete(pluginId);
+    this.hostAPIs.delete(pluginId);
 
     return true;
   }
@@ -192,11 +199,15 @@ export class PluginSandboxService {
 
   private setupMessageListener(): void {
     this.messageHandler = (event: MessageEvent) => {
-      // Only accept messages from sandbox iframes
       if (!event.data || typeof event.data !== 'object') return;
       
       const message = event.data as SandboxMessage;
       if (!message.type || !message.pluginId) return;
+
+      // Only accept messages that really come from the iframe of that plugin.
+      // Without this check any frame/opener could spoof plugin-ready/-response.
+      const sandbox = this.sandboxes.get(message.pluginId);
+      if (!sandbox || !event.source || event.source !== sandbox.iframe.contentWindow) return;
 
       this.handleSandboxMessage(message, event.source as Window);
     };
@@ -237,17 +248,52 @@ export class PluginSandboxService {
 
   private handlePluginCall(message: SandboxMessage, source: Window): void {
     const { pluginId, callId, method, args } = message;
-    
-    // This would be handled by PluginHostService
-    // For now, just send back an error
-    const response: SandboxMessage = {
-      type: 'plugin-response',
-      pluginId,
-      callId,
-      error: 'Host API not configured'
+
+    const reply = (payload: { result?: unknown; error?: string }) => {
+      const response: SandboxMessage = { type: 'plugin-response', pluginId, callId, ...payload };
+      try {
+        // Sandboxed iframe without allow-same-origin has an opaque origin ('null'),
+        // so '*' is the only target origin that works. The source is verified above.
+        source.postMessage(response, '*');
+      } catch {
+        // Result not structured-cloneable (e.g. contains functions)
+        source.postMessage({ type: 'plugin-response', pluginId, callId, error: 'Result is not serializable' }, '*');
+      }
     };
 
-    source.postMessage(response, '*');
+    Promise.resolve()
+      .then(() => this.invokeHostAPI(pluginId, method, Array.isArray(args) ? args : []))
+      .then(result => reply({ result }))
+      .catch((err: unknown) => reply({ error: err instanceof Error ? err.message : String(err) }));
+  }
+
+  /**
+   * Resolves "namespace.method" on the plugin's host API. Only own properties of
+   * the known namespaces are reachable (no prototype walking).
+   */
+  private invokeHostAPI(pluginId: string, method: string | undefined, args: unknown[]): unknown {
+    const api = this.hostAPIs.get(pluginId);
+    if (!api) throw new Error('Host API not configured');
+    if (typeof method !== 'string') throw new Error('Invalid method');
+
+    // The sandbox already keeps config locally; persist it through the host API
+    if (method === 'plugin.setConfig') {
+      return api.setConfig(args[0] as Record<string, unknown>);
+    }
+
+    const [namespace, name, ...rest] = method.split('.');
+    const allowedNamespaces = ['polls', 'predictions', 'giveaways', 'timers', 'obs', 'storage', 'ui', 'commands', 'notifications'];
+    if (rest.length > 0 || !allowedNamespaces.includes(namespace) || !name) {
+      throw new Error(`Unknown API method: ${method}`);
+    }
+
+    const target = (api as unknown as Record<string, Record<string, unknown>>)[namespace];
+    if (!target || !Object.prototype.hasOwnProperty.call(target, name)) {
+      throw new Error(`Unknown API method: ${method}`);
+    }
+    const fn = target[name];
+    if (typeof fn !== 'function') throw new Error(`Unknown API method: ${method}`);
+    return (fn as (...a: unknown[]) => unknown).apply(target, args);
   }
 
   private handlePluginResponse(message: SandboxMessage): void {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy, Check, ExternalLink, HelpCircle, X, Monitor } from 'lucide-react';
+import { useOverlayOwner, withOverlayOwner } from '../hooks/useOverlayOwner';
 
 interface OBSOverlayUrlProps {
   overlayParam: string;
@@ -13,12 +14,14 @@ export const OBSOverlayUrl: React.FC<OBSOverlayUrlProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const owner = useOverlayOwner();
   
   const getOverlayUrl = () => {
     const baseUrl = typeof window !== 'undefined' 
       ? `${window.location.protocol}//${window.location.host}${window.location.pathname}`
       : '';
-    return `${baseUrl}?${overlayParam}=true`;
+    // owner lets an OBS browser source (another browser profile) read this user's data
+    return withOverlayOwner(`${baseUrl}?${overlayParam}=true`, owner);
   };
 
   const openOverlay = () => {

@@ -21,6 +21,8 @@ export interface OverlayOptions {
   height?: number;
   position?: 'top' | 'bottom' | 'center';
   channel?: string;
+  /** Firebase uid of the streamer whose overlay data to show (?owner=) */
+  owner?: string;
 }
 
 /**
@@ -210,6 +212,11 @@ export function generateOverlayURL(typeId: string, options: OverlayOptions = {})
   
   if (options.channel) {
     params.set('channel', options.channel);
+  }
+
+  // Firebase uid whose data the overlay reads (needed when OBS is a different browser)
+  if (options.owner) {
+    params.set('owner', options.owner);
   }
   
   return `${baseURL}/?${params.toString()}`;

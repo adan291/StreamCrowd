@@ -49,6 +49,8 @@ const FIREBASE_BASE_PATH = 'platform_broadcaster_tokens';
  * Stored broadcaster token for any platform
  */
 export interface StoredBroadcasterToken {
+  /** Verified Twitch id of the account that stored it (checked by the database rules) */
+  ownerTwitchId?: string;
   /** Platform identifier */
   platform: Platform;
   /** Broadcaster's user ID */
@@ -353,13 +355,23 @@ class PlatformBroadcasterTokenServiceImpl {
     }
 
     try {
-      // Link the broadcaster ID to Firebase Auth for security rules
-      FirebaseAuthService.linkPlatformId(data.broadcasterId);
+      // The rules tie every stored token to a verified Twitch account (the
+      // owner). For Twitch the token itself proves it; YouTube/Kick tokens are
+      // stored under the Twitch account already signed in.
+      if (platform === 'twitch') {
+        await FirebaseAuthService.signInWithTwitch(data.accessToken, data.broadcasterId);
+      }
+      const ownerTwitchId = FirebaseAuthService.getTwitchId();
+      if (!ownerTwitchId || (platform === 'twitch' && ownerTwitchId !== data.broadcasterId)) {
+        console.error('[PlatformBroadcasterTokenService] Sign in with Twitch first (verified identity required)');
+        return false;
+      }
       
       // Encrypt tokens with AES-GCM
       const encryptedAccessToken = await encryptForFirebase(data.accessToken);
       
       const token: StoredBroadcasterToken = {
+        ownerTwitchId,
         platform,
         broadcasterId: data.broadcasterId,
         broadcasterLogin: data.broadcasterLogin.toLowerCase(),
@@ -471,6 +483,16 @@ class PlatformBroadcasterTokenServiceImpl {
    */
   async removeBroadcasterToken(platform: Platform, broadcasterId: string): Promise<void> {
     if (!this.database) return;
+
+    // Only the owner may delete it (rules); anyone else just drops the cache
+    const cached = this.tokensCache.get(this.getCacheKey(platform, broadcasterId));
+    const myTwitchId = FirebaseAuthService.getTwitchId();
+    const isOwner = !!myTwitchId && (cached?.ownerTwitchId === myTwitchId || (platform === 'twitch' && broadcasterId === myTwitchId));
+    if (!isOwner) {
+      this.tokensCache.delete(this.getCacheKey(platform, broadcasterId));
+      this.notifyListeners();
+      return;
+    }
 
     try {
       const tokenRef = ref(this.database, this.getFirebasePath(platform, broadcasterId));
@@ -642,15 +664,22 @@ class PlatformBroadcasterTokenServiceImpl {
 
       response = await fetch(validationUrl, { headers });
 
-      if (!response.ok) {
+      // Google tokeninfo responde 400 para tokens inválidos; el resto usa 401
+      const isInvalidToken = response.status === 401 || (platform === 'youtube' && response.status === 400);
+      if (isInvalidToken) {
         await this.removeBroadcasterToken(platform, broadcasterId);
         return { valid: false, error: 'Token expired or revoked' };
+      }
+
+      if (!response.ok) {
+        // 429 / 5xx: error transitorio, NO borrar el token
+        return { valid: false, error: `Token validation temporarily unavailable (HTTP ${response.status})` };
       }
 
       const data = await response.json();
 
       // Update scopes if changed (Twitch)
-      if (platform === 'twitch' && data.scopes && this.database) {
+      if (platform === 'twitch' && data.scopes && this.database && FirebaseAuthService.getTwitchId() === broadcasterId) {
         const tokenRef = ref(this.database, `${this.getFirebasePath(platform, broadcasterId)}/scopes`);
         await set(tokenRef, data.scopes);
 

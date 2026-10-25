@@ -17,11 +17,17 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getAuth, 
   signInAnonymously, 
+  signInWithCustomToken,
   onAuthStateChanged,
   Auth,
   User,
   signOut
 } from 'firebase/auth';
+
+/** Serverless endpoint that turns a Twitch token into a Firebase custom token (api/firebase-token.ts) */
+const FIREBASE_TOKEN_ENDPOINT = '/api/firebase-token';
+/** uid prefix used by the endpoint: "twitch:<user_id>" */
+const TWITCH_UID_PREFIX = 'twitch:';
 
 const FIREBASE_CONFIG = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -139,9 +145,105 @@ class FirebaseAuthServiceImpl {
     }
   }
 
+  // In-flight Twitch sign-ins, keyed by expected Twitch id (dedupes parallel callers)
+  private twitchSignIns = new Map<string, Promise<boolean>>();
+
   /**
-   * Link a platform ID to the current Firebase user
-   * This allows Firebase rules to verify broadcaster identity
+   * Sign in with a verified Twitch identity.
+   *
+   * Sends the user's own Twitch token to /api/firebase-token, which validates
+   * it with Twitch and returns a Firebase custom token (uid "twitch:<id>",
+   * claim twitchId). The database rules only trust this identity for
+   * streamer-owned data (broadcaster tokens, profile, giveaways).
+   *
+   * Returns false (and keeps the anonymous session) if the endpoint is not
+   * deployed/configured, e.g. under `npm run dev` without `vercel dev`.
+   */
+  async signInWithTwitch(accessToken: string, expectedTwitchId?: string): Promise<boolean> {
+    await this.initialize();
+    if (!this.auth || !accessToken) return false;
+
+    if (expectedTwitchId && this.getTwitchId() === expectedTwitchId) {
+      return true;
+    }
+
+    const key = expectedTwitchId || accessToken;
+    const pending = this.twitchSignIns.get(key);
+    if (pending) return pending;
+
+    const attempt = this.doSignInWithTwitch(accessToken, expectedTwitchId).finally(() => {
+      this.twitchSignIns.delete(key);
+    });
+    this.twitchSignIns.set(key, attempt);
+    return attempt;
+  }
+
+  private async doSignInWithTwitch(accessToken: string, expectedTwitchId?: string): Promise<boolean> {
+    try {
+      const response = await fetch(FIREBASE_TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken }),
+      });
+      if (!response.ok) {
+        console.warn(`[FirebaseAuth] Twitch identity unavailable (HTTP ${response.status}); staying anonymous`);
+        return false;
+      }
+
+      const data = (await response.json()) as { firebaseToken?: string; twitchId?: string };
+      if (!data.firebaseToken || !data.twitchId) return false;
+      if (expectedTwitchId && data.twitchId !== expectedTwitchId) {
+        console.warn('[FirebaseAuth] Twitch token belongs to a different user than expected');
+        return false;
+      }
+
+      const result = await signInWithCustomToken(this.auth!, data.firebaseToken);
+      this.currentUser = result.user;
+      this.linkPlatformId(data.twitchId);
+      return true;
+    } catch (err) {
+      console.warn('[FirebaseAuth] Twitch sign-in failed; staying anonymous:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Twitch id verified by the server (from the custom-token uid), or null when
+   * signed in anonymously. Unlike getLinkedPlatformId(), this is what the
+   * database rules see.
+   */
+  getTwitchId(): string | null {
+    const uid = this.currentUser?.uid;
+    return uid && uid.startsWith(TWITCH_UID_PREFIX) ? uid.slice(TWITCH_UID_PREFIX.length) : null;
+  }
+
+  /**
+   * Waits (up to timeoutMs) until the session has the given verified Twitch
+   * identity. Used before writes that the rules only allow to the owner.
+   */
+  waitForTwitchIdentity(twitchId: string, timeoutMs = 8000): Promise<boolean> {
+    if (this.getTwitchId() === twitchId) return Promise.resolve(true);
+    return new Promise(resolve => {
+      let done = false;
+      let unsubscribe: () => void = () => {};
+      const finish = (value: boolean) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        unsubscribe();
+        resolve(value);
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      unsubscribe = this.onAuthStateChange(() => {
+        if (this.getTwitchId() === twitchId) finish(true);
+      });
+    });
+  }
+
+  /**
+   * Link a platform ID to the current Firebase user.
+   * NOTE: local only (localStorage); the database rules do NOT see this.
+   * Verified identity comes from signInWithTwitch().
    */
   linkPlatformId(platformId: string): void {
     this.linkedPlatformId = platformId;
@@ -181,6 +283,8 @@ class FirebaseAuthServiceImpl {
       this.currentUser = null;
       this.unlinkPlatformId();
       console.log('[FirebaseAuth] Signed out');
+      // Keep an anonymous session so overlays and local sync keep working
+      await this.signInAnonymously();
     } catch (err) {
       console.error('[FirebaseAuth] Sign out error:', err);
     }

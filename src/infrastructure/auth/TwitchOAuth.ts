@@ -170,6 +170,9 @@ export function openTwitchOAuthPopup(): Promise<TwitchOAuthResult> {
       
       if (type !== 'twitch_oauth_callback') return;
       
+      // Read the expected state BEFORE clearing it (CSRF protection)
+      const savedState = sessionStorage.getItem('twitch_oauth_state');
+      
       // Clean up
       window.removeEventListener('message', handleMessage);
       clearInterval(pollTimer);
@@ -180,9 +183,8 @@ export function openTwitchOAuthPopup(): Promise<TwitchOAuthResult> {
         return;
       }
       
-      // Verify state to prevent CSRF
-      const savedState = sessionStorage.getItem('twitch_oauth_state');
-      if (returnedState !== savedState && savedState !== null) {
+      // Verify state to prevent CSRF: reject when missing or different
+      if (!savedState || returnedState !== savedState) {
         reject({ error: 'state_mismatch', errorDescription: 'State verification failed' });
         return;
       }

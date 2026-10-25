@@ -8,7 +8,7 @@
  */
 
 import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase, ref, set, onValue, off, Database } from 'firebase/database';
+import { getDatabase, ref, set, onValue, Database } from 'firebase/database';
 import { FirebaseAuthService } from '../auth/FirebaseAuthService';
 
 const firebaseConfig = {
@@ -25,6 +25,20 @@ const firebaseConfig = {
 // Initialize Firebase - reuse existing app if available
 let database: Database | null = null;
 let initPromise: Promise<void> | null = null;
+
+/**
+ * Owner of the overlay data to display, from the overlay URL (?owner=<uid>).
+ *
+ * The OBS browser source is a different browser profile with its own
+ * anonymous uid. Without the owner in the URL it read overlays/<its own uid>,
+ * where nothing is ever written, so Firebase sync never worked in OBS.
+ */
+export function getOverlayOwnerFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const owner = new URLSearchParams(window.location.search).get('owner');
+  // Firebase keys cannot contain . # $ [ ] or /
+  return owner && /^[^.#$[\]/]{1,128}$/.test(owner) ? owner : null;
+}
 
 async function ensureInitialized(): Promise<void> {
   if (database) return;
@@ -102,7 +116,7 @@ export interface SyncedOverlayState {
   judgePanel?: {
     title: string;
     contestants: Array<{ id: string; name: string; color: string; image?: string | null; voteKey?: string | null }>;
-    judges: Array<{ id: string; username: string; color: string }>;
+    judges: Array<{ id: string; username: string; color: string; channelName?: string; isHost?: boolean }>;
     criteria: Array<{ id: string; name: string; minScore: number; maxScore: number; weight: number }>;
     scores: Array<{ judgeId: string; contestantId: string; criterionId: string; score: number }>;
     publicVotes: Array<{ oderId: string; contestantId: string }>;
@@ -248,21 +262,24 @@ export function subscribeToState<T>(
   }
 
   let unsubscribed = false;
-  let dbRef: ReturnType<typeof ref> | null = null;
+  let detach: (() => void) | null = null;
 
   // Initialize and subscribe
   ensureInitialized().then(() => {
     if (unsubscribed || !database) return;
     
-    const uid = customUid || FirebaseAuthService.getUid();
+    // Overlay pages read the owner's data (?owner=); the control panel reads its own
+    const uid = customUid || getOverlayOwnerFromUrl() || FirebaseAuthService.getUid();
     if (!uid) {
       console.warn('[FirebaseSync] No UID for subscription');
       return;
     }
     
-    dbRef = ref(database, `overlays/${uid}/${path}`);
+    const dbRef = ref(database, `overlays/${uid}/${path}`);
     
-    onValue(dbRef, (snapshot) => {
+    // Keep this listener's own unsubscribe: off(ref) would also remove every
+    // other component's listener on the same path.
+    detach = onValue(dbRef, (snapshot) => {
       const data = snapshot.val();
       callback(data as T | null);
     }, (error: unknown) => {
@@ -287,7 +304,7 @@ export function subscribeToState<T>(
   // Return unsubscribe function
   return () => {
     unsubscribed = true;
-    if (dbRef) off(dbRef);
+    if (detach) detach();
   };
 }
 

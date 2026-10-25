@@ -184,11 +184,26 @@ class GiveawayFirebaseServiceImpl {
   }
 
   /**
+   * Waits for the verified Twitch identity of the streamer (see
+   * FirebaseAuthService.signInWithTwitch). Writes without it are rejected by
+   * the database rules, so skip them instead of failing noisily.
+   */
+  private async ensureOwnerIdentity(twitchId: string): Promise<boolean> {
+    const ok = await FirebaseAuthService.waitForTwitchIdentity(twitchId);
+    if (!ok) {
+      console.warn('[GiveawayFirebase] Not signed in as this streamer (verified Twitch identity missing); skipping cloud write');
+    }
+    return ok;
+  }
+
+  /**
    * Update streamer profile in Firebase
    */
   async updateStreamerProfile(profile: StreamerProfile): Promise<void> {
     await this.ensureInitialized();
     if (!this.database || !profile.twitchId) return;
+    // Rules: only the verified owner (auth.token.twitchId) may write streamers/<id>
+    if (!(await this.ensureOwnerIdentity(profile.twitchId))) return;
 
     // Remove undefined values (Firebase doesn't accept them)
     const cleanProfile: Record<string, unknown> = {
@@ -223,6 +238,7 @@ class GiveawayFirebaseServiceImpl {
       });
       return null;
     }
+    if (!(await this.ensureOwnerIdentity(this.currentStreamerId))) return null;
 
     try {
       const streamerProfile = await this.getStreamerProfile(this.currentStreamerId);
@@ -268,6 +284,7 @@ class GiveawayFirebaseServiceImpl {
   async updateGiveaway(giveawayId: string, updates: GiveawayUpdateData): Promise<void> {
     await this.ensureInitialized();
     if (!this.database || !this.currentStreamerId) return;
+    if (!(await this.ensureOwnerIdentity(this.currentStreamerId))) return;
 
     try {
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveawayId}`);
@@ -287,6 +304,7 @@ class GiveawayFirebaseServiceImpl {
   async deleteGiveaway(giveawayId: string): Promise<void> {
     await this.ensureInitialized();
     if (!this.database || !this.currentStreamerId) return;
+    if (!(await this.ensureOwnerIdentity(this.currentStreamerId))) return;
 
     try {
       const giveawayRef = ref(this.database, `streamers/${this.currentStreamerId}/sorteos/${giveawayId}`);
