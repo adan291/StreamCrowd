@@ -3,7 +3,7 @@
  * Tests for Twitch OAuth login, logout, and session persistence
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/base.fixture';
 import { setupTwitchMock, mockUser } from '../mocks/twitch-api.mock';
 
 test.describe('Authentication - Login', () => {

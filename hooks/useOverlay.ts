@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getCurrentOverlayType } from '../config/overlayRegistry';
 
 /**
  * Overlay settings configuration
@@ -45,23 +46,8 @@ export const DEFAULT_OVERLAY_SETTINGS: OverlaySettings = {
  * @returns true if any overlay parameter is present in URL params
  */
 export function detectOverlayMode(): boolean {
-  if (typeof window === 'undefined') return false;
-  const params = new URLSearchParams(window.location.search);
-  // Check for any overlay mode parameter
-  return params.get('overlay') === 'true' || 
-         params.get('overlayPoll') === 'true' ||
-         params.get('overlayCountdown') === 'true' ||
-         params.get('overlaySpinner') === 'true' ||
-         params.get('overlayGiveaway') === 'true' ||
-         params.get('overlayRandomWinner') === 'true' ||
-         params.get('overlayJudge') === 'true' ||
-         params.get('overlayJudgePanel') === 'true' ||
-         params.get('overlayTrivia') === 'true' ||
-         params.get('overlayPPT') === 'true' ||
-         params.get('overlayAhorcado') === 'true' ||
-         params.get('overlayCarrera') === 'true' ||
-         params.get('overlayMemoria') === 'true' ||
-         params.get('overlayPartyCo') === 'true';
+  // Same registry as the OverlayRouter in App.tsx, so both always agree
+  return getCurrentOverlayType() !== null;
 }
 
 /**

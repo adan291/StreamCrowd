@@ -1,9 +1,28 @@
 
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import { I18nProvider } from './i18n';
 import { ThemeProvider } from './context';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { getCurrentOverlayType } from './config/overlayRegistry';
+
+// OBS overlays and the dashboard are separate chunks: an overlay URL never
+// downloads the dashboard (App.tsx and everything it imports).
+const overlayType = getCurrentOverlayType();
+const App = lazy(() => import('./App'));
+const OverlayRouter = lazy(() => import('./components/OverlayRouter'));
+
+/** Shown while the dashboard chunk downloads. data-app-loading is used by the E2E fixture. */
+const AppLoading: React.FC = () => (
+  <div
+    data-app-loading=""
+    role="status"
+    aria-label="Cargando StreamCrowd"
+    className="min-h-screen flex items-center justify-center bg-slate-200 dark:bg-black"
+  >
+    <div className="w-10 h-10 rounded-full border-4 border-twitch-brand border-t-transparent animate-spin" />
+  </div>
+);
 
 // Handle OAuth callback BEFORE rendering React
 // Check if URL has access_token in fragment (regardless of path)
@@ -12,7 +31,9 @@ const accessToken = hashParams.get('access_token');
 const oauthError = hashParams.get('error');
 const state = hashParams.get('state');
 
-if ((accessToken || oauthError) && window.opener) {
+const isOAuthPopupCallback = Boolean((accessToken || oauthError) && window.opener);
+
+if (isOAuthPopupCallback) {
   // This is an OAuth callback in a popup
   if (accessToken) {
     window.opener.postMessage({
@@ -42,22 +63,26 @@ if ((accessToken || oauthError) && window.opener) {
     </div>
   `;
   
-  // Don't render React app in popup
-  throw new Error('OAuth callback handled - stopping React render');
-}
+  // Don't render the React app in the popup (no throw: avoids a fake uncaught error)
+} else {
+  const rootElement = document.getElementById('root');
+  if (!rootElement) {
+    throw new Error("Could not find root element to mount to");
+  }
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary variant="app">
+        <ThemeProvider>
+          <I18nProvider>
+            {/* Overlays stay transparent while loading (OBS); the dashboard shows a spinner */}
+            <Suspense fallback={overlayType ? null : <AppLoading />}>
+              {overlayType ? <OverlayRouter type={overlayType} /> : <App />}
+            </Suspense>
+          </I18nProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
 }
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <ThemeProvider>
-      <I18nProvider>
-        <App />
-      </I18nProvider>
-    </ThemeProvider>
-  </React.StrictMode>
-);

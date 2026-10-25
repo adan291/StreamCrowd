@@ -3,7 +3,9 @@
  * Provides pre-authenticated page contexts
  */
 
-import { test as base, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+// Base fixture waits for the lazy-loaded app after goto/reload
+import { test as base } from './base.fixture';
 
 // Mock user data
 export const mockUser = {
@@ -319,7 +321,7 @@ async function mockWebSocket(page: Page): Promise<void> {
             // Dispatch open event
             const openEvent = new Event('open');
             if (this.onopen) this.onopen(openEvent);
-            this.dispatchEvent('open', openEvent);
+            this.emitEvent('open', openEvent);
             
             // Send TMI welcome messages after connection
             setTimeout(() => {
@@ -344,10 +346,12 @@ async function mockWebSocket(page: Page): Promise<void> {
         console.log('[MockWebSocket] Simulating message:', data.substring(0, 50));
         const event = new MessageEvent('message', { data: data + '\r\n' });
         if (this.onmessage) this.onmessage(event);
-        this.dispatchEvent('message', event);
+        this.emitEvent('message', event);
       }
       
-      private dispatchEvent(type: string, event: Event): void {
+      // Named emitEvent (not dispatchEvent) so it is not overridden by the
+      // public EventTarget-style dispatchEvent(event) declared below.
+      private emitEvent(type: string, event: Event): void {
         const listeners = this.eventListeners.get(type);
         if (listeners) {
           listeners.forEach(listener => {
@@ -407,7 +411,7 @@ async function mockWebSocket(page: Page): Promise<void> {
         this.readyState = MockTwitchWebSocket.CLOSED;
         const closeEvent = new CloseEvent('close', { code: code || 1000, reason: reason || '' });
         if (this.onclose) this.onclose(closeEvent);
-        this.dispatchEvent('close', closeEvent);
+        this.emitEvent('close', closeEvent);
       }
       
       addEventListener(type: string, listener: EventListener): void {
@@ -431,6 +435,7 @@ async function mockWebSocket(page: Page): Promise<void> {
       }
       
       dispatchEvent(event: Event): boolean {
+        this.emitEvent(event.type, event);
         return true;
       }
     }
@@ -618,4 +623,4 @@ export const test = base.extend<AuthFixtures>({
   },
 });
 
-export { expect } from '@playwright/test';
+export { expect } from './base.fixture';

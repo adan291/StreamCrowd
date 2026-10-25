@@ -1,5 +1,5 @@
 import path from 'path';
-import { defineConfig, loadEnv, Plugin } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -16,8 +16,7 @@ function buildVersionPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
     base: '/',
     server: {
@@ -135,10 +134,8 @@ export default defineConfig(({ mode }) => {
         }
       })
     ],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-    },
+    // NOTE: never inject secrets with `define`: everything here ends up in the
+    // public bundle. (GEMINI_API_KEY used to be injected and was unused.)
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -156,7 +153,17 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: (id) => {
+            // Rollup's CommonJS interop helpers are used by React itself; keep
+            // them in vendor-react so that chunk has no imports (no cycles).
+            if (id.includes('commonjsHelpers')) {
+              return 'vendor-react';
+            }
             if (id.includes('node_modules')) {
+              // React en su propio chunk. Sin esto Rollup lo metía dentro de
+              // vendor-charts y cada overlay descargaba recharts (~384 KB).
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+                return 'vendor-react';
+              }
               // Firebase - muy pesado
               if (id.includes('firebase')) {
                 return 'vendor-firebase';

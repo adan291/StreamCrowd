@@ -3,7 +3,8 @@
  * Tests for different viewport sizes and device types
  */
 
-import { test, expect, devices } from '@playwright/test';
+import { devices } from '@playwright/test';
+import { test, expect } from '../fixtures/base.fixture';
 import { DashboardPage } from '../pages/DashboardPage';
 import { setupTwitchMock } from '../mocks/twitch-api.mock';
 

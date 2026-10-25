@@ -68,39 +68,20 @@ import { MessageSquare, Activity, Tv, Image as ImageIcon, Vote as VoteIcon, Layo
 import { SoundBoard } from './components/SoundBoard';
 import { Tools } from './components/Tools';
 import { Countdown } from './components/Countdown';
-import { SpinnerWheel } from './components/SpinnerWheel';
-import { RandomWinnerOverlay } from './components/RandomWinnerOverlay';
 import { GiveawayHub } from './components/GiveawayHub';
 import { StreamGames } from './components/StreamGames';
 import { DynamicsPanel } from './components/DynamicsPanel';
 import { PlatformsPanel } from './components/PlatformsPanel';
-import { PollOverlay } from './components/PollOverlay';
 import { useKeyboardShortcuts } from './components/KeyboardShortcuts';
 import { ChannelSelector } from './components/ChannelSelector';
 import { ChannelOrbit } from './components/ChannelOrbit';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { onTwitchAuthExpired } from './src/infrastructure/http/helixFetch';
 import { useChatControlIntegration } from './hooks/useChatControlIntegration';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
 const StreamActivity = lazy(() => import('./components/StreamActivity'));
-
-// Lazy load JudgePanel - used in both overlay and main app
-const JudgePanel = lazy(() => import('./components/JudgePanel'));
-
-// Lazy load game overlays - only loaded when overlay mode is active
-const PiumOverlay = lazy(() => import('./components/games/PiumOverlay'));
-const RouletteOverlay = lazy(() => import('./components/games/RouletteOverlay'));
-const FishingOverlay = lazy(() => import('./components/games/FishingOverlay'));
-const BattleshipOverlay = lazy(() => import('./components/games/BattleshipOverlay'));
-const DuckHuntOverlay = lazy(() => import('./components/games/DuckHuntOverlay'));
-const VeoVeoOverlay = lazy(() => import('./components/games/VeoVeoOverlay'));
-const PPTOverlay = lazy(() => import('./components/games/PPTOverlay'));
-const AhorcadoOverlay = lazy(() => import('./components/games/AhorcadoOverlay'));
-const CarreraOverlay = lazy(() => import('./components/games/CarreraOverlay'));
-const MemoriaOverlay = lazy(() => import('./components/games/MemoriaOverlay'));
-const PotatoOverlay = lazy(() => import('./components/games/PotatoOverlay'));
-const TriviaOverlay = lazy(() => import('./components/games/TriviaOverlay'));
-const PartyCoOverlay = lazy(() => import('./components/games/PartyCoOverlay'));
 
 // Loading fallback component
 const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Cargando...' }) => (
@@ -114,105 +95,7 @@ const LoadingFallback: React.FC<{ message?: string }> = ({ message = 'Cargando..
 
 const DEMO_CHANNEL = 'twitchdev'; // Official Twitch test channel for demo
 
-// Early overlay detection - runs before any hooks to prevent flash
-const getOverlayType = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const params = new URLSearchParams(window.location.search);
-  
-  if (params.get('overlayCountdown') === 'true') return 'countdown';
-  if (params.get('overlaySpinner') === 'true') return 'spinner';
-  if (params.get('overlayRandomWinner') === 'true') return 'randomWinner';
-  if (params.get('overlayJudgePanel') === 'true') return 'judgePanel';
-  if (params.get('overlayPium') === 'true') return 'pium';
-  if (params.get('overlayRoulette') === 'true') return 'roulette';
-  if (params.get('overlayFishing') === 'true') return 'fishing';
-  if (params.get('overlayPotato') === 'true') return 'potato';
-  if (params.get('overlayTrivia') === 'true') return 'trivia';
-  if (params.get('overlayBattleship') === 'true') return 'battleship';
-  if (params.get('overlayDuckHunt') === 'true') return 'duckHunt';
-  if (params.get('overlayVeoVeo') === 'true') return 'veoVeo';
-  if (params.get('overlayPPT') === 'true') return 'ppt';
-  if (params.get('overlayAhorcado') === 'true') return 'ahorcado';
-  if (params.get('overlayCarrera') === 'true') return 'carrera';
-  if (params.get('overlayMemoria') === 'true') return 'memoria';
-  if (params.get('overlayPartyCo') === 'true') return 'partyCo';
-  if (params.get('overlayPoll') === 'true') return 'poll';
-  if (params.get('overlay') === 'true') return 'legacyPoll';
-  
-  return null;
-};
-
-// Detect overlay type once at module level
-const OVERLAY_TYPE = getOverlayType();
-
-// Lightweight overlay router component - renders only the overlay without main app overhead
-const OverlayRouter: React.FC<{ type: string }> = ({ type }) => {
-  // Set document title for OBS identification
-  useEffect(() => {
-    document.title = '🎬 OVERLAY - Twitch Vote';
-  }, []);
-
-  const renderOverlay = () => {
-    switch (type) {
-      case 'countdown':
-        return <Countdown onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
-      case 'spinner':
-        return <SpinnerWheel options={[
-          { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
-          { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
-          { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
-        ]} onClose={() => window.close()} chatMessages={[]} isOverlayMode={true} />;
-      case 'randomWinner':
-        return <RandomWinnerOverlay chatMessages={[]} onClose={() => window.close()} />;
-      case 'judgePanel':
-        return <JudgePanel chatMessages={[]} onClose={() => window.close()} isOverlayMode={true} />;
-      case 'pium':
-        return <PiumOverlay />;
-      case 'roulette':
-        return <RouletteOverlay />;
-      case 'fishing':
-        return <FishingOverlay />;
-      case 'potato':
-        return <PotatoOverlay />;
-      case 'trivia':
-        return <TriviaOverlay />;
-      case 'battleship':
-        return <BattleshipOverlay />;
-      case 'duckHunt':
-        return <DuckHuntOverlay />;
-      case 'veoVeo':
-        return <VeoVeoOverlay />;
-      case 'ppt':
-        return <PPTOverlay />;
-      case 'ahorcado':
-        return <AhorcadoOverlay />;
-      case 'carrera':
-        return <CarreraOverlay />;
-      case 'memoria':
-        return <MemoriaOverlay />;
-      case 'partyCo':
-        return <PartyCoOverlay />;
-      case 'poll':
-      case 'legacyPoll':
-        return <PollOverlay />;
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <Suspense fallback={<LoadingFallback message="Cargando overlay..." />}>
-      {renderOverlay()}
-    </Suspense>
-  );
-};
-
 const App: React.FC = () => {
-  // If overlay mode, render overlay component immediately without loading main app hooks
-  if (OVERLAY_TYPE) {
-    return <OverlayRouter type={OVERLAY_TYPE} />;
-  }
-  
   // Offline mode services initialization state
   // @requirements 5.1, 5.2, 5.3, 5.4, 5.5
   const [servicesInitialized, setServicesInitialized] = useState(false);
@@ -743,6 +626,15 @@ const App: React.FC = () => {
     addMessageToSessionRef.current = aiAnalytics.addMessageToSession;
   }, [aiAnalytics.addMessageToSession]);
 
+  // Latest hook APIs for the chat message subscription below. That effect
+  // subscribes once ([] deps), so it must read these through a ref; otherwise
+  // it keeps the first-render callbacks (e.g. macro triggers created while
+  // `enabled` was false never fire, and createPoll uses a stale config).
+  const chatHandlersRef = useRef({ poll, moderation, macroTriggers });
+  useEffect(() => {
+    chatHandlersRef.current = { poll, moderation, macroTriggers };
+  });
+
   // Check for Overlay Mode on Mount - handle channel and poll from URL
   useEffect(() => {
     if (isOverlayMode) {
@@ -802,6 +694,14 @@ const App: React.FC = () => {
       setTokenWarningShown(false);
     }
   }, [tokenExpiringSoon, tokenExpiresIn, status, tokenWarningShown]);
+
+  // Session token rejected by Twitch (confirmed with /oauth2/validate by helixFetch).
+  // Chat keeps working; API features (subs, polls, moderation...) need a new login.
+  const [twitchAuthExpired, setTwitchAuthExpired] = useState(false);
+  useEffect(() => onTwitchAuthExpired(() => setTwitchAuthExpired(true)), []);
+  useEffect(() => {
+    if (status !== ConnectionStatus.CONNECTED) setTwitchAuthExpired(false);
+  }, [status]);
 
   // Set distinctive window title for OBS overlay identification
   useEffect(() => {
@@ -976,6 +876,8 @@ const App: React.FC = () => {
   // Process Messages
   useEffect(() => {
     const unsubscribe = getTwitchService().onMessage((chatMessage) => {
+      // Always use the latest hook APIs (see chatHandlersRef)
+      const { poll, moderation, macroTriggers } = chatHandlersRef.current;
       const message = chatMessage.message;
       const sourceChannel = chatMessage.sourceChannel;
       const isSubscriber = chatMessage.isSubscriber || 
@@ -1175,9 +1077,6 @@ const App: React.FC = () => {
       unsubscribe();
     };
   }, []);
-
-  // Note: Overlay detection is now handled at module level by OVERLAY_TYPE and OverlayRouter
-  // This prevents the flash/flicker that occurred when detecting overlays after hooks ran
 
   // Disconnected State Render
   if (status !== ConnectionStatus.CONNECTED) {
@@ -1458,6 +1357,18 @@ const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Session expired: Twitch rejects the token for API calls */}
+        {twitchAuthExpired && (
+          <div role="alert" className="bg-red-900/80 border-b border-red-700 text-red-100 px-4 py-2 flex items-center justify-between gap-3 text-xs">
+            <span>🔒 Tu sesión de Twitch ha caducado. El chat sigue funcionando, pero encuestas, predicciones, moderación y datos de subs necesitan volver a iniciar sesión.</span>
+            <button
+              onClick={() => { setTwitchAuthExpired(false); handleReauthenticate(); }}
+              className="shrink-0 px-3 py-1 bg-red-700 hover:bg-red-600 rounded text-white font-medium transition-colors"
+            >
+              Iniciar sesión
+            </button>
+          </div>
+        )}
         {/* Token Expiration Info Banner - Non-invasive */}
         {tokenExpiringSoon && status === ConnectionStatus.CONNECTED && tokenExpiresIn !== null && (
           <div className="bg-zinc-800 border-b border-zinc-700 text-zinc-300 px-4 py-1.5 flex items-center justify-between text-xs">
@@ -1503,6 +1414,8 @@ const App: React.FC = () => {
           
           {/* Left Column Content */}
           <div className="flex-1 flex flex-col min-w-0 bg-zinc-50 dark:bg-black/50 relative overflow-y-auto pb-16 md:pb-0">
+            {/* A crash in one tab must not take down the dashboard; switching tab resets it */}
+            <ErrorBoundary variant="panel" resetKey={`${leftTab}:${dataSubTab}`}>
             {leftTab === 'dynamics' && (
               poll.currentPoll ? (
                 <div data-tour="live-poll" className="h-full">
@@ -1647,7 +1560,6 @@ const App: React.FC = () => {
                         channelName={channelName}
                         authToken={authToken}
                         userId={userId}
-                        onEventAdded={streamEventsHook.addEvent}
                       />
                     </Suspense>
                   )}
@@ -1688,6 +1600,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
+            </ErrorBoundary>
           </div>
 
           {/* Mobile Sidebar Overlay */}
