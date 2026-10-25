@@ -17,6 +17,7 @@ import type {
   TwitchApiResponse,
   RedemptionStatus,
 } from '../../../types/twitch';
+import { helixFetch } from '../../infrastructure/http/helixFetch';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
@@ -237,7 +238,8 @@ export class TwitchRewardsService {
   ): Promise<T | TwitchRewardsError> {
     const result = await fn();
     
-    if (isTwitchRewardsError(result) && result.retryable && retries > 0) {
+    // 429 is already waited/retried by helixFetch using Ratelimit-Reset
+    if (isTwitchRewardsError(result) && result.retryable && result.code !== 'rate_limit' && retries > 0) {
       const delayTime = this.retryDelayMs * (this.maxRetries - retries + 1);
       await this.delay(delayTime);
       return this.withRetry(fn, retries - 1);
@@ -266,7 +268,7 @@ export class TwitchRewardsService {
           url += '&only_manageable_rewards=true';
         }
 
-        const response = await fetch(url, { headers: this.getHeaders() });
+        const response = await helixFetch(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
@@ -292,7 +294,7 @@ export class TwitchRewardsService {
   ): Promise<TwitchReward | TwitchRewardsError> {
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
           {
             method: 'POST',
@@ -326,7 +328,7 @@ export class TwitchRewardsService {
   ): Promise<TwitchReward | TwitchRewardsError> {
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/channel_points/custom_rewards?broadcaster_id=${broadcasterId}&id=${rewardId}`,
           {
             method: 'PATCH',
@@ -359,7 +361,7 @@ export class TwitchRewardsService {
   ): Promise<void | TwitchRewardsError> {
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/channel_points/custom_rewards?broadcaster_id=${broadcasterId}&id=${rewardId}`,
           {
             method: 'DELETE',
@@ -415,7 +417,7 @@ export class TwitchRewardsService {
           url += `&status=${status}`;
         }
 
-        const response = await fetch(url, { headers: this.getHeaders() });
+        const response = await helixFetch(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
@@ -482,7 +484,7 @@ export class TwitchRewardsService {
   ): Promise<TwitchRedemption | TwitchRewardsError> {
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/channel_points/custom_rewards/redemptions?broadcaster_id=${broadcasterId}&reward_id=${rewardId}&id=${redemptionId}`,
           {
             method: 'PATCH',

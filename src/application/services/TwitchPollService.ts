@@ -1,4 +1,5 @@
-/**
+
+import { helixFetch } from '../../infrastructure/http/helixFetch';/**
  * TwitchPollService - Service for Twitch Polls API
  * 
  * This service provides methods to manage Twitch polls
@@ -225,7 +226,8 @@ export class TwitchPollService {
   ): Promise<T | TwitchPollError> {
     const result = await fn();
     
-    if (isTwitchPollError(result) && result.retryable && retries > 0) {
+    // 429 is already waited/retried by helixFetch using Ratelimit-Reset
+    if (isTwitchPollError(result) && result.retryable && result.code !== 'rate_limit' && retries > 0) {
       const delayTime = this.retryDelayMs * (this.maxRetries - retries + 1);
       await this.delay(delayTime);
       return this.withRetry(fn, retries - 1);
@@ -241,7 +243,7 @@ export class TwitchPollService {
     return this.withRetry(async () => {
       try {
         const url = `${TWITCH_API_BASE}/polls?broadcaster_id=${broadcasterId}`;
-        const response = await fetch(url, { headers: this.getHeaders() });
+        const response = await helixFetch(url, { headers: this.getHeaders() });
 
         if (!response.ok) {
           const errorBody = await response.text().catch(() => '');
@@ -265,7 +267,7 @@ export class TwitchPollService {
     
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/polls`,
           {
             method: 'POST',
@@ -298,7 +300,7 @@ export class TwitchPollService {
   async endPoll(data: EndPollData): Promise<TwitchPoll | TwitchPollError> {
     return this.withRetry(async () => {
       try {
-        const response = await fetch(
+        const response = await helixFetch(
           `${TWITCH_API_BASE}/polls`,
           {
             method: 'PATCH',

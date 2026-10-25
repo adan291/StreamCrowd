@@ -25,6 +25,7 @@ import type {
 } from '../../domain/ports/IChatProvider';
 import type { IStreamEventProvider, StreamEventCallback as DomainStreamEventCallback } from '../../domain/ports/IStreamEventProvider';
 import type { StreamEvent as DomainStreamEvent, SubTier } from '../../domain/entities/StreamEvent';
+import { helixFetch } from '../http/helixFetch';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
@@ -1025,7 +1026,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
     
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/users?login=${targetChannel.toLowerCase()}`,
         {
           headers: {
@@ -1055,7 +1056,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getChatters(token: string, broadcasterId: string, moderatorId: string): Promise<string[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`,
         {
           headers: {
@@ -1095,7 +1096,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
           url.searchParams.set('after', cursor);
         }
         
-        const response = await fetch(url.toString(), {
+        const response = await helixFetch(url.toString(), {
           headers: {
             'Authorization': `Bearer ${cleanToken}`,
             'Client-Id': TWITCH_CLIENT_ID,
@@ -1139,7 +1140,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       url.searchParams.set('count', '100');
       url.searchParams.set('period', period);
       
-      const response = await fetch(url.toString(), {
+      const response = await helixFetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
           'Client-Id': TWITCH_CLIENT_ID,
@@ -1168,7 +1169,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getChannelEmotes(token: string, broadcasterId: string): Promise<{ code: string; url: string; id: string }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/emotes?broadcaster_id=${broadcasterId}`,
         {
           headers: {
@@ -1216,7 +1217,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       if (startedAt) url.searchParams.set('started_at', startedAt);
       if (endedAt) url.searchParams.set('ended_at', endedAt);
       
-      const response = await fetch(url.toString(), {
+      const response = await helixFetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
           'Client-Id': TWITCH_CLIENT_ID,
@@ -1261,7 +1262,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       url.searchParams.set('first', first.toString());
       if (type !== 'all') url.searchParams.set('type', type);
       
-      const response = await fetch(url.toString(), {
+      const response = await helixFetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
           'Client-Id': TWITCH_CLIENT_ID,
@@ -1296,7 +1297,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getModerators(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&first=100`,
         {
           headers: {
@@ -1329,7 +1330,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getVIPs(token: string, broadcasterId: string): Promise<{ id: string; username: string; displayName: string }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&first=100`,
         {
           headers: {
@@ -1364,7 +1365,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async banUser(token: string, broadcasterId: string, userId: string, reason?: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
         {
           method: 'POST',
@@ -1403,7 +1404,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       const cleanToken = token.replace('oauth:', '');
       const clampedDuration = Math.max(1, Math.min(duration, 1209600));
       
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
         {
           method: 'POST',
@@ -1439,7 +1440,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async unbanUser(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'DELETE',
@@ -1467,7 +1468,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getChattersDetailed(token: string, broadcasterId: string, moderatorId: string): Promise<{ userId: string; userLogin: string; userName: string }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&first=1000`,
         {
           headers: {
@@ -1502,7 +1503,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async deleteMessage(token: string, broadcasterId: string, moderatorId: string, messageId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}&message_id=${messageId}`,
         {
           method: 'DELETE',
@@ -1530,7 +1531,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async clearChat(token: string, broadcasterId: string, moderatorId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/chat?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
           method: 'DELETE',
@@ -1565,7 +1566,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   }[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/banned?broadcaster_id=${broadcasterId}&first=100`,
         {
           headers: {
@@ -1627,7 +1628,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       if (settings.emoteMode !== undefined) body.emote_mode = settings.emoteMode;
       if (settings.uniqueChatMode !== undefined) body.unique_chat_mode = settings.uniqueChatMode;
       
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
           method: 'PATCH',
@@ -1663,7 +1664,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   } | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/settings?broadcaster_id=${broadcasterId}`,
         {
           headers: {
@@ -1719,7 +1720,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
         body.color = color;
       }
       
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
           method: 'POST',
@@ -1749,7 +1750,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async addVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'POST',
@@ -1777,7 +1778,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async removeVIP(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'DELETE',
@@ -1811,7 +1812,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${fromBroadcasterId}&to_broadcaster_id=${toBroadcasterId}&moderator_id=${moderatorId}`,
         {
           method: 'POST',
@@ -1855,7 +1856,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/raids?from_broadcaster_id=${fromBroadcasterId}&to_broadcaster_id=${toBroadcasterId}`,
         {
           method: 'POST',
@@ -1893,7 +1894,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async cancelRaid(token: string, broadcasterId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/raids?broadcaster_id=${broadcasterId}`,
         {
           method: 'DELETE',
@@ -1925,7 +1926,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   ): Promise<{ success: boolean; clipId?: string; editUrl?: string; error?: string }> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/clips?broadcaster_id=${broadcasterId}&has_delay=${hasDelay}`,
         {
           method: 'POST',
@@ -1967,7 +1968,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
       const cleanToken = token.replace('oauth:', '');
       const cleanUsername = username.replace('@', '').toLowerCase();
       
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/users?login=${cleanUsername}`,
         {
           headers: {
@@ -1997,7 +1998,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async addModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'POST',
@@ -2025,7 +2026,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async removeModerator(token: string, broadcasterId: string, userId: string): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'DELETE',
@@ -2057,7 +2058,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getHypeTrainEvents(token: string, broadcasterId: string): Promise<HypeTrainEvent[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/hypetrain/status?broadcaster_id=${broadcasterId}`,
         {
           headers: {
@@ -2167,7 +2168,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getChannelGoals(token: string, broadcasterId: string): Promise<ChannelGoal[] | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/goals?broadcaster_id=${broadcasterId}`,
         {
           headers: {
@@ -2238,7 +2239,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
         body.description = description.substring(0, 140); // Max 140 chars
       }
       
-      const response = await fetch(
+      const response = await helixFetch(
         'https://api.twitch.tv/helix/streams/markers',
         {
           method: 'POST',
@@ -2291,7 +2292,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
         url.searchParams.set('video_id', videoId);
       }
       
-      const response = await fetch(url.toString(), {
+      const response = await helixFetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${cleanToken}`,
           'Client-Id': TWITCH_CLIENT_ID,
@@ -2344,7 +2345,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async getShieldModeStatus(token: string, broadcasterId: string, moderatorId: string): Promise<ShieldModeStatus | null> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/shield_mode?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
           headers: {
@@ -2383,7 +2384,7 @@ export class TwitchAdapter implements IMultiChannelProvider, IStreamEventProvide
   async updateShieldMode(token: string, broadcasterId: string, moderatorId: string, isActive: boolean): Promise<boolean> {
     try {
       const cleanToken = token.replace('oauth:', '');
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/shield_mode?broadcaster_id=${broadcasterId}&moderator_id=${moderatorId}`,
         {
           method: 'PUT',

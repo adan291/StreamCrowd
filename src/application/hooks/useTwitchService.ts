@@ -22,6 +22,8 @@ import {
 import { AuthService } from '../services/AuthService';
 import { PlatformAuthService } from '../services/PlatformAuthService';
 import { TokenStorage, type PlatformCredentials } from '../services/TokenStorage';
+import { FirebaseAuthService } from '../../infrastructure/auth/FirebaseAuthService';
+import { setHelixSessionToken } from '../../infrastructure/http/helixFetch';
 import type { ConnectionStatus as DomainConnectionStatus, MessageCallback, StatusCallback } from '../../domain/ports/IChatProvider';
 import { ConnectionStatus } from '../../../types';
 import { PlatformManagerService } from '../services/PlatformManagerService';
@@ -415,6 +417,13 @@ export function useTwitchService(
             console.error('Error saving credentials to TokenStorage:', e);
           }
           
+          // Helix 401s with this token now trigger the app-wide "session expired" check
+          setHelixSessionToken(token);
+
+          // Verified Firebase identity (twitch:<id>) for streamer-owned data.
+          // Non-blocking: without the endpoint the app keeps working anonymously.
+          FirebaseAuthService.signInWithTwitch(token, finalUserId || undefined).catch(() => {});
+
           // Update AuthService with OAuth authentication
           AuthService.setOAuthAuth({
             token,
@@ -487,6 +496,7 @@ export function useTwitchService(
     
     // Clear AuthService
     AuthService.clear();
+    setHelixSessionToken(null);
     setCollaborationChannels([]);
     setTokenExpiresIn(null);
     setTokenExpiringSoon(false);

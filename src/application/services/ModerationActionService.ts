@@ -13,6 +13,7 @@
  */
 
 import { TwitchAPIError } from './TwitchAPIService';
+import { helixFetch } from '../../infrastructure/http/helixFetch';
 
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 
@@ -203,7 +204,7 @@ export class ModerationActionService {
         (body.data as Record<string, unknown>).reason = reason;
       }
 
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
         {
           method: 'POST',
@@ -257,7 +258,7 @@ export class ModerationActionService {
         (body.data as Record<string, unknown>).reason = reason;
       }
 
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
         {
           method: 'POST',
@@ -300,7 +301,7 @@ export class ModerationActionService {
     userId: string
   ): Promise<ModerationResult> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/bans?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'DELETE',
@@ -342,7 +343,7 @@ export class ModerationActionService {
     userId: string
   ): Promise<ModerationResult> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'POST',
@@ -384,7 +385,7 @@ export class ModerationActionService {
     userId: string
   ): Promise<ModerationResult> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&user_id=${userId}`,
         {
           method: 'DELETE',
@@ -432,7 +433,7 @@ export class ModerationActionService {
         color,
       };
 
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
         {
           method: 'POST',

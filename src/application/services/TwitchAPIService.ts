@@ -1,4 +1,5 @@
-/**
+
+import { helixFetch } from '../../infrastructure/http/helixFetch';/**
  * TwitchAPIService - Service for Twitch API data fetching
  * 
  * This service provides methods to fetch data from the Twitch API
@@ -335,7 +336,7 @@ export class TwitchAPIService {
    */
   async getFollowers(broadcasterId: string, limit: number = 100): Promise<Follower[] | TwitchAPIError> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcasterId}&first=${limit}`,
         { headers: this.getHeaders() }
       );
@@ -363,7 +364,7 @@ export class TwitchAPIService {
    */
   async getSubscribers(broadcasterId: string, limit: number = 100): Promise<Subscriber[] | TwitchAPIError> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/subscriptions?broadcaster_id=${broadcasterId}&first=${limit}`,
         { headers: this.getHeaders() }
       );
@@ -398,7 +399,7 @@ export class TwitchAPIService {
         url += `&period=${period}`;
       }
 
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await helixFetch(url, { headers: this.getHeaders() });
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
@@ -438,7 +439,7 @@ export class TwitchAPIService {
         url += `&ended_at=${new Date(endDate).toISOString()}`;
       }
 
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await helixFetch(url, { headers: this.getHeaders() });
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
@@ -478,7 +479,7 @@ export class TwitchAPIService {
         url += `&type=${type}`;
       }
 
-      const response = await fetch(url, { headers: this.getHeaders() });
+      const response = await helixFetch(url, { headers: this.getHeaders() });
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
@@ -508,7 +509,7 @@ export class TwitchAPIService {
    */
   async getModerators(broadcasterId: string): Promise<Moderator[] | TwitchAPIError> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${broadcasterId}&first=100`,
         { headers: this.getHeaders() }
       );
@@ -536,7 +537,7 @@ export class TwitchAPIService {
    */
   async getVIPs(broadcasterId: string): Promise<VIP[] | TwitchAPIError> {
     try {
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/channels/vips?broadcaster_id=${broadcasterId}&first=100`,
         { headers: this.getHeaders() }
       );
@@ -565,7 +566,7 @@ export class TwitchAPIService {
   async getChatters(broadcasterId: string, moderatorId?: string): Promise<Chatter[] | TwitchAPIError> {
     try {
       const modId = moderatorId || broadcasterId;
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${broadcasterId}&moderator_id=${modId}&first=1000`,
         { headers: this.getHeaders() }
       );

@@ -16,6 +16,7 @@
 import type { ITwitchApiServiceAdapter } from '../services/ActionExecutorService';
 import type { TwitchAdapter } from '../../infrastructure/adapters/TwitchAdapter';
 import { BroadcasterTokenService, BROADCASTER_SCOPES } from '../services/BroadcasterTokenService';
+import { helixFetch } from '../../infrastructure/http/helixFetch';
 
 export class TwitchApiServiceAdapter implements ITwitchApiServiceAdapter {
   private twitchAdapter: TwitchAdapter;
@@ -253,7 +254,7 @@ export class TwitchApiServiceAdapter implements ITwitchApiServiceAdapter {
     }
 
     try {
-      const response = await fetch('https://api.twitch.tv/helix/polls', {
+      const response = await helixFetch('https://api.twitch.tv/helix/polls', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenResult.token}`,

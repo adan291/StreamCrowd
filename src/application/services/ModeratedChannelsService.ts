@@ -7,6 +7,8 @@
  * @module src/application/services/ModeratedChannelsService
  */
 
+import { helixFetch } from '../../infrastructure/http/helixFetch';
+
 const TWITCH_CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID || 'gp762nuuoqcoxypju8c569th9wz7q5';
 const TWITCH_API_BASE = 'https://api.twitch.tv/helix';
 
@@ -172,7 +174,7 @@ export class ModeratedChannelsService {
           url.searchParams.set('after', cursor);
         }
 
-        const response = await fetch(url.toString(), {
+        const response = await helixFetch(url.toString(), {
           headers: this.getHeaders(),
         });
 
