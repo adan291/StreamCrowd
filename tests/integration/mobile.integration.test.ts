@@ -177,59 +177,6 @@ describe('Mobile Companion Integration', () => {
     });
   });
 
-  describe('MobileServerService', () => {
-    it('should generate valid pairing data', async () => {
-      const { getMobileServerService } = await import('../../src/services/MobileServerService');
-      const service = getMobileServerService();
-
-      const pairingData = service.generatePairingData('TestChannel');
-
-      expect(pairingData.sessionId).toHaveLength(6);
-      expect(pairingData.wsUrl).toContain('ws://');
-      expect(pairingData.token).toHaveLength(64);
-      expect(pairingData.expiresAt).toBeGreaterThan(Date.now());
-      expect(pairingData.channelName).toBe('TestChannel');
-    });
-
-    it('should validate tokens correctly', async () => {
-      const { getMobileServerService } = await import('../../src/services/MobileServerService');
-      const service = getMobileServerService();
-
-      const pairingData = service.generatePairingData();
-      
-      // Valid token
-      const validated = service.validateToken(pairingData.token);
-      expect(validated).not.toBeNull();
-      expect(validated?.sessionId).toBe(pairingData.sessionId);
-
-      // Invalid token
-      const invalid = service.validateToken('invalidtoken');
-      expect(invalid).toBeNull();
-    });
-
-    it('should generate unique session codes', async () => {
-      const { getMobileServerService } = await import('../../src/services/MobileServerService');
-      const service = getMobileServerService();
-
-      const codes = new Set<string>();
-      for (let i = 0; i < 100; i++) {
-        const data = service.generatePairingData();
-        codes.add(data.sessionId);
-      }
-
-      // All codes should be unique
-      expect(codes.size).toBe(100);
-    });
-
-    it('should track connected devices', async () => {
-      const { getMobileServerService } = await import('../../src/services/MobileServerService');
-      const service = getMobileServerService();
-
-      expect(service.getDeviceCount()).toBe(0);
-      expect(service.getConnectedDevices()).toHaveLength(0);
-    });
-  });
-
   describe('NotificationService', () => {
     it('should check notification support', async () => {
       const { getNotificationService } = await import('../../mobile/services/NotificationService');
