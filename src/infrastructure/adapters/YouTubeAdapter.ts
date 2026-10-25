@@ -136,6 +136,7 @@ export class YouTubeAdapter implements IPlatformAdapter {
   private messagesSentThisMinute = 0;
   private lastMessageTime = 0;
   private queueProcessorInterval: ReturnType<typeof setInterval> | null = null;
+  private minuteResetInterval: ReturnType<typeof setInterval> | null = null;
   private isRateLimited = false;
   private rateLimitResetTime = 0;
   
@@ -559,12 +560,19 @@ export class YouTubeAdapter implements IPlatformAdapter {
     }, 1000);
     
     // Reset messages per minute counter every minute
-    setInterval(() => {
+    if (this.minuteResetInterval) {
+      clearInterval(this.minuteResetInterval);
+    }
+    this.minuteResetInterval = setInterval(() => {
       this.messagesSentThisMinute = 0;
     }, 60000);
   }
   
   private stopQueueProcessor(): void {
+    if (this.minuteResetInterval) {
+      clearInterval(this.minuteResetInterval);
+      this.minuteResetInterval = null;
+    }
     if (this.queueProcessorInterval) {
       clearInterval(this.queueProcessorInterval);
       this.queueProcessorInterval = null;

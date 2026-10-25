@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Pause, ExternalLink, Fish, Anchor, Trophy, RotateCcw } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -55,8 +56,8 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fishRef = useRef<SwimmingFish[]>([]);
-  const animationRef = useRef<number>();
-  const lastProcessedRef = useRef(0);
+  const animationRef = useRef<number | undefined>(undefined);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   
   // OBS Triggers
@@ -98,8 +99,7 @@ export const ChatFishing: React.FC<ChatFishingProps> = ({ chatMessages, isConnec
   // Convert chat messages to fish
   useEffect(() => {
     if (!isActive || !isConnected) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
     
     const canvas = canvasRef.current;
     if (!canvas) return;

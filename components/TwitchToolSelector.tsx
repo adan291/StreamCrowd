@@ -127,8 +127,8 @@ interface TwitchToolSelectorProps {
   };
   /** Channel selector props */
   channelSelector?: {
-    channels: ChannelContext[];
-    selectedChannel: ChannelContext | null;
+    channels: Array<ChannelContext & { channelAvatar?: string }>;
+    selectedChannel: (ChannelContext & { channelAvatar?: string }) | null;
     onSelectChannel: (channelId: string) => void;
     isLoading: boolean;
     isViewingModeratedChannel: boolean;

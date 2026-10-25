@@ -326,7 +326,7 @@ export function useOBS(): UseOBSReturn {
         service.current.getScenes(),
         service.current.getVersion(),
         service.current.getTransitions(),
-        service.current.controller?.getCurrentTransition?.() || Promise.resolve(null),
+        service.current.getCurrentTransition(),
         service.current.getStreamStatus(),
       ]);
       

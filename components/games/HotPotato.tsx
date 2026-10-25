@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Bomb, Timer, Trophy, RotateCcw, Users, ExternalLink } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -32,7 +33,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
   const [round, setRound] = useState(1);
   const [leaderboard, setLeaderboard] = useState<Map<string, number>>(new Map<string, number>());
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -70,8 +71,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
   // Process chat messages
   useEffect(() => {
     if (!isConnected) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -123,38 +123,50 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     syncToOverlay();
   }, [players, syncToOverlay]);
 
-  // Game timer
+  // Latest players for the explosion handler (avoids restarting the timer on every pass)
+  const playersRef = useRef<Player[]>(players);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
+
+  // Game timer: depends only on gameState so passing the potato does not reset the 1s tick
   useEffect(() => {
     if (gameState !== 'playing') return;
     
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          // BOOM!
-          clearInterval(timerRef.current!);
-          const holder = players.find(p => p.hasPotato);
-          if (holder) {
-            setLoser(holder);
-            setPlayers(prev => prev.map(p => 
-              p.oderId === holder.oderId ? { ...p, isOut: true, hasPotato: false } : p
-            ));
-            setLeaderboard(prev => {
-              const newBoard = new Map<string, number>(prev);
-              newBoard.set(holder.username, (newBoard.get(holder.username) || 0) + 1);
-              return newBoard;
-            });
-          }
-          setGameState('exploded');
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft(prev => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [gameState, players]);
+  }, [gameState]);
+
+  // Explosion: side effects run here, not inside a state updater (StrictMode runs updaters twice)
+  useEffect(() => {
+    if (gameState !== 'playing' || timeLeft > 0) return;
+    
+    if (timerRef.current) clearInterval(timerRef.current);
+    const holder = playersRef.current.find(p => p.hasPotato);
+    if (holder) {
+      setLoser(holder);
+      setPlayers(prev => prev.map(p => 
+        p.oderId === holder.oderId ? { ...p, isOut: true, hasPotato: false } : p
+      ));
+      setLeaderboard(prev => {
+        const newBoard = new Map<string, number>(prev);
+        newBoard.set(holder.username, (newBoard.get(holder.username) || 0) + 1);
+        return newBoard;
+      });
+    }
+    setGameState('exploded');
+  }, [gameState, timeLeft]);
+
+  // Random bomb time in [10, bombTime] (inclusive), never below 10s
+  const getRandomBombTime = () => {
+    const max = Math.max(10, bombTime);
+    return Math.floor(Math.random() * (max - 10 + 1)) + 10;
+  };
 
   const startGame = () => {
     if (players.length < 2) return;
@@ -168,7 +180,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
     })));
     
     // Random time between 10-bombTime seconds
-    const time = Math.floor(Math.random() * (bombTime - 10)) + 10;
+    const time = getRandomBombTime();
     setTimeLeft(time);
     setGameState('playing');
     setLoser(null);
@@ -192,7 +204,7 @@ export const HotPotato: React.FC<HotPotatoProps> = ({ chatMessages, isConnected 
       hasPotato: p.oderId === randomPlayer.oderId
     })));
     
-    const time = Math.floor(Math.random() * (bombTime - 10)) + 10;
+    const time = getRandomBombTime();
     setTimeLeft(time);
     setRound(prev => prev + 1);
     setGameState('playing');

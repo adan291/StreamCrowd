@@ -18,6 +18,7 @@ let mockService: {
   switchScene: ReturnType<typeof vi.fn>;
   getVersion: ReturnType<typeof vi.fn>;
   getTransitions: ReturnType<typeof vi.fn>;
+  getCurrentTransition: ReturnType<typeof vi.fn>;
   getStreamStatus: ReturnType<typeof vi.fn>;
   getConnectionConfig: ReturnType<typeof vi.fn>;
   getAutomations: ReturnType<typeof vi.fn>;
@@ -74,6 +75,7 @@ describe('useOBS', () => {
       switchScene: vi.fn().mockResolvedValue(undefined),
       getVersion: vi.fn().mockResolvedValue({ obsVersion: '30.0.0', obsWebSocketVersion: '5.3.0' }),
       getTransitions: vi.fn().mockResolvedValue(['Cut', 'Fade']),
+      getCurrentTransition: vi.fn().mockResolvedValue('Fade'),
       getStreamStatus: vi.fn().mockResolvedValue({ isStreaming: false, isRecording: false }),
       getConnectionConfig: vi.fn().mockReturnValue(null),
       getAutomations: vi.fn().mockReturnValue([]),

@@ -110,12 +110,13 @@ export function useWebhookEvents(options: UseWebhookEventsOptions = {}): UseWebh
 
   const triggerEvent = useCallback(async (
     eventType: WebhookEventType,
-    data: Record<string, unknown>
+    data: object
   ): Promise<void> => {
     if (!enabled) return;
     
     try {
-      await webhookService.triggerEvent(eventType, data);
+      // Event payload interfaces are plain JSON objects without an index signature
+      await webhookService.triggerEvent(eventType, data as Record<string, unknown>);
     } catch (error) {
       console.error(`[Webhook] Failed to trigger ${eventType}:`, error);
     }

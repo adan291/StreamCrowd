@@ -64,6 +64,14 @@ export class OBSWebSocketAdapter implements IOBSController {
       this.reconnectTimeout = null;
     }
     
+    await this.openConnection(config);
+  }
+  
+  /**
+   * Opens the WebSocket connection without resetting the reconnect counter.
+   * Used by connect() and by the auto-reconnect loop.
+   */
+  private async openConnection(config: OBSConnectionOptions): Promise<void> {
     this.setStatus('connecting');
     
     try {
@@ -401,11 +409,15 @@ export class OBSWebSocketAdapter implements IOBSController {
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
     
     this.reconnectTimeout = setTimeout(async () => {
+      this.reconnectTimeout = null;
       if (this.lastOptions && this.status !== 'connected') {
         try {
-          await this.connect(this.lastOptions);
+          await this.openConnection(this.lastOptions);
+          this.reconnectAttempts = 0;
         } catch {
-          // Will retry via ConnectionClosed event
+          // A failed connect sets status to 'error', so ConnectionClosed will not
+          // retry. Schedule the next attempt here (bounded by maxReconnectAttempts).
+          this.attemptReconnect();
         }
       }
     }, delay);

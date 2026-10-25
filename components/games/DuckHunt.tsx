@@ -40,7 +40,7 @@ export const DuckHunt: React.FC<DuckHuntProps> = ({ chatMessages, isConnected = 
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ducksRef = useRef<Duck[]>([]);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const channelRef = useRef<BroadcastChannel | null>(null);
   // Procesar mensajes en tiempo real
   const processedIdsRef = useRef<Set<string>>(new Set());

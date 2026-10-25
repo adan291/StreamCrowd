@@ -1,8 +1,18 @@
 import React, { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 
+/** Props the tooltip reads from / injects into its trigger element */
+type TooltipTriggerProps = {
+  ref?: React.Ref<HTMLElement>;
+  'aria-describedby'?: string;
+  onMouseEnter?: (e: React.MouseEvent) => void;
+  onMouseLeave?: (e: React.MouseEvent) => void;
+  onFocus?: (e: React.FocusEvent) => void;
+  onBlur?: (e: React.FocusEvent) => void;
+};
+
 export interface TooltipProps {
-  children: React.ReactElement;
+  children: React.ReactElement<TooltipTriggerProps>;
   content: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;
@@ -22,7 +32,7 @@ export function Tooltip({
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const triggerRef = useRef<HTMLElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const tooltipId = useId();
 
   const showTooltip = () => {

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
+import { sortByKeyRandomTies } from '../../src/application/utils/shuffle';
 import { Play, Trophy, RotateCcw, Skull, Heart, Sparkles, Loader2, RefreshCw, Globe, Timer, Settings } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -152,12 +154,8 @@ const incrementWordUsage = (word: string): void => {
 // Obtener palabra menos usada de una categoría
 const getLeastUsedWord = (category: WordCategory): { word: string; hint: string } => {
   const usage = loadWordUsage();
-  const sorted = [...category.words].sort((a, b) => {
-    const usageA = usage[a.word] || 0;
-    const usageB = usage[b.word] || 0;
-    if (usageA !== usageB) return usageA - usageB;
-    return Math.random() - 0.5;
-  });
+  // Menos usada primero; empates al azar de forma uniforme
+  const sorted = sortByKeyRandomTies(category.words, w => usage[w.word] || 0);
   return sorted[0];
 };
 
@@ -199,7 +197,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
   const [showSettings, setShowSettings] = useState(false);
   const [maxErrors, setMaxErrors] = useState(MAX_ERRORS);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -275,8 +273,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
   // Procesar letras del chat
   useEffect(() => {
     if (!isConnected || gameState !== 'playing') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -369,7 +366,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
     setGuessedLetters(new Set());
     setErrors(0);
     setContributors([]);
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameStart();
   };
 
@@ -379,7 +376,7 @@ export const Ahorcado: React.FC<AhorcadoProps> = ({ chatMessages, isConnected = 
     setGuessedLetters(new Set());
     setErrors(0);
     setContributors([]);
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameStart();
   };
 

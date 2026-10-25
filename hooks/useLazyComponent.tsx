@@ -41,7 +41,7 @@ export function useLazyComponent(
   const ref = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(initialVisible);
   const [hasBeenVisible, setHasBeenVisible] = useState(initialVisible);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     const element = ref.current;

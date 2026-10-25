@@ -29,7 +29,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   callback: T,
   delay: number
 ): T {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const callbackRef = useRef(callback);
 
   // Update callback ref on each render
@@ -96,7 +96,7 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
   interval: number
 ): T {
   const lastCalledRef = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const callbackRef = useRef(callback);
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
  * usePrevious - Get the previous value of a state
  */
 export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
 
   useEffect(() => {
     ref.current = value;
@@ -173,7 +173,7 @@ export function useBatchedUpdates<T>(
 ): [T, (updater: (prev: T) => T) => void, () => void] {
   const [value, setValue] = useState<T>(initialValue);
   const pendingUpdatesRef = useRef<Array<(prev: T) => T>>([]);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const queueUpdate = useCallback(
     (updater: (prev: T) => T) => {
@@ -228,7 +228,7 @@ export function useBatchedUpdates<T>(
  * useDeepMemo - Memoize with deep comparison
  */
 export function useDeepMemo<T>(factory: () => T, deps: any[]): T {
-  const ref = useRef<{ deps: any[]; value: T }>();
+  const ref = useRef<{ deps: any[]; value: T } | undefined>(undefined);
 
   const depsChanged = !ref.current || !deepEqual(ref.current.deps, deps);
 

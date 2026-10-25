@@ -80,8 +80,8 @@ const App: React.FC = () => {
     if (currentScreen === 'pairing' || !isConnected) {
       return (
         <PairingScreen
-          onPair={handlePair}
-          status={status}
+          onPaired={handlePair}
+          connectionStatus={status}
           error={error}
         />
       );

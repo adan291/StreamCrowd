@@ -19,7 +19,7 @@ export interface RaffleTimingConfig {
   timingMode: 'instant' | 'scheduled';
   scheduledStartDate?: string;
   scheduledStartTime?: string;
-  durationMode: 'fixed' | 'until';
+  durationMode: 'fixed' | 'until' | 'manual';
   fixedDuration: number;
   endDate?: string;
   endTime?: string;

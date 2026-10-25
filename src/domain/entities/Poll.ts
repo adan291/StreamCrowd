@@ -33,7 +33,10 @@ export interface Poll {
 }
 
 export interface VoteRecord {
+  /** Voter id (historical misspelling of "voterId", kept for compatibility) */
   oderId: string;
+  /** Same value as oderId; set by the chat vote handler in App.tsx */
+  userId?: string;
   username: string;
   optionId: number;
   timestamp: number;

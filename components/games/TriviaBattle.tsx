@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
+import { shuffle, sortByKeyRandomTies } from '../../src/application/utils/shuffle';
 import { Play, Trophy, RotateCcw, HelpCircle, Check, Timer, Plus, Trash2, Sparkles, AlertCircle, Loader2, BookOpen, Gamepad2, Film, Music, Globe, Cpu, Dumbbell, Utensils, RefreshCw, Pause, X, Users } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
@@ -72,13 +74,8 @@ const incrementQuestionUsage = (questionIds: string[]): void => {
 // Ordenar preguntas priorizando las menos usadas
 const sortByUsage = (questions: Question[]): Question[] => {
   const usage = loadQuestionUsage();
-  return [...questions].sort((a, b) => {
-    const usageA = usage[a.id] || 0;
-    const usageB = usage[b.id] || 0;
-    if (usageA !== usageB) return usageA - usageB;
-    // Si tienen el mismo uso, aleatorizar
-    return Math.random() - 0.5;
-  });
+  // Menos usadas primero; empates en orden aleatorio uniforme
+  return sortByKeyRandomTies(questions, q => usage[q.id] || 0);
 };
 
 // Funciones para persistencia de preguntas personalizadas
@@ -354,12 +351,7 @@ const fetchOpenTDBQuestions = async (
   // Si tenemos suficientes en cache, usar esas (priorizando menos usadas)
   if (cachedForCategory.length >= amount) {
     const usage = loadQuestionUsage();
-    const sorted = [...cachedForCategory].sort((a, b) => {
-      const usageA = usage[a.id] || 0;
-      const usageB = usage[b.id] || 0;
-      if (usageA !== usageB) return usageA - usageB;
-      return Math.random() - 0.5;
-    });
+    const sorted = sortByKeyRandomTies(cachedForCategory, q => usage[q.id] || 0);
     return sorted.slice(0, amount).map(q => ({ ...q, timeLimit }));
   }
   
@@ -423,9 +415,11 @@ const fetchOpenTDBQuestions = async (
     // La respuesta correcta está en la última posición del array options
     const correctAnswerTranslated = options[options.length - 1];
     
-    // Mezclar opciones
-    const shuffledOptions = [...options].sort(() => Math.random() - 0.5);
-    const correctIndex = shuffledOptions.indexOf(correctAnswerTranslated);
+    // Mezclar opciones (Fisher-Yates: la correcta no debe quedar sesgada hacia el final).
+    // Se sigue la posición de la correcta por índice, no por texto, por si hay opciones repetidas.
+    const order = shuffle(options.map((_, idx) => idx));
+    const shuffledOptions = order.map(idx => options[idx]);
+    const correctIndex = order.indexOf(options.length - 1);
     
     const question: Question = {
       id: `opentdb_${categoryId || 'any'}_${Date.now()}_${i}`,
@@ -635,7 +629,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   const [editingCorrect, setEditingCorrect] = useState(0);
   const [editingTime, setEditingTime] = useState(15);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -683,8 +677,7 @@ export const TriviaBattle: React.FC<TriviaBattleProps> = ({ chatMessages, isConn
   // Process chat messages for answers
   useEffect(() => {
     if (!isConnected || gameState !== 'question' || !currentQuestion) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg: TwitchMessage) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -944,7 +937,7 @@ IMPORTANTE:
     setTimeLeft(questions[0].timeLimit);
     setAnswerCounts([0, 0, 0, 0]);
     setShowCorrect(false);
-    lastProcessedRef.current = chatMessages.length; // Reset to avoid processing old messages
+    markChatMessagesRead(chatMessages, lastProcessedRef); // Reset to avoid processing old messages
     setGameState('question');
     triggerGameStart();
   };

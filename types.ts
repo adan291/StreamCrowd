@@ -99,12 +99,9 @@ export interface PollOption {
   voteKey?: string; // Custom vote keyword (e.g., "chula" for #chula)
 }
 
-export interface VoteRecord {
-  userId: string;
-  username: string;
-  optionId: number;
-  timestamp: number;
-}
+// Single VoteRecord shape for UI and domain (the old UI copy lacked oderId/weight,
+// so the vote history passed from the poll service did not type-check)
+export type { VoteRecord } from './src/domain/entities/Poll';
 
 export interface Poll {
   id: string;

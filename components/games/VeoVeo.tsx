@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Eye, Play, Trophy, RotateCcw, ExternalLink, Check, X, HelpCircle } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -30,7 +31,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
   const [players, setPlayers] = useState<Map<string, Player>>(new Map());
   const [hintsGiven, setHintsGiven] = useState<string[]>([]);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -60,8 +61,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
   // Procesar mensajes del chat
   useEffect(() => {
     if (!isConnected || gameState !== 'playing') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -112,7 +112,7 @@ export const VeoVeo: React.FC<VeoVeoProps> = ({ chatMessages, isConnected = true
     setGuesses([]);
     setWinner(null);
     setHintsGiven([hint]);
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameStart();
   };
 

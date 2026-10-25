@@ -20,6 +20,7 @@ import { MultiWinnerConfig } from './MultiWinnerConfig';
 import { RequirementsConfig } from './RequirementsConfig';
 import { BotFilterConfig } from './BotFilterConfig';
 import { RafflePreview } from './RafflePreview';
+import { RaffleCountdown, ViewersCount } from './RaffleStatus';
 import type { RaffleMode, SubsGiveawayConfig, ParticipationRequirements } from './types';
 import type { AnimationPhase } from './hooks/useWinnerAnimation';
 
@@ -237,12 +238,6 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
 
   // Format time left
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   // ============================================
   // COMPACT VIEW
   // ============================================
@@ -276,6 +271,7 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             disabled={isRunning}
+            aria-label="Palabra clave del sorteo"
             placeholder="Palabra clave..."
             className="w-full px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
           />
@@ -313,12 +309,7 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
 
         {/* Timer display when running */}
         {isRunning && useTimer && timeLeft > 0 && (
-          <div className="text-center py-2">
-            <div className="text-3xl font-bold text-purple-500 font-mono">
-              {formatTime(timeLeft)}
-            </div>
-            <p className="text-xs text-zinc-500">{participantCount} participantes</p>
-          </div>
+          <RaffleCountdown timeLeft={timeLeft} participantCount={participantCount} compact />
         )}
 
         {/* Winner display - compact */}
@@ -400,6 +391,7 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
           value={title}
           onChange={(e) => onTitleChange?.(e.target.value)}
           disabled={isRunning}
+          aria-label="Título del sorteo"
           placeholder="Ej: Sorteo de subs, Giveaway especial..."
           className="w-full px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
         />
@@ -416,6 +408,7 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             disabled={isRunning}
+            aria-label="Palabra clave del sorteo"
             placeholder="Ej: !sorteo"
             className="w-full px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
           />
@@ -442,7 +435,7 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
               </p>
               {subsConfig && (
                 <p className="text-xs text-zinc-500 mt-1">
-                  T1: {subsConfig.tier1Entries}, T2: {subsConfig.tier2Entries}, T3: {subsConfig.tier3Entries}
+                  T1: {subsConfig.tier1Value}, T2: {subsConfig.tier2Value}, T3: {subsConfig.tier3Value}
                 </p>
               )}
             </div>
@@ -613,29 +606,12 @@ export const RaffleTab: React.FC<RaffleTabProps> = ({
 
       {/* Timer display when running */}
       {isRunning && useTimer && timeLeft > 0 && (
-        <div className="text-center py-4">
-          <div className="text-4xl font-bold text-purple-500 font-mono">
-            {formatTime(timeLeft)}
-          </div>
-          <p className="text-sm text-zinc-500 mt-1">
-            {participantCount} participantes
-          </p>
-        </div>
+        <RaffleCountdown timeLeft={timeLeft} participantCount={participantCount} />
       )}
 
       {/* Viewers count display - when not running and mode is viewers */}
       {!isRunning && mode === 'viewers' && !useTimer && viewersCount > 0 && (
-        <div className="text-center py-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/20">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Users size={24} className="text-purple-500" />
-          </div>
-          <div className="text-4xl font-bold text-purple-500">
-            {viewersCount}
-          </div>
-          <p className="text-sm text-zinc-500 mt-1">
-            {subsOnly ? 'suscriptores en chat' : 'usuarios en chat'}
-          </p>
-        </div>
+        <ViewersCount count={viewersCount} subsOnly={subsOnly} />
       )}
 
       {/* Winner display */}

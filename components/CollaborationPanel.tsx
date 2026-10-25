@@ -6,7 +6,8 @@ import { useI18n } from '../i18n';
 interface CollaborationPanelProps {
   mainChannel: string;
   collaborationChannels: CollaborationChannel[];
-  onAddCollaborator: (channel: string) => Promise<CollaborationChannel | null>;
+  /** May return void when the caller does not report the result (treated as success) */
+  onAddCollaborator: (channel: string) => Promise<CollaborationChannel | null> | void;
   onRemoveCollaborator: (channel: string) => void;
   isConnected: boolean;
 }
@@ -32,7 +33,7 @@ export const CollaborationPanel: React.FC<CollaborationPanelProps> = ({
     
     try {
       const result = await onAddCollaborator(newChannel.trim());
-      if (result) {
+      if (result || result === undefined) {
         setNewChannel('');
       } else {
         setError(t.collaboration?.errorAdding || 'No se pudo agregar el canal');

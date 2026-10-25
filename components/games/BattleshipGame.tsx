@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, RotateCcw, Ship, Target, Trophy, ExternalLink, Crosshair } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -62,7 +63,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
   const [isHorizontal, setIsHorizontal] = useState(true);
   const [hoverCell, setHoverCell] = useState<{ row: number; col: number } | null>(null);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   function createEmptyGrid(): Cell[][] {
@@ -102,8 +103,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
   // Process chat messages for shots
   useEffect(() => {
     if (!isConnected || gameState !== 'playing') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg: TwitchMessage) => {
       const msgUpper = msg.message.toUpperCase().trim();
@@ -250,7 +250,7 @@ export const BattleshipGame: React.FC<BattleshipGameProps> = ({ chatMessages, is
     setLastShot(null);
     setShipsRemaining(5);
     setPlacingShipIndex(0);
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameEnd();
   };
 

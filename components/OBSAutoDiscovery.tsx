@@ -165,9 +165,9 @@ export const OBSAutoDiscovery: React.FC<OBSAutoDiscoveryProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedInstance.requiresPassword ? (
-                    <Lock size={14} className="text-amber-500" title="Requiere contraseña" />
+                    <span title="Requiere contraseña" className="inline-flex"><Lock size={14} className="text-amber-500" aria-hidden="true" /></span>
                   ) : (
-                    <Unlock size={14} className="text-green-500" title="Sin contraseña" />
+                    <span title="Sin contraseña" className="inline-flex"><Unlock size={14} className="text-green-500" aria-hidden="true" /></span>
                   )}
                 </div>
               </div>

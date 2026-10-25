@@ -475,7 +475,9 @@ export class MacroService implements IMacroService {
 
     // Get existing macros for name conflict detection
     const existingMacros = await this.storageService.getAllMacros();
-    const existingNames = new Set(existingMacros.map(m => m.name.toLowerCase()));
+    // Exact names, same rule as createMacro (which allows "J" and "j" side by side).
+    // Case-insensitive matching renamed such macros on a plain export/import.
+    const existingNames = new Set(existingMacros.map(m => m.name));
 
     // Import each macro
     for (const macro of exportData.macros) {
@@ -498,9 +500,9 @@ export class MacroService implements IMacroService {
 
         // Handle name conflicts
         let finalName = macro.name;
-        if (existingNames.has(finalName.toLowerCase())) {
+        if (existingNames.has(finalName)) {
           let counter = 1;
-          while (existingNames.has(`${macro.name} (${counter})`.toLowerCase())) {
+          while (existingNames.has(`${macro.name} (${counter})`)) {
             counter++;
           }
           finalName = `${macro.name} (${counter})`;
@@ -517,7 +519,7 @@ export class MacroService implements IMacroService {
           cooldown: macro.cooldown
         });
 
-        existingNames.add(finalName.toLowerCase());
+        existingNames.add(finalName);
         result.imported++;
       } catch (error) {
         result.skipped++;

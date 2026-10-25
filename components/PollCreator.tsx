@@ -1179,7 +1179,7 @@ export const PollCreator: React.FC<PollCreatorProps> = ({ onCreate, onNotificati
                            </>
                         )}
                      </div>
-                     <input type="file" id={`option-image-${index}`} name={`option-image-${index}`} accept="image/*" className="hidden" ref={el => fileInputRefs.current[index] = el} onChange={(e) => handleImageUpload(index, e)} />
+                     <input type="file" id={`option-image-${index}`} name={`option-image-${index}`} accept="image/*" className="hidden" ref={el => { fileInputRefs.current[index] = el; }} onChange={(e) => handleImageUpload(index, e)} />
                   </div>
                   <div className="flex-1 flex gap-1.5">
                      <input 

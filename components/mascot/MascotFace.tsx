@@ -105,7 +105,7 @@ export const MascotFace: React.FC<MascotFaceProps> = ({
   const [lookDirection, setLookDirection] = useState({ x: 0, y: 0 });
   const [breathScale, setBreathScale] = useState(1);
   const [particlePhase, setParticlePhase] = useState(0);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   // Breathing animation
   useEffect(() => {

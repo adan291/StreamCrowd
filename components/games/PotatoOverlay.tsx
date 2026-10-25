@@ -60,12 +60,14 @@ export const PotatoOverlay: React.FC = () => {
       } catch { /* ignore */ }
     };
     loadFromStorage();
-    const pollInterval = setInterval(loadFromStorage, 300);
+    // Other windows of this browser: react to localStorage writes instead of
+    // polling (BroadcastChannel and Firebase already deliver live updates)
+    window.addEventListener('storage', loadFromStorage);
     
     return () => {
       channel.close();
       unsubscribeFirebase();
-      clearInterval(pollInterval);
+      window.removeEventListener('storage', loadFromStorage);
     };
   }, []);
 

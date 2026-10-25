@@ -138,8 +138,7 @@ export const PartyCoOverlay: React.FC = () => {
       try {
         const stored = localStorage.getItem(STORAGE_KEY_PARTYCO);
         if (stored) handleState(JSON.parse(stored));
-        const drawing = localStorage.getItem('party_co_drawing');
-        if (drawing && drawing !== drawingDataUrl) setDrawingDataUrl(drawing);
+        // Drawing arrives via BroadcastChannel / Firebase only (not stored locally)
         // Load canvas size
         const canvasSize = localStorage.getItem('party_co_canvas_size');
         if (canvasSize) {
@@ -153,13 +152,15 @@ export const PartyCoOverlay: React.FC = () => {
       } catch { /* ignore */ }
     };
     loadFromStorage();
-    const pollInterval = setInterval(loadFromStorage, 100); // Faster polling for smoother drawing
+    // Other windows of this browser: react to localStorage writes instead of
+    // polling (BroadcastChannel and Firebase already deliver live updates)
+    window.addEventListener('storage', loadFromStorage);
 
     return () => {
       channel.close();
       drawingChannel.close();
       unsubscribeFirebase();
-      clearInterval(pollInterval);
+      window.removeEventListener('storage', loadFromStorage);
     };
   }, []);
 

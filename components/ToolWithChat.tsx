@@ -14,7 +14,7 @@ interface ToolWithChatProps {
   collaborationChannels?: CollaborationChannel[];
   mainChannel?: string;
   title?: string;
-  onAddCollaborator?: (channel: string) => void;
+  onAddCollaborator?: (channel: string) => Promise<CollaborationChannel | null> | void;
   onRemoveCollaborator?: (channel: string) => void;
   isConnected?: boolean;
 }
@@ -151,7 +151,7 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
                   <CollaborationPanel
                     mainChannel={mainChannel}
                     collaborationChannels={collaborationChannels}
-                    onAddCollaborator={onAddCollaborator || (() => {})}
+                    onAddCollaborator={onAddCollaborator || (async () => null)}
                     onRemoveCollaborator={onRemoveCollaborator || (() => {})}
                     isConnected={isConnected}
                   />
@@ -200,7 +200,7 @@ export const ToolWithChat: React.FC<ToolWithChatProps> = ({
                     <CollaborationPanel
                       mainChannel={mainChannel}
                       collaborationChannels={collaborationChannels}
-                      onAddCollaborator={onAddCollaborator || (() => {})}
+                      onAddCollaborator={onAddCollaborator || (async () => null)}
                       onRemoveCollaborator={onRemoveCollaborator || (() => {})}
                       isConnected={isConnected}
                     />

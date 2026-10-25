@@ -48,7 +48,7 @@ export class GiveawayPage extends BasePage {
 
   // Form elements
   get keywordInput(): Locator {
-    return this.page.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+    return this.page.locator('input[aria-label="Palabra clave del sorteo"]');
   }
 
   get timerToggle(): Locator {
@@ -183,7 +183,7 @@ export class GiveawayPage extends BasePage {
 
     // Fill keyword if mode is keyword
     if (data.mode === 'keyword' && data.keyword) {
-      const keywordInput = this.page.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+      const keywordInput = this.page.locator('input[aria-label="Palabra clave del sorteo"]');
       if (await keywordInput.isVisible({ timeout: 2000 }).catch(() => false)) {
         await keywordInput.fill(data.keyword);
       }

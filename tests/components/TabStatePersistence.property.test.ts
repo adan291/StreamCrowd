@@ -22,14 +22,16 @@ type ActivityTab = typeof VALID_TABS[number];
  * Mock localStorage for testing
  */
 function createMockStorage(): Storage {
-  const store: Record<string, string> = {};
+  // Map, not a plain object: random keys such as "__proto__" broke the mock
+  // (store["__proto__"] returns Object.prototype) and failed intermittently.
+  const store = new Map<string, string>();
   return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    removeItem: (key: string) => { delete store[key]; },
-    clear: () => { Object.keys(store).forEach(k => delete store[k]); },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-    get length() { return Object.keys(store).length; },
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => { store.set(key, String(value)); },
+    removeItem: (key: string) => { store.delete(key); },
+    clear: () => { store.clear(); },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() { return store.size; },
   };
 }
 

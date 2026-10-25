@@ -134,7 +134,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `chat_export_${currentSession.channel}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `chat_export_${currentSession.channelName}_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -964,7 +964,7 @@ export const StreamAnalytics: React.FC<StreamAnalyticsProps> = ({
             <h2 className="font-semibold text-white">Analytics</h2>
             <p className="text-xs text-gray-500">Métricas en tiempo real</p>
           </div>
-          {aiConfig?.enabled && (
+          {aiConfig && Object.values(aiConfig.providers).some(p => p.enabled) && (
             <span className="flex items-center gap-1 text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
               <Sparkles className="w-3 h-3" />
               IA

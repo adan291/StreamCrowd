@@ -161,6 +161,9 @@ export class ViewerService {
   processEvent(event: ViewerStreamEvent): void {
     const key = event.username.toLowerCase();
     const existing = this.viewers.get(key) || this.createEmptyViewerData(event.username, event.timestamp);
+    // Register before the switch: processGiftRecipient may look up the same
+    // user, and a late set() would overwrite the recipient's updates.
+    this.viewers.set(key, existing);
 
     // Update basic counters
     existing.totalActivity++;

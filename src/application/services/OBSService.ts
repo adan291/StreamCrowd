@@ -202,6 +202,10 @@ export class OBSService {
   
   // === TRANSICIONES ===
   
+  async getCurrentTransition(): Promise<string | null> {
+    return this.controller.getCurrentTransition();
+  }
+
   async getTransitions(): Promise<string[]> {
     return this.controller.getTransitions();
   }

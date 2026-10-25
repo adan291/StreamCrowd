@@ -309,7 +309,9 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
       judges: currentState.config.judges.map(j => ({
         id: j.id,
         username: j.username,
-        color: j.color
+        color: j.color,
+        channelName: j.channelName,
+        isHost: j.isHost
       })),
       criteria: currentState.config.criteria.map(cr => ({
         id: cr.id,
@@ -1062,7 +1064,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
                 aria-label="Subir imagen del concursante"
                 accept="image/*" 
                 className="hidden" 
-                ref={el => fileInputRefs.current[contestant.id] = el}
+                ref={el => { fileInputRefs.current[contestant.id] = el; }}
                 onChange={(e) => handleImageUpload(contestant.id, e)} 
               />
             </div>
@@ -1350,7 +1352,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               ...prev.config,
               title: data.title || prev.config.title,
               contestants: data.contestants || [],
-              judges: data.judges || [],
+              judges: (data.judges || []).map(j => ({ ...j, channelName: j.channelName ?? j.username, isHost: j.isHost ?? false })),
               criteria: data.criteria || [],
               publicVotingEnabled: data.publicVotingEnabled ?? false,
               publicVoteWeight: data.publicVoteWeight ?? 0.3,
@@ -1358,7 +1360,7 @@ export const JudgePanel: React.FC<JudgePanelProps> = ({
               showJudgeNames: data.showJudgeNames ?? true,
               isActive: data.isActive ?? false,
             },
-            scores: data.scores || [],
+            scores: (data.scores || []).map(s => ({ ...s, timestamp: Date.now() })),
             publicVotes: (data.publicVotes || []).map(v => ({ ...v, odername: '', timestamp: Date.now() })),
             publicVotingActive: data.publicVotingActive ?? false,
             publicVotingTimeLeft: data.publicVotingTimeLeft ?? undefined,

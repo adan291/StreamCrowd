@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Activity, Users, CloudDownload, Calendar, Download, Trash2, Minimize2, Maximize2 } from 'lucide-react';
 import { VoteRecord } from '../types';
+import type { StreamEvent as DomainStreamEvent } from '../src/domain/entities/StreamEvent';
 
 // Import subcomponents
 import {
@@ -37,6 +38,57 @@ export interface StreamEvent {
     recipientUsername?: string; viewerCount?: number; amount?: number; duration?: number; reason?: string; moderator?: string; };
 }
 
+const DOMAIN_TYPE_MAP: Record<DomainStreamEvent['type'], StreamEventType> = {
+  sub: 'sub',
+  primepaidupgrade: 'sub',
+  giftpaidupgrade: 'sub',
+  resub: 'resub',
+  subgift: 'gift',
+  submysterygift: 'gift',
+  raid: 'raid',
+  hosted: 'raid',
+  cheer: 'bits',
+  ban: 'ban',
+  timeout: 'timeout',
+};
+
+const isDomainEvent = (event: StreamEvent | DomainStreamEvent): event is DomainStreamEvent =>
+  !('data' in event) && 'channel' in event;
+
+/**
+ * The stream event service emits flat domain events (type 'cheer', 'subgift',
+ * tier/bits at the top level). This component works with the legacy shape
+ * (type 'bits'/'gift', fields under `data`). Without this conversion bits and
+ * gift stats were always 0 and tiers/viewer counts were lost.
+ */
+export const fromDomainStreamEvent = (event: DomainStreamEvent): StreamEvent => ({
+  id: event.id,
+  type: DOMAIN_TYPE_MAP[event.type] ?? 'follow',
+  username: event.displayName || event.username,
+  timestamp: event.timestamp,
+  data: {
+    tier: event.tier === 'Prime' ? '1000' : event.tier,
+    months: event.cumulativeMonths ?? event.months,
+    message: event.message,
+    giftCount: event.giftCount,
+    recipientUsername: event.recipientUsername,
+    viewerCount: event.viewerCount,
+    amount: event.bits,
+    duration: event.duration,
+    reason: event.reason,
+  },
+});
+
+/**
+ * The moderation service reports API failures as { success: false } instead of
+ * throwing; the drawer only detects failures through exceptions. Without this
+ * it showed "Usuario baneado" even when Twitch rejected the action.
+ */
+const ensureModerationSuccess = async (action: Promise<{ success: boolean; message: string }>): Promise<void> => {
+  const result = await action;
+  if (!result.success) throw new Error(result.message);
+};
+
 export const voteToEvent = (vote: VoteRecord): StreamEvent => ({
   id: generateEventId('vote', vote.username, vote.timestamp, `opt${vote.optionId}`),
   type: 'vote', username: vote.username, timestamp: vote.timestamp, data: { optionId: vote.optionId }
@@ -50,9 +102,10 @@ const toActivityEvent = (event: StreamEvent): ActivityStreamEvent => ({
 });
 
 interface StreamActivityProps {
-  events: StreamEvent[]; votes?: VoteRecord[];
+  /** Legacy events or domain events from useStreamEventService (converted internally) */
+  events: Array<StreamEvent | DomainStreamEvent>; votes?: VoteRecord[];
   pollOptions?: { [key: number]: { color: string; label: string; icon?: string; image?: string } };
-  channelName?: string; authToken?: string; userId?: string; onEventAdded?: (event: StreamEvent) => void;
+  channelName?: string; authToken?: string; userId?: string;
 }
 
 // Legacy storage functions for backward compatibility
@@ -101,7 +154,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({ events, votes = 
 
   // Combine and convert events
   const allEvents = useMemo(() => {
-    const combined = [...events, ...votes.map(voteToEvent)];
+    const normalized = events.map(e => (isDomainEvent(e) ? fromDomainStreamEvent(e) : e));
+    const combined = [...normalized, ...votes.map(voteToEvent)];
     return combined.sort((a, b) => a.timestamp - b.timestamp);
   }, [events, votes]);
 
@@ -117,7 +171,8 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({ events, votes = 
   }, [allEvents, historyEvents, activeTab]);
 
   // Effects for data processing and persistence
-  useEffect(() => { viewerData.processEvents(activityEvents); }, [activityEvents]);
+  // Tiers are always Twitch tier strings here (see fromDomainStreamEvent)
+  useEffect(() => { viewerData.processEvents(activityEvents as Parameters<typeof viewerData.processEvents>[0]); }, [activityEvents]);
   useEffect(() => { try { localStorage.setItem(TAB_STORAGE_KEY, activeTab); } catch {} }, [activeTab]);
   useEffect(() => { if (channelName) setAvailableDates(getAvailableDates(channelName)); }, [channelName]);
   useEffect(() => { if (channelName && allEvents.length > 0) saveEvents(allEvents, channelName); }, [allEvents, channelName]);
@@ -368,11 +423,11 @@ export const StreamActivity: React.FC<StreamActivityProps> = ({ events, votes = 
         user={moderationUser}
         isOpen={showModerationDrawer}
         onClose={() => { setShowModerationDrawer(false); setModerationUser(null); }}
-        onTimeout={(uid: string, dur: number, reason?: string) => moderationAction.timeoutUser(broadcasterId, uid, dur, reason)}
-        onBan={(uid: string, reason?: string) => moderationAction.banUser(broadcasterId, uid, reason)}
-        onUnban={(uid: string) => moderationAction.unbanUser(broadcasterId, uid)}
-        onAddVIP={(uid: string) => moderationAction.addVIP(broadcasterId, uid)}
-        onRemoveVIP={(uid: string) => moderationAction.removeVIP(broadcasterId, uid)}
+        onTimeout={(uid: string, dur: number, reason?: string) => ensureModerationSuccess(moderationAction.timeoutUser(broadcasterId, uid, dur, reason))}
+        onBan={(uid: string, reason?: string) => ensureModerationSuccess(moderationAction.banUser(broadcasterId, uid, reason))}
+        onUnban={(uid: string) => ensureModerationSuccess(moderationAction.unbanUser(broadcasterId, uid))}
+        onAddVIP={(uid: string) => ensureModerationSuccess(moderationAction.addVIP(broadcasterId, uid))}
+        onRemoveVIP={(uid: string) => ensureModerationSuccess(moderationAction.removeVIP(broadcasterId, uid))}
         channelName={channelName}
       />
 

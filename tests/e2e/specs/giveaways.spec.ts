@@ -47,7 +47,7 @@ test.describe('Giveaways', () => {
     await giveawayPage.selectMode('keyword');
     
     // Keyword input should be visible
-    const keywordInput = authenticatedPage.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+    const keywordInput = authenticatedPage.locator('input[aria-label="Palabra clave del sorteo"]');
     await expect(keywordInput).toBeVisible({ timeout: 5000 });
   });
 
@@ -90,7 +90,7 @@ test.describe('Giveaways', () => {
     await giveawayPage.selectMode('keyword');
     
     // Fill keyword
-    const keywordInput = authenticatedPage.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+    const keywordInput = authenticatedPage.locator('input[aria-label="Palabra clave del sorteo"]');
     if (await keywordInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await keywordInput.fill('!test');
       await authenticatedPage.waitForTimeout(300);
@@ -187,7 +187,7 @@ test.describe('Giveaways', () => {
     // Select keyword mode and start giveaway
     await giveawayPage.selectMode('keyword');
     
-    const keywordInput = authenticatedPage.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+    const keywordInput = authenticatedPage.locator('input[aria-label="Palabra clave del sorteo"]');
     if (await keywordInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await keywordInput.fill('!win');
       await authenticatedPage.waitForTimeout(300);
@@ -341,7 +341,7 @@ test.describe('Giveaways - Validation', () => {
     await giveawayPage.selectMode('keyword');
     
     // Clear keyword input if any
-    const keywordInput = authenticatedPage.locator('input[placeholder*="sorteo"], input[placeholder*="Ej:"]');
+    const keywordInput = authenticatedPage.locator('input[aria-label="Palabra clave del sorteo"]');
     if (await keywordInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await keywordInput.clear();
       await authenticatedPage.waitForTimeout(300);

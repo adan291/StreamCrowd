@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PollOption, TwitchMessage, CollaborationChannel } from '../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../src/application/utils/chatCursor';
 import { RotateCcw, Play, X, Users, Timer, Pause, BarChart3, Equal, Settings, UserPlus, Trash2, Download, Upload, GripHorizontal, Minimize2, Maximize2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { ToolWithChat } from './ToolWithChat';
@@ -134,7 +135,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     return initial;
   });
   const [processedMessageIds, setProcessedMessageIds] = useState<Set<string>>(new Set());
-  const lastProcessedIndexRef = useRef(0);
+  const lastProcessedIndexRef = useRef<TwitchMessage | null>(null);
 
   // Manual participants state
   const [manualParticipants, setManualParticipants] = useState<string[]>([]);
@@ -327,9 +328,8 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
   // Process chat messages for votes
   useEffect(() => {
     if (!isVotingActive || mode !== 'voting' || isOverlayMode) return;
-    const newMessages = chatMessages.slice(lastProcessedIndexRef.current);
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedIndexRef);
     if (newMessages.length === 0) return;
-    lastProcessedIndexRef.current = chatMessages.length;
     
     setVoteState(prev => {
       const newState = { ...prev };
@@ -546,7 +546,7 @@ export const SpinnerWheel: React.FC<SpinnerWheelProps> = ({
     currentOptions.forEach(opt => { initial[opt.id] = { votes: 0, voters: new Set() }; });
     setVoteState(initial);
     setProcessedMessageIds(new Set());
-    lastProcessedIndexRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedIndexRef);
   };
 
   const startVoting = () => { resetVotes(); setVotingTimeLeft(votingDuration); setIsVotingActive(true); };

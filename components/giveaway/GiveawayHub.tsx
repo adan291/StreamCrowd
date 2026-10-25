@@ -4,11 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  Gift, Layers, Download, Upload, BarChart3, 
-  Trash2, AlertTriangle, Settings, Users, MessageSquare, Play, AlertCircle, X,
-  History, CalendarClock, Trophy, Sparkles
-} from 'lucide-react';
+import { Gift, Download, Upload, Trash2, Settings, MessageSquare, Play, AlertCircle, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { useOBSTriggers } from '../../src/application/hooks/useOBSTriggers';
 import { useHistoryRecorder } from '../../hooks/useHistoryRecorder';
@@ -25,6 +21,8 @@ import { ChatSettings } from './ChatSettings';
 import { MultiWinnerConfig } from './MultiWinnerConfig';
 import { HistoryPanel } from './HistoryPanel';
 import { CloudSyncButton } from './CloudSyncButton';
+import { GiveawayTabBar, type GiveawayTab } from './GiveawayTabBar';
+import { GiveawayDialogs, type WinnerDisplayState } from './GiveawayDialogs';
 import { SchedulerService } from './services/SchedulerService';
 import { getChatCommandsService, DEFAULT_CHAT_COMMANDS_CONFIG } from './services/ChatCommands';
 import type { ChatCommandsConfig } from './services/ChatCommands';
@@ -50,6 +48,7 @@ import {
   type GiveawayThread,
   type FinishedGiveaway,
 } from './index';
+import { helixFetch } from '../../src/infrastructure/http/helixFetch';
 
 // ============================================
 // TYPES
@@ -70,7 +69,7 @@ interface GiveawayHubProps {
   userId?: string;
 }
 
-type TabType = 'raffle' | 'active' | 'scheduled' | 'stats' | 'history';
+type TabType = GiveawayTab;
 
 interface GiveawayExport {
   version: number;
@@ -79,14 +78,6 @@ interface GiveawayExport {
   history: FinishedGiveaway[];
 }
 
-// Winner display state
-interface WinnerDisplayState {
-  threadId: string;
-  threadName: string;
-  winner: string;
-  participantCount: number;
-  prizeImages?: string[];
-}
 
 // ============================================
 // COMPONENT
@@ -626,6 +617,13 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     onClearChatMessages?.();
   }, [raffle, participants, animation, onClearChatMessages]);
 
+  // Leave "editing" mode in the "Nuevo" tab and clear the form
+  const cancelEditing = () => {
+    setEditingThreadId(null);
+    raffle.reset();
+    participants.clear();
+  };
+
   // Load chatters from Twitch API
   const handleLoadChatters = useCallback(async (): Promise<string[]> => {
     if (!authToken || !userId) {
@@ -636,7 +634,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
     setIsLoadingChatters(true);
     try {
       // Use the TwitchAdapter directly since we have the token
-      const response = await fetch(
+      const response = await helixFetch(
         `https://api.twitch.tv/helix/chat/chatters?broadcaster_id=${userId}&moderator_id=${userId}&first=1000`,
         {
           headers: {
@@ -881,99 +879,18 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1.5 mt-4">
-          <button
-            onClick={() => {
-              setActiveTab('raffle');
-              // Clear editing state when clicking "Nuevo"
-              if (editingThreadId) {
-                setEditingThreadId(null);
-                raffle.reset();
-                participants.clear();
-              }
-            }}
-            className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'raffle'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <Gift size={14} />
-            {editingThreadId ? 'Editando' : 'Nuevo'}
-            {editingThreadId && (
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingThreadId(null);
-                  raffle.reset();
-                  participants.clear();
-                }}
-                className="ml-1 p-0.5 rounded hover:bg-white/20 cursor-pointer"
-                title="Cancelar edición"
-              >
-                <X size={12} />
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('active')}
-            className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'active'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <Layers size={14} />
-            Activos
-            {(threads.activeCount + threads.finishedThreads.length) > 0 && (
-              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                activeTab === 'active' ? 'bg-white/20' : 'bg-green-500 text-white'
-              }`}>
-                {threads.activeCount + threads.finishedThreads.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('scheduled')}
-            className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'scheduled'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <CalendarClock size={14} />
-            Programados
-            {threads.scheduledCount > 0 && (
-              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                activeTab === 'scheduled' ? 'bg-white/20' : 'bg-blue-500 text-white'
-              }`}>
-                {threads.scheduledCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
-              activeTab === 'stats'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-            title="Estadísticas"
-          >
-            <BarChart3 size={14} />
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`py-2 px-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center ${
-              activeTab === 'history'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
-            }`}
-            title="Historial"
-          >
-            <History size={14} />
-          </button>
-        </div>
+        <GiveawayTabBar
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            // Clear editing state when clicking "Nuevo"
+            if (tab === 'raffle' && editingThreadId) cancelEditing();
+          }}
+          isEditing={!!editingThreadId}
+          onCancelEdit={cancelEditing}
+          activeCount={threads.activeCount + threads.finishedThreads.length}
+          scheduledCount={threads.scheduledCount}
+        />
       </div>
 
       {/* Content */}
@@ -1401,7 +1318,7 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
                     // Sync winner to cloud (Firebase)
                     if (cloud.isReady) {
                       cloud.updateInCloud(id, {
-                        winner: { oderId: '', username: winner },
+                        winner: { oderId: '', username: winner, timestamp: Date.now() },
                         isActive: false,
                         closedAt: Date.now(),
                         participantCount: threads.getUniqueParticipantCount(thread),
@@ -1577,65 +1494,6 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         )}
       </div>
 
-      {/* Winner Modal */}
-      {currentWinner && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            {/* Prize images */}
-            {currentWinner.prizeImages && currentWinner.prizeImages.length > 0 && (
-              <div className="flex justify-center gap-2 mb-4">
-                {currentWinner.prizeImages.slice(0, 3).map((img, i) => (
-                  <img 
-                    key={i}
-                    src={img} 
-                    alt={`Premio ${i + 1}`}
-                    className="w-20 h-20 rounded-xl object-cover ring-4 ring-purple-500/30 shadow-lg"
-                  />
-                ))}
-              </div>
-            )}
-            
-            {/* Celebration header */}
-            <div className="text-center mb-4">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Sparkles className="text-yellow-500" size={24} />
-                <Trophy className="text-yellow-500" size={32} />
-                <Sparkles className="text-yellow-500" size={24} />
-              </div>
-              <h2 className="text-xl font-bold text-zinc-800 dark:text-white">
-                ¡Tenemos ganador!
-              </h2>
-              <p className="text-sm text-zinc-500">{currentWinner.threadName}</p>
-            </div>
-            
-            {/* Winner name */}
-            <div className="text-center py-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl mb-4">
-              <p className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-                {currentWinner.winner}
-              </p>
-              <p className="text-sm text-zinc-500 mt-2">
-                de {currentWinner.participantCount} participantes
-              </p>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => {
-                threads.closeThread(currentWinner.threadId);
-                // Delete from Firebase when closing winner
-                if (cloud.isReady && cloud.syncEnabled) {
-                  cloud.deleteFromCloud(currentWinner.threadId);
-                }
-                setCurrentWinner(null);
-              }}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium hover:opacity-90 transition-opacity"
-            >
-              Cerrar y guardar en historial
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* OBS Overlay URL */}
       <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
         <OBSOverlayUrl overlayParam="overlayRandomWinner" title="el sorteo" />
@@ -1663,61 +1521,23 @@ export const GiveawayHub: React.FC<GiveawayHubProps> = ({
         />
       )}
 
-      {/* Recovery Modal */}
-      {showRecoveryModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-yellow-500/20 rounded-lg">
-                <AlertTriangle className="text-yellow-500" size={24} />
-              </div>
-              <h3 className="font-bold text-lg text-zinc-800 dark:text-white">
-                Sorteos sin finalizar
-              </h3>
-            </div>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-              Se encontraron sorteos activos de una sesión anterior. ¿Deseas recuperarlos?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDiscardBackup}
-                className="flex-1 py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
-              >
-                Descartar
-              </button>
-              <button
-                onClick={handleRecoverBackup}
-                className="flex-1 py-2 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors"
-              >
-                Recuperar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Import Error Modal */}
-      {importError && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <AlertTriangle className="text-red-500" size={24} />
-              </div>
-              <h3 className="font-bold text-lg text-zinc-800 dark:text-white">
-                Error de importación
-              </h3>
-            </div>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-6">{importError}</p>
-            <button
-              onClick={() => setImportError(null)}
-              className="w-full py-2 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg transition-colors"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Winner, recovery and import-error dialogs */}
+      <GiveawayDialogs
+        currentWinner={currentWinner}
+        onCloseWinner={(w) => {
+          threads.closeThread(w.threadId);
+          // Delete from Firebase when closing winner
+          if (cloud.isReady && cloud.syncEnabled) {
+            cloud.deleteFromCloud(w.threadId);
+          }
+          setCurrentWinner(null);
+        }}
+        showRecovery={showRecoveryModal}
+        onRecover={handleRecoverBackup}
+        onDiscardBackup={handleDiscardBackup}
+        importError={importError}
+        onDismissImportError={() => setImportError(null)}
+      />
     </div>
   );
 };

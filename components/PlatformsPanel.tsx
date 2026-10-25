@@ -101,9 +101,9 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
     isOwnChannel,
     isLoading: isBroadcasterTokenLoading,
   } = useBroadcasterToken(
-    selectedChannel?.id || channelId || null,
-    selectedChannel?.login || channel || null,
-    selectedChannel?.displayName || channel || null,
+    selectedChannel?.channelId || channelId || null,
+    selectedChannel?.channelLogin || channel || null,
+    selectedChannel?.channelName || channel || null,
     loggedInUserId || null
   );
 
@@ -111,7 +111,7 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
   const twitchBroadcasterAuth: BroadcasterAuthStatus | undefined = channelId ? {
     isAuthorized: hasBroadcasterToken,
     isOwnChannel,
-    broadcasterName: selectedChannel?.displayName || channel,
+    broadcasterName: selectedChannel?.channelName || channel,
     isLoading: isBroadcasterTokenLoading,
   } : undefined;
 
@@ -192,9 +192,9 @@ export const PlatformsPanel: React.FC<PlatformsPanelProps> = ({
               onSelectTool={handleSelectTool}
               onBack={handleBack}
               broadcasterAuth={channelId ? {
-                channelId: selectedChannel?.id || channelId,
-                channelLogin: selectedChannel?.login || channel || '',
-                channelName: selectedChannel?.displayName || channel || '',
+                channelId: selectedChannel?.channelId || channelId,
+                channelLogin: selectedChannel?.channelLogin || channel || '',
+                channelName: selectedChannel?.channelName || channel || '',
                 currentUserId: loggedInUserId || '',
                 currentUserToken: authToken || '',
                 currentUserScopes: userScopes,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, RotateCcw, Settings, ExternalLink, Timer, Users, Trash2 } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -39,9 +40,10 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
   const [bettingOpen, setBettingOpen] = useState(true);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const rotationRef = useRef(0);
+  const spinFrameRef = useRef<number | null>(null);
   
   // OBS Triggers
   const { triggerGameStart, triggerGameEnd } = useOBSTriggers();
@@ -70,8 +72,7 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
   // Process chat messages for bets
   useEffect(() => {
     if (!bettingOpen || !isConnected || isSpinning) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -190,9 +191,17 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
     
     const segmentAngle = 360 / ROULETTE_NUMBERS.length;
     const targetAngle = resultIndex * segmentAngle;
-    const spins = 5 + Math.random() * 3;
+    // Whole number of spins: a fractional value would land on a random pocket
+    const spins = 5 + Math.floor(Math.random() * 3);
     const startRotation = rotationRef.current;
-    const totalRotation = startRotation + (spins * 360) + (360 - targetAngle);
+    // Final angle (mod 360) that puts the CENTER of the result pocket under the
+    // top pointer. Segment i is drawn from i*seg-90° (see drawWheel), so the
+    // wheel must rotate by -(i*seg + seg/2). Computed relative to the current
+    // angle so it also works on the 2nd, 3rd... spin (rotation is cumulative).
+    const desiredAngle = (((360 - targetAngle - segmentAngle / 2) % 360) + 360) % 360;
+    const currentAngle = ((startRotation % 360) + 360) % 360;
+    const delta = (desiredAngle - currentAngle + 360) % 360;
+    const totalRotation = startRotation + (spins * 360) + delta;
     
     syncToOverlay({ type: 'spin', rotation: totalRotation, result: resultNumber });
 
@@ -211,8 +220,9 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
       drawWheel();
       
       if (progress < 1) {
-        requestAnimationFrame(animateSpin);
+        spinFrameRef.current = requestAnimationFrame(animateSpin);
       } else {
+        spinFrameRef.current = null;
         rotationRef.current = totalRotation;
         setResult(resultNumber);
         setShowResult(true);
@@ -223,8 +233,15 @@ export const CasinoRoulette: React.FC<CasinoRouletteProps> = ({ chatMessages, is
       }
     };
     
-    requestAnimationFrame(animateSpin);
+    spinFrameRef.current = requestAnimationFrame(animateSpin);
   }, [isSpinning, bets, syncToOverlay, drawWheel, triggerGameStart, triggerGameEnd]);
+
+  // Stop the spin animation if the component unmounts mid-spin
+  useEffect(() => {
+    return () => {
+      if (spinFrameRef.current !== null) cancelAnimationFrame(spinFrameRef.current);
+    };
+  }, []);
 
   const reset = () => {
     setBets([]);

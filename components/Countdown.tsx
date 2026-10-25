@@ -19,6 +19,7 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import { TwitchMessage } from '../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../src/application/utils/chatCursor';
 import { useI18n } from '../i18n';
 import { countdownSync } from '../src/infrastructure/sync/FirebaseSync';
 import { OBSOverlayUrl } from './OBSOverlayUrl';
@@ -225,12 +226,12 @@ export const Countdown: React.FC<CountdownProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [totalAdded, setTotalAdded] = useState(0);
   const [recentEvents, setRecentEvents] = useState<{ type: string; amount: number; user: string }[]>([]);
-  const lastProcessedIndexRef = useRef(0);
+  const lastProcessedIndexRef = useRef<TwitchMessage | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
   // Ref para estado actual
-  const stateRef = useRef({ timeLeft, isRunning, totalAdded, recentEvents });
+  const stateRef = useRef({ timeLeft, isRunning, totalAdded, recentEvents, config, overlayStyle });
   useEffect(() => {
     stateRef.current = { timeLeft, isRunning, totalAdded, recentEvents, config, overlayStyle };
   }, [timeLeft, isRunning, totalAdded, recentEvents, config, overlayStyle]);
@@ -329,9 +330,8 @@ export const Countdown: React.FC<CountdownProps> = ({
 
   useEffect(() => {
     if (!isRunning || isOverlayMode) return;
-    const newMessages = chatMessages.slice(lastProcessedIndexRef.current);
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedIndexRef);
     if (newMessages.length === 0) return;
-    lastProcessedIndexRef.current = chatMessages.length;
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase();
@@ -419,11 +419,11 @@ export const Countdown: React.FC<CountdownProps> = ({
     setTimeLeft(getInitialTime(config));
     setTotalAdded(0);
     setRecentEvents([]);
-    lastProcessedIndexRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedIndexRef);
   };
 
   const toggleRunning = () => {
-    if (!isRunning) lastProcessedIndexRef.current = chatMessages.length;
+    if (!isRunning) markChatMessagesRead(chatMessages, lastProcessedIndexRef);
     setIsRunning(!isRunning);
   };
 

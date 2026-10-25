@@ -353,7 +353,7 @@ export const TimersPanel: React.FC<TimersPanelProps> = ({
             }`}
           >
             {tab.icon}
-            {t.timers[TAB_LABELS[tab.id] as keyof typeof t.timers]}
+            {t.timers[TAB_LABELS[tab.id] as keyof typeof t.timers] as string}
             {tab.id === 'timers' && timers.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-zinc-800 rounded">
                 {timers.length}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
+import { sortByKeyRandomTies } from '../../src/application/utils/shuffle';
 import { 
   Play, Trophy, RotateCcw, Users, Pause,
   Check, X, Timer, Sparkles, MessageCircle, Eye, Pencil, 
@@ -101,12 +103,8 @@ const incrementChallengeUsage = (challengeId: string): void => {
 
 const sortChallengesByUsage = (challenges: Challenge[]): Challenge[] => {
   const usage = loadChallengeUsage();
-  return [...challenges].sort((a, b) => {
-    const usageA = usage[a.id] || 0;
-    const usageB = usage[b.id] || 0;
-    if (usageA !== usageB) return usageA - usageB;
-    return Math.random() - 0.5;
-  });
+  // Menos usados primero; empates al azar de forma uniforme
+  return sortByKeyRandomTies(challenges, c => usage[c.id] || 0);
 };
 
 
@@ -397,6 +395,11 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#ffffff');
   const [brushSize, setBrushSize] = useState(6);
+  // Read by the camera/hand-tracking callback so changing them does not restart the camera
+  const colorRef = useRef(color);
+  const brushSizeRef = useRef(brushSize);
+  colorRef.current = color;
+  brushSizeRef.current = brushSize;
   const [mode, setMode] = useState<DrawingMode>('mouse');
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -527,9 +530,12 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
     lastSyncRef.current = dataUrl;
     
     channelRef.current?.postMessage({ type: 'drawing_update', dataUrl, canvasWidth, canvasHeight });
+    // The drawing is NOT written to localStorage: a PNG dataURL (hundreds of KB
+    // to MBs) filled the ~5 MB quota and made other saves fail. Overlays get it
+    // via BroadcastChannel (same browser) and Firebase (OBS / other browsers).
     try {
-      localStorage.setItem('party_co_drawing', dataUrl);
       localStorage.setItem('party_co_canvas_size', JSON.stringify({ width: canvasWidth, height: canvasHeight }));
+      localStorage.removeItem('party_co_drawing');
     } catch { /* ignore */ }
   }, [canvasWidth, canvasHeight]);
 
@@ -818,8 +824,8 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
                       const interpY = lastValidPosition.y + (smoothedY - lastValidPosition.y) * t;
                       
                       ctx.beginPath();
-                      ctx.strokeStyle = color;
-                      ctx.lineWidth = brushSize;
+                      ctx.strokeStyle = colorRef.current;
+                      ctx.lineWidth = brushSizeRef.current;
                       ctx.lineCap = 'round';
                       ctx.lineJoin = 'round';
                       
@@ -834,8 +840,8 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
                   } else {
                     // Start drawing
                     ctx.beginPath();
-                    ctx.fillStyle = color;
-                    ctx.arc(smoothedX, smoothedY, brushSize / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = colorRef.current;
+                    ctx.arc(smoothedX, smoothedY, brushSizeRef.current / 2, 0, Math.PI * 2);
                     ctx.fill();
                     
                     // Complete camera tutorial on first draw
@@ -927,7 +933,7 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({ onClose, onFirstDraw, onPau
         try { handsModule.close(); } catch {}
       }
     };
-  }, [mode, color, brushSize, selectedCameraId]);
+  }, [mode, selectedCameraId]);
 
   const getPos = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
@@ -1473,7 +1479,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   // Drawing state - pause timer until drawing starts
   const [isWaitingForDraw, setIsWaitingForDraw] = useState(false);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const autoNextRef = useRef<NodeJS.Timeout | null>(null);
@@ -1524,8 +1530,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   // Procesar mensajes del chat
   useEffect(() => {
     if (!isConnected) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg: TwitchMessage) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -1746,7 +1751,7 @@ export const PartyCo: React.FC<PartyCoProps> = ({ chatMessages, isConnected = tr
   const newGame = () => {
     resetGame();
     clearPlayers();
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
   };
 
   const toggleChallengeType = (type: ChallengeType) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Trophy, RotateCcw, ExternalLink, Swords, Timer } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -33,7 +34,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
   const [results, setResults] = useState<{ winner: string; loser: string; winChoice: string; loseChoice: string }[]>([]);
   const [champion, setChampion] = useState<Player | null>(null);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,8 +69,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
   // Procesar elecciones del chat
   useEffect(() => {
     if (!isConnected || gameState !== 'choosing') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -131,7 +131,7 @@ export const PiedraPapelTijera: React.FC<PiedraPapelTijeraProps> = ({ chatMessag
     setChampion(null);
     setTimeLeft(roundTime);
     setGameState('choosing');
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameStart();
   };
 

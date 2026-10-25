@@ -282,7 +282,7 @@ export const StreamGames: React.FC<StreamGamesProps> = ({
                 {game.icon}
                 <span>{game.name}</span>
                 {isLastPlayed(game.id) && activeGame !== game.id && (
-                  <Clock size={10} className="text-amber-500" title="Último jugado" />
+                  <span title="Último jugado" className="inline-flex"><Clock size={10} className="text-amber-500" aria-hidden="true" /></span>
                 )}
                 <span className="text-[9px] opacity-50 hidden sm:inline">{game.cmd}</span>
               </button>

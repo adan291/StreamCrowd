@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { DEFAULT_SUBS_CONFIG } from '../types';
 import { GiveawayStorage } from '../services/GiveawayStorage';
+import { generateId, toFinishedGiveaway, splitThreadsByState } from './threadHelpers';
 
 // ============================================
 // TYPES
@@ -72,13 +73,6 @@ export interface UseThreadsReturn {
   hasActiveThreads: () => boolean;
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
-const generateId = (): string => {
-  return Math.random().toString(36).substring(2, 9);
-};
 
 // ============================================
 // HOOK IMPLEMENTATION
@@ -408,18 +402,7 @@ export function useThreads(): UseThreadsReturn {
     
     // Only save to history if there's a winner
     if (thread.winner) {
-      const finished: FinishedGiveaway = {
-        id: thread.id,
-        name: thread.name,
-        keyword: thread.keyword,
-        mode: thread.mode as RaffleMode,
-        winner: thread.winner.username,
-        participantCount: new Set(thread.participants.map(p => p.oderId)).size,
-        subscribersOnly: thread.subscribersOnly,
-        createdAt: thread.createdAt,
-        finishedAt: thread.closedAt || Date.now(),
-      };
-      
+      const finished = toFinishedGiveaway(thread);
       GiveawayStorage.addToHistory(finished);
       GiveawayStorage.updateStats(finished);
     }
@@ -452,24 +435,7 @@ export function useThreads(): UseThreadsReturn {
   // DERIVED STATE
   // ============================================
   
-  const now = Date.now();
-  
-  // Active threads: isActive=true, no winner, and (no startsAt OR startsAt has passed)
-  const activeThreads = threads.filter(t => 
-    t.isActive && 
-    !t.winner && 
-    (!t.startsAt || t.startsAt <= now)
-  );
-  
-  // Scheduled threads: have startsAt in the future, no winner
-  const scheduledThreads = threads.filter(t => 
-    !t.winner && 
-    t.startsAt && 
-    t.startsAt > now
-  );
-  
-  // Finished threads: have a winner but not yet closed
-  const finishedThreads = threads.filter(t => t.winner);
+  const { activeThreads, scheduledThreads, finishedThreads } = splitThreadsByState(threads, Date.now());
   
   const activeCount = activeThreads.length;
   const scheduledCount = scheduledThreads.length;

@@ -274,7 +274,9 @@ describe('Favorite Scenes Property Tests', () => {
     it('should handle partial validity correctly', () => {
       fc.assert(
         fc.property(
-          fc.array(sceneNameArb, { minLength: 2, maxLength: MAX_FAVORITE_SCENES }),
+          // Favorites are unique in the app; duplicates (e.g. ["d","#","d"]) made
+          // the expected count wrong and the test fail intermittently.
+          fc.uniqueArray(sceneNameArb, { minLength: 2, maxLength: MAX_FAVORITE_SCENES }),
           fc.integer({ min: 1, max: MAX_FAVORITE_SCENES - 1 }),
           (favorites, validCount) => {
             // Make only first validCount favorites valid

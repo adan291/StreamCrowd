@@ -322,9 +322,9 @@ export const ThreadCard: React.FC<ThreadCardProps> = ({
           {thread.mode === 'subs' && thread.subsConfig && (
             <div className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
               <span className="font-medium">Config:</span>{' '}
-              T1: {thread.subsConfig.tier1Entries}, 
-              T2: {thread.subsConfig.tier2Entries}, 
-              T3: {thread.subsConfig.tier3Entries}
+              T1: {thread.subsConfig.tier1Value}, 
+              T2: {thread.subsConfig.tier2Value}, 
+              T3: {thread.subsConfig.tier3Value}
             </div>
           )}
 

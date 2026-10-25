@@ -273,42 +273,52 @@ const customServerApi = {
 // ============================================
 
 /**
+ * Reads a JSON value from localStorage. A corrupted or unreadable key returns
+ * the fallback instead of aborting the whole backup.
+ */
+function readStoredJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    console.warn(`[Backup] Skipping unreadable key: ${key}`);
+    return fallback;
+  }
+}
+
+/**
  * Collect all data that needs to be backed up
  * @requirements 3.4 - Backup commands, timers, presets, AI config, moderation settings, custom sounds
  */
 async function collectBackupData(): Promise<BackupData['data']> {
   // Collect commands
-  const commandsRaw = localStorage.getItem('twitchvote_commands');
-  const commands = commandsRaw ? JSON.parse(commandsRaw) : [];
+  const commands = readStoredJson<BackupData['data']['commands']>('twitchvote_commands', []);
 
   // Collect timers
-  const timersRaw = localStorage.getItem('twitchvote_timers');
-  const timers = timersRaw ? JSON.parse(timersRaw) : [];
+  const timers = readStoredJson<BackupData['data']['timers']>('twitchvote_timers', []);
 
   // Collect timer groups
-  const timerGroupsRaw = localStorage.getItem('twitchvote_timer_groups');
-  const timerGroups = timerGroupsRaw ? JSON.parse(timerGroupsRaw) : [];
+  const timerGroups = readStoredJson<BackupData['data']['timerGroups']>('twitchvote_timer_groups', []);
 
   // Collect presets
-  const presetsRaw = localStorage.getItem('twitch_vote_mod_presets');
-  const presets = presetsRaw ? JSON.parse(presetsRaw) : [];
+  const presets = readStoredJson<BackupData['data']['presets']>('twitch_vote_mod_presets', []);
 
   // Collect AI config
-  const aiConfigRaw = localStorage.getItem('twitchvote_ai_config');
-  let aiConfig = aiConfigRaw ? JSON.parse(aiConfigRaw) : null;
+  let aiConfig = readStoredJson<BackupData['data']['aiConfig']>('twitchvote_ai_config', null);
   
   // Encrypt sensitive AI config fields
   if (aiConfig && aiConfig.apiKey) {
-    aiConfig = await encryptFields(aiConfig, ['apiKey']);
+    aiConfig = (await encryptFields(
+      aiConfig as unknown as Record<string, unknown>,
+      ['apiKey']
+    )) as unknown as BackupData['data']['aiConfig'];
   }
 
   // Collect moderation settings
-  const moderationRaw = localStorage.getItem('twitchvote_moderation_config');
-  const moderationSettings = moderationRaw ? JSON.parse(moderationRaw) : null;
+  const moderationSettings = readStoredJson<BackupData['data']['moderationSettings']>('twitchvote_moderation_config', null);
 
   // Collect custom sounds
-  const soundsRaw = localStorage.getItem('twitchvote_custom_sounds');
-  const customSounds = soundsRaw ? JSON.parse(soundsRaw) : [];
+  const customSounds = readStoredJson<BackupData['data']['customSounds']>('twitchvote_custom_sounds', []);
 
   return {
     commands,

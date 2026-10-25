@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Trophy, RotateCcw, ExternalLink, Camera, Eye, EyeOff, Plus, Trash2, Check, Sparkles, Loader2 } from 'lucide-react';
 import { loadAIConfig, AIConfig, getProviderForFunction } from '../../src/application/services/AnalyticsService';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
@@ -34,7 +35,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,8 +77,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
   // Procesar respuestas del chat
   useEffect(() => {
     if (!isConnected || gameState !== 'guessing') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -325,7 +325,7 @@ export const MemoriaIRL: React.FC<MemoriaIRLProps> = ({ chatMessages, isConnecte
     setScores(new Map());
     setObjects(prev => prev.map(o => ({ ...o, found: false, foundBy: undefined })));
     setGameState('viewing');
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     triggerGameStart();
   };
 

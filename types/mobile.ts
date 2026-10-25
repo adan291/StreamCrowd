@@ -49,6 +49,9 @@ export type MobileMessage =
   | { type: 'GIVEAWAY_START'; data: { giveawayId: string } }
   | { type: 'GIVEAWAY_DRAW'; data: { giveawayId: string } }
   | { type: 'GIVEAWAY_REROLL'; data: { giveawayId: string } }
+  | { type: 'GIVEAWAY_CREATE'; data: { mode: 'viewers' | 'keyword'; keyword?: string; duration: number; name: string } }
+  | { type: 'GIVEAWAY_DELETE'; data: { giveawayId: string } }
+  | { type: 'GIVEAWAY_REFRESH'; data: {} }
   | { type: 'CHAT_SEND'; data: { message: string; channel?: string } }
   | { type: 'PING'; data: { timestamp: number } }
   | { type: 'REQUEST_STATE'; data: {} };

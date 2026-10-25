@@ -42,6 +42,11 @@ const generateEventId = (): string => {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 };
 
+/** True for localStorage "quota exceeded" errors across browsers */
+const isQuotaError = (error: unknown): boolean =>
+  error instanceof DOMException &&
+  (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED' || error.code === 22);
+
 /**
  * Generate a unique session ID
  */
@@ -391,9 +396,20 @@ export class StreamEventService {
       }
 
       // Trim to max sessions
-      const trimmedSessions = sessions.slice(-MAX_SESSIONS_STORED);
-      
-      localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmedSessions));
+      let trimmedSessions = sessions.slice(-MAX_SESSIONS_STORED);
+
+      // localStorage holds ~5 MB. On quota errors drop the oldest sessions and
+      // retry, so the current session keeps being saved (before, it silently
+      // stopped persisting once the quota was reached).
+      for (;;) {
+        try {
+          localStorage.setItem(SESSIONS_KEY, JSON.stringify(trimmedSessions));
+          return;
+        } catch (error) {
+          if (!isQuotaError(error) || trimmedSessions.length <= 1) throw error;
+          trimmedSessions = trimmedSessions.slice(1);
+        }
+      }
     } catch (error) {
       console.error('Failed to save stream event session:', error);
     }

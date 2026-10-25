@@ -1012,7 +1012,7 @@ export const LivePoll: React.FC<LivePollProps> = ({
         <div className="mt-4 animate-fade-in border-t border-zinc-200 dark:border-zinc-800 pt-4 relative z-20 shrink-0" data-tour="moderation">
           <div className="max-h-[30vh] sm:max-h-[35vh] md:max-h-[40vh] overflow-y-auto custom-scrollbar space-y-3 sm:space-y-4 pr-1">
             <ModerationStatsDisplay stats={moderationStats} />
-            <ModerationLogViewer entries={moderationLog} pollId={poll.id} />
+            <ModerationLogViewer entries={moderationLog} />
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Trophy, RotateCcw, ExternalLink, Flag, Plus, Trash2, Download, Upload, Loader2, Sparkles } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -252,9 +253,9 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
   const [showEmotePicker, setShowEmotePicker] = useState(false);
   const [emoteError, setEmoteError] = useState<string | null>(null);
   
-  const lastProcessedRef = useRef(0);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -289,8 +290,7 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
   // Procesar apuestas del chat
   useEffect(() => {
     if (!isConnected || gameState !== 'betting') return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const msgLower = msg.message.toLowerCase().trim();
@@ -556,7 +556,7 @@ export const CarreraEmotes: React.FC<CarreraEmotesProps> = ({ chatMessages, isCo
     if (racers.length < 2) return;
     setTimeLeft(bettingTime);
     setGameState('betting');
-    lastProcessedRef.current = chatMessages.length;
+    markChatMessagesRead(chatMessages, lastProcessedRef);
     // OBS Trigger: Game start (betting phase)
     triggerGameStart();
   };

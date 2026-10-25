@@ -205,6 +205,10 @@ export class StreamlabsAdapter {
     }
     
     if (this.socket) {
+      // Detach handlers first so a manual disconnect does not trigger auto-reconnect
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.onmessage = null;
       this.socket.close();
       this.socket = null;
     }

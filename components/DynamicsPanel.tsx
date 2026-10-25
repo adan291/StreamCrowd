@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { DynamicsView, TwitchMessage, CollaborationChannel, MediaAsset, ModerationConfig } from '../types';
+import { DynamicsView, TwitchMessage, CollaborationChannel, MediaAsset, ModerationConfig, PollOption } from '../types';
 import { ActivitySelector } from './ActivitySelector';
 import { PollCreator } from './PollCreator';
 import { JudgePanelSkeleton, GiveawayHubSkeleton } from './ui/Skeleton';
@@ -19,6 +19,13 @@ const LazyJudgePanel = React.lazy(() => import('./JudgePanel'));
 const LazyGiveawayHub = React.lazy(() => import('./GiveawayHub'));
 
 import { SpinnerWheel } from './SpinnerWheel';
+
+/** Default wheel options (same as the spinner overlay in App.tsx) */
+const DEFAULT_SPINNER_OPTIONS: PollOption[] = [
+  { id: 1, label: 'Opción 1', votes: 0, color: '#a970ff' },
+  { id: 2, label: 'Opción 2', votes: 0, color: '#00f0f0' },
+  { id: 3, label: 'Opción 3', votes: 0, color: '#ff6b6b' },
+];
 
 export interface DynamicsPanelProps {
   // Navigation state
@@ -52,7 +59,8 @@ export interface DynamicsPanelProps {
   onAddAsset: (asset: MediaAsset) => void;
   moderationConfig: ModerationConfig;
   onModerationConfigChange: (config: ModerationConfig) => void;
-  onShowHistory: () => void;
+  /** Not used by any child yet (PollCreator has no history button) */
+  onShowHistory?: () => void;
   sidebarHidden: boolean;
   onClearChatMessages: () => void;
   onShowCountdown: () => void;
@@ -160,7 +168,6 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
                 moderationConfig={moderationConfig}
                 onModerationConfigChange={onModerationConfigChange}
                 chatMessages={chatMessages}
-                onShowHistory={onShowHistory}
                 sidebarHidden={sidebarHidden}
                 onClearChatMessages={onClearChatMessages}
                 userVoteMap={userVoteMap}
@@ -212,9 +219,6 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
                   chatMessages={chatMessages}
                   isConnected={isConnected}
                   onClearChatMessages={onClearChatMessages}
-                  userVoteMap={userVoteMap}
-                  collaborationChannels={collaborationChannels}
-                  mainChannel={mainChannel}
                   authToken={authToken}
                   userId={userId}
                 />
@@ -230,7 +234,18 @@ export const DynamicsPanel: React.FC<DynamicsPanelProps> = ({
               {renderBackButton()}
             </div>
             <div className="flex-1 min-h-0 p-4">
-              <SpinnerWheel />
+              {/* options/onClose are required: without them SpinnerWheel crashes (options.forEach) */}
+              <SpinnerWheel
+                options={DEFAULT_SPINNER_OPTIONS}
+                onClose={handleBack}
+                chatMessages={chatMessages}
+                userVoteMap={userVoteMap}
+                collaborationChannels={collaborationChannels}
+                mainChannel={mainChannel}
+                onAddCollaborator={onAddCollaborator}
+                onRemoveCollaborator={onRemoveCollaborator}
+                isConnected={isConnected}
+              />
             </div>
           </div>
         );

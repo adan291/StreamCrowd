@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TwitchMessage } from '../../types';
+import { takeNewChatMessages, markChatMessagesRead } from '../../src/application/utils/chatCursor';
 import { Play, Pause, ExternalLink, Trash2, Volume2, VolumeX, Trophy, RotateCcw } from 'lucide-react';
 import { OBSOverlayUrl } from '../OBSOverlayUrl';
 import { gameSync } from '../../src/infrastructure/sync/FirebaseSync';
@@ -52,8 +53,8 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ballsRef = useRef<Ball[]>([]);
   const cueBallRef = useRef<Ball | null>(null);
-  const animationRef = useRef<number>();
-  const lastProcessedRef = useRef(0);
+  const animationRef = useRef<number | undefined>(undefined);
+  const lastProcessedRef = useRef<TwitchMessage | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   
@@ -153,8 +154,7 @@ export const PiumGame: React.FC<PiumGameProps> = ({ chatMessages, isConnected = 
   // Add viewers as balls when they chat
   useEffect(() => {
     if (!isActive || !isConnected) return;
-    const newMessages = chatMessages.slice(lastProcessedRef.current);
-    lastProcessedRef.current = chatMessages.length;
+    const newMessages = takeNewChatMessages(chatMessages, lastProcessedRef);
 
     newMessages.forEach((msg) => {
       const oderId = msg.userId || msg.username;

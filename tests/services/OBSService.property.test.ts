@@ -46,7 +46,9 @@ const automationArb: fc.Arbitrary<Omit<SceneAutomation, 'id'>> = fc.record({
   trigger: automationTriggerArb,
   sceneName: sceneNameArb,
   transition: fc.option(transitionArb, { nil: undefined }),
-  delay: fc.option(fc.integer({ min: 0, max: 100 }), { nil: undefined }),
+  // Small delays: 100 runs x up to 100ms real sleeps exceeded the 5s test
+  // timeout when the full suite ran in parallel (intermittent failure).
+  delay: fc.option(fc.integer({ min: 0, max: 5 }), { nil: undefined }),
   enabled: fc.boolean(),
   sourcesToShow: fc.option(fc.array(fc.constantFrom('Webcam', 'Chat', 'Alerts'), { maxLength: 2 }), { nil: undefined }),
   sourcesToHide: fc.option(fc.array(fc.constantFrom('Webcam', 'Chat', 'Alerts'), { maxLength: 2 }), { nil: undefined }),
