@@ -8,9 +8,11 @@ Esta guía explica cómo desplegar TwitchVote como una aplicación web (PWA) en 
 |----------------|-------------|
 | **Hosting** | Vercel (gratis) |
 | **PWA** | Instalable desde el navegador |
-| **Base de datos** | No necesaria (localStorage) |
-| **Autenticación** | No necesaria (conexión pública a canales) |
-| **Costo** | $0/mes |
+| **Base de datos** | Firebase Realtime Database (sincronización de overlays, sorteos públicos, token de broadcaster para moderadores) |
+| **Autenticación** | Twitch OAuth + función `api/firebase-token.ts` (identidad verificada para Firebase) |
+| **Costo** | $0/mes en los planes gratuitos de Vercel y Firebase |
+
+> **Importante:** antes del primer despliegue sigue los pasos de "Pasos que solo puedes hacer tú" en [docs/REVISION_Y_ROADMAP.md](docs/REVISION_Y_ROADMAP.md): activar el login anónimo, configurar la cuenta de servicio en Vercel y publicar `firebase-rules.json`. Las variables están en `.env.example`. El resto de esta guía es anterior a esos cambios.
 
 ---
 

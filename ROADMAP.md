@@ -1,5 +1,7 @@
 # 🗺️ Roadmap de Mejoras - StreamCrowd
 
+> **Documento histórico (diciembre 2025).** Varias funciones marcadas aquí como completadas no funcionaban (API REST, servidor móvil, colaboración por WebSocket) y se han retirado. El estado real y el roadmap vigente están en [docs/REVISION_Y_ROADMAP.md](docs/REVISION_Y_ROADMAP.md).
+
 ## Estado Actual
 
 ### Fase 1 ✅ COMPLETADA

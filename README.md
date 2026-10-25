@@ -9,7 +9,6 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite)](https://vitejs.dev/)
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss)](https://tailwindcss.com/)
-  [![Electron](https://img.shields.io/badge/Electron-39-47848F?logo=electron)](https://www.electronjs.org/)
   
   [Características](#-características) • [Instalación](#-instalación) • [OBS](#-integración-obs) • [Documentación](#-documentación)
 </div>
@@ -22,7 +21,7 @@ StreamCrowd es una aplicación todo-en-uno diseñada para streamers que quieren 
 
 Combina **encuestas en tiempo real**, **sorteos avanzados**, **panel de jueces**, **+13 minijuegos**, **predicciones**, **recompensas de canal**, **analytics con IA**, y mucho más en una sola herramienta.
 
-Compatible con **Twitch**, **YouTube** y **Kick**. Disponible como **app web** (PWA) y **escritorio** (Electron).
+Compatible con **Twitch**, **YouTube** y **Kick**. Disponible como **app web** instalable (PWA) en escritorio y móvil.
 
 ---
 
@@ -150,7 +149,7 @@ cd streamcrowd
 npm install
 
 # Configurar variables de entorno
-cp .env.local.example .env.local
+cp .env.example .env.local
 
 # Iniciar en modo desarrollo
 npm run dev
@@ -158,15 +157,16 @@ npm run dev
 
 Abre `http://localhost:5173`
 
-### Aplicación de Escritorio
+### Inicio de sesión verificado (Firebase)
 
-```bash
-# Desarrollo con Electron
-npm run electron:dev
+Las funciones que guardan datos del streamer (token de broadcaster para moderadores, perfil y sorteos públicos) necesitan la función serverless `api/firebase-token.ts`. Esta función valida el token de Twitch y emite una identidad de Firebase que las reglas de la base de datos pueden comprobar.
 
-# Compilar ejecutable
-npm run electron:build
-```
+1. En Firebase Console → Authentication → Sign-in method, activa **Anónimo** (lo usan los overlays de OBS).
+2. Configura en Vercel las variables de servidor de `.env.example` (cuenta de servicio de Firebase).
+3. Publica las reglas: `firebase deploy --only database` con `firebase-rules.json`, o pégalas en Firebase Console → Realtime Database → Reglas.
+4. En local, usa `vercel dev` para tener `/api`. Con `npm run dev` la app funciona en modo anónimo: chat, juegos y overlays funcionan; guardar en la nube no.
+
+Las URLs de overlay incluyen `&owner=<id>` para que la fuente de navegador de OBS lea tus datos aunque sea otro navegador. Si cambias de cuenta, vuelve a copiar la URL.
 
 ---
 
@@ -238,7 +238,6 @@ npm run test:all    # Todos
 │   ├── domain/       # Entidades
 │   └── infrastructure/ # Sync, storage
 ├── i18n/             # Traducciones ES/EN
-└── electron/         # App de escritorio
 ```
 
 ---
