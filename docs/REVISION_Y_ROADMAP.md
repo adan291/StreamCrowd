@@ -16,6 +16,13 @@ Fecha: 25 de octubre de 2026. Alcance: todo el repositorio (776 ficheros .ts/.ts
 
 Los documentos existentes (`ROADMAP.md`, `HEXAGONAL_MIGRATION_PLAN.md`) marcan todo como completado. Varias funciones listadas como terminadas son stubs o no pueden funcionar sin servidor (sección 4).
 
+## Avance (quinta tanda)
+
+- El procesador de chat (lista de mensajes, macros, analítica, comandos `!poll`/`!endpoll`/`!resetpoll`/`!pollsync`/`!pollend` y votos) sale de `App.tsx` a `hooks/useChatMessageProcessor.ts`. El análisis de comandos y la detección de votos son funciones puras en `src/application/utils/chatPollCommands.ts`, con tests (antes no tenían ninguno). `App.tsx` pasa de 1916 a 1689 líneas.
+- `TwitchPredictionService` ya no escribe en la consola los 10 primeros caracteres del token.
+- `CODE_AUDIT_REPORT.md`: credenciales redactadas. Siguen en el historial de git, así que la API key de Firebase hay que rotarla igualmente.
+- Vitest 1875/1875, E2E 165/165, `tsc` 0 errores, build correcto.
+
 ## Avance (cuarta tanda): reglas en CI y robustez en directo
 
 Estado: `tsc` 0 errores; Vitest 1868/1868; E2E Chromium 165/165; reglas 43/43 (`npm run test:rules`); build correcto.

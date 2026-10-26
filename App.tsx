@@ -20,20 +20,14 @@ import { getIndexedDBService } from './src/application/services/IndexedDBService
 import { getMigrationService } from './src/application/services/MigrationService';
 import { getMacroService } from './src/application/services/MacroService';
 import { createTwitchPredictionService } from './src/application/services/TwitchPredictionService';
-import { StoredMessage } from './src/application/services/AnalyticsService';
 import { useOBSTriggers } from './src/application/hooks/useOBSTriggers';
 import { 
   ConnectionStatus, 
-  Poll, 
-  VoteRecord, 
+
+
   TwitchMessage, 
   MediaAsset,
   ModerationConfig,
-  DEFAULT_MODERATION_CONFIG,
-  DEFAULT_MODERATION_STATS,
-  UserVoteState,
-  createLogEntry,
-  updateStats,
   LeftTab,
   DynamicsView,
   PlatformsView,
@@ -55,7 +49,7 @@ import {
   TourStep,
 } from './hooks';
 import { useStreamNotifications } from './hooks/useStreamNotifications';
-import { useMacroTriggers, type TwitchMessageWithRoles } from './hooks/useMacroTriggers';
+import { useMacroTriggers } from './hooks/useMacroTriggers';
 import { 
   useTwitchService as useTwitchConnection,
   useStreamEventService as useStreamEvents,
@@ -78,6 +72,7 @@ import { ChannelOrbit } from './components/ChannelOrbit';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { onTwitchAuthExpired } from './src/infrastructure/http/helixFetch';
 import { useChatControlIntegration } from './hooks/useChatControlIntegration';
+import { useChatMessageProcessor } from './hooks/useChatMessageProcessor';
 
 // Lazy load heavy components for better initial bundle size
 const OBSControlPanel = lazy(() => import('./components/OBSControlPanel'));
@@ -608,31 +603,13 @@ const App: React.FC = () => {
   // Popup window ref (at App level so it persists across tab changes)
   const overlayWindowRef = useRef<Window | null>(null);
   
-  // Refs for callbacks
-  const pollRef = useRef<Poll | null>(null);
-  const moderationConfigRef = useRef<ModerationConfig>(DEFAULT_MODERATION_CONFIG);
-  const addMessageToSessionRef = useRef(aiAnalytics.addMessageToSession);
-
-  // Sync refs with hook state
-  useEffect(() => {
-    pollRef.current = poll.currentPoll;
-  }, [poll.currentPoll]);
-
-  useEffect(() => {
-    moderationConfigRef.current = moderation.config;
-  }, [moderation.config]);
-
-  useEffect(() => {
-    addMessageToSessionRef.current = aiAnalytics.addMessageToSession;
-  }, [aiAnalytics.addMessageToSession]);
-
-  // Latest hook APIs for the chat message subscription below. That effect
-  // subscribes once ([] deps), so it must read these through a ref; otherwise
-  // it keeps the first-render callbacks (e.g. macro triggers created while
-  // `enabled` was false never fire, and createPoll uses a stale config).
-  const chatHandlersRef = useRef({ poll, moderation, macroTriggers });
-  useEffect(() => {
-    chatHandlersRef.current = { poll, moderation, macroTriggers };
+  // Chat subscription: chat list, macro triggers, analytics, poll commands and votes
+  useChatMessageProcessor({
+    poll,
+    moderation,
+    macroTriggers,
+    addMessageToSession: aiAnalytics.addMessageToSession,
+    setChatMessages,
   });
 
   // Check for Overlay Mode on Mount - handle channel and poll from URL
@@ -873,210 +850,6 @@ const App: React.FC = () => {
     moderation.reset();
   };
 
-  // Process Messages
-  useEffect(() => {
-    const unsubscribe = getTwitchService().onMessage((chatMessage) => {
-      // Always use the latest hook APIs (see chatHandlersRef)
-      const { poll, moderation, macroTriggers } = chatHandlersRef.current;
-      const message = chatMessage.message;
-      const sourceChannel = chatMessage.sourceChannel;
-      const isSubscriber = chatMessage.isSubscriber || 
-        (chatMessage.badges && ('subscriber' in chatMessage.badges || 'founder' in chatMessage.badges));
-      const msg: TwitchMessage = {
-        username: chatMessage.displayName || chatMessage.username || 'Anon',
-        message,
-        color: chatMessage.color || '#a970ff',
-        id: chatMessage.id,
-        userId: chatMessage.userId,
-        isSubscriber: !!isSubscriber,
-        timestamp: Date.now(),
-        sourceChannel: sourceChannel, // Track which channel the message came from
-      };
-      
-      setChatMessages(prev => [...prev.slice(-199), msg]);
-      
-      // Process chat message for macro triggers
-      // @requirements 2.1, 2.2 - Chat command and keyword triggers
-      const macroMsg: TwitchMessageWithRoles = {
-        ...msg,
-        isBroadcaster: chatMessage.isBroadcaster,
-        isModerator: chatMessage.isModerator,
-      };
-      macroTriggers.processChatMessage(macroMsg);
-      
-      // Store message in current session for analytics
-      // Always try to add - the function handles null session internally
-      const storedMsg: StoredMessage = {
-        username: msg.username,
-        message: msg.message,
-        timestamp: Date.now(),
-        userId: msg.userId,
-      };
-      addMessageToSessionRef.current(storedMsg);
-
-      // Process chat commands for overlay mode (broadcaster/mod only)
-      const isBroadcaster = chatMessage.isBroadcaster;
-      const isMod = chatMessage.isModerator;
-      const canControl = isBroadcaster || isMod;
-      
-      if (canControl) {
-        const trimmedMsg = message.trim();
-        
-        // !poll Pregunta | Opción1 | Opción2 | Opción3
-        if (trimmedMsg.startsWith('!poll ')) {
-          const parts = trimmedMsg.substring(6).split('|').map(p => p.trim()).filter(p => p);
-          if (parts.length >= 3) {
-            const question = parts[0];
-            const optionLabels = parts.slice(1);
-            const colors = ['#a970ff', '#00f0f0', '#ff6b6b', '#4ade80', '#fbbf24', '#f472b6', '#8b5cf6', '#06b6d4'];
-            poll.createPoll({
-              title: 'Encuesta',
-              question,
-              options: optionLabels.map((label, i) => ({
-                label,
-                color: colors[i % colors.length],
-              })),
-            });
-            moderation.reset();
-          }
-        }
-        
-        // !endpoll - End current poll
-        if (trimmedMsg === '!endpoll' && pollRef.current && pollRef.current.isActive) {
-          poll.setCurrentPoll(prev => prev ? { ...prev, isActive: false } : null);
-        }
-        
-        // !resetpoll - Reset/clear poll
-        if (trimmedMsg === '!resetpoll') {
-          poll.resetPoll();
-        }
-      }
-      
-      // !pollend - Sync end poll from main panel
-      if (message.trim() === '!pollend' && pollRef.current) {
-        poll.setCurrentPoll(prev => prev ? { ...prev, isActive: false } : null);
-      }
-      
-      // !pollsync - Sync command from main panel
-      if (message.trim().startsWith('!pollsync ')) {
-        const syncData = message.trim().substring(10);
-        const parts = syncData.split('|').map(p => p.trim()).filter(p => p);
-        if (parts.length >= 3) {
-          const question = parts[0];
-          const optionLabels = parts.slice(1);
-          const colors = ['#a970ff', '#00f0f0', '#ff6b6b', '#4ade80', '#fbbf24', '#f472b6', '#8b5cf6', '#06b6d4'];
-          poll.createPoll({
-            title: 'Encuesta',
-            question,
-            options: optionLabels.map((label, i) => ({
-              label,
-              color: colors[i % colors.length],
-            })),
-          });
-          moderation.reset();
-        }
-      }
-
-      // Process Vote with Moderation
-      if (pollRef.current && pollRef.current.isActive) {
-        const prefix = pollRef.current.votePrefix || '+';
-        // Escape special regex characters in prefix
-        const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const trimmedMsg = message.trim().toLowerCase();
-        
-        // Try to match vote by number (e.g., +1, +2)
-        const voteRegex = new RegExp(`^${escapedPrefix}(\\d+)$`, 'i');
-        const voteMatch = trimmedMsg.match(voteRegex);
-        
-        let optionId: number | null = null;
-        
-        if (voteMatch) {
-          // Matched by number
-          optionId = parseInt(voteMatch[1]);
-        } else {
-          // Try to match by voteKey (e.g., #chula, #rojo)
-          const voteKeyRegex = new RegExp(`^${escapedPrefix}([a-z0-9]+)$`, 'i');
-          const keyMatch = trimmedMsg.match(voteKeyRegex);
-          if (keyMatch) {
-            const key = keyMatch[1].toLowerCase();
-            const matchMode = pollRef.current.voteMatchMode || 'exact';
-            const matchedOption = pollRef.current.options.find(o => {
-              if (!o.voteKey) return false;
-              const optKey = o.voteKey.toLowerCase();
-              if (matchMode === 'partial') {
-                return key.includes(optKey) || optKey.includes(key);
-              }
-              return optKey === key;
-            });
-            if (matchedOption) {
-              optionId = matchedOption.id;
-            }
-          }
-        }
-        
-        // Partial match mode: also check if message contains any voteKey
-        if (optionId === null && pollRef.current.voteMatchMode === 'partial') {
-          const msgLower = message.toLowerCase();
-          for (const opt of pollRef.current.options) {
-            if (opt.voteKey && msgLower.includes(`${prefix}${opt.voteKey.toLowerCase()}`)) {
-              optionId = opt.id;
-              break;
-            }
-          }
-        }
-        
-        if (optionId !== null) {
-          const userId = chatMessage.userId || chatMessage.username || 'unknown';
-          
-          // Extract user attributes from ChatMessage
-          const isSubForVote = chatMessage.isSubscriber;
-          const isFollower = chatMessage.badges ? 'follower' in chatMessage.badges : false;
-          
-          // Get valid option IDs
-          const validOptionIds = pollRef.current.options.map(o => o.id);
-          
-          // Process vote through moderation hook
-          const result = moderation.processVote(
-            {
-              userId,
-              username: msg.username,
-              optionId,
-              isSubscriber: isSubForVote,
-              isFollower,
-              accountAgeDays: 365, // Default to 1 year
-            },
-            validOptionIds
-          );
-          
-          if (result.isValid) {
-            if (result.isVoteChange && result.previousOptionId !== undefined && result.previousWeight !== undefined) {
-              // Update vote in poll hook
-              poll.updateVote(userId, result.previousOptionId, optionId, result.previousWeight, result.weight);
-            } else {
-              // Add new vote
-              const newVote = {
-                oderId: userId,
-                userId,
-                username: msg.username,
-                optionId,
-                timestamp: Date.now(),
-                weight: result.weight,
-              };
-              poll.addVote(newVote, result.weight);
-            }
-          }
-        }
-      }
-    });
-
-    // Note: Status changes are handled by useTwitchConnection hook
-    // Do NOT call twitchService.onStatusChange here as it overwrites the hook's callback
-    
-    // Cleanup: unsubscribe from message callback to prevent duplicates
-    return () => {
-      unsubscribe();
-    };
-  }, []);
 
   // Disconnected State Render
   if (status !== ConnectionStatus.CONNECTED) {
