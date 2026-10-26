@@ -59,9 +59,9 @@ case 'supabase':    // TODO: línea 130
 ### 2.1 Credenciales en .env.local (CRÍTICO)
 ```env
 # .env.local - EXPUESTAS EN REPOSITORIO
-VITE_TWITCH_CLIENT_ID=3tz1yl90wzjq2syvrsf6zrefvzb3y4
-VITE_GOOGLE_CLIENT_ID=979549084688-0v6bdb346uj19mrl99r68hmh6cklpsi6.apps.googleusercontent.com
-VITE_FIREBASE_API_KEY=REDACTED_FIREBASE_API_KEY
+VITE_TWITCH_CLIENT_ID=<redactado>
+VITE_GOOGLE_CLIENT_ID=<redactado>
+VITE_FIREBASE_API_KEY=<redactado>  # sigue en el historial de git: rotarla y restringirla por dominio
 # ... más credenciales Firebase
 ```
 

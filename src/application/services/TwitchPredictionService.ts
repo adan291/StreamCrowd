@@ -173,13 +173,7 @@ export class TwitchPredictionService {
    * Get authorization headers for API requests
    */
   private getHeaders(): HeadersInit {
-    console.log('[TwitchPredictionService] getHeaders called', {
-      hasToken: !!this.token,
-      tokenLength: this.token?.length,
-      tokenPreview: this.token ? `${this.token.substring(0, 10)}...` : 'none',
-      clientId: this.clientId,
-    });
-    
+    // Never log the token (not even a prefix): logs end up in bug reports.
     return {
       'Authorization': `Bearer ${this.token}`,
       'Client-Id': this.clientId,
